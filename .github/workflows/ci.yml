@@ -42,6 +42,40 @@ jobs:
       - name: Unit tests
         run: uv run pytest -q -m "not integration"
 
+  backend-integration:
+    name: Backend integration (PostgreSQL 17)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: qd_owner
+          POSTGRES_PASSWORD: qd_ci_only
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U qd_owner"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    env:
+      QD_TEST_ADMIN_URL: postgresql://qd_owner:qd_ci_only@127.0.0.1:5432/postgres
+      QD_REQUIRE_DB: "1"
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.3.0  # exact pin: no floating major tag is published
+        with:
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+      - name: Install
+        run: uv sync --locked
+      - name: Integration tests
+        run: uv run pytest -q -m integration
+
   frontend:
     name: Frontend
     runs-on: ubuntu-latest

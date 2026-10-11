@@ -216,8 +216,7 @@ Indexes on `run_id`; `agent_execution_id`.
 | sha256 | TEXT | profile-tagged digest `SHA-256(profile ‖ LF ‖ canonical bytes)`, lowercase hex ([REPLAY_ENGINE §2.3](REPLAY_ENGINE.md#23-digest-definition)); UNIQUE |
 | kind | TEXT | `query`, `param_sets`, `schema_snapshot`, `plan`, `plan_analyze`, `stats_snapshot`, `workload_snapshot`, `experiment_config`, `agent_output`, `report_json`, `report_md`, `environment`, `replay_manifest` |
 | media_type | TEXT | `application/json`, `text/sql`, `text/markdown` |
-| content_json / content_text | JSONB / TEXT | exactly one set (CHECK) |
-| size_bytes | INT | CHECK ≤ 5 MB |
+| content | BYTEA | exact canonical bytes; CHECK `octet_length ≤ 5 MB`. **Not JSONB/TEXT:** JSONB reorders keys, normalizes numbers and rejects `\u0000`, and TEXT rejects NUL, so either could make a stored artifact fail digest verification. Query JSON content ad hoc with `convert_from(content, 'UTF8')::jsonb`. |
 | canonicalization | TEXT | profile ID: `qd-json-v1`, `qd-text-v1`, `qd-raw-v1` (frozen; see REPLAY_ENGINE §2) |
 
 Artifacts are shared across runs by hash; ownership comes from `run_artifacts`. Because they are immutable and purged only by retention, `updated_at`/`deleted_at` stay NULL (no trigger fires: the app role cannot `UPDATE`).

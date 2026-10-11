@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | Phase | **1 — Foundation** (Phase 0 documentation complete) |
-| Status | In progress: all Docker-free Phase 1 work done (T1.1–T1.3, T1.6, T1.7 logic, T1.8 canonicalization, T1.9, T1.15); the remainder needs Docker |
+| Status | In progress: T1.1–T1.4, T1.6, T1.7 (logic), T1.8 (canonicalization), T1.9, T1.15 done; Docker running |
 | Last updated | 2026-10-11 |
 | Application code | Scaffolding only: FastAPI app factory with `/api/v1/healthz`; Next.js shell page; local Compose file. |
 
@@ -77,11 +77,18 @@
   - 12 new Vitest tests.
   - Verified in the browser: dark mode switches tokens (`#0E1013` background), the font resolves to IBM Plex Sans, the preference persists, and there are no console errors.
   - Not yet: the mobile single-column layout (UI_UX §3.4) arrives with the workspace (T1.17).
-- [ ] **Blocked on Docker:** T1.4–T1.5, the T1.8 store, T1.10–T1.14, T1.16–T1.19, and the real PG plan fixtures for T1.7. Doing Docker-free tasks first (T1.7, T1.9, the canonicalization part of T1.8, T1.15, T1.17–T1.18) while Docker is down.
+- [x] **T1.4 Alembic baseline** (migration `0001`).
+  - Contents: `uuid-ossp`, `qd_app`/`qd_retention` roles (created NOLOGIN if missing; no passwords in migrations), the shared `set_updated_at()` trigger, and tables `users`, `sessions`, `database_connections`, `artifacts`, `run_artifacts`. All follow ADR-0006: UUID, TEXT, TIMESTAMPTZ, soft delete, CHECK-based enums, no FKs.
+  - Per-table grants: the app gets SELECT/INSERT/UPDATE on mutable tables but no DELETE, and only SELECT/INSERT on append-only tables. Retention gets SELECT/DELETE.
+  - **Deviation (documented in DATABASE_DESIGN):** `artifacts.content` is `BYTEA` holding exact canonical bytes. JSONB would reorder keys, normalize numbers and reject `\u0000`, and TEXT rejects NUL; either could break digest verification.
+  - Local login roles come from `infra/docker/metadata-init/01-roles.sh` (idempotent; env passwords with dev-only defaults).
+  - 18 integration tests run with `SET ROLE` as the restricted roles: conventions, trigger, CHECKs, a second upgrade as a no-op, a single head, and grants (app cannot UPDATE/DELETE/TRUNCATE/lock artifacts or create tables; retention can delete but not insert).
+  - CI gained a `postgres:17` integration job with `QD_REQUIRE_DB=1`, so a missing DB fails instead of skipping.
+- [ ] **Next (Docker now running):** T1.5, the T1.8 store, T1.10–T1.14, T1.16–T1.19, and the real PG plan fixtures for T1.7. Doing Docker-free tasks first (T1.7, T1.9, the canonicalization part of T1.8, T1.15, T1.17–T1.18) while Docker is down.
 
 ## Blockers
 
-- The Docker daemon is not running. `docker compose up` has not been executed; only `docker compose config` was checked. This is needed from T1.4 onward.
+- None. Docker Desktop is running. Compose `metadata-db` and `sandbox-db` are healthy on PostgreSQL 17.11; sandbox egress was verified blocked (TCP and DNS), with metadata-db as the positive control.
 
 ## Deviations / deferred
 
@@ -101,9 +108,9 @@
 | Required files exist | See Phase 0 validation in the final summary |
 | Internal links | Checked by script during Phase 0 |
 | Mermaid syntax | Reviewed manually (no renderer installed; not executed) |
-| Backend (through T1.3) | `uv run pytest -q` → 306 passed (3.13 also checked locally) (3.12; CI also 3.13); `ruff check` and `ruff format --check` clean; `mypy` strict → no issues in 29 files; uvicorn smoke test: `/api/v1/healthz` 200, `/api/v1/openapi.json` 200 |
+| Backend (through T1.3) | `uv run pytest -q` → 324 passed (306 unit + 18 integration on PG 17.11) (3.12; CI also 3.13); `ruff check` and `ruff format --check` clean; `mypy` strict → no issues in 29 files; uvicorn smoke test: `/api/v1/healthz` 200, `/api/v1/openapi.json` 200 |
 | Frontend (through T1.15) | `pnpm lint` clean; `pnpm typecheck` clean; `pnpm test` → 13 passed; `pnpm build` → compiled, `/` and `/app` prerendered static |
-| Compose | `docker compose config` valid; **not started** (daemon down) |
+| Compose | Running: `metadata-db` and `sandbox-db` healthy; `alembic current` → `0001 (head)`; `qd_app` login verified (INSERT yes, UPDATE no on `artifacts`) |
 
 ## Open decisions
 

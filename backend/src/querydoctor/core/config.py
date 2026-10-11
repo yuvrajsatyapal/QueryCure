@@ -31,6 +31,10 @@ class Settings(BaseSettings):
     database_url_direct: SecretStr | None = Field(
         default=None, validation_alias=_env("DATABASE_URL_DIRECT")
     )
+    # Owner role, used only by Alembic. The app itself connects as the restricted qd_app role.
+    database_migration_url: SecretStr | None = Field(
+        default=None, validation_alias=_env("DATABASE_MIGRATION_URL")
+    )
     sandbox_admin_url: SecretStr | None = Field(
         default=None, validation_alias=_env("SANDBOX_ADMIN_URL")
     )

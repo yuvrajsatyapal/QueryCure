@@ -110,7 +110,8 @@ Migrations run as a separate release step before new API instances start; migrat
 | Variable | Purpose |
 |---|---|
 | `QD_PROFILE` | `local` or `demo` |
-| `DATABASE_URL` / `DATABASE_URL_DIRECT` | metadata DB pooled / direct (LISTEN) |
+| `DATABASE_URL` / `DATABASE_URL_DIRECT` | metadata DB pooled / direct (LISTEN), as the restricted `qd_app` role |
+| `DATABASE_MIGRATION_URL` | owner role, used only by Alembic |
 | `SANDBOX_ADMIN_URL` | sandbox server admin DSN (local only) |
 | `QD_MASTER_KEY` | AES-256-GCM key (base64, 32 bytes) |
 | `ALLOW_PRIVATE_TARGETS` | SSRF guard bypass for local profile |

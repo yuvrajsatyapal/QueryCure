@@ -7,7 +7,7 @@ Status: Planned. Testing is designed before implementation; each phase's exit cr
 | Layer | Tool | Scope | Runs in CI |
 |---|---|---|---|
 | Unit | pytest | Pure logic: SQL validation, plan parsing/metrics/diff, stats, correctness hashing, verdict rules, state transitions, routing functions, canonicalization | every PR |
-| Integration | pytest + real Postgres (compose or `testcontainers`) | Repositories, job queue, SSE replay, inspection gateway against a seeded "target", sandbox clone lifecycle, LangGraph with fake LLM, checkpoint resume | PRs touching backend |
+| Integration | pytest + real Postgres (compose locally; a `postgres:17` service in CI). Each session creates and drops its own database. Tests skip without a DB locally but **fail** when `QD_REQUIRE_DB=1` (CI) | Repositories, job queue, SSE replay, inspection gateway against a seeded "target", sandbox clone lifecycle, LangGraph with fake LLM, checkpoint resume | PRs touching backend |
 | Security | pytest | Negative tests per control (§4) | every PR |
 | Agent evals | custom runner (`querydoctor.evals`) | Decision quality on ground-truth fixtures (§5) | smoke (recorded) on PRs touching `agents/`; live nightly/manual |
 | Benchmark evals | integration + workloads | Engine verdicts on fixtures with known answers (§6) | nightly + before Phase 3/4 exit |
