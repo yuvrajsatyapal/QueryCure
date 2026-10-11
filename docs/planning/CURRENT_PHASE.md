@@ -37,7 +37,7 @@
   - `errors.py`: stable codes and statuses matching the API error envelope.
   - `crypto.py`: AES-256-GCM `SecretBox` with table/row/user associated data and key versions for rotation.
   - 43 new unit tests.
-  - CI actions bumped to their Node 24 majors (checkout v7, setup-uv v10, pnpm/action-setup v6, setup-node v7).
+  - CI actions bumped to their Node 24 majors (checkout v7, setup-uv v10.3.0 (exact pin; no floating tag), pnpm/action-setup v6, setup-node v7).
 - [ ] T1.4–T1.19 per [TASKS.md](TASKS.md).
 
 ## Blockers

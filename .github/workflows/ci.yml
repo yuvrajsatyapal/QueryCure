@@ -27,7 +27,7 @@ jobs:
       UV_PYTHON: ${{ matrix.python }}
     steps:
       - uses: actions/checkout@v7
-      - uses: astral-sh/setup-uv@v10
+      - uses: astral-sh/setup-uv@v10.3.0  # exact pin: no floating major tag is published
         with:
           enable-cache: true
           cache-dependency-glob: backend/uv.lock
