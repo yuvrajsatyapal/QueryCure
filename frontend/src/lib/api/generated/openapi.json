@@ -509,6 +509,32 @@
         "title": "DeclaredTable",
         "type": "object"
       },
+      "ExampleQuery": {
+        "properties": {
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "param_sets": {
+            "items": {
+              "$ref": "#/components/schemas/ParamSet"
+            },
+            "title": "Param Sets",
+            "type": "array"
+          },
+          "sql": {
+            "title": "Sql",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "sql",
+          "param_sets"
+        ],
+        "title": "ExampleQuery",
+        "type": "object"
+      },
       "ExplainRequest": {
         "additionalProperties": false,
         "properties": {
@@ -874,6 +900,25 @@
           "self_temp_written_blocks"
         ],
         "title": "NodeMetrics",
+        "type": "object"
+      },
+      "ParamSet": {
+        "properties": {
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "values": {
+            "items": {},
+            "title": "Values",
+            "type": "array"
+          }
+        },
+        "required": [
+          "name",
+          "values"
+        ],
+        "title": "ParamSet",
         "type": "object"
       },
       "PlanInspection": {
@@ -1883,6 +1928,93 @@
         ],
         "title": "ValidationError",
         "type": "object"
+      },
+      "WorkloadCatalog": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/WorkloadInfo"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "WorkloadCatalog",
+        "type": "object"
+      },
+      "WorkloadInfo": {
+        "properties": {
+          "availability": {
+            "enum": [
+              "live",
+              "prerecorded"
+            ],
+            "title": "Availability",
+            "type": "string"
+          },
+          "default_seed": {
+            "title": "Default Seed",
+            "type": "integer"
+          },
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "example_queries": {
+            "items": {
+              "$ref": "#/components/schemas/ExampleQuery"
+            },
+            "title": "Example Queries",
+            "type": "array"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "injected_problem": {
+            "title": "Injected Problem",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "scale_factors": {
+            "items": {
+              "type": "number"
+            },
+            "title": "Scale Factors",
+            "type": "array"
+          },
+          "tables": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Tables",
+            "type": "array"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "version",
+          "description",
+          "injected_problem",
+          "tables",
+          "scale_factors",
+          "default_seed",
+          "example_queries",
+          "availability"
+        ],
+        "title": "WorkloadInfo",
+        "type": "object"
       }
     }
   },
@@ -2333,6 +2465,27 @@
         "summary": "Create Session",
         "tags": [
           "session"
+        ]
+      }
+    },
+    "/api/v1/workloads": {
+      "get": {
+        "operationId": "list_workloads_api_v1_workloads_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkloadCatalog"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Workloads",
+        "tags": [
+          "workloads"
         ]
       }
     }

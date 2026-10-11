@@ -187,7 +187,12 @@ Until F-47 ships, the Index Strategist provides a qualitative write-overhead cla
 
 ## 11. Demo workloads (ground-truth fixtures)
 
-Deterministic generators (`workloads/<name>/generator.py`, seeded, versioned). Scale factor `sf` scales row counts.
+Deterministic generators (`workloads/registry.py`, seeded, versioned; workload ID `name@vN:sf=X:seed=N`). Scale factor `sf` (0.01–10) scales row counts.
+
+- **Generation:** data is generated server-side from `generate_series` and an `md5`-based per-column hash of (row, seed, salt). It never uses `random()`, `now()` or `hashtext()`: they change between runs or PostgreSQL versions. Timestamps count back from a fixed epoch (2026-01-01 UTC).
+- **SQL safety:** statements are composed with `psycopg.sql`, using literals and identifiers only.
+- **Verified reproducible:** an identical ref gives identical per-table md5 checksums. The sf=1 `orders_ecommerce` checksums matched across two independent loads and a rewrite of the generator code.
+- **Implemented so far:** `orders_ecommerce`, `rewrite_trap` and `no_benefit` (Phase 1). The others arrive in Phase 3 (T3.3).
 
 | Workload | Injected problem | Expected result |
 |---|---|---|

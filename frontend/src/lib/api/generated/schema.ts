@@ -215,6 +215,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/workloads": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Workloads */
+        get: operations["list_workloads_api_v1_workloads_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -391,6 +408,15 @@ export interface components {
             /** Schema Name */
             schema_name: string | null;
         };
+        /** ExampleQuery */
+        ExampleQuery: {
+            /** Name */
+            name: string;
+            /** Param Sets */
+            param_sets: components["schemas"]["ParamSet"][];
+            /** Sql */
+            sql: string;
+        };
         /** ExplainRequest */
         ExplainRequest: {
             /**
@@ -500,6 +526,13 @@ export interface components {
             sort_spilled: boolean;
             /** Total Actual Rows */
             total_actual_rows: number | null;
+        };
+        /** ParamSet */
+        ParamSet: {
+            /** Name */
+            name: string;
+            /** Values */
+            values: unknown[];
         };
         /** PlanInspection */
         PlanInspection: {
@@ -774,6 +807,37 @@ export interface components {
             msg: string;
             /** Error Type */
             type: string;
+        };
+        /** WorkloadCatalog */
+        WorkloadCatalog: {
+            /** Items */
+            items: components["schemas"]["WorkloadInfo"][];
+        };
+        /** WorkloadInfo */
+        WorkloadInfo: {
+            /**
+             * Availability
+             * @enum {string}
+             */
+            availability: "live" | "prerecorded";
+            /** Default Seed */
+            default_seed: number;
+            /** Description */
+            description: string;
+            /** Example Queries */
+            example_queries: components["schemas"]["ExampleQuery"][];
+            /** Id */
+            id: string;
+            /** Injected Problem */
+            injected_problem: string;
+            /** Name */
+            name: string;
+            /** Scale Factors */
+            scale_factors: number[];
+            /** Tables */
+            tables: string[];
+            /** Version */
+            version: number;
         };
     };
     responses: never;
@@ -1131,6 +1195,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SessionResponse"];
+                };
+            };
+        };
+    };
+    list_workloads_api_v1_workloads_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkloadCatalog"];
                 };
             };
         };

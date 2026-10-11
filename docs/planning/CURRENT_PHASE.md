@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | Phase | **1 — Foundation** (Phase 0 documentation complete) |
-| Status | In progress: T1.1–T1.13 and T1.15 done (T1.7 still needs real plan captures) |
+| Status | In progress: backend Phase 1 complete (T1.1–T1.14); frontend T1.15 done, T1.16–T1.19 remaining |
 | Last updated | 2026-10-11 |
 | Application code | Scaffolding only: FastAPI app factory with `/api/v1/healthz`; Next.js shell page; local Compose file. |
 
@@ -45,13 +45,14 @@
   - The literal-normalized fingerprint is metadata, not artifact identity.
   - 97 new tests: 82 unit plus 15 security evasion tests in `tests/security/`.
   - Unqualified user functions can't be detected by parsing; the `pg_proc` check is now an explicit T1.10 requirement (SECURITY §4.3 updated).
-- [x] **T1.7 `plans/`** (logic done; real-capture fixtures pending Docker).
+- [x] **T1.7 `plans/`** (complete).
   - The parser takes PG JSON (list or object) into a typed preorder `PlanTree`.
   - Every node carries a JSON-pointer `locator` for evidence citations. Unknown keys are kept in `extra`.
   - Strict type checks; 5 MB / depth-256 limits; detection of ANALYZE, TIMING OFF, and BUFFERS.
   - Metrics: loops-aware inclusive and self time, dividing by process count below `Gather`; per-loop estimate error with direction; total rows removed by filter; sort spill; self buffers.
   - Unknown values stay `None`, never 0.
-  - 29 tests against hand-computed **synthetic** fixtures (labeled as such in `tests/fixtures/plans/README.md`). Real PG 17 captures will be added when Docker is available, to close ROADMAP Phase 1 acceptance #2.
+  - 29 tests against hand-computed **synthetic** fixtures, plus 7 invariant tests on **real PG 17.11 captures** (`pg17_*.json`, provenance in the fixtures README).
+  - The real canonical plan is parallel (`Limit → Gather Merge(2) → Sort → Seq Scan`). The invariants confirm self times are ≥ 0 and add up to the root, and that the parallel correction keeps scan time ≤ execution time.
 - [x] **T1.9 SSRF guard** (`connectors/ssrf_guard.py`).
   - Host syntax validation runs before any DNS lookup. inet_aton-style numeric hosts (`2130706433`, `0x7f000001`, `0177.0.0.1`, `127.1`) are refused, as are ports outside the allowlist (5432, 6543, plus configured).
   - DNS is resolved **once**; the target is refused if **any** answer is non-public. IPv4 addresses embedded in IPv4-mapped, 6to4, NAT64 and Teredo IPv6 forms are checked too.
@@ -117,7 +118,14 @@
   - New `MaxBodySizeMiddleware` (6 MB): declared sizes are refused up front, and streamed bodies are counted.
   - **Bug fixed while testing:** Starlette's `BaseHTTPMiddleware` wrapped errors in `ExceptionGroup`s, which turned an over-limit stream into a 500. The request-ID and CSRF middlewares were rewritten as plain ASGI, and all earlier envelope, CSRF and session tests still pass.
   - 7 DDL unit tests, 1 duplicate-key test, 3 body-limit tests, 9 integration tests.
-- [ ] **Remaining:** T1.14, T1.16–T1.19, and real PG 17 plan captures for T1.7.
+- [x] **T1.14 demo workloads.**
+  - `orders_ecommerce` has no `(customer_id, created_at)` index, and ten hot customers own 10% of orders. `rewrite_trap` puts a NULL in the `NOT IN` subquery. `no_benefit` is a primary-key lookup.
+  - Generation is deterministic SQL (md5 mixing, fixed epoch) composed with `psycopg.sql`. A `WorkloadRef` parser validates IDs.
+  - CLI: `python -m querydoctor.workloads URL WORKLOAD_ID` prints table checksums. `GET /workloads` reports `live` locally and `prerecorded` on the demo.
+  - **Bug fixed while testing:** salted multiplicative hashes were correlated, leaving hot customer 1024 with 5 orders instead of about 100. Switched to md5 per salt.
+  - Verified at sf=1: 1M orders in 8.8 s, customer 1024 has 10,013 orders and customer 7 has 9. Identical checksums across two independent loads and across the f-string → `psycopg.sql` rewrite.
+  - 9 unit tests, 7 integration tests (incl. the rewrite trap really differing), and 2 API tests.
+- [ ] **Remaining:** T1.16–T1.19 (frontend connections page, workspace, plan graph, README run-locally).
 
 ## Blockers
 
@@ -141,7 +149,7 @@
 | Required files exist | See Phase 0 validation in the final summary |
 | Internal links | Checked by script during Phase 0 |
 | Mermaid syntax | Reviewed manually (no renderer installed; not executed) |
-| Backend (through T1.13) | `uv run pytest -q` → 412 passed: 332 unit/security + 80 integration on PG 17.11, Python 3.12; CI also runs 3.13 and a `postgres:17` integration job. `ruff check`/`format --check` clean; `mypy --strict` clean on 53 files. Live API check as `qd_app`: readyz ok, session flow 401 → 201 → 200, CSRF 403 envelope |
+| Backend (through T1.14) | `uv run pytest -q` → 438 passed: 351 unit/security + 87 integration on PG 17.11, Python 3.12; CI also runs 3.13 and a `postgres:17` integration job. `ruff check`/`format --check` clean; `mypy --strict` clean on 58 files. Live API check as `qd_app`: readyz ok, session flow 401 → 201 → 200, CSRF 403 envelope |
 | Frontend (through T1.15) | `pnpm lint` clean; `pnpm typecheck` clean; `pnpm test` → 13 passed; `pnpm build` → compiled, `/` and `/app` prerendered static |
 | Compose | Running: `metadata-db` and `sandbox-db` healthy; `alembic current` → `0002 (head)`; `qd_app` login verified (INSERT yes, UPDATE no on `artifacts`) |
 

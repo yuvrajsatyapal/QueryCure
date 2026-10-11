@@ -12,7 +12,7 @@ from querydoctor.api.middleware import (
     RequestIdMiddleware,
     install_error_handlers,
 )
-from querydoctor.api.routers import connections, health, inspect, session
+from querydoctor.api.routers import connections, health, inspect, session, workloads
 from querydoctor.core.config import Settings
 from querydoctor.core.logging import configure_logging
 from querydoctor.db.engine import make_engine
@@ -62,6 +62,7 @@ def create_app(settings: Settings | None = None, engine: AsyncEngine | None = No
     app.include_router(session.router, prefix=API_PREFIX)
     app.include_router(connections.router, prefix=API_PREFIX)
     app.include_router(inspect.router, prefix=API_PREFIX)
+    app.include_router(workloads.router, prefix=API_PREFIX)
     return app
 
 
