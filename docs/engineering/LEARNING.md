@@ -16,7 +16,7 @@ For the project author: what to learn in each phase, why it matters, where Query
 | **Pydantic v2** (validators, `extra="forbid"`, discriminated unions, `model_json_schema`) | Every boundary is validated; LLM structured output reuses the same models | `domain/`, `api/schemas/`, uploaded plan validation |
 | **asyncio fundamentals** (event loop, `await` vs blocking, `TaskGroup`, `timeout`, cancellation) | API and worker are async; one blocking call stalls everything | psycopg async, `asyncio.to_thread` for CPU work |
 | **SQLAlchemy 2.0 async + Alembic** | Typed metadata access and safe migrations | `db/`, `migrations/` |
-| **psycopg 3** (async connections, server-side cursors, `sql.Identifier`, `prepare_threshold`) | Precise control over target/sandbox sessions | `connectors/session.py`, `benchmark/timing.py` |
+| **psycopg 3** (async connections, server-side cursors, `sql.Identifier`, `prepare_threshold`) | Precise control over target/sandbox sessions | `connectors/inspection_gateway.py` (hardened sessions), `benchmark/timing.py` |
 | **PostgreSQL EXPLAIN** (node types, cost model, estimates vs actuals, loops, buffers) | The core domain | `plans/parser.py`, `plans/metrics.py` |
 | **Query planner basics** (seq vs index vs bitmap scans, join algorithms, sort/hash memory, `work_mem`) | To judge whether agent hypotheses make sense | Plan metrics, eval cases |
 | **pg_catalog & statistics** (`pg_class.reltuples`, `pg_stats`, `pg_stat_user_tables`, `pg_index`) | Inspection without touching data | `connectors/catalog_queries/*.sql` |
@@ -29,7 +29,7 @@ For the project author: what to learn in each phase, why it matters, where Query
 - Pin `hostaddr` after resolving so the DNS answer you checked is the one you connect to.
 
 ### Modules to study (once implemented)
-`plans/parser.py`, `plans/metrics.py`, `sql/validator.py`, `connectors/ssrf_guard.py`, `connectors/session.py`, `api/deps.py`.
+`plans/parser.py`, `plans/metrics.py`, `sql/validator.py`, `connectors/ssrf_guard.py`, `connectors/inspection_gateway.py`, `api/deps.py`.
 
 ### Interview questions
 1. Walk me through an `EXPLAIN ANALYZE` output. What does `loops=1000` change about how you read `actual time`?

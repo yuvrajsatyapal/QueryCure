@@ -2,7 +2,7 @@
 
 > Autonomous, multi-agent investigation and *verified* optimization of PostgreSQL query performance.
 
-**Project status: Phase 1 — Foundation.** What runs today: SQL and plan parsing, an offline plan explorer (tree and graph), restricted live `EXPLAIN` against a database you connect, and demo workload generators. **No LLM agents, benchmarks, or reports yet.** Those arrive in Phases 2–4. Features below marked *planned* do not exist yet. See [docs/planning/CURRENT_PHASE.md](docs/planning/CURRENT_PHASE.md) for live status.
+**Project status: Phase 1 (Foundation) complete; Phase 2 not started.** What runs today: SQL and plan parsing, an offline plan explorer (tree and graph), restricted live `EXPLAIN` against a database you connect, and demo workload generators. **No LLM agents, benchmarks, or reports yet.** Those arrive in Phases 2–4. Features below marked *planned* do not exist yet. See [docs/planning/CURRENT_PHASE.md](docs/planning/CURRENT_PHASE.md) for live status.
 
 ---
 
@@ -146,7 +146,7 @@ The demo database shares the local metadata server only for convenience. Private
 | Phase | Theme | Status |
 |---|---|---|
 | 0 | Documentation & architecture | Done |
-| 1 | Foundation: repo, API, metadata DB, SQL/plan parsing, demo workloads, editor | **In progress** |
+| 1 | Foundation: repo, API, metadata DB, SQL/plan parsing, demo workloads, editor | Done ([report](docs/planning/reports/PHASE_1_REPORT.md)) |
 | 2 | Multi-agent intelligence: LangGraph supervisor, analyzer agents, streaming | Planned |
 | 3 | Optimization & benchmarking: sandbox, benchmark engine, tournament | Planned |
 | 4 | Verification & replay: auditor, lineage, replay, regression detection | Planned |

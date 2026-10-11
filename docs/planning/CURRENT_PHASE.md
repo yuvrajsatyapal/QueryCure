@@ -3,9 +3,9 @@
 | Field | Value |
 |---|---|
 | Phase | **1 — Foundation** (Phase 0 documentation complete) |
-| Status | In progress: backend Phase 1 complete (T1.1–T1.14); frontend T1.15–T1.19 done; Phase 1 report pending |
+| Status | **Phase 1 complete.** All 5 acceptance criteria met; report: [PHASE_1_REPORT](reports/PHASE_1_REPORT.md). Phase 2 not started (awaiting go-ahead) |
 | Last updated | 2026-10-11 |
-| Application code | Scaffolding only: FastAPI app factory with `/api/v1/healthz`; Next.js shell page; local Compose file. |
+| Application code | Phase 1 foundation: API (session, connections, inspect, workloads, health), metadata DB migrations, SQL/plan parsing, inspection gateway, artifact store, demo workloads; web app with connections and plan workspace (tree + graph). No agents yet. |
 
 ## Completed
 
