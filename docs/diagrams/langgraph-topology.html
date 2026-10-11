@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Investigation graph · QueryDoctor AI</title>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --color-paper:  #FAFAF9;
+      --color-ink:    #15181D;
+      --color-muted:  #566070;
+      --color-accent: #0A6F6A;
+      --font-sans:    'IBM Plex Sans', system-ui, sans-serif;
+      --font-serif:   'Instrument Serif', 'Noto Serif', serif;
+      --font-mono:    'IBM Plex Mono', ui-monospace, monospace;
+    }
+    body { font-family: var(--font-sans); background: var(--color-paper); color: var(--color-ink);
+           min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 3rem 1rem; }
+    .frame { max-width: 840px; width: 100%; min-width: 0; }
+    .diagram-container { width: 100%; overflow-x: auto; }
+    .eyebrow { font-family: var(--font-mono); font-size: 0.66rem; font-weight: 500; letter-spacing: 0.18em;
+               text-transform: uppercase; color: var(--color-muted); margin-bottom: 0.5rem; }
+    h1 { font-family: var(--font-serif); font-size: clamp(1.5rem, 2.4vw + 0.75rem, 2rem); font-weight: 400;
+         letter-spacing: -0.02em; line-height: 1.15; margin-bottom: 0.5rem; }
+    .sub { color: var(--color-muted); font-size: 0.9rem; margin-bottom: 1.5rem; max-width: 70ch; }
+    .colophon { font-family: var(--font-mono); font-size: 0.7rem; color: var(--color-muted);
+                border-top: 1px solid rgba(21,24,29,0.12); margin-top: 1.5rem; padding-top: 0.75rem; }
+    .colophon a { color: #2C5BA8; }
+    svg { width: 100%; min-width: 800px; display: block; }
+    @media print {
+      .diagram-container { overflow-x: visible; }
+      svg { min-width: 0; }
+    }
+  </style>
+</head>
+<body>
+  <div class="frame">
+    <p class="eyebrow">Flowchart · Agent system · QueryDoctor AI</p>
+    <h1>Investigation graph</h1>
+    <p class="sub">Every exit ends at the same report node. LLM agents propose; deterministic nodes measure and decide.</p>
+    <div class="diagram-container">
+      <svg viewBox="0 0 800 836" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="langgraph-topology-title langgraph-topology-desc">
+        <title id="langgraph-topology-title">Investigation graph</title>
+        <desc id="langgraph-topology-desc">LangGraph topology: deterministic intake and context collection, supervisor planning, parallel specialist analysts, an actionability decision, the Optimization Engineer, a human approval gate, the deterministic benchmark tournament, a verdict decision with a bounded retry loop, and a single report node.</desc>
+        <defs><marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#566070"/></marker><marker id="arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#0A6F6A"/></marker><marker id="arrow-link" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#2C5BA8"/></marker><marker id="arrow-open" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polyline points="0 0, 8 3, 0 6" fill="none" stroke="#566070" stroke-width="1.2"/></marker></defs>
+        <rect width="100%" height="100%" fill="#FAFAF9"/>
+<path d="M 200,96 L 200,128" fill="none" stroke="#566070" stroke-width="1.2" marker-end="url(#arrow)"/>
+<path d="M 200,184 L 200,216" fill="none" stroke="#566070" stroke-width="1.2" marker-end="url(#arrow)"/>
+<path d="M 200,272 L 200,304" fill="none" stroke="#566070" stroke-width="1.2" marker-end="url(#arrow)"/>
+<path d="M 288,344 L 420,344" fill="none" stroke="#566070" stroke-width="1.2" marker-end="url(#arrow)"/>
+<path d="M 200,384 L 200,652" fill="none" stroke="#566070" stroke-width="1.2" marker-end="url(#arrow)"/>
+<path d="M 520,372 L 520,416" fill="none" stroke="#566070" stroke-width="1.2" marker-end="url(#arrow)"/>
+<path d="M 432,456 L 256,456 Q 248,456 248,464 L 248,652" fill="none" stroke="#566070" stroke-width="1.2" marker-end="url(#arrow)"/>
+<path d="M 520,496 L 520,540" fill="none" stroke="#566070" stroke-width="1.2" marker-end="url(#arrow)"/>
+<path d="M 520,596 L 520,640" fill="none" stroke="#566070" stroke-width="1.2" marker-end="url(#arrow)"/>
+<path d="M 432,680 L 300,680" fill="none" stroke="#0A6F6A" stroke-width="1.4" marker-end="url(#arrow-accent)"/>
+<path d="M 608,680 L 672,680 Q 680,680 680,672 L 680,352 Q 680,344 672,344 L 620,344" fill="none" stroke="#566070" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#arrow)"/>
+<path d="M 520,720 L 520,744 Q 520,752 512,752 L 240,752 Q 232,752 232,744 L 232,708" fill="none" stroke="#566070" stroke-width="1.2" marker-end="url(#arrow)"/><rect x="342" y="324" width="24" height="12" rx="2" fill="#FAFAF9"/><text x="354" y="333" fill="#5C6574" font-size="8" font-family="'IBM Plex Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.06em">YES</text>
+<rect x="208" y="410" width="56" height="12" rx="2" fill="#FAFAF9"/><text x="236" y="419" fill="#5C6574" font-size="8" font-family="'IBM Plex Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.06em">NO ACTION</text>
+<rect x="316" y="436" width="48" height="12" rx="2" fill="#FAFAF9"/><text x="340" y="445" fill="#5C6574" font-size="8" font-family="'IBM Plex Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.06em">DECLINED</text>
+<rect x="528" y="512" width="48" height="12" rx="2" fill="#FAFAF9"/><text x="552" y="521" fill="#5C6574" font-size="8" font-family="'IBM Plex Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.06em">APPROVED</text>
+<rect x="342" y="660" width="48" height="12" rx="2" fill="#FAFAF9"/><text x="366" y="669" fill="#0A6F6A" font-size="8" font-family="'IBM Plex Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.06em">VERIFIED</text>
+<rect x="688" y="506" width="48" height="12" rx="2" fill="#FAFAF9"/><text x="712" y="515" fill="#5C6574" font-size="8" font-family="'IBM Plex Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.06em">RETRY ≤2</text>
+<rect x="338" y="732" width="76" height="12" rx="2" fill="#FAFAF9"/><text x="376" y="741" fill="#5C6574" font-size="8" font-family="'IBM Plex Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.06em">OUT OF BUDGET</text><rect x="100" y="40" width="200" height="56" rx="20" fill="#FAFAF9"/><rect x="100" y="40" width="200" height="56" rx="20" fill="#ffffff" stroke="#15181D" stroke-width="1"/><text x="200.0" y="64.0" fill="#15181D" font-size="12" font-weight="600" font-family="'IBM Plex Sans', system-ui, sans-serif" text-anchor="middle">Intake &amp; context</text><text x="200.0" y="80.0" fill="#566070" font-size="9" font-family="'IBM Plex Mono', ui-monospace, monospace" text-anchor="middle">deterministic</text>
+<rect x="100" y="128" width="200" height="56" rx="6" fill="#FAFAF9"/><rect x="100" y="128" width="200" height="56" rx="6" fill="#ffffff" stroke="#15181D" stroke-width="1"/><text x="200.0" y="152.0" fill="#15181D" font-size="12" font-weight="600" font-family="'IBM Plex Sans', system-ui, sans-serif" text-anchor="middle">Supervisor plan</text><text x="200.0" y="168.0" fill="#566070" font-size="9" font-family="'IBM Plex Mono', ui-monospace, monospace" text-anchor="middle">LLM · plan</text>
+<rect x="100" y="216" width="200" height="56" rx="6" fill="#FAFAF9"/><rect x="100" y="216" width="200" height="56" rx="6" fill="#ffffff" stroke="#15181D" stroke-width="1"/><text x="200.0" y="240.0" fill="#15181D" font-size="12" font-weight="600" font-family="'IBM Plex Sans', system-ui, sans-serif" text-anchor="middle">Specialist analysts</text><text x="200.0" y="256.0" fill="#566070" font-size="9" font-family="'IBM Plex Mono', ui-monospace, monospace" text-anchor="middle">query · index · workload</text>
+<polygon points="200,304.0 288.0,344 200,384.0 112.0,344" fill="#FAFAF9"/><polygon points="200,304.0 288.0,344 200,384.0 112.0,344" fill="#ffffff" stroke="#15181D" stroke-width="1"/><text x="200" y="348" fill="#15181D" font-size="12" font-weight="600" font-family="'IBM Plex Sans', system-ui, sans-serif" text-anchor="middle">Actionable?</text>
+<rect x="420" y="316" width="200" height="56" rx="6" fill="#FAFAF9"/><rect x="420" y="316" width="200" height="56" rx="6" fill="#ffffff" stroke="#15181D" stroke-width="1"/><text x="520.0" y="340.0" fill="#15181D" font-size="12" font-weight="600" font-family="'IBM Plex Sans', system-ui, sans-serif" text-anchor="middle">Optimization Engineer</text><text x="520.0" y="356.0" fill="#566070" font-size="9" font-family="'IBM Plex Mono', ui-monospace, monospace" text-anchor="middle">LLM · candidates</text>
+<polygon points="520,416.0 608.0,456 520,496.0 432.0,456" fill="#FAFAF9"/><polygon points="520,416.0 608.0,456 520,496.0 432.0,456" fill="#ffffff" stroke="#15181D" stroke-width="1"/><text x="520" y="460" fill="#15181D" font-size="12" font-weight="600" font-family="'IBM Plex Sans', system-ui, sans-serif" text-anchor="middle">Approved?</text>
+<rect x="420" y="540" width="200" height="56" rx="6" fill="#FAFAF9"/><rect x="420" y="540" width="200" height="56" rx="6" fill="rgba(10,111,106,0.08)" stroke="#0A6F6A" stroke-width="1"/><text x="520.0" y="564.0" fill="#15181D" font-size="12" font-weight="600" font-family="'IBM Plex Sans', system-ui, sans-serif" text-anchor="middle">Benchmark tournament</text><text x="520.0" y="580.0" fill="#566070" font-size="9" font-family="'IBM Plex Mono', ui-monospace, monospace" text-anchor="middle">deterministic · no LLM</text>
+<polygon points="520,640.0 608.0,680 520,720.0 432.0,680" fill="#FAFAF9"/><polygon points="520,640.0 608.0,680 520,720.0 432.0,680" fill="#ffffff" stroke="#15181D" stroke-width="1"/><text x="520" y="684" fill="#15181D" font-size="12" font-weight="600" font-family="'IBM Plex Sans', system-ui, sans-serif" text-anchor="middle">Verdict</text>
+<rect x="100" y="652" width="200" height="56" rx="20" fill="#FAFAF9"/><rect x="100" y="652" width="200" height="56" rx="20" fill="#ffffff" stroke="#15181D" stroke-width="1"/><text x="200.0" y="676.0" fill="#15181D" font-size="12" font-weight="600" font-family="'IBM Plex Sans', system-ui, sans-serif" text-anchor="middle">Write report</text><text x="200.0" y="692.0" fill="#566070" font-size="9" font-family="'IBM Plex Mono', ui-monospace, monospace" text-anchor="middle">outcome + evidence</text><line x1="40" y1="788" x2="760" y2="788" stroke="rgba(21,24,29,0.1)" stroke-width="0.8"/><text x="40" y="804" fill="#566070" font-size="8" font-family="'IBM Plex Mono', ui-monospace, monospace" letter-spacing="0.18em">LEGEND</text><rect x="40" y="816" width="20" height="10" rx="5" fill="#ffffff" stroke="#15181D" stroke-width="1"/><text x="66" y="824" fill="#566070" font-size="8.5" font-family="'IBM Plex Sans', system-ui, sans-serif">Start / end</text><rect x="150" y="816" width="14" height="10" rx="2" fill="#ffffff" stroke="#15181D" stroke-width="1"/><text x="170" y="824" fill="#566070" font-size="8.5" font-family="'IBM Plex Sans', system-ui, sans-serif">Step</text><polygon points="225,814 232,821 225,828 218,821" fill="#ffffff" stroke="#15181D" stroke-width="1"/><text x="238" y="824" fill="#566070" font-size="8.5" font-family="'IBM Plex Sans', system-ui, sans-serif">Decision</text><rect x="306" y="816" width="14" height="10" rx="2" fill="rgba(10,111,106,0.08)" stroke="#0A6F6A" stroke-width="1"/><text x="326" y="824" fill="#566070" font-size="8.5" font-family="'IBM Plex Sans', system-ui, sans-serif">Deterministic verifier</text><line x1="462" y1="821" x2="490" y2="821" stroke="#0A6F6A" stroke-width="1.4" marker-end="url(#arrow-accent)"/><text x="498" y="824" fill="#566070" font-size="8.5" font-family="'IBM Plex Sans', system-ui, sans-serif">Verified path</text><line x1="590" y1="821" x2="618" y2="821" stroke="#566070" stroke-width="1.2" stroke-dasharray="4,3" marker-end="url(#arrow)"/><text x="626" y="824" fill="#566070" font-size="8.5" font-family="'IBM Plex Sans', system-ui, sans-serif">Bounded loop</text>
+      </svg>
+    </div>
+    <p class="colophon">Planned architecture (Phase 0). Source of truth: <a href="../architecture/AGENT_SYSTEM.md">docs/architecture/AGENT_SYSTEM.md</a>, which also carries an editable Mermaid version.</p>
+  </div>
+</body>
+</html>
