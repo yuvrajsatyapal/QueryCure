@@ -1,0 +1,33 @@
+[
+  {
+    "Plan": {
+      "Node Type": "Limit", "Parallel Aware": false, "Async Capable": false,
+      "Startup Cost": 1000.0, "Total Cost": 1000.05, "Plan Rows": 20, "Plan Width": 64,
+      "Actual Startup Time": 120.0, "Actual Total Time": 120.5, "Actual Rows": 20, "Actual Loops": 1,
+      "Shared Hit Blocks": 100, "Shared Read Blocks": 900, "Temp Read Blocks": 50, "Temp Written Blocks": 50,
+      "Plans": [
+        {
+          "Node Type": "Sort", "Parent Relationship": "Outer", "Parallel Aware": false, "Async Capable": false,
+          "Startup Cost": 1000.0, "Total Cost": 1001.0, "Plan Rows": 500, "Plan Width": 64,
+          "Actual Startup Time": 119.0, "Actual Total Time": 120.0, "Actual Rows": 20, "Actual Loops": 1,
+          "Sort Key": ["created_at DESC"], "Sort Method": "external merge", "Sort Space Used": 4096,
+          "Sort Space Type": "Disk",
+          "Shared Hit Blocks": 100, "Shared Read Blocks": 900, "Temp Read Blocks": 50, "Temp Written Blocks": 50,
+          "Plans": [
+            {
+              "Node Type": "Seq Scan", "Parent Relationship": "Outer", "Parallel Aware": false,
+              "Async Capable": false, "Relation Name": "orders", "Schema": "public", "Alias": "orders",
+              "Startup Cost": 0.0, "Total Cost": 900.0, "Plan Rows": 500, "Plan Width": 64,
+              "Actual Startup Time": 0.5, "Actual Total Time": 100.0, "Actual Rows": 5000, "Actual Loops": 1,
+              "Filter": "(customer_id = 1024)", "Rows Removed by Filter": 995000,
+              "Shared Hit Blocks": 100, "Shared Read Blocks": 900
+            }
+          ]
+        }
+      ]
+    },
+    "Planning Time": 0.25,
+    "Triggers": [],
+    "Execution Time": 121.0
+  }
+]

@@ -58,7 +58,7 @@ Applies from Phase 1. Tooling decisions: [ADR-0014](adr/ADR-0014-python-tooling.
 ## 3. Validation
 
 - Validate at boundaries (API input, uploaded files, LLM output, artifacts on read). Trust validated domain objects internally.
-- Size limits: SQL 100 KB, plan JSON 5 MB, DDL 1 MB, objective 2,000 chars; JSON nesting depth ≤ 64.
+- Size limits: SQL 100 KB, plan JSON 5 MB, DDL 1 MB, objective 2,000 chars; JSON nesting depth ≤ 64. Exception: plan uploads allow depth 256, because plan JSON nests two levels per plan node and deep join trees are legitimate.
 
 ## 4. Testing conventions
 

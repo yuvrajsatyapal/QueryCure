@@ -29,6 +29,11 @@ class BadRequestError(QueryDoctorError):
     status = 400
 
 
+class InvalidPlanFormatError(QueryDoctorError):
+    code = "INVALID_PLAN_FORMAT"
+    status = 400
+
+
 class NotFoundError(QueryDoctorError):
     code = "NOT_FOUND"
     status = 404

@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | Phase | **1 — Foundation** (Phase 0 documentation complete) |
-| Status | In progress: T1.1–T1.3, T1.6 done on `main` |
+| Status | In progress: T1.1–T1.3, T1.6, T1.7 (logic) done on `main` |
 | Last updated | 2026-10-11 |
 | Application code | Scaffolding only: FastAPI app factory with `/api/v1/healthz`; Next.js shell page; local Compose file. |
 
@@ -45,7 +45,14 @@
   - The literal-normalized fingerprint is metadata, not artifact identity.
   - 97 new tests: 82 unit plus 15 security evasion tests in `tests/security/`.
   - Unqualified user functions can't be detected by parsing; the `pg_proc` check is now an explicit T1.10 requirement (SECURITY §4.3 updated).
-- [ ] T1.4–T1.5, T1.7–T1.19 per [TASKS.md](TASKS.md). Doing Docker-free tasks first (T1.7, T1.9, the canonicalization part of T1.8, T1.15, T1.17–T1.18) while Docker is down.
+- [x] **T1.7 `plans/`** (logic done; real-capture fixtures pending Docker).
+  - The parser takes PG JSON (list or object) into a typed preorder `PlanTree`.
+  - Every node carries a JSON-pointer `locator` for evidence citations. Unknown keys are kept in `extra`.
+  - Strict type checks; 5 MB / depth-256 limits; detection of ANALYZE, TIMING OFF, and BUFFERS.
+  - Metrics: loops-aware inclusive and self time, dividing by process count below `Gather`; per-loop estimate error with direction; total rows removed by filter; sort spill; self buffers.
+  - Unknown values stay `None`, never 0.
+  - 29 tests against hand-computed **synthetic** fixtures (labeled as such in `tests/fixtures/plans/README.md`). Real PG 17 captures will be added when Docker is available, to close ROADMAP Phase 1 acceptance #2.
+- [ ] T1.4–T1.5, T1.8–T1.19 per [TASKS.md](TASKS.md). Doing Docker-free tasks first (T1.7, T1.9, the canonicalization part of T1.8, T1.15, T1.17–T1.18) while Docker is down.
 
 ## Blockers
 
@@ -69,7 +76,7 @@
 | Required files exist | See Phase 0 validation in the final summary |
 | Internal links | Checked by script during Phase 0 |
 | Mermaid syntax | Reviewed manually (no renderer installed; not executed) |
-| Backend (through T1.3) | `uv run pytest -q` → 142 passed (3.12; CI also 3.13); `ruff check` and `ruff format --check` clean; `mypy` strict → no issues in 15 files; uvicorn smoke test: `/api/v1/healthz` 200, `/api/v1/openapi.json` 200 |
+| Backend (through T1.3) | `uv run pytest -q` → 171 passed (3.12; CI also 3.13); `ruff check` and `ruff format --check` clean; `mypy` strict → no issues in 19 files; uvicorn smoke test: `/api/v1/healthz` 200, `/api/v1/openapi.json` 200 |
 | Frontend (T1.1) | `pnpm lint` clean; `pnpm typecheck` clean; `pnpm test` → 1 passed; `pnpm build` → compiled, `/` prerendered static |
 | Compose | `docker compose config` valid; **not started** (daemon down) |
 
