@@ -25,6 +25,16 @@ Status: Planned. Orchestration decision: [ADR-0002](../engineering/adr/ADR-0002-
 
 Tools are thin async functions over the evidence store / inspection gateway / sandbox, with Pydantic input schemas. They **return evidence IDs alongside data** so agents can cite them.
 
+**Tool protocol (implemented in T2.9, `agents/agent_runner.run_tool_agent`).** Providers are not asked for native tool calling. Each turn the model returns one JSON object validated as `AgentTurn`: `{"action": "call_tool", "tool", "args"}` or `{"action": "final", "analysis"}`. Our code then:
+- refuses tools outside the agent's allowlist (`tool_executions.status = refused`, `TOOL_NOT_ALLOWED`) and tells the model which tools exist;
+- validates arguments with the tool's input model (`INVALID_ARGUMENTS` goes back to the model);
+- charges the per-invocation cap (exhaustion is soft: the model is asked for its final answer) and the run-wide budget (exhaustion stops the run);
+- records evidence, a `tool_executions` row and `tool.started`/`tool.completed` events, and returns the result **fenced** (`kind=tool_result`).
+
+Every provider call is written as it finishes (`tool_call` turns get their own status, migration `0006`), so tool rows always reference an existing execution row. The final answer goes through the same citation check and single retry as other agents. At most 14 turns.
+
+Allowlists are exactly the table above. Index size is a deterministic btree leaf-level approximation (rows × (8-byte header + MAXALIGN'd key widths + 4-byte line pointer) at fillfactor 90, labelled `derived`). Workload tools use four fixed catalog templates (`statement_stats`, `activity_summary`, `lock_summary`, `table_io`) that return aggregates only: no other sessions' query text, user names or client addresses; `pg_stat_statements` text is truncated to 500 characters and fenced. Each call stores a `workload_snapshot` artifact (role `context.workload`) that its evidence points at.
+
 ## 3. Graph topology
 
 Simplified designed overview: [docs/diagrams/langgraph-topology.html](../diagrams/langgraph-topology.html). The Mermaid below is authoritative and shows every node.

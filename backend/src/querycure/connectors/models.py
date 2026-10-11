@@ -112,3 +112,49 @@ class SchemaSnapshot(BaseModel):
     columns: list[ColumnStats]
     indexes: list[IndexInfo]
     unresolved: list[TableRef]
+
+
+class StatementStat(BaseModel):
+    """A pg_stat_statements row. `query` is normalised by PostgreSQL and truncated to 500."""
+
+    model_config = ConfigDict(frozen=True)
+
+    queryid: str
+    calls: int
+    total_exec_time_ms: float
+    mean_exec_time_ms: float
+    rows: int
+    shared_blks_hit: int
+    shared_blks_read: int
+    temp_blks_written: int
+    query: str
+
+
+class ActivityBucket(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    state: str
+    wait_event_type: str
+    sessions: int
+    longest_xact_seconds: float
+
+
+class LockBucket(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    locktype: str
+    mode: str
+    relation: str
+    granted: int
+    waiting: int
+
+
+class TableIo(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    schema_name: str
+    name: str
+    heap_blks_read: int | None
+    heap_blks_hit: int | None
+    idx_blks_read: int | None
+    idx_blks_hit: int | None

@@ -17,11 +17,15 @@ from psycopg import sql
 from psycopg.rows import dict_row
 
 from querycure.connectors.models import (
+    ActivityBucket,
     ColumnStats,
     ExplainResult,
     GatewayLimits,
     IndexInfo,
+    LockBucket,
     SchemaSnapshot,
+    StatementStat,
+    TableIo,
     TableStats,
     TargetCapabilities,
     TargetConnection,
@@ -317,6 +321,36 @@ class InspectionGateway:
             indexes=[IndexInfo.model_validate(_with_owner(names, row)) for row in index_rows],
             unresolved=unresolved,
         )
+
+    async def _rows(self, template: str, params: dict[str, Any]) -> list[dict[str, Any]]:
+        try:
+            async with self._conn.transaction(), self._conn.cursor(row_factory=dict_row) as cur:
+                await cur.execute(_template(template), params)
+                return await cur.fetchall()
+        except psycopg.Error as exc:
+            raise _map_error(exc) from None
+
+    async def statement_stats(self, *, limit: int = 10) -> list[StatementStat]:
+        if not self._capabilities.has_pg_stat_statements:
+            raise TargetQueryError("pg_stat_statements is not installed on the target database.")
+        rows = await self._rows("statement_stats.sql", {"limit": max(1, min(limit, 50))})
+        return [StatementStat.model_validate(r) for r in rows]
+
+    async def activity_summary(self) -> list[ActivityBucket]:
+        return [
+            ActivityBucket.model_validate(r) for r in await self._rows("activity_summary.sql", {})
+        ]
+
+    async def lock_summary(self) -> list[LockBucket]:
+        return [LockBucket.model_validate(r) for r in await self._rows("lock_summary.sql", {})]
+
+    async def table_io(self, tables: list[TableRef]) -> list[TableIo]:
+        found = await self._rows(
+            "resolve_tables.sql",
+            {"schemas": [t.schema_name for t in tables], "names": [t.name for t in tables]},
+        )
+        rows = await self._rows("table_io.sql", {"oids": [r["oid"] for r in found]})
+        return [TableIo.model_validate(r) for r in rows]
 
     async def _unsafe_execute_for_tests(self, statement: str) -> None:
         """Runs raw SQL in a read-only transaction to prove layer-3 controls. Tests only."""

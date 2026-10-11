@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | Phase | **2 — Multi-agent intelligence** (Phase 1 complete: [PHASE_1_REPORT](reports/PHASE_1_REPORT.md)) |
-| Status | **Phase 2 in progress.** T2.1–T2.8 done |
+| Status | **Phase 2 in progress.** T2.1–T2.9 done (T2.9's eval smoke waits for T2.14 recordings) |
 | Last updated | 2026-10-12 |
 | Application code | Phase 1 foundation: API (session, connections, inspect, workloads, health), metadata DB migrations, SQL/plan parsing, inspection gateway, artifact store, demo workloads; web app with connections and plan workspace (tree + graph). No agents yet. |
 
@@ -219,6 +219,12 @@
   - Deterministic guard rails around the model: eligibility intersection, fallback plan, confidence re-ranking, `proposed_by` from shared citations, cited `no_action_evidence`.
   - Hypotheses persisted idempotently with `hypothesis.created` only for new rows; findings repository ready for the analysts (T2.9).
   - Tests: 7 routing/ranking unit tests (eligibility per mode/capability, `Send` fan-out, stop → report, confidence ranking with stable keys, `proposed_by`); 8 integration tests (ineligible dropped, fallback on model failure, no LLM call without analysts, **disagreeing analysts persisted as separate ranked hypotheses**, re-run adds no rows or events, uncited hypothesis dropped, `no_action_evidence` stripped of unknown IDs, no synthesis call without findings). Full suite 653 passed; ruff, format, mypy clean.
+- [x] **T2.9 Query Analyzer, Index Strategist, Workload Investigator** (`agents/nodes/analysts.py`, `agents/tools/{base,evidence_tools,workload_tools}.py`, `agents/prompts/{analyst,query_analyzer,index_strategist,workload_investigator}.py`, gateway workload methods + 4 catalog templates, migration `0006`).
+  - JSON-turn tool protocol with allowlist refusal, argument validation, soft per-agent and hard run-wide tool budgets, fenced tool results, `tool.started`/`tool.completed` events, `tool_executions` rows linked to the requesting `agent_executions` row.
+  - Analysts share one factory; each persists its own findings (`fd_` keys, `finding.created` for new rows) and a failure becomes a recoverable error so the run continues. In Mode B they get the gateway, so missing statistics are fetched live.
+  - Workload templates checked against the real PG 17 target as the restricted role: idle-in-transaction session aggregated, a real `ACCESS EXCLUSIVE` lock and its waiter counted, table I/O read; `pg_stat_statements` refused cleanly when absent.
+  - Tests: 4 gateway workload integration tests; 9 analyst integration tests (tool use + fenced result + row linkage + events; **injection fixture: a model obeying planted instructions is refused for a non-allowlisted tool and for another agent's tool**; per-agent budget soft stop; run-wide budget stops the run; invalid arguments; failure isolation; crash re-run reuses findings with zero model calls; index size 28 bytes/entry → 12 pages from live stats; workload tools on the live target). Full suite 666 passed; ruff, format, mypy clean.
+  - **Not yet done:** "eval smoke on 3 workloads" needs recorded model responses (T2.14, after an API key is configured).
 
 ## Blockers
 

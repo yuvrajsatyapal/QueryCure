@@ -9,7 +9,15 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 
 from querycure.connectors.credentials import target_from_record
 from querycure.connectors.inspection_gateway import InspectionGateway
-from querycure.connectors.models import ExplainResult, SchemaSnapshot, TargetCapabilities
+from querycure.connectors.models import (
+    ActivityBucket,
+    ExplainResult,
+    LockBucket,
+    SchemaSnapshot,
+    StatementStat,
+    TableIo,
+    TargetCapabilities,
+)
 from querycure.connectors.ssrf_guard import TargetPolicy
 from querycure.core.config import Settings
 from querycure.core.errors import ApprovalRequiredError, NotFoundError
@@ -21,6 +29,10 @@ class Inspector(Protocol):
     async def capabilities(self) -> TargetCapabilities: ...
     async def explain(self, query: str) -> ExplainResult: ...
     async def schema_snapshot(self, tables: list[TableRef]) -> SchemaSnapshot: ...
+    async def statement_stats(self, *, limit: int = 10) -> list[StatementStat]: ...
+    async def activity_summary(self) -> list[ActivityBucket]: ...
+    async def lock_summary(self) -> list[LockBucket]: ...
+    async def table_io(self, tables: list[TableRef]) -> list[TableIo]: ...
 
 
 class InspectorFactory(Protocol):

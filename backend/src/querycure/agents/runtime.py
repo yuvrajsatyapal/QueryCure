@@ -14,7 +14,7 @@ from querycure.agents.services import InspectorFactory
 from querycure.agents.state import InvestigationState
 from querycure.core.errors import BudgetExhaustedError, RunCancelledError
 from querycure.core.logging import get_logger
-from querycure.domain.investigation import NodeError
+from querycure.domain.investigation import NodeError, RunBudget
 from querycure.events.types import EventType
 from querycure.llm.structured import RetryPolicy
 from querycure.llm.types import ChatClient
@@ -30,7 +30,14 @@ class LlmClients:
     fallback: ChatClient | None = None
 
 
+class ToolAllowanceLike(Protocol):
+    async def charge(self) -> None: ...
+
+
 class Guard(Protocol):
+    budget: RunBudget
+
+    def tool_allowance(self) -> ToolAllowanceLike: ...
     async def check(self) -> None: ...
     async def charge_llm_call(self) -> None: ...
     async def record_tokens(

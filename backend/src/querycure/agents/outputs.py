@@ -5,8 +5,9 @@ Drafts accept any string as an evidence ID so that invented IDs reach the citati
 """
 
 from collections.abc import Mapping
+from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, RootModel
 
 from querycure.agents.citations import CitationReport, Claim, judge_claims
 from querycure.domain.investigation import (
@@ -89,3 +90,18 @@ def judge_hypotheses(
     ]
     no_action = [i for i in dict.fromkeys(output.no_action_evidence) if i in evidence_kinds]
     return output.model_copy(update={"hypotheses": kept, "no_action_evidence": no_action}), report
+
+
+class ToolCallTurn(Draft):
+    action: Literal["call_tool"]
+    tool: str = Field(min_length=1, max_length=64)
+    args: dict[str, Any] = Field(default_factory=dict)
+
+
+class FinalTurn(Draft):
+    action: Literal["final"]
+    analysis: AgentAnalysis
+
+
+class AgentTurn(RootModel[Annotated[ToolCallTurn | FinalTurn, Field(discriminator="action")]]):
+    """One step of a tool-using analyst: request a tool, or give the final analysis."""
