@@ -124,3 +124,5 @@ Migrations run as a separate release step before new API instances start; migrat
 | `SESSION_TTL_SECONDS` | session and CSRF cookie lifetime (default 30 days) |
 | `OTEL_EXPORTER_OTLP_ENDPOINT`, `LANGSMITH_API_KEY` | optional observability |
 | `GEMINI_API_KEY`, `OPENROUTER_API_KEY` | local-profile fallback only; ignored in demo |
+| `LLM_PROVIDER` / `LLM_MODEL` / `LLM_FALLBACK_MODEL` | default `gemini` / `gemini-2.5-flash` / none (open decision D3: chosen after Phase 2 evals) |
+| `OPENROUTER_BASE_URL` | default `https://openrouter.ai/api/v1` |

@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | Phase | **2 — Multi-agent intelligence** (Phase 1 complete: [PHASE_1_REPORT](reports/PHASE_1_REPORT.md)) |
-| Status | **Phase 2 in progress.** T2.1–T2.3 done |
+| Status | **Phase 2 in progress.** T2.1–T2.4 done |
 | Last updated | 2026-10-12 |
 | Application code | Phase 1 foundation: API (session, connections, inspect, workloads, health), metadata DB migrations, SQL/plan parsing, inspection gateway, artifact store, demo workloads; web app with connections and plan workspace (tree + graph). No agents yet. |
 
@@ -187,6 +187,14 @@
   - History endpoint with an opaque seq cursor. Run lookups go through `get_run_for_user` (404 for missing, deleted, or another user's run).
   - Tests: 8 emitter tests (25 concurrent emitters → gap-free 1..25, rollback leaves no gap, NOTIFY only after commit, sealing, status + event atomicity); 3 hub tests (per-run wake-ups, reconnect after `pg_terminate_backend`); 10 API tests over a real uvicorn server, including **ROADMAP acceptance #3**: a client drops after 10 of 41 live events, reconnects with `Last-Event-ID`, and receives every event exactly once (passed 8/8 repeated runs). Also wire format, `after_seq`, heartbeats, early close, 401, cross-user 404, bad `Last-Event-ID`, history pagination, forged cursor. Full suite 544 passed; ruff, format, mypy clean.
   - Live check: uvicorn as `qc_app` streamed seq 1–3 emitted by a separate process and closed after the terminal event.
+- [x] **T2.4 LLM layer** (`llm/types.py`, `llm/structured.py`, `llm/providers.py`, `llm/credentials.py`).
+  - `call_structured`: JSON mode with the schema in the prompt, Pydantic validation, one repair attempt that sends the validation errors back (locations and messages only, `include_input=False`); retries on rate limit/5xx/timeout/connection errors with `min(2^n + jitter, 30 s)` backoff, ≤ 3, then the fallback model if configured, then `LLM_UNAVAILABLE`; auth and invalid-request errors are not retried. A 60 s timeout per call. `before_call`/`after_call` hooks for budgets and accounting.
+  - **Design change (AGENT_SYSTEM §5):** JSON mode + our own validation instead of `with_structured_output(json_schema)`, for one validation path across providers, replays and fakes.
+  - Errors are classified with `langchain_core.exceptions` (`ModelRateLimitError`, `ModelAPIError`, …), which both `langchain-google-genai` 4.4 and `langchain-openai` 1.7 map into, so retry logic has no provider-specific code.
+  - Providers: `ChatGoogleGenerativeAI` and `ChatOpenAI` pointed at OpenRouter, both with SDK retries off. System messages are merged to the front (Gemini takes one system instruction). Clients' `repr` never shows the key.
+  - New dependencies: `langchain-google-genai`, `langchain-openai` (the roadmap names Gemini + OpenRouter via LangChain).
+  - Tests: 21 unit tests with scripted fake clients: parsing, fenced JSON, repair with errors, no third call, backoff 2/4/8/16/30/30 s, jitter bounds, fallback, no retry on auth failure, budget hook stops a retry before it is sent, records for every call, logs contain no prompt/output text; key resolution per profile; no key in client reprs; message merging; adapter usage extraction.
+  - **Not verified live:** no `GEMINI_API_KEY` or `OPENROUTER_API_KEY` is configured on this machine, so no real provider call has been made. The adapters are exercised only through LangChain's fake chat model.
 
 ## Blockers
 

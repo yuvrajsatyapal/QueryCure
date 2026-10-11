@@ -1,7 +1,7 @@
 import base64
 import binascii
 from enum import StrEnum
-from typing import Self
+from typing import Literal, Self
 
 from pydantic import AliasChoices, Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -61,6 +61,21 @@ class Settings(BaseSettings):
     )
     worker_poll_seconds: float = Field(
         default=1.0, gt=0, validation_alias=_env("WORKER_POLL_SECONDS")
+    )
+    # Local-profile fallback keys (DEPLOYMENT §6); the demo profile is BYOK only (Phase 5).
+    gemini_api_key: SecretStr | None = Field(default=None, validation_alias=_env("GEMINI_API_KEY"))
+    openrouter_api_key: SecretStr | None = Field(
+        default=None, validation_alias=_env("OPENROUTER_API_KEY")
+    )
+    llm_provider: Literal["gemini", "openrouter"] = Field(
+        default="gemini", validation_alias=_env("LLM_PROVIDER")
+    )
+    llm_model: str = Field(default="gemini-2.5-flash", validation_alias=_env("LLM_MODEL"))
+    llm_fallback_model: str | None = Field(
+        default=None, validation_alias=_env("LLM_FALLBACK_MODEL")
+    )
+    openrouter_base_url: str = Field(
+        default="https://openrouter.ai/api/v1", validation_alias=_env("OPENROUTER_BASE_URL")
     )
     sse_heartbeat_seconds: float = Field(
         default=15.0, gt=0, validation_alias=_env("SSE_HEARTBEAT_SECONDS")
