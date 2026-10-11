@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | Phase | **1 — Foundation** (Phase 0 documentation complete) |
-| Status | In progress: backend Phase 1 complete (T1.1–T1.14); frontend T1.15–T1.16 done, T1.17–T1.19 remaining |
+| Status | In progress: backend Phase 1 complete (T1.1–T1.14); frontend T1.15–T1.17 done, T1.18–T1.19 remaining |
 | Last updated | 2026-10-11 |
 | Application code | Scaffolding only: FastAPI app factory with `/api/v1/healthz`; Next.js shell page; local Compose file. |
 
@@ -75,7 +75,7 @@
   - Types are generated from the backend OpenAPI by `pnpm gen:api`, using `python -m querydoctor.api.export_openapi`.
   - 12 new Vitest tests.
   - Verified in the browser: dark mode switches tokens (`#0E1013` background), the font resolves to IBM Plex Sans, the preference persists, and there are no console errors.
-  - Not yet: the mobile single-column layout (UI_UX §3.4) arrives with the workspace (T1.17).
+  - Mobile: below `md` the side nav becomes a scrollable strip under the header and pages stack to one column (done in T1.17).
 - [x] **T1.4 Alembic baseline** (migration `0001`).
   - Contents: `uuid-ossp`, `qd_app`/`qd_retention` roles (created NOLOGIN if missing; no passwords in migrations), the shared `set_updated_at()` trigger, and tables `users`, `sessions`, `database_connections`, `artifacts`, `run_artifacts`. All follow ADR-0006: UUID, TEXT, TIMESTAMPTZ, soft delete, CHECK-based enums, no FKs.
   - Per-table grants: the app gets SELECT/INSERT/UPDATE on mutable tables but no DELETE, and only SELECT/INSERT on append-only tables. Retention gets SELECT/DELETE.
@@ -132,7 +132,16 @@
   - API client: `rawJsonBody`, so plan JSON is never key-converted; typed modules over the generated schema.
   - Vitest: 4 form tests, 1 checklist test, 1 raw-upload test.
   - **Verified in the browser** against the real API (`qd_app`) and PG 17.11: created a `qd_demo_inspector` connection to the sf=1 database; Test showed `LAST TEST: OK` with live capabilities; a `169.254.169.254` host showed the backend's "Target address is not allowed" inline.
-- [ ] **Remaining:** T1.17 workspace (SQL editor, plan upload, plan tree table), T1.18 plan graph, T1.19 README run-locally.
+- [x] **T1.17 workspace** (`/app/investigations/new`).
+  - CodeMirror 6 SQL editor (PostgreSQL dialect, token-based highlighting); "Upload plan" (paste or file) and "Live EXPLAIN" (connection picker) tabs; "Start investigation" is disabled and says investigations arrive in Phase 2.
+  - Plan tree table: an ARIA treegrid with roving tabindex (arrows, Home/End, Left/Right collapse and expand); per-loop estimated vs actual rows with the misestimate stated as "N× under/over"; self time and share; buffers; the hottest node labelled in words; "spilled to disk" for sorts; an "Estimates only" banner for plain EXPLAIN.
+  - Node details panel: relation, filter, inclusive time, loops, actual rows across all loops, rows removed by filter, cost.
+  - **Bug fixed during browser verification:** the Actual rows column showed the all-loops total next to a per-loop estimate (Seq Scan: 4,333 vs 10,014 under 3 loops). Both columns are now per loop, as in EXPLAIN, and the total moved to the details panel. A regression test came first.
+  - **Mobile fix:** at 375 px the fixed side nav took half the screen and clipped the workspace. Now no horizontal page scroll at 375 px on the workspace or connections pages; the plan table scrolls inside its own container. The UI_UX §3.4 mobile tabs (Query · Plan · Agents · Results) wait for the Phase 2 panels.
+  - Next 16: `instant = false` is needed on each session-gated page, not only the `/app` layout. The dev overlay flagged every page as a dropped segment until then.
+  - Vitest: 7 plan-tree tests and 3 workspace tests (29 frontend tests in total).
+  - **Verified in the browser** against the live API: a real PG 17 `EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON)` plan from the sf=1 demo rendered Limit → Gather Merge → Sort → Seq Scan on orders. Seq Scan was labelled hottest at 62.6 ms (91.1% self time), matching hand-computed values (ROADMAP Phase 1 acceptance #2). Live EXPLAIN on the `qd_demo_inspector` connection returned the same shape with the "Estimates only" banner.
+- [ ] **Remaining:** T1.18 plan graph, T1.19 README run-locally.
 
 ## Blockers
 
@@ -142,12 +151,13 @@
 
 - `import-linter` is not configured yet. Its layer contracts reference modules (`agents`, `benchmark`, `llm`) that don't exist, and the tool errors on missing modules. Add the contracts as the modules land, starting with T1.6.
 - Starlette deprecated `httpx` for its TestClient, so the dev dependency is `httpx2`.
+- T1.17's param-sets editor is deferred to Phase 2. Param sets are only consumed by the investigation-create request (API_DESIGN `param_sets`), so a Phase 1 editor would collect values nothing uses. It ships with the Phase 2 investigation form; the demo workloads already define their param sets in `workloads/registry.py`.
 - Port 8765 on this machine is already in use by another local server. Smoke tests used a random free port.
 
 ## Next actions
 
-1. T1.2 CI workflow (lint, types, unit tests, frontend build).
-2. T1.3 `core/` (settings, structlog + redaction, errors, AES-GCM), then T1.6 SQL validator and T1.7 plan parser, written test-first.
+1. T1.18 plan graph (React Flow + dagre), same nodes as the tree, hottest node accented.
+2. T1.19 README "Run locally", verified from a fresh clone; then the Phase 1 report.
 
 ## Verification status
 
@@ -157,7 +167,7 @@
 | Internal links | Checked by script during Phase 0 |
 | Mermaid syntax | Reviewed manually (no renderer installed; not executed) |
 | Backend (through T1.14) | `uv run pytest -q` → 438 passed: 351 unit/security + 87 integration on PG 17.11, Python 3.12; CI also runs 3.13 and a `postgres:17` integration job. `ruff check`/`format --check` clean; `mypy --strict` clean on 58 files. Live API check as `qd_app`: readyz ok, session flow 401 → 201 → 200, CSRF 403 envelope |
-| Frontend (through T1.16) | `pnpm lint` and `pnpm typecheck` clean; `pnpm test` → 19 passed; `pnpm build` compiles; browser-verified against the live API |
+| Frontend (through T1.17) | `pnpm lint` and `pnpm typecheck` clean; `pnpm test` → 29 passed; `pnpm build` compiles; browser-verified against the live API, including 375 px width |
 | Compose | Running: `metadata-db` and `sandbox-db` healthy; `alembic current` → `0002 (head)`; `qd_app` login verified (INSERT yes, UPDATE no on `artifacts`) |
 
 ## Open decisions

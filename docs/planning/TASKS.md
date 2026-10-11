@@ -22,7 +22,7 @@ IDs `T<phase>.<n>`. Priority: **P0** blocks the phase exit, **P1** needed for ph
 | T1.14 | Workload generators: `orders_ecommerce`, `rewrite_trap`, `no_benefit` + `GET /workloads` | P0 | T1.1 | Deterministic: same seed → same table checksums |
 | T1.15 | Frontend shell: tokens.css, theme toggle, AppShell, nav, API client + case conversion + generated types | P0 | T1.1 | Token classes only; dark/light switch; Vitest for case conversion |
 | T1.16 | Connections page | P1 | T1.12, T1.15 | Add/test/delete; capability checklist; SSRF error inline |
-| T1.17 | Workspace draft: SqlEditor (CodeMirror), param sets, plan upload, PlanTreeTable | P0 | T1.13, T1.15 | Paste plan → tree renders; keyboard navigation works |
+| T1.17 | Workspace draft: SqlEditor (CodeMirror), plan upload, PlanTreeTable (param sets editor deferred to Phase 2, see CURRENT_PHASE) | P0 | T1.13, T1.15 | Paste plan → tree renders; keyboard navigation works |
 | T1.18 | Basic React Flow plan graph | P1 | T1.17 | Graph and tree show the same nodes; hottest node accented |
 | T1.19 | README "Run locally" section verified | P1 | all | Fresh clone instructions tested |
 
@@ -41,7 +41,7 @@ IDs `T<phase>.<n>`. Priority: **P0** blocks the phase exit, **P1** needed for ph
 | T2.9 | Query Analyzer, Index Strategist, Workload Investigator (+ tools, prompts) | P0 | T2.8 | Eval smoke on 3 workloads |
 | T2.10 | Graph assembly with `Send` fan-out + Postgres checkpointer + resume | P0 | T2.9 | Kill/restart test passes |
 | T2.11 | Investigations/runs API (create, list, detail, cancel, findings, evidence) | P0 | T2.2, T2.3 | Idempotency-Key behaviour; 404 cross-user |
-| T2.12 | Frontend: start run, AgentTimeline (SSE → query cache), Findings tab, EvidenceChip → plan highlight | P0 | T2.11 | Playwright with stubbed LLM |
+| T2.12 | Frontend: start run (incl. param sets editor deferred from T1.17), AgentTimeline (SSE → query cache), Findings tab, EvidenceChip → plan highlight | P0 | T2.11 | Playwright with stubbed LLM |
 | T2.13 | History page | P1 | T2.11 | Cursor pagination; soft delete + undo |
 | T2.14 | Eval runner, recordings format, first 5 cases | P0 | T2.9 | `python -m querydoctor.evals run --suite smoke` deterministic |
 

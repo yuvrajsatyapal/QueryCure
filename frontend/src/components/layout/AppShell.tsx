@@ -13,9 +13,9 @@ export function AppShell({ children }: { children: ReactNode }) {
         </Link>
         <ThemeToggle />
       </header>
-      <div className="flex flex-1">
+      <div className="flex flex-1 flex-col md:flex-row">
         <SideNav />
-        <main className="flex-1 p-6">
+        <main className="min-w-0 flex-1 p-4 md:p-6">
           <SessionGate>{children}</SessionGate>
         </main>
       </div>
