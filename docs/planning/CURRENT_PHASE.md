@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | Phase | **1 — Foundation** (Phase 0 documentation complete) |
-| Status | In progress: T1.1–T1.12 and T1.15 done (T1.7 still needs real plan captures) |
+| Status | In progress: T1.1–T1.13 and T1.15 done (T1.7 still needs real plan captures) |
 | Last updated | 2026-10-11 |
 | Application code | Scaffolding only: FastAPI app factory with `/api/v1/healthz`; Next.js shell page; local Compose file. |
 
@@ -109,7 +109,15 @@
   - Explain returns the parsed plan plus metrics. Production connections answer `409 APPROVAL_REQUIRED`.
   - Other users' IDs get 404 on every route. The demo profile answers `FEATURE_DISABLED`. A missing `QD_MASTER_KEY` gives `CONFIGURATION_ERROR` rather than plaintext storage.
   - 15 integration tests plus a unit test that scans every OpenAPI response schema for secret-like fields.
-- [ ] **Remaining:** T1.13–T1.14, T1.16–T1.19, and real PG 17 plan captures for T1.7.
+- [x] **T1.13 inspect API (Mode A).**
+  - `POST /inspect/sql` validates and fingerprints.
+  - `POST /inspect/plan` takes a raw plan body and returns the tree, metrics, and a `plan`/`plan_analyze` artifact. It dedupes by digest, so reformatted JSON maps to the same artifact.
+  - `POST /inspect/schema` parses DDL with `sql/ddl.py`. It handles `pg_dump` style: columns, NOT NULL/PK, `ALTER … ADD PRIMARY KEY`, indexes with `USING`/`WHERE`. Other statements become warnings and are never executed.
+  - Plan uploads now **reject duplicate JSON keys**; stdlib `json` silently kept the last one.
+  - New `MaxBodySizeMiddleware` (6 MB): declared sizes are refused up front, and streamed bodies are counted.
+  - **Bug fixed while testing:** Starlette's `BaseHTTPMiddleware` wrapped errors in `ExceptionGroup`s, which turned an over-limit stream into a 500. The request-ID and CSRF middlewares were rewritten as plain ASGI, and all earlier envelope, CSRF and session tests still pass.
+  - 7 DDL unit tests, 1 duplicate-key test, 3 body-limit tests, 9 integration tests.
+- [ ] **Remaining:** T1.14, T1.16–T1.19, and real PG 17 plan captures for T1.7.
 
 ## Blockers
 
@@ -133,7 +141,7 @@
 | Required files exist | See Phase 0 validation in the final summary |
 | Internal links | Checked by script during Phase 0 |
 | Mermaid syntax | Reviewed manually (no renderer installed; not executed) |
-| Backend (through T1.12) | `uv run pytest -q` → 392 passed: 321 unit/security + 71 integration on PG 17.11, Python 3.12; CI also runs 3.13 and a `postgres:17` integration job. `ruff check`/`format --check` clean; `mypy --strict` clean on 50 files. Live API check as `qd_app`: readyz ok, session flow 401 → 201 → 200, CSRF 403 envelope |
+| Backend (through T1.13) | `uv run pytest -q` → 412 passed: 332 unit/security + 80 integration on PG 17.11, Python 3.12; CI also runs 3.13 and a `postgres:17` integration job. `ruff check`/`format --check` clean; `mypy --strict` clean on 53 files. Live API check as `qd_app`: readyz ok, session flow 401 → 201 → 200, CSRF 403 envelope |
 | Frontend (through T1.15) | `pnpm lint` clean; `pnpm typecheck` clean; `pnpm test` → 13 passed; `pnpm build` → compiled, `/` and `/app` prerendered static |
 | Compose | Running: `metadata-db` and `sandbox-db` healthy; `alembic current` → `0002 (head)`; `qd_app` login verified (INSERT yes, UPDATE no on `artifacts`) |
 

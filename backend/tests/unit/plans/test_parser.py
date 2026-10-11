@@ -118,3 +118,10 @@ def test_absurd_nesting_is_rejected() -> None:
 
     with pytest.raises(InvalidPlanFormatError, match="deep"):
         parse_plan([{"Plan": node}])
+
+
+def test_duplicate_keys_are_rejected() -> None:
+    doc = '[{"Plan": {"Node Type": "Seq Scan", "Node Type": "Index Scan"}}]'
+
+    with pytest.raises(InvalidPlanFormatError, match="Duplicate"):
+        parse_plan(doc)

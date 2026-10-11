@@ -1,25 +1,24 @@
 import hmac
-from collections.abc import Awaitable, Callable
 
 import structlog
-from fastapi import FastAPI, Request, Response
+from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
-from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from querydoctor.api.deps import CSRF_COOKIE
-from querydoctor.core.errors import CsrfFailedError, QueryDoctorError
+from querydoctor.core.errors import CsrfFailedError, PayloadTooLargeError, QueryDoctorError
 from querydoctor.core.ids import new_request_id
 from querydoctor.core.logging import get_logger
 
+MAX_REQUEST_BYTES = 6 * 1024 * 1024  # 5 MB plan uploads plus envelope overhead
 SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
 # Creating a session is the one mutation without a CSRF token yet (ADR-0013); login CSRF on an
 # anonymous/local session grants nothing.
 CSRF_EXEMPT = frozenset({("POST", "/api/v1/session")})
 
 log = get_logger("querydoctor.api")
-Handler = Callable[[Request], Awaitable[Response]]
 
 
 def _request_id(request: Request) -> str:
@@ -30,32 +29,89 @@ def _envelope(err: QueryDoctorError, request: Request) -> JSONResponse:
     return JSONResponse(err.to_envelope(request_id=_request_id(request)), status_code=err.status)
 
 
-class RequestIdMiddleware(BaseHTTPMiddleware):
-    async def dispatch(self, request: Request, call_next: Handler) -> Response:
+class MaxBodySizeMiddleware:
+    """Refuse oversized bodies before they are buffered, with or without Content-Length.
+
+    Declared sizes are refused up front. Streamed bodies raise PayloadTooLargeError from
+    `receive`, which surfaces in the endpoint and is rendered by the normal envelope handler.
+    """
+
+    def __init__(self, app: ASGIApp, max_bytes: int = MAX_REQUEST_BYTES) -> None:
+        self.app = app
+        self.max_bytes = max_bytes
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+        declared = dict(scope.get("headers") or []).get(b"content-length")
+        if declared is not None and declared.isdigit() and int(declared) > self.max_bytes:
+            err = PayloadTooLargeError(f"Request body is larger than {self.max_bytes} bytes.")
+            response = JSONResponse(err.to_envelope(request_id=new_request_id()), status_code=413)
+            await response(scope, receive, send)
+            return
+        received = 0
+
+        async def limited_receive() -> Message:
+            nonlocal received
+            message = await receive()
+            if message["type"] == "http.request":
+                received += len(message.get("body", b""))
+                if received > self.max_bytes:
+                    raise PayloadTooLargeError(
+                        f"Request body is larger than {self.max_bytes} bytes."
+                    )
+            return message
+
+        await self.app(scope, limited_receive, send)
+
+
+class RequestIdMiddleware:
+    """Plain ASGI (not BaseHTTPMiddleware) so exceptions are never wrapped in task groups."""
+
+    def __init__(self, app: ASGIApp) -> None:
+        self.app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
         request_id = new_request_id()
-        request.state.request_id = request_id
+        scope.setdefault("state", {})["request_id"] = request_id
+
+        async def send_with_id(message: Message) -> None:
+            if message["type"] == "http.response.start":
+                headers = [*message.get("headers", []), (b"x-request-id", request_id.encode())]
+                message = {**message, "headers": headers}
+            await send(message)
+
         structlog.contextvars.bind_contextvars(request_id=request_id)
         try:
-            response = await call_next(request)
+            await self.app(scope, receive, send_with_id)
         finally:
             structlog.contextvars.unbind_contextvars("request_id")
-        response.headers["X-Request-ID"] = request_id
-        return response
 
 
-class CsrfMiddleware(BaseHTTPMiddleware):
+class CsrfMiddleware:
     """Double-submit token: the `qd_csrf` cookie must equal the X-CSRF-Token header."""
 
-    async def dispatch(self, request: Request, call_next: Handler) -> Response:
-        if (
-            request.method not in SAFE_METHODS
-            and (request.method, request.url.path) not in CSRF_EXEMPT
-        ):
+    def __init__(self, app: ASGIApp) -> None:
+        self.app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+        request = Request(scope)
+        method, path = request.method, request.url.path
+        if method not in SAFE_METHODS and (method, path) not in CSRF_EXEMPT:
             cookie = request.cookies.get(CSRF_COOKIE, "")
             header = request.headers.get("X-CSRF-Token", "")
             if not cookie or not header or not hmac.compare_digest(cookie, header):
-                return _envelope(CsrfFailedError("Missing or invalid CSRF token."), request)
-        return await call_next(request)
+                response = _envelope(CsrfFailedError("Missing or invalid CSRF token."), request)
+                await response(scope, receive, send)
+                return
+        await self.app(scope, receive, send)
 
 
 def _plain_error(

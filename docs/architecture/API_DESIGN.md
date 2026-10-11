@@ -16,6 +16,7 @@ Status: Planned. Base path `/api/v1`. JSON is `snake_case`. Timestamps ISO 8601 
 | Validation | Pydantic models; unknown fields rejected (`extra="forbid"`). |
 | Versioning | URL major version; additive changes only within v1. |
 | Rate limits | 429 with `Retry-After`; headers `X-RateLimit-Remaining`. |
+| Body size | Requests over 6 MB are refused with 413 `PAYLOAD_TOO_LARGE` before buffering, with or without `Content-Length`. |
 
 ### Error envelope
 
@@ -72,9 +73,9 @@ Error messages never include credentials, DSNs, or raw driver errors (driver err
 ### Inspection (synchronous, bounded)
 | Method | Path | Purpose | Phase |
 |---|---|---|---|
-| POST | `/inspect/sql` | Parse + validate + fingerprint `{query, dialect}` → `SqlAnalysis` | 1 |
-| POST | `/inspect/plan` | Parse uploaded plan JSON → `PlanTree` + metrics; stores artifact | 1 |
-| POST | `/inspect/schema` | Parse DDL → `SchemaSnapshot`; stores artifact | 1 |
+| POST | `/inspect/sql` | `{query, allow_user_functions?}` → `SqlAnalysis` (statement type, metadata, fingerprint) | 1 |
+| POST | `/inspect/plan` | Raw `EXPLAIN (FORMAT JSON)` body (≤ 5 MB; duplicate keys rejected) → `{artifact_sha256, plan, metrics}`; stored as artifact kind `plan` or `plan_analyze` | 1 |
+| POST | `/inspect/schema` | `{ddl}` (≤ 1 MB; parsed, never executed; non-schema statements become warnings) → `{artifact_sha256, schema: DeclaredSchema}` | 1 |
 | POST | `/connections/{id}/explain` | `{query, allow_user_functions?}` → `{plan: PlanTree, metrics: NodeMetrics[], generic_plan, query}`; plain EXPLAIN only. Production connections → 409 `APPROVAL_REQUIRED` outside an investigation | 1 |
 | GET | `/connections/{id}/schema?tables=public.orders,customers` | Redacted `SchemaSnapshot` (tables, columns with numeric stats only, indexes, unresolved names); 1–50 tables | 1 |
 

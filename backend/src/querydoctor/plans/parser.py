@@ -61,17 +61,35 @@ def _json_depth(value: Any) -> int:
     return deepest
 
 
+def _reject_duplicates(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    # Stdlib json silently keeps the last duplicate; uploads must be unambiguous (REPLAY §2.1).
+    obj: dict[str, Any] = {}
+    for key, value in pairs:
+        if key in obj:
+            raise _invalid(f'Duplicate key "{key[:60]}" in plan JSON.')
+        obj[key] = value
+    return obj
+
+
+def load_plan_document(raw: str | bytes) -> Any:
+    """Decode an uploaded plan with size, depth and duplicate-key checks."""
+    data = raw.encode() if isinstance(raw, str) else raw
+    if len(data) > MAX_PLAN_BYTES:
+        raise PayloadTooLargeError("Plan upload is larger than 5 MB.")
+    try:
+        document = json.loads(data, object_pairs_hook=_reject_duplicates)
+    except (json.JSONDecodeError, UnicodeDecodeError) as exc:
+        raise _invalid("Plan is not valid JSON.") from exc
+    except RecursionError as exc:
+        raise _invalid("Plan is nested too deep.") from exc
+    if _json_depth(document) > MAX_JSON_DEPTH:
+        raise _invalid("Plan is nested too deep.")
+    return document
+
+
 def _load(document: str | bytes | list[Any] | dict[str, Any]) -> tuple[dict[str, Any], str]:
     if isinstance(document, str | bytes):
-        raw = document.encode() if isinstance(document, str) else document
-        if len(raw) > MAX_PLAN_BYTES:
-            raise PayloadTooLargeError("Plan upload is larger than 5 MB.")
-        try:
-            document = json.loads(raw)
-        except (json.JSONDecodeError, UnicodeDecodeError) as exc:
-            raise _invalid("Plan is not valid JSON.") from exc
-        except RecursionError as exc:
-            raise _invalid("Plan is nested too deep.") from exc
+        document = load_plan_document(document)
     if _json_depth(document) > MAX_JSON_DEPTH:
         raise _invalid("Plan is nested too deep.")
     if isinstance(document, list):

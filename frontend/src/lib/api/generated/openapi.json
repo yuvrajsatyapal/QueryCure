@@ -352,6 +352,163 @@
         "title": "CreateConnectionRequest",
         "type": "object"
       },
+      "DeclaredColumn": {
+        "properties": {
+          "data_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Data Type"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "not_null": {
+            "title": "Not Null",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "name",
+          "data_type",
+          "not_null"
+        ],
+        "title": "DeclaredColumn",
+        "type": "object"
+      },
+      "DeclaredIndex": {
+        "properties": {
+          "columns": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Columns",
+            "type": "array"
+          },
+          "method": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Method"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "predicate": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Predicate"
+          },
+          "table": {
+            "title": "Table",
+            "type": "string"
+          },
+          "unique": {
+            "title": "Unique",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "name",
+          "table",
+          "columns",
+          "unique",
+          "method",
+          "predicate"
+        ],
+        "title": "DeclaredIndex",
+        "type": "object"
+      },
+      "DeclaredSchema": {
+        "properties": {
+          "indexes": {
+            "items": {
+              "$ref": "#/components/schemas/DeclaredIndex"
+            },
+            "title": "Indexes",
+            "type": "array"
+          },
+          "tables": {
+            "items": {
+              "$ref": "#/components/schemas/DeclaredTable"
+            },
+            "title": "Tables",
+            "type": "array"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "tables",
+          "indexes",
+          "warnings"
+        ],
+        "title": "DeclaredSchema",
+        "type": "object"
+      },
+      "DeclaredTable": {
+        "properties": {
+          "columns": {
+            "items": {
+              "$ref": "#/components/schemas/DeclaredColumn"
+            },
+            "title": "Columns",
+            "type": "array"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "primary_key": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Primary Key",
+            "type": "array"
+          },
+          "schema_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Schema Name"
+          }
+        },
+        "required": [
+          "schema_name",
+          "name",
+          "columns"
+        ],
+        "title": "DeclaredTable",
+        "type": "object"
+      },
       "ExplainRequest": {
         "additionalProperties": false,
         "properties": {
@@ -504,6 +661,43 @@
           "idx_scan"
         ],
         "title": "IndexInfo",
+        "type": "object"
+      },
+      "InspectSchemaRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "ddl": {
+            "maxLength": 1048576,
+            "minLength": 1,
+            "title": "Ddl",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ddl"
+        ],
+        "title": "InspectSchemaRequest",
+        "type": "object"
+      },
+      "InspectSqlRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "allow_user_functions": {
+            "default": false,
+            "title": "Allow User Functions",
+            "type": "boolean"
+          },
+          "query": {
+            "maxLength": 100000,
+            "minLength": 1,
+            "title": "Query",
+            "type": "string"
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "title": "InspectSqlRequest",
         "type": "object"
       },
       "MeResponse": {
@@ -680,6 +874,31 @@
           "self_temp_written_blocks"
         ],
         "title": "NodeMetrics",
+        "type": "object"
+      },
+      "PlanInspection": {
+        "properties": {
+          "artifact_sha256": {
+            "title": "Artifact Sha256",
+            "type": "string"
+          },
+          "metrics": {
+            "items": {
+              "$ref": "#/components/schemas/NodeMetrics"
+            },
+            "title": "Metrics",
+            "type": "array"
+          },
+          "plan": {
+            "$ref": "#/components/schemas/PlanTree"
+          }
+        },
+        "required": [
+          "artifact_sha256",
+          "plan",
+          "metrics"
+        ],
+        "title": "PlanInspection",
         "type": "object"
       },
       "PlanNode": {
@@ -1267,6 +1486,23 @@
         "title": "ReadinessResponse",
         "type": "object"
       },
+      "SchemaInspection": {
+        "properties": {
+          "artifact_sha256": {
+            "title": "Artifact Sha256",
+            "type": "string"
+          },
+          "schema": {
+            "$ref": "#/components/schemas/DeclaredSchema"
+          }
+        },
+        "required": [
+          "artifact_sha256",
+          "schema"
+        ],
+        "title": "SchemaInspection",
+        "type": "object"
+      },
       "SchemaSnapshot": {
         "properties": {
           "columns": {
@@ -1317,6 +1553,27 @@
           "user"
         ],
         "title": "SessionResponse",
+        "type": "object"
+      },
+      "SqlAnalysis": {
+        "properties": {
+          "fingerprint": {
+            "$ref": "#/components/schemas/QueryFingerprint"
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/QueryMetadata"
+          },
+          "statement_type": {
+            "title": "Statement Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "statement_type",
+          "metadata",
+          "fingerprint"
+        ],
+        "title": "SqlAnalysis",
         "type": "object"
       },
       "TableRef": {
@@ -1899,6 +2156,119 @@
         "summary": "Healthz",
         "tags": [
           "health"
+        ]
+      }
+    },
+    "/api/v1/inspect/plan": {
+      "post": {
+        "operationId": "inspect_plan_api_v1_inspect_plan_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "description": "EXPLAIN (FORMAT JSON) output"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlanInspection"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Inspect Plan",
+        "tags": [
+          "inspect"
+        ]
+      }
+    },
+    "/api/v1/inspect/schema": {
+      "post": {
+        "operationId": "inspect_schema_api_v1_inspect_schema_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InspectSchemaRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SchemaInspection"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Inspect Schema",
+        "tags": [
+          "inspect"
+        ]
+      }
+    },
+    "/api/v1/inspect/sql": {
+      "post": {
+        "operationId": "inspect_sql_api_v1_inspect_sql_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InspectSqlRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SqlAnalysis"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Inspect Sql",
+        "tags": [
+          "inspect"
         ]
       }
     },

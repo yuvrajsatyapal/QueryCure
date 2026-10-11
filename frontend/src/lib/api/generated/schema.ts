@@ -110,6 +110,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/inspect/plan": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Inspect Plan */
+        post: operations["inspect_plan_api_v1_inspect_plan_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/inspect/schema": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Inspect Schema */
+        post: operations["inspect_schema_api_v1_inspect_schema_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/inspect/sql": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Inspect Sql */
+        post: operations["inspect_sql_api_v1_inspect_sql_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/me": {
         parameters: {
             query?: never;
@@ -296,6 +347,50 @@ export interface components {
             /** Username */
             username: string;
         };
+        /** DeclaredColumn */
+        DeclaredColumn: {
+            /** Data Type */
+            data_type: string | null;
+            /** Name */
+            name: string;
+            /** Not Null */
+            not_null: boolean;
+        };
+        /** DeclaredIndex */
+        DeclaredIndex: {
+            /** Columns */
+            columns: string[];
+            /** Method */
+            method: string | null;
+            /** Name */
+            name: string;
+            /** Predicate */
+            predicate: string | null;
+            /** Table */
+            table: string;
+            /** Unique */
+            unique: boolean;
+        };
+        /** DeclaredSchema */
+        DeclaredSchema: {
+            /** Indexes */
+            indexes: components["schemas"]["DeclaredIndex"][];
+            /** Tables */
+            tables: components["schemas"]["DeclaredTable"][];
+            /** Warnings */
+            warnings: string[];
+        };
+        /** DeclaredTable */
+        DeclaredTable: {
+            /** Columns */
+            columns: components["schemas"]["DeclaredColumn"][];
+            /** Name */
+            name: string;
+            /** Primary Key */
+            primary_key?: string[];
+            /** Schema Name */
+            schema_name: string | null;
+        };
         /** ExplainRequest */
         ExplainRequest: {
             /**
@@ -353,6 +448,21 @@ export interface components {
             /** Table Name */
             table_name: string;
         };
+        /** InspectSchemaRequest */
+        InspectSchemaRequest: {
+            /** Ddl */
+            ddl: string;
+        };
+        /** InspectSqlRequest */
+        InspectSqlRequest: {
+            /**
+             * Allow User Functions
+             * @default false
+             */
+            allow_user_functions: boolean;
+            /** Query */
+            query: string;
+        };
         /** MeResponse */
         MeResponse: {
             features: components["schemas"]["Features"];
@@ -390,6 +500,14 @@ export interface components {
             sort_spilled: boolean;
             /** Total Actual Rows */
             total_actual_rows: number | null;
+        };
+        /** PlanInspection */
+        PlanInspection: {
+            /** Artifact Sha256 */
+            artifact_sha256: string;
+            /** Metrics */
+            metrics: components["schemas"]["NodeMetrics"][];
+            plan: components["schemas"]["PlanTree"];
         };
         /**
          * PlanNode
@@ -537,6 +655,12 @@ export interface components {
             /** Status */
             status: string;
         };
+        /** SchemaInspection */
+        SchemaInspection: {
+            /** Artifact Sha256 */
+            artifact_sha256: string;
+            schema: components["schemas"]["DeclaredSchema"];
+        };
         /** SchemaSnapshot */
         SchemaSnapshot: {
             /** Columns */
@@ -551,6 +675,13 @@ export interface components {
         /** SessionResponse */
         SessionResponse: {
             user: components["schemas"]["UserOut"];
+        };
+        /** SqlAnalysis */
+        SqlAnalysis: {
+            fingerprint: components["schemas"]["QueryFingerprint"];
+            metadata: components["schemas"]["QueryMetadata"];
+            /** Statement Type */
+            statement_type: string;
         };
         /** TableRef */
         TableRef: {
@@ -850,6 +981,96 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HealthResponse"];
+                };
+            };
+        };
+    };
+    inspect_plan_api_v1_inspect_plan_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": unknown;
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlanInspection"];
+                };
+            };
+        };
+    };
+    inspect_schema_api_v1_inspect_schema_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InspectSchemaRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SchemaInspection"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    inspect_sql_api_v1_inspect_sql_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InspectSqlRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SqlAnalysis"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

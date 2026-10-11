@@ -6,8 +6,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from querydoctor import __version__
-from querydoctor.api.middleware import CsrfMiddleware, RequestIdMiddleware, install_error_handlers
-from querydoctor.api.routers import connections, health, session
+from querydoctor.api.middleware import (
+    CsrfMiddleware,
+    MaxBodySizeMiddleware,
+    RequestIdMiddleware,
+    install_error_handlers,
+)
+from querydoctor.api.routers import connections, health, inspect, session
 from querydoctor.core.config import Settings
 from querydoctor.core.logging import configure_logging
 from querydoctor.db.engine import make_engine
@@ -41,7 +46,7 @@ def create_app(settings: Settings | None = None, engine: AsyncEngine | None = No
     app.state.settings = settings
     app.state.engine = engine
     install_error_handlers(app)
-    # Starlette runs the last-added middleware first: CORS → request id → CSRF → routes.
+    # Starlette runs the last-added middleware first: body limit → CORS → request id → CSRF.
     app.add_middleware(CsrfMiddleware)
     app.add_middleware(RequestIdMiddleware)
     app.add_middleware(
@@ -52,9 +57,11 @@ def create_app(settings: Settings | None = None, engine: AsyncEngine | None = No
         allow_headers=["Content-Type", "X-CSRF-Token"],
         expose_headers=["X-Request-ID"],
     )
+    app.add_middleware(MaxBodySizeMiddleware)
     app.include_router(health.router, prefix=API_PREFIX)
     app.include_router(session.router, prefix=API_PREFIX)
     app.include_router(connections.router, prefix=API_PREFIX)
+    app.include_router(inspect.router, prefix=API_PREFIX)
     return app
 
 
