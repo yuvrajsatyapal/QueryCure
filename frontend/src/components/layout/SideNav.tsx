@@ -11,7 +11,7 @@ const NAV: NavItem[] = [
   { label: "Dashboard", href: "/app", available: true },
   { label: "New investigation", href: "/app/investigations/new", available: false },
   { label: "History", href: "/app/history", available: false },
-  { label: "Connections", href: "/app/connections", available: false },
+  { label: "Connections", href: "/app/connections", available: true },
   { label: "Settings", href: "/app/settings", available: false },
 ];
 

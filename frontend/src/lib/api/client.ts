@@ -57,13 +57,16 @@ async function toApiError(response: Response): Promise<ApiError> {
 export interface ApiRequest {
   method?: "GET" | "POST" | "DELETE";
   body?: unknown;
+  /** Sent verbatim (no case conversion), e.g. PostgreSQL plan JSON whose keys contain spaces. */
+  rawJsonBody?: string;
   signal?: AbortSignal;
 }
 
 export async function apiFetch<T>(path: string, request: ApiRequest = {}): Promise<T> {
   const method = request.method ?? "GET";
   const headers = new Headers({ Accept: "application/json" });
-  if (request.body !== undefined) headers.set("Content-Type", "application/json");
+  const hasBody = request.body !== undefined || request.rawJsonBody !== undefined;
+  if (hasBody) headers.set("Content-Type", "application/json");
   if (method !== "GET") {
     const csrf = readCookie("qd_csrf");
     if (csrf) headers.set("X-CSRF-Token", csrf);
@@ -74,7 +77,9 @@ export async function apiFetch<T>(path: string, request: ApiRequest = {}): Promi
       method,
       headers,
       credentials: "include",
-      body: request.body === undefined ? undefined : JSON.stringify(toSnake(request.body)),
+      body:
+        request.rawJsonBody ??
+        (request.body === undefined ? undefined : JSON.stringify(toSnake(request.body))),
       signal: request.signal,
     });
   } catch {

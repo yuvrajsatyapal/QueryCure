@@ -13,6 +13,14 @@
     "gen:api": "cd ../backend && uv run python -m querydoctor.api.export_openapi > ../frontend/src/lib/api/generated/openapi.json && cd ../frontend && openapi-typescript src/lib/api/generated/openapi.json -o src/lib/api/generated/schema.ts"
   },
   "dependencies": {
+    "@codemirror/commands": "^6.11.1",
+    "@codemirror/lang-sql": "^6.10.0",
+    "@codemirror/language": "^6.13.1",
+    "@codemirror/state": "^6.7.6",
+    "@codemirror/view": "^6.43.14",
+    "@dagrejs/dagre": "^3.1.1",
+    "@tanstack/react-query": "^5.104.1",
+    "@xyflow/react": "^12.12.0",
     "next": "16.4.0",
     "next-themes": "^0.4.6",
     "react": "19.3.0",
@@ -23,6 +31,7 @@
     "@tailwindcss/turbopack": "^4",
     "@testing-library/dom": "^10.4.2",
     "@testing-library/react": "^16.3.3",
+    "@testing-library/user-event": "^14.6.7",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",

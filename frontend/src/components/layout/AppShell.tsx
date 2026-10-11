@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
+import { SessionGate } from "./SessionGate";
 import { SideNav } from "./SideNav";
 
 export function AppShell({ children }: { children: ReactNode }) {
@@ -14,7 +15,9 @@ export function AppShell({ children }: { children: ReactNode }) {
       </header>
       <div className="flex flex-1">
         <SideNav />
-        <main className="flex-1 p-6">{children}</main>
+        <main className="flex-1 p-6">
+          <SessionGate>{children}</SessionGate>
+        </main>
       </div>
     </div>
   );

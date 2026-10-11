@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | Phase | **1 — Foundation** (Phase 0 documentation complete) |
-| Status | In progress: backend Phase 1 complete (T1.1–T1.14); frontend T1.15 done, T1.16–T1.19 remaining |
+| Status | In progress: backend Phase 1 complete (T1.1–T1.14); frontend T1.15–T1.16 done, T1.17–T1.19 remaining |
 | Last updated | 2026-10-11 |
 | Application code | Scaffolding only: FastAPI app factory with `/api/v1/healthz`; Next.js shell page; local Compose file. |
 
@@ -125,7 +125,14 @@
   - **Bug fixed while testing:** salted multiplicative hashes were correlated, leaving hot customer 1024 with 5 orders instead of about 100. Switched to md5 per salt.
   - Verified at sf=1: 1M orders in 8.8 s, customer 1024 has 10,013 orders and customer 7 has 9. Identical checksums across two independent loads and across the f-string → `psycopg.sql` rewrite.
   - 9 unit tests, 7 integration tests (incl. the rewrite trap really differing), and 2 API tests.
-- [ ] **Remaining:** T1.16–T1.19 (frontend connections page, workspace, plan graph, README run-locally).
+- [x] **T1.16 connections page** (`/app/connections`).
+  - List, add form (client-side required-field checks; backend envelope messages and field details shown inline), Test with a capability checklist that states each result in words, two-step delete, and a copyable restricted-role SQL snippet.
+  - App plumbing: `Providers` (TanStack Query that skips retries on 4xx, theme) and a `SessionGate` that creates a session after a 401 on `/me`.
+  - The `/app` segment sets `instant = false`. Next 16's instant-navigation validation can't render session-gated client pages on the server, and the bundled docs prescribe this opt-out.
+  - API client: `rawJsonBody`, so plan JSON is never key-converted; typed modules over the generated schema.
+  - Vitest: 4 form tests, 1 checklist test, 1 raw-upload test.
+  - **Verified in the browser** against the real API (`qd_app`) and PG 17.11: created a `qd_demo_inspector` connection to the sf=1 database; Test showed `LAST TEST: OK` with live capabilities; a `169.254.169.254` host showed the backend's "Target address is not allowed" inline.
+- [ ] **Remaining:** T1.17 workspace (SQL editor, plan upload, plan tree table), T1.18 plan graph, T1.19 README run-locally.
 
 ## Blockers
 
@@ -150,7 +157,7 @@
 | Internal links | Checked by script during Phase 0 |
 | Mermaid syntax | Reviewed manually (no renderer installed; not executed) |
 | Backend (through T1.14) | `uv run pytest -q` → 438 passed: 351 unit/security + 87 integration on PG 17.11, Python 3.12; CI also runs 3.13 and a `postgres:17` integration job. `ruff check`/`format --check` clean; `mypy --strict` clean on 58 files. Live API check as `qd_app`: readyz ok, session flow 401 → 201 → 200, CSRF 403 envelope |
-| Frontend (through T1.15) | `pnpm lint` clean; `pnpm typecheck` clean; `pnpm test` → 13 passed; `pnpm build` → compiled, `/` and `/app` prerendered static |
+| Frontend (through T1.16) | `pnpm lint` and `pnpm typecheck` clean; `pnpm test` → 19 passed; `pnpm build` compiles; browser-verified against the live API |
 | Compose | Running: `metadata-db` and `sandbox-db` healthy; `alembic current` → `0002 (head)`; `qd_app` login verified (INSERT yes, UPDATE no on `artifacts`) |
 
 ## Open decisions
