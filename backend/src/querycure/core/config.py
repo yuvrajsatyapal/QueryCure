@@ -62,6 +62,9 @@ class Settings(BaseSettings):
     worker_poll_seconds: float = Field(
         default=1.0, gt=0, validation_alias=_env("WORKER_POLL_SECONDS")
     )
+    sse_heartbeat_seconds: float = Field(
+        default=15.0, gt=0, validation_alias=_env("SSE_HEARTBEAT_SECONDS")
+    )
     cors_origins: list[str] = Field(default_factory=list, validation_alias=_env("CORS_ORIGINS"))
     cookie_domain: str | None = Field(default=None, validation_alias=_env("COOKIE_DOMAIN"))
     log_level: str = Field(default="INFO", validation_alias=_env("LOG_LEVEL"))

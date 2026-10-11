@@ -2,6 +2,7 @@ import hashlib
 from collections.abc import AsyncIterator
 from typing import Annotated
 
+import psycopg
 from fastapi import Depends, Request
 from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine
 
@@ -9,6 +10,7 @@ from querycure.core.config import Settings
 from querycure.core.errors import QueryCureError, UnauthenticatedError
 from querycure.db.repositories import sessions
 from querycure.domain.users import User
+from querycure.events.hub import EventHub
 
 SESSION_COOKIE = "qc_session"
 CSRF_COOKIE = "qc_csrf"
@@ -57,7 +59,44 @@ async def current_user(user: Annotated[User | None, Depends(optional_user)]) -> 
     return user
 
 
+async def stream_user(
+    request: Request, engine: Annotated[AsyncEngine, Depends(get_engine)]
+) -> User:
+    """Like current_user, but its transaction ends before a streaming response starts.
+
+    Yield-dependencies such as get_conn stay open until the response finishes, which for an
+    SSE stream would hold an idle transaction for the stream's whole lifetime.
+    """
+    token = request.cookies.get(SESSION_COOKIE)
+    user = None
+    if token:
+        async with engine.begin() as conn:
+            user = await sessions.get_session_user(conn, hash_token(token))
+    if user is None:
+        raise UnauthenticatedError("Sign in to continue.")
+    return user
+
+
+def get_event_hub(
+    request: Request, engine: Annotated[AsyncEngine, Depends(get_engine)]
+) -> EventHub:
+    hub: EventHub | None = request.app.state.event_hub
+    if hub is None:
+        # LISTEN needs no table privileges; a plain psycopg connection from the same URL.
+        url = engine.url.set(drivername="postgresql").render_as_string(hide_password=False)
+
+        async def connect() -> psycopg.AsyncConnection:
+            return await psycopg.AsyncConnection.connect(url, autocommit=True)
+
+        hub = EventHub(connect)
+        request.app.state.event_hub = hub
+    return hub
+
+
 SettingsDep = Annotated[Settings, Depends(get_settings)]
+EngineDep = Annotated[AsyncEngine, Depends(get_engine)]
+StreamUser = Annotated[User, Depends(stream_user)]
+HubDep = Annotated[EventHub, Depends(get_event_hub)]
 ConnDep = Annotated[AsyncConnection, Depends(get_conn)]
 CurrentUser = Annotated[User, Depends(current_user)]
 OptionalUser = Annotated[User | None, Depends(optional_user)]

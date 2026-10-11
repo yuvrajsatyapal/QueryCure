@@ -12,7 +12,7 @@ from querycure.api.middleware import (
     RequestIdMiddleware,
     install_error_handlers,
 )
-from querycure.api.routers import connections, health, inspect, session, workloads
+from querycure.api.routers import connections, health, inspect, runs, session, workloads
 from querycure.core.config import Settings
 from querycure.core.logging import configure_logging
 from querycure.db.engine import make_engine
@@ -32,6 +32,8 @@ def create_app(settings: Settings | None = None, engine: AsyncEngine | None = No
         try:
             yield
         finally:
+            if app.state.event_hub is not None:
+                await app.state.event_hub.close()
             if owns_engine and app.state.engine is not None:
                 await app.state.engine.dispose()
 
@@ -45,6 +47,7 @@ def create_app(settings: Settings | None = None, engine: AsyncEngine | None = No
     )
     app.state.settings = settings
     app.state.engine = engine
+    app.state.event_hub = None
     install_error_handlers(app)
     # Starlette runs the last-added middleware first: body limit → CORS → request id → CSRF.
     app.add_middleware(CsrfMiddleware)
@@ -63,6 +66,7 @@ def create_app(settings: Settings | None = None, engine: AsyncEngine | None = No
     app.include_router(connections.router, prefix=API_PREFIX)
     app.include_router(inspect.router, prefix=API_PREFIX)
     app.include_router(workloads.router, prefix=API_PREFIX)
+    app.include_router(runs.router, prefix=API_PREFIX)
     return app
 
 

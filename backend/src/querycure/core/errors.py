@@ -129,3 +129,10 @@ class RunCancelledError(QueryCureError):
 
 class ArtifactConflictError(QueryCureError):
     code = "ARTIFACT_CONFLICT"
+
+
+class RunFinalizedError(QueryCureError):
+    """Content writes to a sealed run (REPLAY_ENGINE §5 sealing rules)."""
+
+    code = "RUN_FINALIZED"
+    status = 409

@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | Phase | **2 — Multi-agent intelligence** (Phase 1 complete: [PHASE_1_REPORT](reports/PHASE_1_REPORT.md)) |
-| Status | **Phase 2 in progress.** T2.1–T2.2 done |
+| Status | **Phase 2 in progress.** T2.1–T2.3 done |
 | Last updated | 2026-10-12 |
 | Application code | Phase 1 foundation: API (session, connections, inspect, workloads, health), metadata DB migrations, SQL/plan parsing, inspection gateway, artifact store, demo workloads; web app with connections and plan workspace (tree + graph). No agents yet. |
 
@@ -180,6 +180,13 @@
   - `jobs/handlers.py` registers no handlers yet; `run_start`/`run_resume` arrive with the graph in T2.10. `WORKER_MODE=embedded` is not implemented (demo deployment, Phase 5).
   - Tests: 10 queue integration tests (6 concurrent workers drain 30 jobs with no double claim, reclaim, heartbeat ownership, stale worker cannot complete, backoff then dead-letter, reaping, active-only dedupe, ordering); 8 worker tests (success, retry, permanent error, unknown kind, lease-loss cancellation, 3-slot concurrency, reaping callback, shutdown); 2 config tests. Full suite 523 passed; ruff, format, mypy clean.
   - Live check: `python -m querycure.worker` as `qc_app` dead-lettered an unhandled `retention_sweep` job (`UNKNOWN_JOB_KIND`, attempt 1) and exited 0 on SIGTERM.
+- [x] **T2.3 event emitter + SSE** (`events/emitter.py`, `events/hub.py`, `api/sse.py`, `api/routers/runs.py`).
+  - `emit()` runs in the caller's transaction: seq from `UPDATE … last_event_seq + 1 RETURNING`, insert, `pg_notify`. A finalized run accepts only `report.ready` / `run.status_changed` (`RunFinalizedError`, rolling the seq back). `change_status()` transitions and emits `run.status_changed {from, to, outcome?}` in one transaction.
+  - **Design change (API_DESIGN §3):** one `LISTEN qc_run_events` connection per API process instead of `NOTIFY run_<id>` per stream; notifications are wake-ups only and events are always read from the table.
+  - SSE route uses its own short auth transaction: FastAPI 0.143's default yield-dependency scope would otherwise keep one idle transaction open per stream.
+  - History endpoint with an opaque seq cursor. Run lookups go through `get_run_for_user` (404 for missing, deleted, or another user's run).
+  - Tests: 8 emitter tests (25 concurrent emitters → gap-free 1..25, rollback leaves no gap, NOTIFY only after commit, sealing, status + event atomicity); 3 hub tests (per-run wake-ups, reconnect after `pg_terminate_backend`); 10 API tests over a real uvicorn server, including **ROADMAP acceptance #3**: a client drops after 10 of 41 live events, reconnects with `Last-Event-ID`, and receives every event exactly once (passed 8/8 repeated runs). Also wire format, `after_seq`, heartbeats, early close, 401, cross-user 404, bad `Last-Event-ID`, history pagination, forged cursor. Full suite 544 passed; ruff, format, mypy clean.
+  - Live check: uvicorn as `qc_app` streamed seq 1–3 emitted by a separate process and closed after the terminal event.
 
 ## Blockers
 

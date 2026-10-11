@@ -143,7 +143,15 @@ Error messages never include credentials, DSNs, or raw driver errors (driver err
 
 ## 3. Streaming (SSE)
 
-`GET /api/v1/runs/{run_id}/events` with `Accept: text/event-stream`. Supports `Last-Event-ID` (or `?after_seq=`). Server replays persisted events with `seq > last`, then streams live events triggered by `NOTIFY run_<id>`. Heartbeat comment every 15 s. Stream closes after a terminal status event.
+`GET /api/v1/runs/{run_id}/events` with `Accept: text/event-stream`. Supports `Last-Event-ID` (or `?after_seq=`; the header wins, and a non-numeric header is 400). Server replays persisted events with `seq > last`, then streams live events. Heartbeat comment every 15 s (`SSE_HEARTBEAT_SECONDS`). Stream closes after a terminal `run.status_changed`, or immediately if the run is already terminal and the client is caught up.
+
+Live delivery (implemented in T2.3):
+- Each API process holds **one** `LISTEN qc_run_events` connection (`events/hub.py`); the emitter sends `pg_notify('qc_run_events', run_id)` inside the event's transaction. One channel instead of one per run means one connection per process rather than one per open stream.
+- A notification is only a wake-up. The stream always reads `investigation_events WHERE seq > last` from the table, so a lost notification (listener reconnecting, DB restart) delays an event by at most one heartbeat and never drops or reorders it. After reconnecting, the hub wakes every subscriber to re-read.
+- Events become visible in `seq` order because `seq` is assigned under the run row lock, which is held until commit.
+- The stream resolves the user in a short transaction of its own: yield-dependencies stay open until the response ends, which for SSE would hold an idle transaction per client.
+
+`GET /runs/{run_id}/events/history?limit=&cursor=` returns `{items: [{run_id, seq, ts, type, payload}], next_cursor}` in `seq` order (limit ≤ 500; the opaque cursor encodes the last `seq`).
 
 Why SSE: one-directional progress, auto-reconnect built into `EventSource`, works through HTTP proxies, cookie auth works; client→server actions (approve, cancel) are normal POSTs. WebSockets add bidirectional complexity we don't need ([ADR-0005](../engineering/adr/ADR-0005-sse-event-log.md)).
 
