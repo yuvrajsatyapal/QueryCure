@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | Phase | **1 — Foundation** (Phase 0 documentation complete) |
-| Status | In progress: T1.1–T1.6, T1.7 (logic), T1.8 (canonicalization), T1.9, T1.15 done |
+| Status | In progress: T1.1–T1.6, T1.7 (logic), T1.8, T1.9, T1.15 done |
 | Last updated | 2026-10-11 |
 | Application code | Scaffolding only: FastAPI app factory with `/api/v1/healthz`; Next.js shell page; local Compose file. |
 
@@ -59,14 +59,12 @@
   - Returns a pinned `hostaddr` plus the original `host` for TLS. Error details never echo resolved addresses.
   - 70 security tests, including a rebinding resolver (one lookup only) and the real system resolver path.
   - Bug caught by the tests: Python reports `::1` as `is_reserved`, so loopback is now classified before the reserved rule.
-- [~] **T1.8, canonicalization half done; store half pending T1.4 / Docker.**
-  - `replay/canonical/`: frozen `qd-json-v1` (RFC 8785: UTF-16 key order, minimal escapes, ECMAScript number text, ±2^53 integer bound, primitives only).
-  - Also `qd-text-v1` (LF, single trailing LF, no BOM) and `qd-raw-v1` (exact bytes, strict UTF-8, no BOM).
-  - Typed encoders: UTC instants with 6 fractional digits, UUID, Enum, Decimal, base64url bytes, Pydantic models; naive datetimes and sets are rejected.
-  - `replay/digest.py` computes the profile-tagged SHA-256.
-  - Golden vectors in `tests/fixtures/canonical/`: RFC 8785 Appendix B numbers, plus hand-written canonical strings with digests computed independently via `hashlib`.
-  - 64 tests, passing on Python 3.12 and 3.13.
-  - Still to do: the `artifacts`/`run_artifacts` store and its integration tests as the restricted `qd_app` role. These need the metadata DB.
+- [x] **T1.8 canonicalization profiles and artifact store.**
+  - Canonical profiles, as above.
+  - `replay/artifact_store.py`: `store_json`/`store_text`/`store_raw_sql` dedupe by digest using `INSERT … ON CONFLICT DO NOTHING` plus re-select. There is no UPDATE and no row lock, so it works as `qd_app`.
+  - `get_artifact` re-verifies the digest on every read and raises `ArtifactIntegrityError` on a mismatch.
+  - A profile or content mismatch under an existing digest raises `ArtifactConflictError`. Artifacts over 5 MB are rejected. `link()` into `run_artifacts` is idempotent.
+  - 11 integration tests run as `qd_app`: 8 concurrent same-digest inserts yield one row, NUL survives storage, and corruption is detected.
 - [x] **T1.15 frontend shell.**
   - `styles/tokens.css` holds DESIGN_SYSTEM §2 tokens (light and `.dark`), mapped into Tailwind 4 `@theme` (`bg-surface`, `text-muted`, …). IBM Plex Sans/Mono come via `next/font`.
   - `next-themes` with the class strategy, plus a `ThemeToggle`.
@@ -91,9 +89,9 @@
   - Request-ID middleware and CSRF middleware (constant-time compare; `POST /session` exempt per ADR-0013).
   - Every error, including framework 404s, validation errors and crashes, leaves as the documented envelope. Crashes are generic and leak nothing.
   - Migration `0002`: a partial unique index allows one active local user, so concurrent first logins converge. It also grants `SELECT` on `alembic_version` to `qd_app` for readiness. The test first exposed the missing grant as a 503.
-  - Tests: 10 unit tests (envelope, CSRF) plus 12 integration tests, with the app engine running as `qd_app` via `SET ROLE`.
+  - Tests: 10 unit tests (envelope, CSRF) plus 10 integration tests, with the app engine running as `qd_app` via `SET ROLE`.
   - Verified live: uvicorn as the `qd_app` login against the dev DB (readyz ok, 401 → 201 → 200, CSRF 403 envelope).
-- [ ] **Next:** the T1.8 store, T1.10–T1.14, T1.16–T1.19, and the real PG plan fixtures for T1.7. Doing Docker-free tasks first (T1.7, T1.9, the canonicalization part of T1.8, T1.15, T1.17–T1.18) while Docker is down.
+- [ ] **Next:** T1.10–T1.14, T1.16–T1.19, and the real PG plan fixtures for T1.7. Doing Docker-free tasks first (T1.7, T1.9, the canonicalization part of T1.8, T1.15, T1.17–T1.18) while Docker is down.
 
 ## Blockers
 
@@ -117,7 +115,7 @@
 | Required files exist | See Phase 0 validation in the final summary |
 | Internal links | Checked by script during Phase 0 |
 | Mermaid syntax | Reviewed manually (no renderer installed; not executed) |
-| Backend (through T1.3) | `uv run pytest -q` → 347 passed (unit + security + 32 integration on PG 17.11) (3.12; CI also 3.13); `ruff check` and `ruff format --check` clean; `mypy` strict → no issues in 43 files; uvicorn smoke test: `/api/v1/healthz` 200, `/api/v1/openapi.json` 200 |
+| Backend (through T1.3) | `uv run pytest -q` → 358 passed (unit + security + 41 integration on PG 17.11) (3.12; CI also 3.13); `ruff check` and `ruff format --check` clean; `mypy` strict → no issues in 44 files; uvicorn smoke test: `/api/v1/healthz` 200, `/api/v1/openapi.json` 200 |
 | Frontend (through T1.15) | `pnpm lint` clean; `pnpm typecheck` clean; `pnpm test` → 13 passed; `pnpm build` → compiled, `/` and `/app` prerendered static |
 | Compose | Running: `metadata-db` and `sandbox-db` healthy; `alembic current` → `0002 (head)`; `qd_app` login verified (INSERT yes, UPDATE no on `artifacts`) |
 
