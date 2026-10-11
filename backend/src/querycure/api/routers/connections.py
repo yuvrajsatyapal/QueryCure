@@ -14,14 +14,13 @@ from querycure.api.schemas.connections import (
     ExplainResponse,
     QueryInfo,
 )
+from querycure.connectors.credentials import connection_aad, secret_box, target_from_record
 from querycure.connectors.inspection_gateway import InspectionGateway
 from querycure.connectors.models import SchemaSnapshot, TargetConnection
 from querycure.connectors.ssrf_guard import TargetPolicy, resolve_target
 from querycure.core.config import Profile, Settings
-from querycure.core.crypto import SecretBox, secret_aad
 from querycure.core.errors import (
     ApprovalRequiredError,
-    ConfigurationError,
     FeatureDisabledError,
     NotFoundError,
     QueryCureError,
@@ -37,7 +36,6 @@ from querycure.plans.parser import parse_plan
 from querycure.sql.validator import SqlPolicy, TableRef
 
 MAX_SNAPSHOT_TABLES = 50
-_TABLE = "database_connections"
 
 
 def require_live_inspection(settings: SettingsDep) -> None:
@@ -51,18 +49,6 @@ router = APIRouter(
 )
 
 
-def _secret_box(settings: Settings) -> SecretBox:
-    if settings.master_key is None:
-        raise ConfigurationError("QC_MASTER_KEY is not configured; credentials cannot be stored.")
-    return SecretBox.from_base64(
-        settings.master_key.get_secret_value(), version=settings.master_key_version
-    )
-
-
-def _aad(record_id: uuid.UUID, user: User) -> bytes:
-    return secret_aad(table=_TABLE, row_id=str(record_id), user_id=str(user.id))
-
-
 async def _owned(conn: ConnDep, user: User, connection_id: uuid.UUID) -> ConnectionRecord:
     record = await repo.get_connection(conn, user_id=user.id, connection_id=connection_id)
     if record is None:
@@ -71,18 +57,7 @@ async def _owned(conn: ConnDep, user: User, connection_id: uuid.UUID) -> Connect
 
 
 def _target(record: ConnectionRecord, user: User, settings: Settings) -> TargetConnection:
-    sealed = record.sealed_password()
-    if sealed is None:
-        raise NotFoundError("Connection not found.")
-    password = _secret_box(settings).decrypt(sealed, aad=_aad(record.id, user))
-    return TargetConnection(
-        host=record.host,
-        port=record.port,
-        dbname=record.dbname,
-        username=record.username,
-        password=password,
-        sslmode=record.sslmode,  # type: ignore[arg-type]
-    )
+    return target_from_record(record, user.id, settings)
 
 
 @router.post("", status_code=status.HTTP_201_CREATED)
@@ -97,9 +72,9 @@ async def create_connection(
         )
     # Fail fast on blocked targets; the gateway re-resolves and re-checks on every use.
     await resolve_target(body.host, body.port, policy=policy)
-    box = _secret_box(settings)
+    box = secret_box(settings)
     record_id = uuid.uuid4()
-    sealed = box.encrypt(body.password.get_secret_value(), aad=_aad(record_id, user))
+    sealed = box.encrypt(body.password.get_secret_value(), aad=connection_aad(record_id, user.id))
     record = await repo.insert_connection(
         conn,
         id=record_id,

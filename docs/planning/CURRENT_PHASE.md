@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | Phase | **2 — Multi-agent intelligence** (Phase 1 complete: [PHASE_1_REPORT](reports/PHASE_1_REPORT.md)) |
-| Status | **Phase 2 in progress.** T2.1–T2.5 done |
+| Status | **Phase 2 in progress.** T2.1–T2.6 done |
 | Last updated | 2026-10-12 |
 | Application code | Phase 1 foundation: API (session, connections, inspect, workloads, health), metadata DB migrations, SQL/plan parsing, inspection gateway, artifact store, demo workloads; web app with connections and plan workspace (tree + graph). No agents yet. |
 
@@ -201,6 +201,13 @@
   - **Decision:** budget counters are DB-side (`investigation_runs.usage`) with atomic conditional updates, so the three parallel analysts share one budget; the same statements observe cancellation and wall clock. AGENT_SYSTEM §11 defaults per profile.
   - `guarded()` node wrapper + `unless_stopped()` router: budget exhaustion or cancellation becomes a `stop_reason` and routes to `write_report`, which always runs (partial reports). `RunEventSink` commits each progress event on its own.
   - Tests: 8 integration (profile defaults, limit, 3 parallel guards grant exactly 5 of 5, tokens enforced on the next call, per-invocation and run tool limits, cancellation observed, wall clock, single 80% warning event); 7 unit routing tests on real LangGraph graphs (happy path + events, exhaustion skips to report with `inconclusive`, cancellation still writes the report, parallel stop reasons merge, unexpected errors propagate); 1 sink test. Full suite 581 passed; ruff, format, mypy clean.
+- [x] **T2.6 intake + collect_context** (`agents/nodes/intake.py`, `agents/nodes/collect_context.py`, `evidence/{ids,builders,sanitize,store}.py`, `agents/services.py`).
+  - Deterministic evidence IDs (`ev_` + 12 hex of `sha256(run_id|kind|artifact_sha|locator)`); summaries generated from data, never by an LLM. Real PG 17 plan: "Seq Scan on orders; 62.6 ms self (91.1% of runtime); est 4,333 vs actual 3,338 rows/loop x 3 loops (1.3x overestimate); filter (customer_id = 1024); 989,988 rows removed by filter; hottest node".
+  - Evidence store: one `jsonb_to_recordset` insert, idempotent, `evidence.created` only for new rows, finalized runs refused.
+  - Mode B uses the hardened gateway via `GatewayInspectorFactory`; failures degrade to `tool_error` evidence instead of failing the run; production connections are refused until Phase 3 approvals; another user's connection is `NOT_FOUND`.
+  - Refactor: connection decrypt/target helpers moved from the API router to `connectors/credentials.py` so the API and the worker share one implementation (connection API tests unchanged and passing).
+  - Bugs found by tests: validator details were dropped from intake errors; identifier truncation added "…", turning plain names into quoted ones (now truncates like PostgreSQL).
+  - Tests: 11 builder unit tests (on the real PG 17 captures); 9 integration tests (offline evidence, **crash re-run adds no rows or events**, 3 invalid-input routes, Mode B against the seeded target with the gateway — measured plan/table/column/index evidence, artifacts linked, planted e-mails absent — unreachable target degrades, production refused, foreign connection refused); 10 sanitizer security tests. Full suite 614 passed; ruff, format, mypy clean.
 
 ## Blockers
 

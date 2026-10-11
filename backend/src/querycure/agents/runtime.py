@@ -3,11 +3,13 @@
 import time
 import uuid
 from collections.abc import Awaitable, Callable
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any, Protocol
 
 from langgraph.runtime import Runtime
+from sqlalchemy.ext.asyncio import AsyncEngine
 
+from querycure.agents.services import InspectorFactory
 from querycure.agents.state import InvestigationState
 from querycure.core.errors import BudgetExhaustedError, RunCancelledError
 from querycure.core.logging import get_logger
@@ -39,7 +41,13 @@ class RunContext:
     guard: Guard
     events: EventSink
     attempt: int = 1
-    services: dict[str, Any] = field(default_factory=dict)
+    engine: AsyncEngine | None = None
+    inspectors: InspectorFactory | None = None
+
+    def db(self) -> AsyncEngine:
+        if self.engine is None:
+            raise RuntimeError("this node needs the metadata database")
+        return self.engine
 
 
 NodeFn = Callable[[InvestigationState, Runtime[RunContext]], Awaitable[dict[str, Any]]]

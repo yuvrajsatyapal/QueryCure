@@ -234,7 +234,7 @@ Artifacts are shared across runs by hash; ownership comes from `run_artifacts`. 
 5. **Concurrency.** Two transactions inserting the same digest concurrently: the second waits on the unique index, then takes the `DO NOTHING` path and re-selects. No error and no duplicate.
 
 ### run_artifacts
-`run_id`, `artifact_id`, `role TEXT` (e.g. `input.query`, `context.plan`, `output.report`), `produced_by TEXT` (node name). Unique `(run_id, artifact_id, role)`.
+`run_id`, `artifact_id`, `role TEXT` (e.g. `input.query`, `context.plan`, `output.report`), `produced_by TEXT` (node name). Unique `(run_id, artifact_id, role)`. Roles in use from Phase 2: `input.query` (qc-raw-v1 SQL), `input.plan` (`plan`/`plan_analyze`), `input.schema` (parsed `DeclaredSchema`), `input.param_sets`, `context.plan` (live plain EXPLAIN), `context.schema_snapshot`, `output.agent` (agent outputs).
 
 ### evidence
 As in the ER diagram. Primary key `(run_id, id)`. `id` = `ev_` + first 12 hex of `sha256(run_id|kind|artifact_sha|locator)` (deterministic → idempotent inserts), enforced by a CHECK on the shape. `kind` adds `plan_summary` (whole-plan facts such as total time) and `query_fact` (parsed query metadata such as ORDER BY/LIMIT) to the AGENT_SYSTEM list.
