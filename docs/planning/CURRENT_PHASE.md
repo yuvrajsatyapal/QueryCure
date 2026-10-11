@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | Phase | **2 — Multi-agent intelligence** (Phase 1 complete: [PHASE_1_REPORT](reports/PHASE_1_REPORT.md)) |
-| Status | **Phase 2 in progress.** T2.1 done |
+| Status | **Phase 2 in progress.** T2.1–T2.2 done |
 | Last updated | 2026-10-12 |
 | Application code | Phase 1 foundation: API (session, connections, inspect, workloads, health), metadata DB migrations, SQL/plan parsing, inspection gateway, artifact store, demo workloads; web app with connections and plan workspace (tree + graph). No agents yet. |
 
@@ -173,6 +173,13 @@
   - `domain/runs.py`: modes, statuses, outcomes, and the AGENT_SYSTEM §9 transition table. `db/repositories/runs.py`: `transition_run` in one `UPDATE … FROM (SELECT … FOR UPDATE)`; a completed status requires an outcome.
   - Dependencies: `langgraph` 1.2, `langgraph-checkpoint-postgres` 3.1, `langchain-core` 1.6 (uv also moved `websockets` 17.2 → 16.1 to satisfy `langgraph-sdk`).
   - Tests: 6 unit (state machine); 55 schema/grant integration tests run as `qc_app`/`qc_retention` (incl. the job claim query and checkpointer grants); 6 `transition_run` tests incl. a 6-way race with exactly one winner. Full suite 503 passed; ruff, format, mypy clean. Dev DB at `0004 (head)`.
+- [x] **T2.2 job queue + worker** (`jobs/queue.py`, `worker/runner.py`, `worker/__main__.py`).
+  - Queue: `enqueue` (dedupe via `ON CONFLICT … DO NOTHING`), `claim` (the documented `FOR UPDATE SKIP LOCKED` query, reporting whether the job was reclaimed from an expired lease), `heartbeat`, `complete`, `fail` (backoff or dead-letter), `reap_exhausted`. All times use the DB clock.
+  - Worker: N slots; a heartbeat beside each handler cancels it if the lease is lost; `PermanentJobError` and unknown kinds dead-letter at once; other exceptions retry, storing only `{code, type}`; SIGTERM/SIGINT stop gracefully and leave in-flight jobs to lease expiry. Lease, heartbeat and poll timings come from settings (heartbeat must be under half the lease).
+  - **Fix (migration `0005`):** the `dedupe_key` index from `0003` covered every status, so a finished resume job would have blocked all later resumes for that run. It now covers active jobs only.
+  - `jobs/handlers.py` registers no handlers yet; `run_start`/`run_resume` arrive with the graph in T2.10. `WORKER_MODE=embedded` is not implemented (demo deployment, Phase 5).
+  - Tests: 10 queue integration tests (6 concurrent workers drain 30 jobs with no double claim, reclaim, heartbeat ownership, stale worker cannot complete, backoff then dead-letter, reaping, active-only dedupe, ordering); 8 worker tests (success, retry, permanent error, unknown kind, lease-loss cancellation, 3-slot concurrency, reaping callback, shutdown); 2 config tests. Full suite 523 passed; ruff, format, mypy clean.
+  - Live check: `python -m querycure.worker` as `qc_app` dead-lettered an unhandled `retention_sweep` job (`UNKNOWN_JOB_KIND`, attempt 1) and exited 0 on SIGTERM.
 
 ## Blockers
 

@@ -118,6 +118,7 @@ Migrations run as a separate release step before new API instances start; migrat
 | `FEATURE_LIVE_INSPECTION_PUBLIC`, `FEATURE_SANDBOX` | feature flags |
 | `WORKER_MODE` | `separate` or `embedded` |
 | `WORKER_CONCURRENCY` | default 2 local / 1 demo |
+| `WORKER_LEASE_SECONDS` / `WORKER_HEARTBEAT_SECONDS` / `WORKER_POLL_SECONDS` | job lease (default 60), heartbeat (20; must be under half the lease) and idle poll (1) |
 | `CORS_ORIGINS`, `COOKIE_DOMAIN` | web origin config |
 | `SESSION_TTL_SECONDS` | session and CSRF cookie lifetime (default 30 days) |
 | `OTEL_EXPORTER_OTLP_ENDPOINT`, `LANGSMITH_API_KEY` | optional observability |

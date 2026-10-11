@@ -53,6 +53,15 @@ class Settings(BaseSettings):
     worker_concurrency: int | None = Field(
         default=None, ge=1, validation_alias=_env("WORKER_CONCURRENCY")
     )
+    worker_lease_seconds: int = Field(
+        default=60, ge=5, validation_alias=_env("WORKER_LEASE_SECONDS")
+    )
+    worker_heartbeat_seconds: float = Field(
+        default=20.0, gt=0, validation_alias=_env("WORKER_HEARTBEAT_SECONDS")
+    )
+    worker_poll_seconds: float = Field(
+        default=1.0, gt=0, validation_alias=_env("WORKER_POLL_SECONDS")
+    )
     cors_origins: list[str] = Field(default_factory=list, validation_alias=_env("CORS_ORIGINS"))
     cookie_domain: str | None = Field(default=None, validation_alias=_env("COOKIE_DOMAIN"))
     log_level: str = Field(default="INFO", validation_alias=_env("LOG_LEVEL"))
@@ -82,6 +91,9 @@ class Settings(BaseSettings):
             self.feature_sandbox = local
         if self.worker_concurrency is None:
             self.worker_concurrency = 2 if local else 1
+        if self.worker_heartbeat_seconds * 2 >= self.worker_lease_seconds:
+            # Two missed beats must still fit inside the lease, or healthy jobs get reclaimed.
+            raise ValueError("WORKER_HEARTBEAT_SECONDS must be under half of WORKER_LEASE_SECONDS")
         if not local:
             # Public deployments: SSRF guard must not be bypassable (SECURITY.md §5.1).
             if self.allow_private_targets:

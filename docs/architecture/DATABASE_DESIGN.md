@@ -293,7 +293,8 @@ Indexes: `(source_run_id, created_at DESC)`; `(status) WHERE status IN ('checkin
 | attempts / max_attempts | INT | default max 3 |
 | run_after | TIMESTAMPTZ | backoff scheduling |
 | locked_by / locked_until | TEXT / TIMESTAMPTZ | lease; heartbeat extends |
-| dedupe_key | TEXT | unique where not null (prevents duplicate resume jobs) |
+| dedupe_key | TEXT | unique among **active** jobs (`status IN ('pending','running')`, migration `0005`): prevents duplicate resume jobs without blocking a later resume once the first is done |
+| last_error | JSONB | `{code, type?}` only; exception messages are never stored (they can carry DSNs or keys) |
 
 Claim query:
 ```sql
@@ -308,6 +309,8 @@ WHERE id = (
 RETURNING *;
 ```
 Index: `(run_after) WHERE status = 'pending'`; `(locked_until) WHERE status = 'running'`.
+
+The claim excludes expired leases with no attempts left; `reap_exhausted` dead-letters those instead and the worker fails their runs. `heartbeat`, `complete` and `fail` are conditional on `locked_by = worker AND status = 'running'`, so a worker whose lease was reclaimed cannot touch the job; when its heartbeat sees that, it cancels the handler. On shutdown, in-flight jobs are left `running` for lease expiry rather than failed. Backoff after a failure: `min(2^attempts, 300)` s (`jobs/queue.py`).
 
 ### rate_limits
 `bucket_key TEXT PRIMARY KEY`, `tokens FLOAT`, `refilled_at TIMESTAMPTZ` — token bucket updated atomically with a single `UPDATE … RETURNING` (Phase 5).
