@@ -98,7 +98,10 @@ Key insight: **LLM output is untrusted** even though the agent code is trusted. 
 
 ### 4.3 Plan-time evaluation caveat
 
-Plain `EXPLAIN` does not execute the query, but the planner may evaluate `IMMUTABLE` functions and constant-fold expressions, and planning itself can be expensive for huge joins. Mitigations: function denylist (L1), `statement_timeout` (L3), and only allowing schema-qualified user functions if the user explicitly opts in (otherwise queries calling non-`pg_catalog` functions are rejected in Mode B).
+Plain `EXPLAIN` does not execute the query, but the planner may evaluate `IMMUTABLE` functions and constant-fold expressions, and planning itself can be expensive for huge joins. Mitigations: function denylist (L1), `statement_timeout` (L3), and user-defined functions only with explicit opt-in. Enforcement is split, because a parser cannot tell an unqualified user function from a built-in:
+
+- **L1 validator (T1.6):** rejects schema-qualified calls outside `pg_catalog`.
+- **Gateway (T1.10):** before `EXPLAIN`, resolves every function name the query uses against `pg_proc` in the target and rejects any that does not live in `pg_catalog`. This catches unqualified user functions found via `search_path`.
 
 ## 5. Connection security
 

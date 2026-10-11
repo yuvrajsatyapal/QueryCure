@@ -15,7 +15,7 @@ IDs `T<phase>.<n>`. Priority: **P0** blocks the phase exit, **P1** needed for ph
 | T1.7 | `plans/` parser + metrics (PG 13–17 fixtures) | P0 | T1.1 | Loops-aware self time matches hand-computed fixtures |
 | T1.8 | Canonicalization profiles (`qd-json-v1`, `qd-text-v1`, `qd-raw-v1`) + artifact store with profile-tagged digests | P0 | T1.4 | Golden-vector suite (REPLAY_ENGINE §2.4) passes on Python 3.12 and 3.13; integrity failure detected; canonicalizer rejects non-primitive input; integration tests for insert/dedupe/concurrent-insert/retrieval run as restricted `qd_app` role (TESTING_STRATEGY §3) |
 | T1.9 | `connectors/ssrf_guard.py` | P0 | T1.3 | All SSRF security cases pass |
-| T1.10 | Hardened sessions + inspection gateway + catalog templates + capabilities | P0 | T1.6, T1.9 | Integration: restricted role works; superuser refused; DML blocked at validator and at read-only txn; timeouts enforced |
+| T1.10 | Hardened sessions + inspection gateway + catalog templates + capabilities | P0 | T1.6, T1.9 | Integration: restricted role works; superuser refused; DML blocked at validator and at read-only txn; timeouts enforced; unqualified user-defined function (resolved via `search_path`) refused by the `pg_proc` check |
 | T1.11 | Statistics redaction (no MCV/histogram values) | P0 | T1.10 | Test asserts gateway output contains no `most_common_vals` |
 | T1.12 | Connections API (CRUD + test + explain + schema) | P0 | T1.5, T1.10 | Responses contain no secrets (schema scan test) |
 | T1.13 | Inspect API (`/inspect/sql|plan|schema`), upload limits | P0 | T1.6–T1.8 | 413 on oversize, 422 on invalid; artifacts stored |

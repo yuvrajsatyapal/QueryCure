@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | Phase | **1 — Foundation** (Phase 0 documentation complete) |
-| Status | In progress: T1.1–T1.3 done on `main` |
+| Status | In progress: T1.1–T1.3, T1.6 done on `main` |
 | Last updated | 2026-10-11 |
 | Application code | Scaffolding only: FastAPI app factory with `/api/v1/healthz`; Next.js shell page; local Compose file. |
 
@@ -38,7 +38,14 @@
   - `crypto.py`: AES-256-GCM `SecretBox` with table/row/user associated data and key versions for rotation.
   - 43 new unit tests.
   - CI actions bumped to their Node 24 majors (checkout v7, setup-uv v10.3.0 (exact pin; no floating tag), pnpm/action-setup v6, setup-node v7).
-- [ ] T1.4–T1.19 per [TASKS.md](TASKS.md).
+- [x] **T1.6 `sql/`** (SQLGlot 30).
+  - `parse_single` enforces one statement and a byte limit, and fails closed on empty, unparseable, or over-deep input.
+  - `validate_select` allows only SELECT and set-operation roots, and walks the **whole tree** for writes. This catches data-modifying CTEs, which parse with an innocent `Select` root. It also rejects SELECT INTO, row locks, the function denylist (also when schema-qualified or upper-cased), and qualified user functions unless opted in.
+  - Metadata covers tables (CTE names excluded), columns, ORDER BY, LIMIT, and parameter count.
+  - The literal-normalized fingerprint is metadata, not artifact identity.
+  - 97 new tests: 82 unit plus 15 security evasion tests in `tests/security/`.
+  - Unqualified user functions can't be detected by parsing; the `pg_proc` check is now an explicit T1.10 requirement (SECURITY §4.3 updated).
+- [ ] T1.4–T1.5, T1.7–T1.19 per [TASKS.md](TASKS.md). Doing Docker-free tasks first (T1.7, T1.9, the canonicalization part of T1.8, T1.15, T1.17–T1.18) while Docker is down.
 
 ## Blockers
 
@@ -62,7 +69,7 @@
 | Required files exist | See Phase 0 validation in the final summary |
 | Internal links | Checked by script during Phase 0 |
 | Mermaid syntax | Reviewed manually (no renderer installed; not executed) |
-| Backend (through T1.3) | `uv run pytest -q` → 45 passed (3.12; CI also 3.13); `ruff check` and `ruff format --check` clean; `mypy` strict → no issues in 11 files; uvicorn smoke test: `/api/v1/healthz` 200, `/api/v1/openapi.json` 200 |
+| Backend (through T1.3) | `uv run pytest -q` → 142 passed (3.12; CI also 3.13); `ruff check` and `ruff format --check` clean; `mypy` strict → no issues in 15 files; uvicorn smoke test: `/api/v1/healthz` 200, `/api/v1/openapi.json` 200 |
 | Frontend (T1.1) | `pnpm lint` clean; `pnpm typecheck` clean; `pnpm test` → 1 passed; `pnpm build` → compiled, `/` prerendered static |
 | Compose | `docker compose config` valid; **not started** (daemon down) |
 

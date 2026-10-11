@@ -11,6 +11,7 @@ dependencies = [
     "fastapi>=0.143.0",
     "pydantic>=2.14.0",
     "pydantic-settings>=2.15.0",
+    "sqlglot>=30.22.0",
     "structlog>=26.1.0",
     "uvicorn[standard]>=0.54.0",
 ]
@@ -36,7 +37,8 @@ target-version = "py312"
 select = ["E", "W", "F", "I", "B", "UP", "ASYNC", "S", "RUF", "SIM", "PT"]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**" = ["S101"]
+# Tests build hostile SQL from strings on purpose (S608).
+"tests/**" = ["S101", "S608"]
 
 [tool.mypy]
 python_version = "3.12"
