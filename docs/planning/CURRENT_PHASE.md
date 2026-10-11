@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | Phase | **1 — Foundation** (Phase 0 documentation complete) |
-| Status | In progress: T1.1–T1.2 done on `main` |
+| Status | In progress: T1.1–T1.3 done on `main` |
 | Last updated | 2026-10-11 |
 | Application code | Scaffolding only: FastAPI app factory with `/api/v1/healthz`; Next.js shell page; local Compose file. |
 
@@ -31,7 +31,14 @@
   - frontend: frozen install, lint, typecheck, test, and build.
   
   The failure path was verified locally: an injected type error makes both `mypy` and `tsc` report errors. It was not pushed, to keep `main` green.
-- [ ] T1.3–T1.19 per [TASKS.md](TASKS.md).
+- [x] **T1.3 `core/`.**
+  - `config.py`: profile-aware settings; the demo profile refuses `ALLOW_PRIVATE_TARGETS=true` and requires `QD_MASTER_KEY`; secrets are `SecretStr`.
+  - `logging.py` + `redaction.py`: structlog JSON with UTC timestamps. Sensitive keys are redacted recursively; DSN passwords, Google/OpenRouter/`sk-` keys and Bearer tokens are masked inside values, including exception tracebacks.
+  - `errors.py`: stable codes and statuses matching the API error envelope.
+  - `crypto.py`: AES-256-GCM `SecretBox` with table/row/user associated data and key versions for rotation.
+  - 43 new unit tests.
+  - CI actions bumped to their Node 24 majors (checkout v7, setup-uv v10, pnpm/action-setup v6, setup-node v7).
+- [ ] T1.4–T1.19 per [TASKS.md](TASKS.md).
 
 ## Blockers
 
@@ -55,7 +62,7 @@
 | Required files exist | See Phase 0 validation in the final summary |
 | Internal links | Checked by script during Phase 0 |
 | Mermaid syntax | Reviewed manually (no renderer installed; not executed) |
-| Backend (T1.1) | `uv run pytest -q` → 2 passed; `ruff check` and `ruff format --check` clean; `mypy` strict → no issues in 5 files; uvicorn smoke test: `/api/v1/healthz` 200, `/api/v1/openapi.json` 200 |
+| Backend (through T1.3) | `uv run pytest -q` → 45 passed (3.12; CI also 3.13); `ruff check` and `ruff format --check` clean; `mypy` strict → no issues in 11 files; uvicorn smoke test: `/api/v1/healthz` 200, `/api/v1/openapi.json` 200 |
 | Frontend (T1.1) | `pnpm lint` clean; `pnpm typecheck` clean; `pnpm test` → 1 passed; `pnpm build` → compiled, `/` prerendered static |
 | Compose | `docker compose config` valid; **not started** (daemon down) |
 
