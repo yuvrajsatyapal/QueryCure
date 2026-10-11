@@ -65,6 +65,8 @@ class HypothesisSet(Draft):
 
     hypotheses: list[HypothesisDraft] = Field(max_length=8)
     summary: str = Field(max_length=600)
+    # Only when no hypothesis is returned: evidence that the query is already efficient.
+    no_action_evidence: list[str] = Field(default_factory=list, max_length=10)
 
 
 def judge_hypotheses(
@@ -85,4 +87,5 @@ def judge_hypotheses(
         for h, v in zip(output.hypotheses, verdicts, strict=True)
         if v.keep
     ]
-    return output.model_copy(update={"hypotheses": kept}), report
+    no_action = [i for i in dict.fromkeys(output.no_action_evidence) if i in evidence_kinds]
+    return output.model_copy(update={"hypotheses": kept, "no_action_evidence": no_action}), report

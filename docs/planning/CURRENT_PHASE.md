@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | Phase | **2 — Multi-agent intelligence** (Phase 1 complete: [PHASE_1_REPORT](reports/PHASE_1_REPORT.md)) |
-| Status | **Phase 2 in progress.** T2.1–T2.7 done |
+| Status | **Phase 2 in progress.** T2.1–T2.8 done |
 | Last updated | 2026-10-12 |
 | Application code | Phase 1 foundation: API (session, connections, inspect, workloads, health), metadata DB migrations, SQL/plan parsing, inspection gateway, artifact store, demo workloads; web app with connections and plan workspace (tree + graph). No agents yet. |
 
@@ -214,6 +214,11 @@
   - Agent runner: one `agent_executions` row per provider call, accepted output stored as an artifact, reuse by `invocation_key` (crash re-run makes no LLM call), provider outage → `AgentFailed`, budget/cancellation propagate after recording calls made. Per-run LLM semaphore and a retry policy on the run context.
   - Bug found by a test: the runner hard-wired the default retry backoff, so a provider outage test slept ~15 s; the policy now comes from the run context.
   - Tests: 7 fencing security tests (forged markers, fresh tokens, objective line breaks, kind labels); 9 citation unit tests; 7 runner integration tests as `qc_app` (accept + rows + usage + artifact role, retry with the problems sent back, second failure keeps cited claims only, exactly 50% not retried, crash re-run reuses output with zero calls, outage records 4 failed calls, budget exhaustion before any call). Full suite 638 passed; ruff, format, mypy clean.
+- [x] **T2.8 supervisor plan + synthesize_hypotheses** (`agents/nodes/supervisor.py`, `agents/prompts/{common,supervisor}.py`, `db/repositories/findings.py`).
+  - Shared system prompt sections: role, task, evidence rules (cite IDs from the evidence block only, no invented numbers, no speed-up predictions, say "unknown"), data rules. Prompt versions `supervisor_plan@1`, `supervisor_synthesis@1`.
+  - Deterministic guard rails around the model: eligibility intersection, fallback plan, confidence re-ranking, `proposed_by` from shared citations, cited `no_action_evidence`.
+  - Hypotheses persisted idempotently with `hypothesis.created` only for new rows; findings repository ready for the analysts (T2.9).
+  - Tests: 7 routing/ranking unit tests (eligibility per mode/capability, `Send` fan-out, stop → report, confidence ranking with stable keys, `proposed_by`); 8 integration tests (ineligible dropped, fallback on model failure, no LLM call without analysts, **disagreeing analysts persisted as separate ranked hypotheses**, re-run adds no rows or events, uncited hypothesis dropped, `no_action_evidence` stripped of unknown IDs, no synthesis call without findings). Full suite 653 passed; ruff, format, mypy clean.
 
 ## Blockers
 
