@@ -1,9 +1,10 @@
 """Per-run context handed to nodes (not checkpointed) and the node wrapper."""
 
+import asyncio
 import time
 import uuid
 from collections.abc import Awaitable, Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Protocol
 
 from langgraph.runtime import Runtime
@@ -15,10 +16,18 @@ from querycure.core.errors import BudgetExhaustedError, RunCancelledError
 from querycure.core.logging import get_logger
 from querycure.domain.investigation import NodeError
 from querycure.events.types import EventType
+from querycure.llm.structured import RetryPolicy
+from querycure.llm.types import ChatClient
 
 log = get_logger(__name__)
 
 REPORT_NODE = "write_report"
+
+
+@dataclass(frozen=True)
+class LlmClients:
+    primary: ChatClient
+    fallback: ChatClient | None = None
 
 
 class Guard(Protocol):
@@ -43,6 +52,15 @@ class RunContext:
     attempt: int = 1
     engine: AsyncEngine | None = None
     inspectors: InspectorFactory | None = None
+    llm: "LlmClients | None" = None
+    llm_retry: RetryPolicy = field(default_factory=RetryPolicy)
+    # Per-run cap on concurrent LLM calls across parallel branches (AGENT_SYSTEM §6).
+    llm_slots: asyncio.Semaphore = field(default_factory=lambda: asyncio.Semaphore(3))
+
+    def clients(self) -> "LlmClients":
+        if self.llm is None:
+            raise RuntimeError("this node needs an LLM client")
+        return self.llm
 
     def db(self) -> AsyncEngine:
         if self.engine is None:

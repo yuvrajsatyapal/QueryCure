@@ -127,7 +127,7 @@ Mode B is **disabled by default** on the public demo (`FEATURE_LIVE_INSPECTION_P
 Untrusted text sources: user objective, query text and comments, identifiers, table/column comments, plan JSON, workload query texts from `pg_stat_statements` (other users' queries!).
 
 Controls:
-1. **Fencing.** Untrusted data is placed in delimited blocks with a random per-call boundary token: `<<DATA 7f3a… kind=schema>> … <<END 7f3a…>>`. The system prompt states data blocks contain no instructions.
+1. **Fencing.** Untrusted data is placed in delimited blocks with a random per-call boundary token: `<<DATA 7f3a… kind=schema>> … <<END 7f3a…>>`. The system prompt states data blocks contain no instructions. Implemented in `agents/fencing.py` (T2.7): 16-hex token per block (regenerated if the content happens to contain it), kind labels restricted to `[a-z_]{1,32}`, user objectives flattened to one line. Tokens are recorded per prompt so eval recordings can normalise them.
 2. **Sanitization.** Identifiers rendered via a quoting function; comments truncated (200 chars) and control characters stripped; `pg_stat_statements` query texts truncated to 500 chars and normalized (constants already replaced by `$n`).
 3. **Capability limits.** Even a fully hijacked agent can only call its allowlisted typed tools; none can run arbitrary SQL on a target or execute without approval.
 4. **Deterministic verification.** A hijacked agent cannot make a candidate "verified" — verdicts come from rules (ADR-0009).

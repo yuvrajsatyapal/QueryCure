@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | Phase | **2 — Multi-agent intelligence** (Phase 1 complete: [PHASE_1_REPORT](reports/PHASE_1_REPORT.md)) |
-| Status | **Phase 2 in progress.** T2.1–T2.6 done |
+| Status | **Phase 2 in progress.** T2.1–T2.7 done |
 | Last updated | 2026-10-12 |
 | Application code | Phase 1 foundation: API (session, connections, inspect, workloads, health), metadata DB migrations, SQL/plan parsing, inspection gateway, artifact store, demo workloads; web app with connections and plan workspace (tree + graph). No agents yet. |
 
@@ -208,6 +208,12 @@
   - Refactor: connection decrypt/target helpers moved from the API router to `connectors/credentials.py` so the API and the worker share one implementation (connection API tests unchanged and passing).
   - Bugs found by tests: validator details were dropped from intake errors; identifier truncation added "…", turning plain names into quoted ones (now truncates like PostgreSQL).
   - Tests: 11 builder unit tests (on the real PG 17 captures); 9 integration tests (offline evidence, **crash re-run adds no rows or events**, 3 invalid-input routes, Mode B against the seeded target with the gateway — measured plan/table/column/index evidence, artifacts linked, planted e-mails absent — unreachable target degrades, production refused, foreign connection refused); 10 sanitizer security tests. Full suite 614 passed; ruff, format, mypy clean.
+- [x] **T2.7 evidence grounding: fencing, citation validator, agent runner** (`agents/fencing.py`, `agents/citations.py`, `agents/outputs.py`, `agents/agent_runner.py`, `db/repositories/agents.py`).
+  - Fencing with random per-block tokens; forged `<<END …>>` markers in content stay inside the block.
+  - Citation validator: unknown IDs stripped, uncited claims removed, unbenchmarked speed-up numbers removed, retry once when > 50% removed.
+  - Agent runner: one `agent_executions` row per provider call, accepted output stored as an artifact, reuse by `invocation_key` (crash re-run makes no LLM call), provider outage → `AgentFailed`, budget/cancellation propagate after recording calls made. Per-run LLM semaphore and a retry policy on the run context.
+  - Bug found by a test: the runner hard-wired the default retry backoff, so a provider outage test slept ~15 s; the policy now comes from the run context.
+  - Tests: 7 fencing security tests (forged markers, fresh tokens, objective line breaks, kind labels); 9 citation unit tests; 7 runner integration tests as `qc_app` (accept + rows + usage + artifact role, retry with the problems sent back, second failure keeps cited claims only, exactly 50% not retried, crash re-run reuses output with zero calls, outage records 4 failed calls, budget exhaustion before any call). Full suite 638 passed; ruff, format, mypy clean.
 
 ## Blockers
 
