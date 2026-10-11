@@ -24,10 +24,27 @@ Instructions for any coding agent (Codex, Claude Code, Cursor, etc.). [CLAUDE.md
 | Data conventions | snake_case JSON, camelCase TS, UTC everywhere, UUID PKs, TEXT, soft delete, no FK constraints ([ADR-0006](docs/engineering/adr/ADR-0006-metadata-schema-conventions.md)). |
 | Dependencies | Justify every new one; prefer stdlib and existing deps. |
 
+## Git Branch Policy — Main Only
+
+* All future development must happen directly on the `main` branch.
+* Do not create feature branches, temporary branches, or worktrees for implementation.
+* Before starting any task, check the current branch.
+* If the current branch is not `main`, switch to `main` safely before making changes.
+* Never discard uncommitted changes when switching branches.
+* After completing a task or implementation phase, run the relevant tests and checks.
+* Commit completed, verified changes directly to `main` with a descriptive commit message.
+* Push successful commits to `origin/main` when a remote is configured.
+* Never force-push or rewrite published history.
+* Do not automatically resolve merge conflicts by discarding changes.
+* If the working tree is dirty, conflicts exist, tests fail, or pushing is rejected, report the problem and resolve it safely rather than forcing the operation.
+* Do not commit secrets, credentials, `.env` files, virtual environments, build artifacts, or dependency directories.
+* Follow this workflow for every subsequent implementation task unless I explicitly instruct otherwise.
+
 ## Definition of done
 
 - Tests written first for deterministic logic; security controls have negative tests; agent changes have eval fixtures.
 - Verification commands (CLAUDE.md §7) run, and **actual** output reported. If a command could not run, say so.
 - Owning docs updated; ADR added for new trade-offs; CURRENT_PHASE.md updated.
+- Verified changes committed on `main` and pushed to `origin/main` when a remote exists (Git Branch Policy above).
 - No fabricated benchmark numbers or claims of untested functionality. No silent mocks.
 - At phase completion: report in `docs/planning/reports/` using [PHASE_TEMPLATE.md](docs/planning/PHASE_TEMPLATE.md), with a learning summary.

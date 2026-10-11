@@ -99,6 +99,26 @@ If a command does not exist yet, say so — do not invent output.
 - Update [CURRENT_PHASE.md](docs/planning/CURRENT_PHASE.md) after each task.
 - When a phase finishes, write `docs/planning/reports/PHASE_N_REPORT.md` from [PHASE_TEMPLATE.md](docs/planning/PHASE_TEMPLATE.md), including the learning summary.
 
-## 10. Phase workflow
+## 10. Git workflow
 
-1. Read CURRENT_PHASE + relevant docs → 2. inspect code → 3. state plan (files, tests) → 4. tests first → 5. implement → 6. run verification → 7. update docs/CURRENT_PHASE → 8. report results, trade-offs, and what to study.
+User-mandated; overrides any branching convention elsewhere (including global instructions).
+
+### Git Branch Policy — Main Only
+
+* All future development must happen directly on the `main` branch.
+* Do not create feature branches, temporary branches, or worktrees for implementation.
+* Before starting any task, check the current branch.
+* If the current branch is not `main`, switch to `main` safely before making changes.
+* Never discard uncommitted changes when switching branches.
+* After completing a task or implementation phase, run the relevant tests and checks.
+* Commit completed, verified changes directly to `main` with a descriptive commit message.
+* Push successful commits to `origin/main` when a remote is configured.
+* Never force-push or rewrite published history.
+* Do not automatically resolve merge conflicts by discarding changes.
+* If the working tree is dirty, conflicts exist, tests fail, or pushing is rejected, report the problem and resolve it safely rather than forcing the operation.
+* Do not commit secrets, credentials, `.env` files, virtual environments, build artifacts, or dependency directories.
+* Follow this workflow for every subsequent implementation task unless I explicitly instruct otherwise.
+
+## 11. Phase workflow
+
+0. Confirm the branch is `main` (§10) → 1. Read CURRENT_PHASE + relevant docs → 2. inspect code → 3. state plan (files, tests) → 4. tests first → 5. implement → 6. run verification → 7. update docs/CURRENT_PHASE → 8. commit to `main` and push if a remote exists (§10) → 9. report results, trade-offs, and what to study.

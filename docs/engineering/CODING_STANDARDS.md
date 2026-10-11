@@ -78,5 +78,6 @@ Before adding a package: (1) can stdlib or an existing dependency do it? (2) is 
 
 ## 7. Git
 
-- Branches: `feature/<slug>`, `fix/<slug>`, `docs/<slug>`. Conventional commit messages (`feat(benchmark): add bootstrap CI`).
+- **Main only:** all work is committed directly to `main` (see *Git Branch Policy* in [CLAUDE.md](../../CLAUDE.md) and [AGENTS.md](../../AGENTS.md)). No feature branches or worktrees. Never force-push.
+- Conventional commit messages (`feat(benchmark): add bootstrap CI`), referencing task IDs where applicable.
 - Small PRs mapped to TASKS.md IDs (`T2.4`).
