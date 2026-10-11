@@ -56,6 +56,9 @@ class Settings(BaseSettings):
     cors_origins: list[str] = Field(default_factory=list, validation_alias=_env("CORS_ORIGINS"))
     cookie_domain: str | None = Field(default=None, validation_alias=_env("COOKIE_DOMAIN"))
     log_level: str = Field(default="INFO", validation_alias=_env("LOG_LEVEL"))
+    session_ttl_seconds: int = Field(
+        default=30 * 24 * 3600, ge=300, validation_alias=_env("SESSION_TTL_SECONDS")
+    )
 
     @field_validator("master_key")
     @classmethod

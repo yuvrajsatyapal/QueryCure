@@ -1,6 +1,24 @@
 {
   "components": {
     "schemas": {
+      "Features": {
+        "properties": {
+          "live_inspection": {
+            "title": "Live Inspection",
+            "type": "boolean"
+          },
+          "sandbox": {
+            "title": "Sandbox",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "live_inspection",
+          "sandbox"
+        ],
+        "title": "Features",
+        "type": "object"
+      },
       "HealthResponse": {
         "properties": {
           "status": {
@@ -13,6 +31,108 @@
         ],
         "title": "HealthResponse",
         "type": "object"
+      },
+      "MeResponse": {
+        "properties": {
+          "features": {
+            "$ref": "#/components/schemas/Features"
+          },
+          "profile": {
+            "$ref": "#/components/schemas/Profile"
+          },
+          "user": {
+            "$ref": "#/components/schemas/UserOut"
+          }
+        },
+        "required": [
+          "user",
+          "profile",
+          "features"
+        ],
+        "title": "MeResponse",
+        "type": "object"
+      },
+      "Profile": {
+        "enum": [
+          "local",
+          "demo"
+        ],
+        "title": "Profile",
+        "type": "string"
+      },
+      "ReadinessResponse": {
+        "properties": {
+          "database": {
+            "title": "Database",
+            "type": "string"
+          },
+          "migrations": {
+            "title": "Migrations",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "database",
+          "migrations"
+        ],
+        "title": "ReadinessResponse",
+        "type": "object"
+      },
+      "SessionResponse": {
+        "properties": {
+          "user": {
+            "$ref": "#/components/schemas/UserOut"
+          }
+        },
+        "required": [
+          "user"
+        ],
+        "title": "SessionResponse",
+        "type": "object"
+      },
+      "UserKind": {
+        "enum": [
+          "local",
+          "anonymous",
+          "oauth"
+        ],
+        "title": "UserKind",
+        "type": "string"
+      },
+      "UserOut": {
+        "properties": {
+          "display_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Name"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/UserKind"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "display_name"
+        ],
+        "title": "UserOut",
+        "type": "object"
       }
     }
   },
@@ -24,6 +144,7 @@
   "paths": {
     "/api/v1/healthz": {
       "get": {
+        "description": "Liveness only: the process is up.",
         "operationId": "healthz_api_v1_healthz_get",
         "responses": {
           "200": {
@@ -40,6 +161,70 @@
         "summary": "Healthz",
         "tags": [
           "health"
+        ]
+      }
+    },
+    "/api/v1/me": {
+      "get": {
+        "operationId": "me_api_v1_me_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MeResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Me",
+        "tags": [
+          "session"
+        ]
+      }
+    },
+    "/api/v1/readyz": {
+      "get": {
+        "description": "Readiness: metadata DB reachable and migrated to head (API_DESIGN \u00a72).",
+        "operationId": "readyz_api_v1_readyz_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReadinessResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Readyz",
+        "tags": [
+          "health"
+        ]
+      }
+    },
+    "/api/v1/session": {
+      "post": {
+        "operationId": "create_session_api_v1_session_post",
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Create Session",
+        "tags": [
+          "session"
         ]
       }
     }

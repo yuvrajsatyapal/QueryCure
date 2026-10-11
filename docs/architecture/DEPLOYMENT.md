@@ -119,5 +119,6 @@ Migrations run as a separate release step before new API instances start; migrat
 | `WORKER_MODE` | `separate` or `embedded` |
 | `WORKER_CONCURRENCY` | default 2 local / 1 demo |
 | `CORS_ORIGINS`, `COOKIE_DOMAIN` | web origin config |
+| `SESSION_TTL_SECONDS` | session and CSRF cookie lifetime (default 30 days) |
 | `OTEL_EXPORTER_OTLP_ENDPOINT`, `LANGSMITH_API_KEY` | optional observability |
 | `GEMINI_API_KEY`, `OPENROUTER_API_KEY` | local-profile fallback only; ignored in demo |

@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | Phase | **1 — Foundation** (Phase 0 documentation complete) |
-| Status | In progress: T1.1–T1.4, T1.6, T1.7 (logic), T1.8 (canonicalization), T1.9, T1.15 done; Docker running |
+| Status | In progress: T1.1–T1.6, T1.7 (logic), T1.8 (canonicalization), T1.9, T1.15 done |
 | Last updated | 2026-10-11 |
 | Application code | Scaffolding only: FastAPI app factory with `/api/v1/healthz`; Next.js shell page; local Compose file. |
 
@@ -84,7 +84,16 @@
   - Local login roles come from `infra/docker/metadata-init/01-roles.sh` (idempotent; env passwords with dev-only defaults).
   - 18 integration tests run with `SET ROLE` as the restricted roles: conventions, trigger, CHECKs, a second upgrade as a no-op, a single head, and grants (app cannot UPDATE/DELETE/TRUNCATE/lock artifacts or create tables; retention can delete but not insert).
   - CI gained a `postgres:17` integration job with `QD_REQUIRE_DB=1`, so a missing DB fails instead of skipping.
-- [ ] **Next (Docker now running):** T1.5, the T1.8 store, T1.10–T1.14, T1.16–T1.19, and the real PG plan fixtures for T1.7. Doing Docker-free tasks first (T1.7, T1.9, the canonicalization part of T1.8, T1.15, T1.17–T1.18) while Docker is down.
+- [x] **T1.5 session API, CSRF, and error envelope.**
+  - `POST /session`: the local profile resolves to the single local user; the demo profile creates anonymous users. A valid existing session is reused (200, not 201).
+  - The token is random and stored only as its SHA-256. The `qd_session` cookie is HttpOnly and SameSite=Lax (Secure outside local); `qd_csrf` is readable for double-submit.
+  - `GET /me` returns the user, profile and features. `GET /readyz` checks DB reachability and that migrations are at head.
+  - Request-ID middleware and CSRF middleware (constant-time compare; `POST /session` exempt per ADR-0013).
+  - Every error, including framework 404s, validation errors and crashes, leaves as the documented envelope. Crashes are generic and leak nothing.
+  - Migration `0002`: a partial unique index allows one active local user, so concurrent first logins converge. It also grants `SELECT` on `alembic_version` to `qd_app` for readiness. The test first exposed the missing grant as a 503.
+  - Tests: 10 unit tests (envelope, CSRF) plus 12 integration tests, with the app engine running as `qd_app` via `SET ROLE`.
+  - Verified live: uvicorn as the `qd_app` login against the dev DB (readyz ok, 401 → 201 → 200, CSRF 403 envelope).
+- [ ] **Next:** the T1.8 store, T1.10–T1.14, T1.16–T1.19, and the real PG plan fixtures for T1.7. Doing Docker-free tasks first (T1.7, T1.9, the canonicalization part of T1.8, T1.15, T1.17–T1.18) while Docker is down.
 
 ## Blockers
 
@@ -108,9 +117,9 @@
 | Required files exist | See Phase 0 validation in the final summary |
 | Internal links | Checked by script during Phase 0 |
 | Mermaid syntax | Reviewed manually (no renderer installed; not executed) |
-| Backend (through T1.3) | `uv run pytest -q` → 324 passed (306 unit + 18 integration on PG 17.11) (3.12; CI also 3.13); `ruff check` and `ruff format --check` clean; `mypy` strict → no issues in 29 files; uvicorn smoke test: `/api/v1/healthz` 200, `/api/v1/openapi.json` 200 |
+| Backend (through T1.3) | `uv run pytest -q` → 347 passed (unit + security + 32 integration on PG 17.11) (3.12; CI also 3.13); `ruff check` and `ruff format --check` clean; `mypy` strict → no issues in 43 files; uvicorn smoke test: `/api/v1/healthz` 200, `/api/v1/openapi.json` 200 |
 | Frontend (through T1.15) | `pnpm lint` clean; `pnpm typecheck` clean; `pnpm test` → 13 passed; `pnpm build` → compiled, `/` and `/app` prerendered static |
-| Compose | Running: `metadata-db` and `sandbox-db` healthy; `alembic current` → `0001 (head)`; `qd_app` login verified (INSERT yes, UPDATE no on `artifacts`) |
+| Compose | Running: `metadata-db` and `sandbox-db` healthy; `alembic current` → `0002 (head)`; `qd_app` login verified (INSERT yes, UPDATE no on `artifacts`) |
 
 ## Open decisions
 

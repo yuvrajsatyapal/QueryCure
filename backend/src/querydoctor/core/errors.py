@@ -34,6 +34,21 @@ class InvalidPlanFormatError(QueryDoctorError):
     status = 400
 
 
+class UnauthenticatedError(QueryDoctorError):
+    code = "UNAUTHENTICATED"
+    status = 401
+
+
+class CsrfFailedError(QueryDoctorError):
+    code = "CSRF_FAILED"
+    status = 403
+
+
+class FeatureDisabledError(QueryDoctorError):
+    code = "FEATURE_DISABLED"
+    status = 403
+
+
 class NotFoundError(QueryDoctorError):
     code = "NOT_FOUND"
     status = 404

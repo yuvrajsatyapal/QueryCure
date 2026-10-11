@@ -42,6 +42,7 @@ Status: Planned. Base path `/api/v1`. JSON is `snake_case`. Timestamps ISO 8601 
 | 422 | `VALIDATION_ERROR`, `EXPERIMENT_NOT_REPLAYABLE`, `SQL_NOT_ALLOWED`, `SQL_PARSE_ERROR`, `CONNECTION_TARGET_BLOCKED`, `ROLE_TOO_PRIVILEGED` |
 | 429 | `RATE_LIMITED`, `CONCURRENCY_LIMIT` |
 | 502/504 | `TARGET_UNREACHABLE`, `TARGET_TIMEOUT` |
+| 503 | `SERVICE_UNAVAILABLE` (metadata DB not configured or unreachable) |
 
 Error messages never include credentials, DSNs, or raw driver errors (driver errors are mapped to codes; originals go to logs, redacted).
 

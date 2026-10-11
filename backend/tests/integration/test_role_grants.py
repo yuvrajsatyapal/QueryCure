@@ -67,3 +67,16 @@ def test_retention_role_can_delete_append_only_rows(
 def test_retention_role_cannot_insert(as_retention: psycopg.Connection) -> None:
     with pytest.raises(psycopg.errors.InsufficientPrivilege):
         _insert_artifact(as_retention, "d" * 64)
+
+
+def test_app_can_read_but_not_change_migration_state(as_app: psycopg.Connection) -> None:
+    assert as_app.execute("SELECT version_num FROM alembic_version").fetchone() is not None
+    with pytest.raises(psycopg.errors.InsufficientPrivilege):
+        as_app.execute("UPDATE alembic_version SET version_num = 'x'")
+
+
+def test_only_one_active_local_user_can_exist(as_app: psycopg.Connection) -> None:
+    as_app.execute("INSERT INTO users (kind) VALUES ('local') ON CONFLICT DO NOTHING")
+
+    with pytest.raises(psycopg.errors.UniqueViolation):
+        as_app.execute("INSERT INTO users (kind) VALUES ('local')")
