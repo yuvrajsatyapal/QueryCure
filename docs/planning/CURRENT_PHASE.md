@@ -2,9 +2,9 @@
 
 | Field | Value |
 |---|---|
-| Phase | **1 — Foundation** (Phase 0 documentation complete) |
-| Status | **Phase 1 complete.** All 5 acceptance criteria met; report: [PHASE_1_REPORT](reports/PHASE_1_REPORT.md). Phase 2 not started (awaiting go-ahead) |
-| Last updated | 2026-10-11 |
+| Phase | **2 — Multi-agent intelligence** (Phase 1 complete: [PHASE_1_REPORT](reports/PHASE_1_REPORT.md)) |
+| Status | **Phase 2 in progress.** T2.1 done |
+| Last updated | 2026-10-12 |
 | Application code | Phase 1 foundation: API (session, connections, inspect, workloads, health), metadata DB migrations, SQL/plan parsing, inspection gateway, artifact store, demo workloads; web app with connections and plan workspace (tree + graph). No agents yet. |
 
 ## Completed
@@ -157,6 +157,22 @@
   - **Found by the fresh-clone run:** the form's default `TLS = verify-full` cannot reach the TLS-less compose container, and the UI said only "Could not connect". The README now says to set TLS to `disable (local only)`.
   - The gateway now classifies connect failures into fixed reason codes (`connect_failure_reason`), logs `target_connect_failed` without libpq's text, and returns a hint for auth, database, and TLS failures. Network-level failures stay generic (SECURITY §5.3). This was test-first: 8 classifier unit tests and 2 gateway integration tests; the TLS case was checked against real libpq output.
   - Also fixed a stale cross-reference (SECURITY T8 → §4.3) and the README status, which still said "Phase 0, no code".
+
+## Phase 2 progress
+
+- [x] **Pre-flight (2026-10-11).**
+  - `main` clean and equal to `origin/main` (`1ce5b58`).
+  - Rebrand sweep: no `QueryDoctor`/`QD_`/`qd-` references remain in docs, source, Compose, env examples, API contracts or profiles, except the intentional history note in ADR-0015. Canonicalization profiles are `qc-json-v1`/`qc-text-v1`/`qc-raw-v1` (+ `qc-events-v1`, planned `qc-row-v1`) and are frozen.
+  - No `backend/.env` existed, so `QC_MASTER_KEY` was not persistent. Created `backend/.env` from `.env.example` (mode 600, gitignored) with a newly generated key, never printed. The metadata DB held 0 sealed connections, so no ciphertext was stranded.
+  - Old volume `querydoctor_qd_meta` kept, not deleted. Current volume: `querycure_qc_meta`.
+- [x] **T2.1 migrations** (`0003_investigations`, `0004_langgraph_checkpointer`).
+  - Tables: `investigations`, `investigation_runs` (with `last_event_seq`, idempotency key + request hash, Phase 4 finalization columns), `investigation_events`, `agent_executions`, `tool_executions`, `evidence`, `findings`, `hypotheses`, `jobs`. ADR-0006 conventions, CHECK-based enums, no FKs, every relationship column indexed.
+  - Grants: append-only tables (`investigation_events`, `agent_executions`, `tool_executions`, `evidence`, `findings`) are `SELECT/INSERT` only for `qc_app`, plus `USAGE` on the event identity sequence; mutable tables get `UPDATE` but never `DELETE`; `qc_retention` gets `SELECT/DELETE`.
+  - **Deviation:** a `findings` table was added (displayed values must come from persisted records). `agent_executions.invocation_key` with a unique partial index on successful executions makes LLM nodes idempotent across crash/resume.
+  - **Deviation:** the LangGraph checkpointer's `setup()` needs DDL, which `qc_app` lacks. Migration `0004` runs the library's migration list as the owner in schema `langgraph`; `qc_app` gets `SELECT/INSERT/UPDATE`, not `CREATE` or `DELETE`. Documented in DATABASE_DESIGN §2.
+  - `domain/runs.py`: modes, statuses, outcomes, and the AGENT_SYSTEM §9 transition table. `db/repositories/runs.py`: `transition_run` in one `UPDATE … FROM (SELECT … FOR UPDATE)`; a completed status requires an outcome.
+  - Dependencies: `langgraph` 1.2, `langgraph-checkpoint-postgres` 3.1, `langchain-core` 1.6 (uv also moved `websockets` 17.2 → 16.1 to satisfy `langgraph-sdk`).
+  - Tests: 6 unit (state machine); 55 schema/grant integration tests run as `qc_app`/`qc_retention` (incl. the job claim query and checkpointer grants); 6 `transition_run` tests incl. a 6-way race with exactly one winner. Full suite 503 passed; ruff, format, mypy clean. Dev DB at `0004 (head)`.
 
 ## Blockers
 

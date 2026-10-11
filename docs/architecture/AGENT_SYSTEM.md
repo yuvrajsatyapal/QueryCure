@@ -110,7 +110,7 @@ Never in state: DSNs, passwords, API keys, result rows, full plan JSON, full sch
 ```python
 class Evidence(BaseModel):
     id: str                       # "ev_" + short ulid
-    kind: Literal["plan_node", "table_stat", "column_stat", "index_def", "schema_fact",
+    kind: Literal["plan_node", "plan_summary", "query_fact", "table_stat", "column_stat", "index_def", "schema_fact",
                   "workload_stat", "lock_sample", "benchmark_metric", "correctness_check",
                   "tool_error", "user_input"]
     source_artifact: ArtifactRef | None

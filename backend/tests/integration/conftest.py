@@ -1,7 +1,7 @@
 import os
 import secrets
 import uuid
-from collections.abc import Iterator
+from collections.abc import AsyncIterator, Iterator
 from pathlib import Path
 from typing import Any
 
@@ -10,6 +10,7 @@ import pytest
 from alembic import command
 from alembic.config import Config
 from psycopg.conninfo import conninfo_to_dict
+from sqlalchemy.ext.asyncio import AsyncEngine
 
 BACKEND = Path(__file__).parents[2]
 ADMIN_URL = os.environ.get(
@@ -116,3 +117,13 @@ def target() -> Iterator[dict[str, Any]]:
     with psycopg.connect(ADMIN_URL, autocommit=True) as admin:
         admin.execute(f'DROP DATABASE IF EXISTS "{db}" WITH (FORCE)')
         admin.execute(f"DROP ROLE IF EXISTS {role}")
+
+
+@pytest.fixture
+async def app_engine(migrated_db: str) -> AsyncIterator[AsyncEngine]:
+    """Async engine with exactly the qc_app role's privileges."""
+    from querycure.db.engine import make_engine
+
+    engine = make_engine(migrated_db, set_role="qc_app")
+    yield engine
+    await engine.dispose()

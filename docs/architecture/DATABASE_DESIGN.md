@@ -24,7 +24,7 @@ This document specifies the **metadata DB**. Sandbox layout is in [BENCHMARK_ENG
 - JSON payloads use `JSONB`, schema-validated by Pydantic before writing; each JSONB column has a documented model.
 - Migrations: Alembic, forward-only in production, one concern per migration.
 
-Exception: LangGraph's checkpointer manages its own tables in schema `langgraph`; we do not alter them.
+Exception: LangGraph's checkpointer tables live in schema `langgraph` and follow the library's layout; we do not alter them. The library's own `setup()` runs DDL (including `CREATE INDEX CONCURRENTLY`), which `qc_app` cannot, so migration `0004` runs the library's migration list as the owner (resuming from `checkpoint_migrations`) and grants `qc_app` `SELECT/INSERT/UPDATE` only; deleting threads is reserved for `qc_retention`. Upgrading `langgraph-checkpoint-postgres` to a release with new migrations requires a new Alembic revision that re-applies them.
 
 ## 3. Entity overview
 
@@ -195,6 +195,7 @@ Indexes: `(user_id, created_at DESC) WHERE deleted_at IS NULL`; GIN trigram on `
 | cancel_requested_at, started_at, finished_at | TIMESTAMPTZ | |
 | error | JSONB | last fatal error (redacted) |
 | idempotency_key | TEXT | from `Idempotency-Key` header |
+| idempotency_request_hash | TEXT | SHA-256 of the canonical request body; same key + different body → 409 (both set or both NULL) |
 | last_event_seq | INT | NOT NULL DEFAULT 0; event sequence counter |
 | finalized_at | TIMESTAMPTZ | set once by `finalize_run` ([REPLAY_ENGINE §5](REPLAY_ENGINE.md#5-atomic-finalization)); after it, content writes are rejected |
 | events_cutoff_seq | INT | last content event included in the events digest |
@@ -206,9 +207,9 @@ Indexes: unique `(investigation_id, run_number)`; `(status) WHERE status IN ('qu
 Index: unique `(run_id, seq)`. This table backs SSE resume (`Last-Event-ID = seq`) and report replay. Once the run is finalized, only the lifecycle types `report.ready` and `run.status_changed` may be appended (seq > `events_cutoff_seq`).
 
 ### agent_executions / tool_executions (append-only)
-- `agent_executions`: `run_id`, `agent`, `node`, `attempt`, `prompt_version`, `model`, `input_tokens`, `output_tokens`, `latency_ms`, `status`, `output_artifact_id`, `error`.
+- `agent_executions`: `run_id`, `agent`, `node`, `invocation_key`, `attempt`, `prompt_version`, `model`, `input_tokens`, `output_tokens`, `latency_ms`, `status`, `output_artifact_id`, `error`.
 - `tool_executions`: `agent_execution_id`, `run_id`, `tool`, `args JSONB` (redacted), `status`, `latency_ms`, `evidence_ids TEXT[]`, `error`.
-Indexes on `run_id`; `agent_execution_id`.
+Indexes on `run_id`; `agent_execution_id`. Unique `(run_id, invocation_key) WHERE status = 'succeeded'`: a node re-executed after a crash finds its successful execution and reuses the stored output artifact instead of calling the LLM again, so resume does not duplicate (or change) agent output. `status` ∈ `succeeded`, `failed`, `invalid_output`. Rows are written once, when the attempt ends; `tool_executions.agent_execution_id` is generated in the application before the attempt starts.
 
 ### artifacts (immutable, content-addressed)
 | Column | Type | Notes |
@@ -236,10 +237,13 @@ Artifacts are shared across runs by hash; ownership comes from `run_artifacts`. 
 `run_id`, `artifact_id`, `role TEXT` (e.g. `input.query`, `context.plan`, `output.report`), `produced_by TEXT` (node name). Unique `(run_id, artifact_id, role)`.
 
 ### evidence
-As in the ER diagram. Unique `(run_id, id)`. `id` = `ev_` + first 12 hex of `sha256(run_id|kind|artifact_sha|locator)` (deterministic → idempotent inserts).
+As in the ER diagram. Primary key `(run_id, id)`. `id` = `ev_` + first 12 hex of `sha256(run_id|kind|artifact_sha|locator)` (deterministic → idempotent inserts), enforced by a CHECK on the shape. `kind` adds `plan_summary` (whole-plan facts such as total time) and `query_fact` (parsed query metadata such as ORDER BY/LIMIT) to the AGENT_SYSTEM list.
+
+### findings (append-only)
+Added in Phase 2: findings are displayed (Findings tab) and every displayed value must come from a persisted record (ROADMAP replay contract). `run_id`, `key` (`fd_` + 12 hex, deterministic, unique per run), `agent`, `title`, `detail`, `severity`, `evidence_ids TEXT[]` (≥ 1).
 
 ### hypotheses, optimization_candidates
-Mirror the Pydantic models in [AGENT_SYSTEM.md §4](AGENT_SYSTEM.md#key-models-abridged) with `run_id`, `round INT`, `status` (`proposed`, `approved`, `declined`, `benchmarked`, `verified`, `rejected`, `inconclusive`), and `sql_artifact_id` for candidate SQL.
+Mirror the Pydantic models in [AGENT_SYSTEM.md §4](AGENT_SYSTEM.md#key-models-abridged) with `run_id`, `round INT`, `status`. Hypotheses (Phase 2) use a UUID `id` plus a citable `key` (`hy_` + 12 hex, unique per run) that candidates reference, `rank INT` (1 = top), and `proposed_by TEXT[]` (agents whose findings support it). Hypothesis `status` (`proposed`, `approved`, `declined`, `benchmarked`, `verified`, `rejected`, `inconclusive`), and `sql_artifact_id` for candidate SQL.
 
 ### approval_requests
 `run_id`, `kind` (`sandbox_execution`, `production_explain`, `budget_extension`), `payload JSONB` (exact SQL list + target), `status` (`pending`, `approved`, `partially_approved`, `declined`, `expired`), `decided_by`, `decided_at`, `expires_at`, `decision JSONB` (approved candidate ids).
