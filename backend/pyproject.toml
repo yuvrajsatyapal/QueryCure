@@ -1,0 +1,51 @@
+[project]
+name = "querydoctor"
+version = "0.1.0"
+description = "QueryDoctor AI backend: API and worker for multi-agent PostgreSQL performance investigation"
+authors = [
+    { name = "Yuvraj Satyapal", email = "yuvrajsatyapal21@gmail.com" }
+]
+requires-python = ">=3.12,<3.14"
+dependencies = [
+    "fastapi>=0.143.0",
+    "pydantic>=2.14.0",
+    "uvicorn[standard]>=0.54.0",
+]
+
+[build-system]
+requires = ["uv_build>=0.13.0,<0.14.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "httpx2>=2.13.1",
+    "mypy>=2.4.0",
+    "pytest>=9.1.1",
+    "pytest-asyncio>=1.4.0",
+    "ruff>=0.17.0",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "W", "F", "I", "B", "UP", "ASYNC", "S", "RUF", "SIM", "PT"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+mypy_path = "src"
+packages = ["querydoctor"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+addopts = "-ra --strict-markers"
+markers = [
+    "integration: needs docker compose databases",
+]

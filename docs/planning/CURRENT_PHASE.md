@@ -2,10 +2,10 @@
 
 | Field | Value |
 |---|---|
-| Phase | **0 — Documentation & architecture** |
-| Status | Documentation complete, awaiting user review |
+| Phase | **1 — Foundation** (Phase 0 documentation complete) |
+| Status | In progress: T1.1 done on branch `feature/T1.1-scaffolding` |
 | Last updated | 2026-10-11 |
-| Application code | None. No packages installed, no project initialized, no git repository yet. |
+| Application code | Scaffolding only: FastAPI app factory with `/api/v1/healthz`; Next.js shell page; local Compose file. |
 
 ## Completed
 
@@ -20,21 +20,29 @@
 - [x] Replay engine tightened (ADR-0015): canonicalization profiles, atomic finalization, integrity scope, renderer versioning, replay lifecycles, statistical comparison; lifecycle events outside the seal; restricted-role artifact paths; same- vs cross-environment labeling. Replay contracts for Phases 1–3 recorded in ROADMAP.
 - [x] 3 designed HTML diagrams in `docs/diagrams/` (system architecture, trust boundaries, agent graph) — added only where they add value beyond Mermaid.
 
-## Pending
+## Phase 1 progress
 
-- [ ] User review of documentation and open decisions below.
-- [ ] `git init` and first commit (user's call).
+- [x] **T1.1 Repo scaffolding.**
+  - `backend/` is a uv project on Python 3.12.15 with FastAPI, ruff, `mypy --strict`, and pytest (asyncio).
+  - `frontend/` is Next.js 16.4 + Tailwind 4 + Vitest 5, with `lint`, `typecheck` (`next typegen && tsc`), `test`, and `build` scripts.
+  - `infra/docker/compose.yaml` defines `metadata-db` and `sandbox-db`; the sandbox sits on an internal network.
+- [ ] T1.2 CI workflow — next.
+- [ ] T1.3–T1.19 per [TASKS.md](TASKS.md).
 
-## Blockers (for starting Phase 1)
+## Blockers
 
-- `uv` is not installed. The only Python available is 3.14; the docs target 3.12 (CI also on 3.13).
-- The Docker daemon is not running; integration tests and sandboxes need it.
-- No git repository yet (D7).
+- The Docker daemon is not running. `docker compose up` has not been executed; only `docker compose config` was checked. This is needed from T1.4 onward.
+
+## Deviations / deferred
+
+- `import-linter` is not configured yet. Its layer contracts reference modules (`agents`, `benchmark`, `llm`) that don't exist, and the tool errors on missing modules. Add the contracts as the modules land, starting with T1.6.
+- Starlette deprecated `httpx` for its TestClient, so the dev dependency is `httpx2`.
+- Port 8765 on this machine is already in use by another local server. Smoke tests used a random free port.
 
 ## Next actions
 
-1. User reviews docs; resolves or accepts defaults for open decisions.
-2. On explicit go-ahead: start **T1.1 Repo scaffolding** (see [TASKS.md](TASKS.md)).
+1. T1.2 CI workflow (lint, types, unit tests, frontend build).
+2. T1.3 `core/` (settings, structlog + redaction, errors, AES-GCM), then T1.6 SQL validator and T1.7 plan parser, written test-first.
 
 ## Verification status
 
@@ -43,7 +51,9 @@
 | Required files exist | See Phase 0 validation in the final summary |
 | Internal links | Checked by script during Phase 0 |
 | Mermaid syntax | Reviewed manually (no renderer installed; not executed) |
-| Code tests | N/A — no code |
+| Backend (T1.1) | `uv run pytest -q` → 2 passed; `ruff check` and `ruff format --check` clean; `mypy` strict → no issues in 5 files; uvicorn smoke test: `/api/v1/healthz` 200, `/api/v1/openapi.json` 200 |
+| Frontend (T1.1) | `pnpm lint` clean; `pnpm typecheck` clean; `pnpm test` → 1 passed; `pnpm build` → compiled, `/` prerendered static |
+| Compose | `docker compose config` valid; **not started** (daemon down) |
 
 ## Open decisions
 
@@ -57,7 +67,7 @@ Defaults are chosen so implementation can proceed; change any before the listed 
 | D4 | Allow user-provisioned sandbox connections (Mode C on user's own non-prod DB) in MVP? | Yes in local profile only, with attestation | Phase 3 |
 | D5 | Custom domain for demo (needed for same-site cookies) | Required; name TBD | Phase 5 |
 | D6 | Write-overhead benchmark in MVP or Post-MVP | Post-MVP (qualitative class shown until then) | Phase 3 |
-| D7 | Initialize git + branching model (`main`/`develop`/feature) | `main` + feature branches (solo project) | Phase 1 start |
+| D7 | ~~Initialize git + branching model~~ | **Resolved:** git initialized on `main`; feature branches per task | — |
 | D8 | Manifest signing (key outside DB) or external timestamping | Deferred; digests + append-only grants + manifest digest in exports (REPLAY_ENGINE §6) | Phase 5 security review |
 | D9 | Replay equivalence margin `m` | 1.25 (±25% speedup drift); revisit after measuring same-machine replay variance in Phase 4 | Phase 4 exit |
 | D10 | Retirement policy for old report builders/renderers | Keep all versions; fallback to stored artifacts if ever retired | Before first builder@2 |

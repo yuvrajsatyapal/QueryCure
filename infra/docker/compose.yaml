@@ -1,0 +1,51 @@
+# Local development databases (DEPLOYMENT.md §2). Application processes run on the host for now;
+# api/worker containers are added when the worker exists (Phase 2/3).
+name: querydoctor
+
+services:
+  metadata-db:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: qd_owner
+      POSTGRES_PASSWORD: ${QD_META_PASSWORD:-qd_local_dev_only}
+      POSTGRES_DB: querydoctor
+      TZ: UTC
+      PGTZ: UTC
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - qd_meta:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U qd_owner -d querydoctor"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # Mode C sandbox (SECURITY.md §8). Internal network = no egress and no host port.
+  # Nothing uses it until the benchmark engine (Phase 3), when the worker container joins sandbox_net.
+  sandbox-db:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: qd_sandbox_admin
+      POSTGRES_PASSWORD: ${QD_SANDBOX_PASSWORD:-qd_local_dev_only}
+      POSTGRES_DB: sandbox_admin
+      TZ: UTC
+      PGTZ: UTC
+    networks:
+      - sandbox_net
+    cpus: 2
+    mem_limit: 2g
+    pids_limit: 256
+    shm_size: 512m
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U qd_sandbox_admin -d sandbox_admin"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+networks:
+  sandbox_net:
+    internal: true
+
+volumes:
+  qd_meta:

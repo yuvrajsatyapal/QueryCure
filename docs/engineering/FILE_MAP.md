@@ -1,6 +1,6 @@
 # File Map
 
-**Everything under `frontend/`, `backend/`, and `infra/` is PLANNED — none of it exists yet.** Only `README.md`, `CLAUDE.md`, `AGENTS.md`, and `docs/` exist (Phase 0). Update this file when directories are created; mark rows ✅ when real.
+**Legend:** ✅ exists · 🟡 partially exists · ⏳ planned. Unmarked rows inside `backend/` and `frontend/` trees are planned unless the filesystem says otherwise — check before assuming. Update this file when directories are created; mark rows ✅ when real.
 
 ## 1. Top level
 
@@ -12,10 +12,10 @@ querycure/                      (repo root; product name QueryDoctor AI)
 ├── docs/                       ✅ all documentation (this tree)
 │   ├── diagrams/               ✅ 3 designed HTML diagrams (system architecture, trust boundaries, agent graph); Mermaid in the .md docs is authoritative
 │   └── planning/reports/       ⏳ phase completion reports (created at end of each phase)
-├── backend/                    ⏳ Python package `querydoctor` (api + worker)
-├── frontend/                   ⏳ Next.js app
+├── backend/                    🟡 Python package `querydoctor`: api app factory + health route exist; worker not yet
+├── frontend/                   🟡 Next.js 16 app: scaffold + placeholder page exist
 ├── infra/
-│   └── docker/                 ⏳ compose.yaml, sandbox postgresql.conf, init SQL
+│   └── docker/                 🟡 compose.yaml exists; sandbox postgresql.conf and init SQL pending
 └── .github/workflows/          ⏳ CI/CD
 ```
 
