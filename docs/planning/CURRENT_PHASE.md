@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | Phase | **1 — Foundation** (Phase 0 documentation complete) |
-| Status | In progress: T1.1–T1.3, T1.6, T1.7 (logic), T1.9 done; T1.8 canonicalization done |
+| Status | In progress: all Docker-free Phase 1 work done (T1.1–T1.3, T1.6, T1.7 logic, T1.8 canonicalization, T1.9, T1.15); the remainder needs Docker |
 | Last updated | 2026-10-11 |
 | Application code | Scaffolding only: FastAPI app factory with `/api/v1/healthz`; Next.js shell page; local Compose file. |
 
@@ -67,7 +67,17 @@
   - Golden vectors in `tests/fixtures/canonical/`: RFC 8785 Appendix B numbers, plus hand-written canonical strings with digests computed independently via `hashlib`.
   - 64 tests, passing on Python 3.12 and 3.13.
   - Still to do: the `artifacts`/`run_artifacts` store and its integration tests as the restricted `qd_app` role. These need the metadata DB.
-- [ ] T1.4–T1.5, T1.10–T1.19 per [TASKS.md](TASKS.md). Doing Docker-free tasks first (T1.7, T1.9, the canonicalization part of T1.8, T1.15, T1.17–T1.18) while Docker is down.
+- [x] **T1.15 frontend shell.**
+  - `styles/tokens.css` holds DESIGN_SYSTEM §2 tokens (light and `.dark`), mapped into Tailwind 4 `@theme` (`bg-surface`, `text-muted`, …). IBM Plex Sans/Mono come via `next/font`.
+  - `next-themes` with the class strategy, plus a `ThemeToggle`.
+  - `AppShell` has a 56px top bar and a 224px side nav. Planned sections render disabled ("soon"), never as dead links.
+  - The `/app` dashboard shows an empty state.
+  - `lib/api`: `apiFetch` (cookies, CSRF header on mutations, error envelope → `ApiError`, network failures → `NETWORK_ERROR`) and `case.ts` (snake↔camel, type-fest typed).
+  - Types are generated from the backend OpenAPI by `pnpm gen:api`, using `python -m querydoctor.api.export_openapi`.
+  - 12 new Vitest tests.
+  - Verified in the browser: dark mode switches tokens (`#0E1013` background), the font resolves to IBM Plex Sans, the preference persists, and there are no console errors.
+  - Not yet: the mobile single-column layout (UI_UX §3.4) arrives with the workspace (T1.17).
+- [ ] **Blocked on Docker:** T1.4–T1.5, the T1.8 store, T1.10–T1.14, T1.16–T1.19, and the real PG plan fixtures for T1.7. Doing Docker-free tasks first (T1.7, T1.9, the canonicalization part of T1.8, T1.15, T1.17–T1.18) while Docker is down.
 
 ## Blockers
 
@@ -91,8 +101,8 @@
 | Required files exist | See Phase 0 validation in the final summary |
 | Internal links | Checked by script during Phase 0 |
 | Mermaid syntax | Reviewed manually (no renderer installed; not executed) |
-| Backend (through T1.3) | `uv run pytest -q` → 305 passed (also 305 on 3.13 locally) (3.12; CI also 3.13); `ruff check` and `ruff format --check` clean; `mypy` strict → no issues in 29 files; uvicorn smoke test: `/api/v1/healthz` 200, `/api/v1/openapi.json` 200 |
-| Frontend (T1.1) | `pnpm lint` clean; `pnpm typecheck` clean; `pnpm test` → 1 passed; `pnpm build` → compiled, `/` prerendered static |
+| Backend (through T1.3) | `uv run pytest -q` → 306 passed (3.13 also checked locally) (3.12; CI also 3.13); `ruff check` and `ruff format --check` clean; `mypy` strict → no issues in 29 files; uvicorn smoke test: `/api/v1/healthz` 200, `/api/v1/openapi.json` 200 |
+| Frontend (through T1.15) | `pnpm lint` clean; `pnpm typecheck` clean; `pnpm test` → 13 passed; `pnpm build` → compiled, `/` and `/app` prerendered static |
 | Compose | `docker compose config` valid; **not started** (daemon down) |
 
 ## Open decisions

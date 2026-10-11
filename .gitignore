@@ -25,3 +25,6 @@ test-results/
 .DS_Store
 .idea/
 .vscode/
+
+# Local agent/preview tooling
+.claude/launch.json

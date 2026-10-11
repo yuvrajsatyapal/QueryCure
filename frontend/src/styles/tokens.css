@@ -1,0 +1,38 @@
+/* Design tokens: docs/design/DESIGN_SYSTEM.md §2. Binding — no raw palette colors in components. */
+:root {
+  --bg: #fafaf9;
+  --surface: #ffffff;
+  --surface-2: #f1f2f1;
+  --border: #e2e4e6;
+  --border-strong: #c9cdd2;
+  --ink: #15181d;
+  --muted: #566070;
+  --accent: #0a6f6a;
+  --accent-tint: rgba(10, 111, 106, 0.08);
+  --accent-fg: #ffffff;
+  --link: #2c5ba8;
+  --hypothesis: #3f5577;
+  --verified: #1e7240;
+  --rejected: #b3261e;
+  --inconclusive: #8f5300;
+  color-scheme: light;
+}
+
+.dark {
+  --bg: #0e1013;
+  --surface: #15181d;
+  --surface-2: #1b1f25;
+  --border: #2a2f37;
+  --border-strong: #3a414b;
+  --ink: #e6e8eb;
+  --muted: #9aa3af;
+  --accent: #3cc3b4;
+  --accent-tint: rgba(60, 195, 180, 0.12);
+  --accent-fg: #06211f;
+  --link: #7ea6e8;
+  --hypothesis: #9db2d6;
+  --verified: #5bc584;
+  --rejected: #f2837a;
+  --inconclusive: #e0a84a;
+  color-scheme: dark;
+}
