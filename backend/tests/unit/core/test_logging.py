@@ -4,7 +4,7 @@ import json
 import pytest
 from pydantic import SecretStr
 
-from querydoctor.core.logging import configure_logging, get_logger
+from querycure.core.logging import configure_logging, get_logger
 
 GOOGLE_KEY = "AIza" + "B" * 35
 OPENROUTER_KEY = "sk-or-v1-" + "a" * 64

@@ -7,7 +7,7 @@ Canonical terms. Use these exact names in code, docs, UI, and API fields.
 | Investigation | A user-owned unit of work: one objective + inputs (query, plan, connection). Persists across runs. | `Investigation` |
 | Run | One execution of the agent graph for an investigation (initial, resume-after-approval is the *same* run; re-investigation is a *new* run). | `InvestigationRun` |
 | Execution mode | A = offline analysis, B = restricted live inspection, C = isolated benchmarking. A run may combine B+C. | `ExecutionMode.OFFLINE / LIVE_INSPECTION / SANDBOX_BENCHMARK` |
-| Metadata DB | QueryDoctor's own PostgreSQL database. | `metadata_db` |
+| Metadata DB | QueryCure's own PostgreSQL database. | `metadata_db` |
 | Target DB | A user's database reached in Mode B. Never written to. | `target_db` |
 | Sandbox DB | Disposable PostgreSQL database used in Mode C. | `sandbox_db` |
 | Workload | A dataset + schema + query set used for benchmarks. Demo workloads are generated deterministically from a seed. | `Workload` |
@@ -24,7 +24,7 @@ Canonical terms. Use these exact names in code, docs, UI, and API fields.
 | Outcome | Final run result: `verified_recommendation`, `unverified_recommendations`, `no_action_needed`, `inconclusive`. | `RunOutcome` |
 | Approval request | A human gate before risky operations (sandbox DDL, live `EXPLAIN` on a production-flagged connection, budget extension). | `ApprovalRequest` |
 | Provenance | Where a number came from: `measured`, `prerecorded`, `imported`. | `provenance` |
-| Canonicalization profile | Frozen rule set producing canonical bytes for hashing (`qd-json-v1`, `qd-text-v1`, `qd-raw-v1`, `qd-events-v1`, `qd-row-v1`). | `artifacts.canonicalization` |
+| Canonicalization profile | Frozen rule set producing canonical bytes for hashing (`qc-json-v1`, `qc-text-v1`, `qc-raw-v1`, `qc-events-v1`, `qc-row-v1`). | `artifacts.canonicalization` |
 | Digest | `SHA-256(profile ‖ LF ‖ canonical bytes)`, written `sha256:<hex>`. Proves consistency with a stored reference, not authenticity. | `sha256` |
 | Finalization | The single transaction that seals a run: event cutoff, events digest, report, manifest, terminal status. | `finalize_run` |
 | Events cutoff | Last event `seq` covered by the events digest; later events are lifecycle-only. | `events_cutoff_seq` |

@@ -5,14 +5,14 @@
 ## 1. Top level
 
 ```
-querycure/                      (repo root; product name QueryDoctor AI)
+querycure/                      (repo root; product name QueryCure)
 ├── README.md                   ✅ product overview, status, doc index
 ├── CLAUDE.md                   ✅ Claude Code instructions
 ├── AGENTS.md                   ✅ tool-agnostic agent instructions
 ├── docs/                       ✅ all documentation (this tree)
 │   ├── diagrams/               ✅ 3 designed HTML diagrams (system architecture, trust boundaries, agent graph); Mermaid in the .md docs is authoritative
 │   └── planning/reports/       ⏳ phase completion reports (created at end of each phase)
-├── backend/                    🟡 Python package `querydoctor`: api app factory + health route exist; worker not yet
+├── backend/                    🟡 Python package `querycure`: api app factory + health route exist; worker not yet
 ├── frontend/                   🟡 Next.js 16 app: scaffold + placeholder page exist
 ├── infra/
 │   └── docker/                 🟡 compose.yaml exists; sandbox postgresql.conf and init SQL pending
@@ -28,7 +28,7 @@ backend/
 ├── Dockerfile
 ├── alembic.ini
 ├── migrations/                 Alembic versions (metadata DB only)
-├── src/querydoctor/
+├── src/querycure/
 │   ├── core/                   config (pydantic-settings), logging (structlog), errors, ids, clock, retry, redaction, crypto (AES-GCM), telemetry (OTel)
 │   ├── domain/                 Pydantic domain models & enums shared by all layers (Evidence, Finding, Hypothesis, Candidate, ExperimentConfig, RunStatus…)
 │   ├── db/                     SQLAlchemy async engine/session, table definitions, repositories (one per aggregate), transition_run()
@@ -68,7 +68,7 @@ backend/
 └── evals/
     ├── cases/                  YAML eval cases (workload, query, expected labels, forbidden claims)
     ├── recordings/             recorded LLM responses for deterministic CI
-    └── runner.py               `python -m querydoctor.evals`
+    └── runner.py               `python -m querycure.evals`
 ```
 
 ### Dependency direction (enforced by `import-linter` contract)

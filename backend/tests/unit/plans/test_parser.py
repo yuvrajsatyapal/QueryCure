@@ -3,8 +3,8 @@ from pathlib import Path
 
 import pytest
 
-from querydoctor.core.errors import InvalidPlanFormatError, PayloadTooLargeError
-from querydoctor.plans.parser import parse_plan
+from querycure.core.errors import InvalidPlanFormatError, PayloadTooLargeError
+from querycure.plans.parser import parse_plan
 
 FIXTURES = Path(__file__).parents[2] / "fixtures" / "plans"
 

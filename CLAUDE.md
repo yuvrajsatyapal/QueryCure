@@ -1,4 +1,4 @@
-# CLAUDE.md — QueryDoctor AI
+# CLAUDE.md — QueryCure
 
 Project instructions for Claude Code. Tool-agnostic equivalents live in [AGENTS.md](AGENTS.md); the two must stay aligned. If they conflict, fix the conflict — don't pick one silently.
 
@@ -52,7 +52,7 @@ Project instructions for Claude Code. Tool-agnostic equivalents live in [AGENTS.
 - Every finding/hypothesis must cite `evidence_ids`. Outputs with uncited claims fail validation and are retried once, then dropped and logged.
 - Use deterministic code whenever the answer is computable (plan metrics, stats, diffs, hashes).
 - Respect budgets in `agents/budgets.py`; check cancellation between nodes.
-- Prompts live in `backend/src/querydoctor/agents/prompts/` with a `PROMPT_VERSION`; bump it on any change.
+- Prompts live in `backend/src/querycure/agents/prompts/` with a `PROMPT_VERSION`; bump it on any change.
 
 ## 5. Coding conventions (summary — full rules in CODING_STANDARDS)
 
@@ -77,7 +77,7 @@ Project instructions for Claude Code. Tool-agnostic equivalents live in [AGENTS.
 cd backend && uv run ruff check . && uv run ruff format --check . && uv run mypy src && uv run pytest -q
 uv run pytest tests/integration -q        # needs docker compose up -d metadata-db sandbox-db
 uv run pytest tests/security -q
-uv run python -m querydoctor.evals run --suite smoke   # recorded fixtures, no LLM cost
+uv run python -m querycure.evals run --suite smoke   # recorded fixtures, no LLM cost
 # frontend
 cd frontend && pnpm lint && pnpm typecheck && pnpm test && pnpm build
 pnpm exec playwright test                  # e2e, needs api running

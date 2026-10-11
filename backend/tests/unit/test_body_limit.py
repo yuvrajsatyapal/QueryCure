@@ -1,8 +1,8 @@
 from fastapi import APIRouter, Request
 from fastapi.testclient import TestClient
 
-from querydoctor.api.main import create_app
-from querydoctor.core.config import Settings
+from querycure.api.main import create_app
+from querycure.core.config import Settings
 
 
 def client() -> TestClient:
@@ -15,7 +15,7 @@ def client() -> TestClient:
 
     app.include_router(router, prefix="/api/v1/test")
     c = TestClient(app)
-    c.cookies.set("qd_csrf", "t")
+    c.cookies.set("qc_csrf", "t")
     c.headers["X-CSRF-Token"] = "t"
     return c
 

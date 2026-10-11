@@ -4,7 +4,7 @@ Status: Planned (Phase 0). Decisions referenced as ADR-NNNN live in [../engineer
 
 ## 1. Shape of the system
 
-QueryDoctor is a **modular monolith** ([ADR-0001](../engineering/adr/ADR-0001-modular-monolith.md)): one Next.js frontend and one Python package that runs as two processes — `api` (FastAPI) and `worker` (LangGraph + benchmark engine). PostgreSQL is used three distinct ways and the three are never mixed.
+QueryCure is a **modular monolith** ([ADR-0001](../engineering/adr/ADR-0001-modular-monolith.md)): one Next.js frontend and one Python package that runs as two processes — `api` (FastAPI) and `worker` (LangGraph + benchmark engine). PostgreSQL is used three distinct ways and the three are never mixed.
 
 Designed version: [docs/diagrams/system-architecture.html](../diagrams/system-architecture.html) (Mermaid below is the editable source of truth).
 
@@ -14,7 +14,7 @@ flowchart TB
     UI[Next.js app: workspace, plan explorer, timeline]
   end
 
-  subgraph App["QueryDoctor backend (trusted)"]
+  subgraph App["QueryCure backend (trusted)"]
     API["api process<br/>FastAPI: REST + SSE"]
     WK["worker process<br/>job runner, LangGraph graph,<br/>benchmark engine"]
     subgraph Core["shared Python modules"]
@@ -48,14 +48,14 @@ flowchart TB
 | Component | Responsibility | Must not |
 |---|---|---|
 | **Web app** (`frontend/`) | Rendering, editing, SSE consumption, client UI state. | Hold secrets beyond the session cookie; talk to any DB. |
-| **API** (`querydoctor.api`) | AuthN/Z, validation, CRUD on metadata, enqueue jobs, approval decisions, SSE fan-out from persisted events. | Run LLM calls or benchmarks inline (keeps request latency bounded). |
-| **Worker** (`querydoctor.worker`) | Claim jobs; run/resume LangGraph runs; execute benchmarks; write events/artifacts. | Accept inbound network traffic. |
+| **API** (`querycure.api`) | AuthN/Z, validation, CRUD on metadata, enqueue jobs, approval decisions, SSE fan-out from persisted events. | Run LLM calls or benchmarks inline (keeps request latency bounded). |
+| **Worker** (`querycure.worker`) | Claim jobs; run/resume LangGraph runs; execute benchmarks; write events/artifacts. | Accept inbound network traffic. |
 | **SQL module** | SQLGlot parsing, statement classification, allowlist validation, normalized fingerprint. | Be treated as the security boundary (see SECURITY §4). |
 | **Plans module** | Parse PG JSON plans to a typed tree; derived metrics; plan diff. | Call LLMs. |
 | **Inspection gateway** | The only path to a target DB: SSRF guard, session hardening, templated catalog queries, plain `EXPLAIN`. | Execute arbitrary SQL, `EXPLAIN ANALYZE`, DDL/DML. |
 | **Sandbox provisioner** | Start/locate sandbox server, build template DBs from workloads, clone per arm, destroy. | Connect to non-sandbox hosts. |
 | **Benchmark engine** | Deterministic measurement, correctness fingerprints, statistics, tournament verdict rules. | Depend on LLM output for any number or verdict. |
-| **Agent graph** (`querydoctor.agents`) | Supervisor + five agents, typed state, routing, budgets, approvals. | Hold DB clients or secrets in state. |
+| **Agent graph** (`querycure.agents`) | Supervisor + five agents, typed state, routing, budgets, approvals. | Hold DB clients or secrets in state. |
 | **Artifact store** | SHA-256 content-addressed immutable blobs in metadata DB; evidence lineage. | Store target-DB row data beyond bounded, opt-in samples (none in MVP). |
 | **Metadata DB** | System of record. | Be reachable from agents directly (repositories only). |
 

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>System architecture · QueryDoctor AI</title>
+  <title>System architecture · QueryCure</title>
   <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -37,16 +37,16 @@
 </head>
 <body>
   <div class="frame">
-    <p class="eyebrow">Architecture · QueryDoctor AI</p>
+    <p class="eyebrow">Architecture · QueryCure</p>
     <h1>System architecture</h1>
     <p class="sub">One Python package runs as two processes. The API never runs agents; the worker never accepts traffic. They meet only in the metadata database.</p>
     <div class="diagram-container">
       <svg viewBox="0 0 960 440" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="system-architecture-title system-architecture-desc">
         <title id="system-architecture-title">System architecture</title>
-        <desc id="system-architecture-desc">Architecture of QueryDoctor AI: a Next.js web app calls a FastAPI API; API and worker share a metadata Postgres for jobs and events; only the worker reaches LLM providers, user target databases (plain EXPLAIN only) and an isolated sandbox (approved DDL).</desc>
+        <desc id="system-architecture-desc">Architecture of QueryCure: a Next.js web app calls a FastAPI API; API and worker share a metadata Postgres for jobs and events; only the worker reaches LLM providers, user target databases (plain EXPLAIN only) and an isolated sandbox (approved DDL).</desc>
         <defs><marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#566070"/></marker><marker id="arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#0A6F6A"/></marker><marker id="arrow-link" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#2C5BA8"/></marker><marker id="arrow-open" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polyline points="0 0, 8 3, 0 6" fill="none" stroke="#566070" stroke-width="1.2"/></marker></defs>
         <rect width="100%" height="100%" fill="#FAFAF9"/>
-<rect x="228" y="88" width="388" height="264" rx="8" fill="rgba(21,24,29,0.02)" stroke="rgba(21,24,29,0.1)" stroke-width="0.8"/><rect x="240" y="92" width="92" height="12" rx="2" fill="#FAFAF9"/><text x="286.0" y="101" fill="#5C6574" font-size="7" font-family="'IBM Plex Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.14em">QUERYDOCTOR BACKEND</text>
+<rect x="228" y="88" width="388" height="264" rx="8" fill="rgba(21,24,29,0.02)" stroke="rgba(21,24,29,0.1)" stroke-width="0.8"/><rect x="240" y="92" width="92" height="12" rx="2" fill="#FAFAF9"/><text x="286.0" y="101" fill="#5C6574" font-size="7" font-family="'IBM Plex Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.14em">QUERYCURE BACKEND</text>
 <rect x="748" y="40" width="196" height="232" rx="8" fill="rgba(21,24,29,0.02)" stroke="rgba(21,24,29,0.1)" stroke-width="0.8"/><rect x="760" y="44" width="84" height="12" rx="2" fill="#FAFAF9"/><text x="802.0" y="53" fill="#5C6574" font-size="7" font-family="'IBM Plex Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.14em">OUTSIDE OUR TRUST</text><path d="M 180,152 L 248,152" fill="none" stroke="#2C5BA8" stroke-width="1.2" marker-end="url(#arrow-link)"/>
 <path d="M 312,184 L 312,288 Q 312,296 320,296 L 340,296" fill="none" stroke="#566070" stroke-width="1.2" marker-end="url(#arrow)"/>
 <path d="M 520,184 L 520,288 Q 520,296 512,296 L 500,296" fill="none" stroke="#566070" stroke-width="1.2" marker-end="url(#arrow)"/>

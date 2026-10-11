@@ -27,7 +27,7 @@
   - `replay/`: frozen canonicalization profiles and an append-only artifact store.
   - `workloads/`: 3 deterministic generators.
   - `api/`: cookie sessions, double-submit CSRF, body limit, request IDs.
-- **Metadata DB:** Alembic `0001`–`0002` under ADR-0006 conventions. The `qd_app` role can only `INSERT`/`SELECT` on append-only tables.
+- **Metadata DB:** Alembic `0001`–`0002` under ADR-0006 conventions. The `qc_app` role can only `INSERT`/`SELECT` on append-only tables.
 - **Frontend:** Next.js 16 with Tailwind 4 tokens, light/dark themes, generated OpenAPI types, and case conversion only in `lib/api`.
 
 ## 2. Important architecture decisions
@@ -35,7 +35,7 @@
 | Decision | ADR / doc updated | Why |
 |---|---|---|
 | Canonicalization profiles, digest = SHA-256(profile ‖ LF ‖ bytes); artifacts stored as `BYTEA` | ADR-0015, REPLAY_ENGINE, DATABASE_DESIGN | JSONB/TEXT re-serialize, which breaks byte-exact replay |
-| `qd_app` restricted to INSERT/SELECT on artifacts; tests run under `SET ROLE` | DATABASE_DESIGN §5, TESTING_STRATEGY | Append-only must be enforced by the DB, not only by convention |
+| `qc_app` restricted to INSERT/SELECT on artifacts; tests run under `SET ROLE` | DATABASE_DESIGN §5, TESTING_STRATEGY | Append-only must be enforced by the DB, not only by convention |
 | Plain ASGI middlewares instead of `BaseHTTPMiddleware` | API_DESIGN | `BaseHTTPMiddleware` turned an over-limit body into a 500 |
 | Plan uploads allow JSON depth 256 (others stay at 64) | CODING_STANDARDS §3 | Plan JSON nests two levels per node; deep join trees are legitimate |
 | `GENERIC_PLAN` only for `$n` queries on PG16+ | BENCHMARK_ENGINE §11, SECURITY §4.3 | Plain EXPLAIN can't plan parameterized SQL |
@@ -79,8 +79,8 @@ Run on 2026-10-11 against PostgreSQL 17.11 in the compose `metadata-db`, with Py
 |---|---|---|
 | 1. Validator unit suite passes, including fail-closed on unparseable input | Met | `tests/unit/sql` 92 passed (incl. `test_unparseable_input_fails_closed`, `test_empty_input_fails_closed`); `tests/security/test_sql_validator_evasion.py` 15 passed |
 | 2. A PG 17 `EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON)` upload renders a tree with correct loops-aware self times | Met | `tests/unit/plans` 37 passed (incl. `test_loops_multiply_inner_side_of_nested_loop`, `test_parallel_nodes_divide_loops_by_process_count`, real `pg17_*.json` fixtures). Browser checks: Seq Scan on orders 62.6 ms (91.1%) under Gather Merge; join fixture Hash Join self 23.4 ms = 41.617 − 18.077 − 0.142 |
-| 3. A restricted-role connection to `orders_ecommerce` returns capabilities and a plain EXPLAIN; a superuser connection is refused | Met | Integration tests `test_capabilities_of_restricted_role`, `test_explain_returns_plain_plan_without_executing`, `test_superuser_connections_are_refused`. Browser: `qd_demo_inspector` → `LAST TEST: OK` with the checklist; Live EXPLAIN rendered with the estimates-only banner |
-| 4. All private/loopback/metadata forms blocked in the `demo` profile | Met | `tests/security/test_ssrf_guard.py` 70 passed (`test_non_public_addresses_are_blocked`, `test_localhost_blocked_in_public_profile`, `test_ambiguous_numeric_hosts_are_rejected`, `test_dns_is_resolved_exactly_once_so_rebinding_cannot_swap_the_address`, …). Settings refuse `ALLOW_PRIVATE_TARGETS=true` with `QD_PROFILE=demo` |
+| 3. A restricted-role connection to `orders_ecommerce` returns capabilities and a plain EXPLAIN; a superuser connection is refused | Met | Integration tests `test_capabilities_of_restricted_role`, `test_explain_returns_plain_plan_without_executing`, `test_superuser_connections_are_refused`. Browser: `qc_demo_inspector` → `LAST TEST: OK` with the checklist; Live EXPLAIN rendered with the estimates-only banner |
+| 4. All private/loopback/metadata forms blocked in the `demo` profile | Met | `tests/security/test_ssrf_guard.py` 70 passed (`test_non_public_addresses_are_blocked`, `test_localhost_blocked_in_public_profile`, `test_ambiguous_numeric_hosts_are_rejected`, `test_dns_is_resolved_exactly_once_so_rebinding_cannot_swap_the_address`, …). Settings refuse `ALLOW_PRIVATE_TARGETS=true` with `QC_PROFILE=demo` |
 | 5. `docker compose up` + `pnpm dev` gives a working UI on a fresh clone following the README | Met | Fresh clone under Compose project `qdfresh` with an empty volume, following README steps 1–6 literally (CURRENT_PHASE T1.19). The run found the TLS-default gap, which is now documented, and a better error message was added |
 
 ## 6. Known limitations
@@ -122,11 +122,11 @@ Run on 2026-10-11 against PostgreSQL 17.11 in the compose `metadata-db`, with Py
 
 See [LEARNING.md Phase 1](../../engineering/LEARNING.md#phase-1--foundation).
 
-1. `backend/src/querydoctor/plans/metrics.py` — self time = inclusive × loops − children, and the parallel correction that divides loops by process count.
-2. `backend/src/querydoctor/sql/validator.py` — why the walk covers the whole tree, and identifier folding (`_pg_name`).
-3. `backend/src/querydoctor/connectors/ssrf_guard.py` — resolve once, check every answer, pin `hostaddr`.
-4. `backend/src/querydoctor/connectors/inspection_gateway.py` — hardened session verified by reading settings back, capability refusal, connect-failure classification.
-5. `backend/src/querydoctor/replay/canonical/json_v1.py` + `digest.py` — RFC 8785 and profile-tagged digests.
+1. `backend/src/querycure/plans/metrics.py` — self time = inclusive × loops − children, and the parallel correction that divides loops by process count.
+2. `backend/src/querycure/sql/validator.py` — why the walk covers the whole tree, and identifier folding (`_pg_name`).
+3. `backend/src/querycure/connectors/ssrf_guard.py` — resolve once, check every answer, pin `hostaddr`.
+4. `backend/src/querycure/connectors/inspection_gateway.py` — hardened session verified by reading settings back, capability refusal, connect-failure classification.
+5. `backend/src/querycure/replay/canonical/json_v1.py` + `digest.py` — RFC 8785 and profile-tagged digests.
 6. `backend/migrations/versions/0001_baseline.py` — grants as the enforcement of append-only tables.
 7. `frontend/src/components/plan/PlanTreeTable.tsx` — treegrid keyboard model (roving tabindex).
 8. `frontend/src/lib/plan/layout.ts` — dagre centre → top-left conversion; log-scaled edges.
@@ -135,7 +135,7 @@ See [LEARNING.md Phase 1](../../engineering/LEARNING.md#phase-1--foundation).
 
 1. **A loops bug that looked right.** The plan table showed per-loop estimates next to all-loops actual rows (Seq Scan: 4,333 vs 10,014 under 3 loops). That suggested a 2.3× underestimate while the ratio column correctly said 1.3× over. Caught in the browser against a real PG 17 plan, not in tests. Fixed test-first by making both columns per loop and moving totals to node details and graph edges.
 2. **A fresh-clone test found what unit tests couldn't.** Following the README literally, the default `verify-full` TLS failed against the TLS-less compose server with only "Could not connect". libpq doesn't return a SQLSTATE at connect time, so the gateway now classifies the message into fixed reason codes. It explains auth, database, and TLS failures, keeps refused/timeout generic (no port-scanning oracle), and never logs libpq's text. The classifier was checked against real libpq output.
-3. **Append-only enforced by the database.** `qd_app` has no UPDATE/DELETE on artifacts, and integration tests run under `SET ROLE qd_app`. A side effect: `/readyz` returned 503 until migration `0002` granted SELECT on `alembic_version`.
+3. **Append-only enforced by the database.** `qc_app` has no UPDATE/DELETE on artifacts, and integration tests run under `SET ROLE qc_app`. A side effect: `/readyz` returned 503 until migration `0002` granted SELECT on `alembic_version`.
 4. **Correlated hashes in a "random" generator.** Salted multiplicative hashes left the hot customer with 5 orders instead of about 100. Switching to an md5 mix fixed the skew. Checksums are identical across independent loads and across the f-string → `psycopg.sql` rewrite.
 5. **Framework failure modes.** Starlette's `BaseHTTPMiddleware` converted a 413 into a 500, so the middlewares became plain ASGI. Next 16's instant-navigation validation needs `instant = false` on each session-gated page, not only the layout.
 

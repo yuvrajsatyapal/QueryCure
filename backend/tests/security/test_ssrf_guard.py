@@ -5,9 +5,9 @@ from collections.abc import Sequence
 
 import pytest
 
-from querydoctor.connectors.ssrf_guard import TargetPolicy, resolve_target
-from querydoctor.core.config import Profile, Settings
-from querydoctor.core.errors import TargetBlockedError, TargetUnreachableError
+from querycure.connectors.ssrf_guard import TargetPolicy, resolve_target
+from querycure.core.config import Profile, Settings
+from querycure.core.errors import TargetBlockedError, TargetUnreachableError
 
 PUBLIC_V4 = "93.184.216.34"
 PUBLIC_V6 = "2606:2800:220:1:248:1893:25c8:1946"

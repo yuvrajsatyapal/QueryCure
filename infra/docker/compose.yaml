@@ -1,26 +1,26 @@
 # Local development databases (DEPLOYMENT.md §2). Application processes run on the host for now;
 # api/worker containers are added when the worker exists (Phase 2/3).
-name: querydoctor
+name: querycure
 
 services:
   metadata-db:
     image: postgres:17
     environment:
-      POSTGRES_USER: qd_owner
-      POSTGRES_PASSWORD: ${QD_META_PASSWORD:-qd_local_dev_only}
-      POSTGRES_DB: querydoctor
+      POSTGRES_USER: qc_owner
+      POSTGRES_PASSWORD: ${QC_META_PASSWORD:-qc_local_dev_only}
+      POSTGRES_DB: querycure
       TZ: UTC
       PGTZ: UTC
-      QD_APP_PASSWORD: ${QD_APP_PASSWORD:-qd_local_dev_only}
-      QD_RETENTION_PASSWORD: ${QD_RETENTION_PASSWORD:-qd_local_dev_only}
+      QC_APP_PASSWORD: ${QC_APP_PASSWORD:-qc_local_dev_only}
+      QC_RETENTION_PASSWORD: ${QC_RETENTION_PASSWORD:-qc_local_dev_only}
     ports:
       - "127.0.0.1:5432:5432"
     volumes:
-      - qd_meta:/var/lib/postgresql/data
+      - qc_meta:/var/lib/postgresql/data
       # Runs only when the volume is empty; idempotent, so it can also be applied by hand.
       - ./metadata-init:/docker-entrypoint-initdb.d:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U qd_owner -d querydoctor"]
+      test: ["CMD-SHELL", "pg_isready -U qc_owner -d querycure"]
       interval: 5s
       timeout: 3s
       retries: 10
@@ -30,8 +30,8 @@ services:
   sandbox-db:
     image: postgres:17
     environment:
-      POSTGRES_USER: qd_sandbox_admin
-      POSTGRES_PASSWORD: ${QD_SANDBOX_PASSWORD:-qd_local_dev_only}
+      POSTGRES_USER: qc_sandbox_admin
+      POSTGRES_PASSWORD: ${QC_SANDBOX_PASSWORD:-qc_local_dev_only}
       POSTGRES_DB: sandbox_admin
       TZ: UTC
       PGTZ: UTC
@@ -42,7 +42,7 @@ services:
     pids_limit: 256
     shm_size: 512m
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U qd_sandbox_admin -d sandbox_admin"]
+      test: ["CMD-SHELL", "pg_isready -U qc_sandbox_admin -d sandbox_admin"]
       interval: 5s
       timeout: 3s
       retries: 10
@@ -52,4 +52,4 @@ networks:
     internal: true
 
 volumes:
-  qd_meta:
+  qc_meta:

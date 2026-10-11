@@ -1,6 +1,6 @@
 from fastapi.testclient import TestClient
 
-from querydoctor.api.main import create_app
+from querycure.api.main import create_app
 
 
 def test_healthz_reports_process_up() -> None:

@@ -11,7 +11,7 @@ The author's standing database conventions (applied across projects) require: UU
 2. Use FK constraints (PostgreSQL default best practice) — stronger integrity guarantees at the DB level.
 
 ## Decision
-Follow the conventions (option 1) for all QueryDoctor-owned tables. Exception: LangGraph's checkpointer tables are managed by the library.
+Follow the conventions (option 1) for all QueryCure-owned tables. Exception: LangGraph's checkpointer tables are managed by the library.
 
 ## Rationale & trade-offs
 - + Consistency with the author's other projects; simpler migrations and retention purges (no cascade ordering surprises).

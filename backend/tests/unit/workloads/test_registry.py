@@ -1,7 +1,7 @@
 import pytest
 
-from querydoctor.core.errors import ValidationFailedError
-from querydoctor.workloads.registry import WORKLOADS, WorkloadRef, build_statements
+from querycure.core.errors import ValidationFailedError
+from querycure.workloads.registry import WORKLOADS, WorkloadRef, build_statements
 
 
 def test_workload_ref_round_trip() -> None:
@@ -53,7 +53,7 @@ def test_generated_sql_uses_no_nondeterministic_functions() -> None:
 
 
 def test_every_example_query_passes_the_validator() -> None:
-    from querydoctor.sql.validator import validate_select
+    from querycure.sql.validator import validate_select
 
     for spec in WORKLOADS.values():
         for query in spec.example_queries:

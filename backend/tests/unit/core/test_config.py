@@ -4,7 +4,7 @@ import os
 import pytest
 from pydantic import ValidationError
 
-from querydoctor.core.config import Profile, Settings
+from querycure.core.config import Profile, Settings
 
 
 def key() -> str:
@@ -12,7 +12,7 @@ def key() -> str:
 
 
 def test_defaults_are_local_profile(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.delenv("QD_PROFILE", raising=False)
+    monkeypatch.delenv("QC_PROFILE", raising=False)
 
     settings = Settings(_env_file=None)
 
@@ -27,7 +27,7 @@ def test_demo_profile_forbids_private_targets() -> None:
 
 
 def test_demo_profile_requires_master_key() -> None:
-    with pytest.raises(ValidationError, match="QD_MASTER_KEY"):
+    with pytest.raises(ValidationError, match="QC_MASTER_KEY"):
         Settings(_env_file=None, profile=Profile.DEMO, allow_private_targets=False)
 
 
@@ -46,7 +46,7 @@ def test_master_key_must_decode_to_32_bytes() -> None:
 
 
 def test_env_variables_are_read(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("QD_PROFILE", "local")
+    monkeypatch.setenv("QC_PROFILE", "local")
     monkeypatch.setenv("WORKER_CONCURRENCY", "3")
     monkeypatch.setenv("CORS_ORIGINS", '["http://localhost:3000"]')
 

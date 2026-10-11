@@ -21,9 +21,9 @@ Replay features ship in Phase 4, but their contracts bind from Phase 1 so no dat
 
 | Phase | Must already hold |
 |---|---|
-| 1 | All artifacts are written through the frozen profiles (`qd-json-v1` / `qd-text-v1` / `qd-raw-v1`) with profile-tagged digests. `qd_app` is restricted to `INSERT`/`SELECT` on `artifacts`. No code path updates an artifact. |
+| 1 | All artifacts are written through the frozen profiles (`qc-json-v1` / `qc-text-v1` / `qc-raw-v1`) with profile-tagged digests. `qc_app` is restricted to `INSERT`/`SELECT` on `artifacts`. No code path updates an artifact. |
 | 2 | `investigation_events` is append-only with gap-free `seq`. Evidence IDs are deterministic. Every displayed value comes from persisted records or artifacts. The interim report writer reads no wall clock. |
-| 3 | Samples are integer nanoseconds. `EnvironmentFingerprint`, `engine_version`, `row_profile` (`qd-row-v1`) and `seed` are stored per experiment. `benchmark_runs` is append-only. |
+| 3 | Samples are integer nanoseconds. `EnvironmentFingerprint`, `engine_version`, `row_profile` (`qc-row-v1`) and `seed` are stored per experiment. `benchmark_runs` is append-only. |
 | 4 | `finalize_run`, manifests, report builder/renderer versioning, replay attempts, and comparison. Runs from earlier phases are not finalized and report `not_replayable: not_finalized`. They are never retro-sealed. |
 
 ---
@@ -94,7 +94,7 @@ Replay features ship in Phase 4, but their contracts bind from Phase 1 so no dat
   1. Benchmark-engine eval table (TESTING_STRATEGY §6) passes with hand-written candidates on sf=0.1–1.
   2. A full run on `orders_ecommerce` reaches a `verified` composite-index candidate (or a documented inconclusive reason on noisy hardware).
   3. `rewrite_trap` rewrite is `rejected: result_mismatch`.
-  4. Cancelling during measurement stops within one block and leaves no `qd_clone_*` databases.
+  4. Cancelling during measurement stops within one block and leaves no `qc_clone_*` databases.
   5. No sandbox DDL executes without an approved `approval_requests` row (integration test).
 - **Security:** DDL allowlist, sandbox internal network, non-superuser benchmark role, resource limits.
 - **Exit:** acceptance met; sample experiment artifacts committed as prerecorded demo fixtures (labeled).

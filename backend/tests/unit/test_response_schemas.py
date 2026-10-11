@@ -2,8 +2,8 @@
 
 import re
 
-from querydoctor.api.main import create_app
-from querydoctor.core.config import Settings
+from querycure.api.main import create_app
+from querycure.core.config import Settings
 
 FORBIDDEN = re.compile(r"password|secret|token|api_key|ciphertext|nonce|master_key", re.IGNORECASE)
 

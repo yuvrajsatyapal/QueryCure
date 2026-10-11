@@ -2,8 +2,8 @@
 
 import pytest
 
-from querydoctor.core.errors import SqlNotAllowedError, SqlParseError
-from querydoctor.sql.validator import validate_select
+from querycure.core.errors import SqlNotAllowedError, SqlParseError
+from querycure.sql.validator import validate_select
 
 REJECTED = (SqlNotAllowedError, SqlParseError)
 

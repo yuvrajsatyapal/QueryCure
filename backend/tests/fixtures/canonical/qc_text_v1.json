@@ -1,0 +1,23 @@
+{
+  "profile": "qc-text-v1",
+  "vectors": [
+    {
+      "name": "crlf and cr become lf",
+      "input": "a\r\nb\rc",
+      "canonical": "a\nb\nc\n",
+      "digest": "ca44dcd8ac7fc49f9f79763d133d131b8189689fb3b2715cdd2a872f52325857"
+    },
+    {
+      "name": "trailing newlines collapse to one",
+      "input": "report\n\n\n",
+      "canonical": "report\n",
+      "digest": "403576ab21851d0f62df7acd8e603e7fe62cc7139c2b5e53e859097c25f8907d"
+    },
+    {
+      "name": "adds missing final newline",
+      "input": "x",
+      "canonical": "x\n",
+      "digest": "870b63063d78674fad4ff8f53c7d150c3e0a5471096169449e1f880525d25791"
+    }
+  ]
+}

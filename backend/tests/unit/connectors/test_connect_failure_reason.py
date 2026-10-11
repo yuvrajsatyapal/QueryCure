@@ -1,6 +1,6 @@
 import pytest
 
-from querydoctor.connectors.inspection_gateway import connect_failure_reason
+from querycure.connectors.inspection_gateway import connect_failure_reason
 
 
 @pytest.mark.parametrize(
@@ -8,7 +8,7 @@ from querydoctor.connectors.inspection_gateway import connect_failure_reason
     [
         (
             'connection to server at "127.0.0.1", port 5432 failed: FATAL:  password '
-            'authentication failed for user "qd_demo_inspector"',
+            'authentication failed for user "qc_demo_inspector"',
             "auth_failed",
         ),
         ('FATAL:  role "nobody" does not exist', "auth_failed"),

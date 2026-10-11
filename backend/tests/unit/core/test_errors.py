@@ -1,8 +1,8 @@
-from querydoctor.core.errors import (
+from querycure.core.errors import (
     BudgetExhaustedError,
     InvalidStateError,
     NotFoundError,
-    QueryDoctorError,
+    QueryCureError,
     SqlNotAllowedError,
     TargetBlockedError,
 )
@@ -16,7 +16,7 @@ def test_errors_carry_stable_code_and_status() -> None:
         (TargetBlockedError("private address"), "CONNECTION_TARGET_BLOCKED", 422),
     ]
     for err, code, status in cases:
-        assert isinstance(err, QueryDoctorError)
+        assert isinstance(err, QueryCureError)
         assert err.code == code
         assert err.status == status
 

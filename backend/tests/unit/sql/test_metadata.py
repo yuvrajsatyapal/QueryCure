@@ -1,4 +1,4 @@
-from querydoctor.sql.validator import validate_select
+from querycure.sql.validator import validate_select
 
 
 def test_extracts_tables_columns_order_and_limit() -> None:

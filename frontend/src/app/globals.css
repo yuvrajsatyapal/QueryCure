@@ -46,7 +46,7 @@ body {
 }
 
 /* React Flow reads these at render, so the plan graph follows the theme without a reload. */
-.qd-plan-graph {
+.qc-plan-graph {
   --xy-background-color: var(--bg);
   --xy-background-pattern-color: color-mix(in srgb, var(--border) 50%, transparent);
   --xy-edge-stroke: var(--border-strong);

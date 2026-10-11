@@ -22,7 +22,7 @@ Applies from Phase 1. Tooling decisions: [ADR-0014](adr/ADR-0014-python-tooling.
 - Every external call has a timeout (`asyncio.timeout`).
 
 ### Errors
-- Domain exceptions in `core/errors.py` (`QueryDoctorError` → `NotFound`, `InvalidState`, `SqlNotAllowed`, `TargetBlocked`, `BudgetExhausted`, `RunCancelled`…), each with a stable `code`.
+- Domain exceptions in `core/errors.py` (`QueryCureError` → `NotFound`, `InvalidState`, `SqlNotAllowed`, `TargetBlocked`, `BudgetExhausted`, `RunCancelled`…), each with a stable `code`.
 - API maps exceptions to the error envelope in one middleware. No HTTP concerns below the router layer.
 - Never `except:` bare; never swallow — log with context then re-raise or convert. Fallbacks must log.
 - Retry only idempotent operations, with bounded attempts and jittered backoff (`tenacity` is not added; a 20-line helper in `core/retry.py` suffices).

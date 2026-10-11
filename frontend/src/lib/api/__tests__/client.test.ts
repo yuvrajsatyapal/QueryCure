@@ -14,7 +14,7 @@ function mockFetch(status: number, body: unknown, contentType = "application/jso
 
 afterEach(() => {
   vi.unstubAllGlobals();
-  document.cookie = "qd_csrf=; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+  document.cookie = "qc_csrf=; expires=Thu, 01 Jan 1970 00:00:00 GMT";
 });
 
 describe("apiFetch", () => {
@@ -30,7 +30,7 @@ describe("apiFetch", () => {
   });
 
   test("sends snake_case bodies and the CSRF header on mutations", async () => {
-    document.cookie = "qd_csrf=tok123";
+    document.cookie = "qc_csrf=tok123";
     const fetchMock = mockFetch(202, { ok: true });
 
     await apiFetch("/investigations", { method: "POST", body: { paramSets: [], workloadId: "w" } });
@@ -41,7 +41,7 @@ describe("apiFetch", () => {
   });
 
   test("does not send the CSRF header on GET", async () => {
-    document.cookie = "qd_csrf=tok123";
+    document.cookie = "qc_csrf=tok123";
     const fetchMock = mockFetch(200, {});
 
     await apiFetch("/me");

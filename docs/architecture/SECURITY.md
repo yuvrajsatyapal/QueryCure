@@ -4,11 +4,11 @@ Status: Planned. Security is a foundational requirement: every control here has 
 
 ## 1. Security goals
 
-1. QueryDoctor never modifies, and never causes heavy load on, a user's target database.
+1. QueryCure never modifies, and never causes heavy load on, a user's target database.
 2. AI-generated SQL executes only in disposable, network-isolated sandboxes after human approval.
 3. Credentials and API keys are never exposed (logs, state, prompts, events, responses, errors).
 4. One user cannot see or influence another user's data.
-5. QueryDoctor cannot be used as a pivot to reach internal networks (SSRF).
+5. QueryCure cannot be used as a pivot to reach internal networks (SSRF).
 6. Untrusted text (queries, schema, plans, uploads) cannot steer agents into unsafe actions.
 
 ## 2. Trust boundaries
@@ -20,7 +20,7 @@ flowchart LR
   subgraph Z0["Zone 0: Internet (untrusted)"]
     B[Browser / attacker]
   end
-  subgraph Z1["Zone 1: QueryDoctor app (trusted code)"]
+  subgraph Z1["Zone 1: QueryCure app (trusted code)"]
     API[api]
     WK[worker]
     AG["LLM agents<br/>(trusted code, untrusted reasoning)"]
@@ -67,7 +67,7 @@ Key insight: **LLM output is untrusted** even though the agent code is trusted. 
 | T12 | Sandbox escape / abuse | AI DDL tries to break out | Docker container, non-superuser benchmark role, no network, CPU/mem limits, disposable clones, no `COPY PROGRAM` (role lacks `pg_execute_server_program`) | Container escape via kernel bug (out of scope) |
 | T13 | Cost abuse | Spamming investigations on public demo | Rate limits, BYOK required for LLM, budgets, concurrency 1 per session | Low |
 | T14 | Session theft / CSRF | Cookie theft, cross-site requests | `HttpOnly; Secure; SameSite=Lax` cookies, CSRF token on mutating requests (double-submit), strict CORS allowlist | Low |
-| T15 | Undetected mutation of saved evidence | App bug, SQL injection via app role, direct DB edits | Append-only grants for `qd_app`, content digests, sealed finalization, report-replay verification, manifest digest in exports | Attacker with owner/retention credentials can rewrite data **and** digests consistently — digests prove consistency, not authenticity (REPLAY_ENGINE §6) |
+| T15 | Undetected mutation of saved evidence | App bug, SQL injection via app role, direct DB edits | Append-only grants for `qc_app`, content digests, sealed finalization, report-replay verification, manifest digest in exports | Attacker with owner/retention credentials can rewrite data **and** digests consistently — digests prove consistency, not authenticity (REPLAY_ENGINE §6) |
 
 ## 4. SQL execution policy
 
@@ -137,7 +137,7 @@ Controls:
 
 ## 7. Credential & key management
 
-- Master key: `QD_MASTER_KEY` (32 bytes, base64) from environment/secret manager; `key_version` supports rotation (re-encrypt job).
+- Master key: `QC_MASTER_KEY` (32 bytes, base64) from environment/secret manager; `key_version` supports rotation (re-encrypt job).
 - Encryption: AES-256-GCM via `cryptography`, random 96-bit nonce per secret, associated data = `f"{table}:{row_id}:{user_id}"` (prevents ciphertext swapping between rows).
 - Decryption only inside `connectors`/`llm` modules, returning `SecretStr`; plaintext lifetime limited to the call.
 - structlog processor redacts keys matching `password|secret|token|api_key|authorization|dsn` and any value matching known key prefixes.
@@ -155,7 +155,7 @@ Controls:
 | Disposability | Clones created per experiment arm via `CREATE DATABASE … TEMPLATE`, dropped after; container recreated on failure |
 | Data | Synthetic demo workloads, or a user-provisioned sandbox (purpose=`sandbox`) that the user attests is non-production |
 
-A user-provisioned sandbox connection gets Mode C privileges **only** if flagged `purpose=sandbox` and the user confirms an explicit attestation; QueryDoctor still only touches databases it creates (`qd_clone_*`) and refuses if it cannot `CREATE DATABASE`.
+A user-provisioned sandbox connection gets Mode C privileges **only** if flagged `purpose=sandbox` and the user confirms an explicit attestation; QueryCure still only touches databases it creates (`qc_clone_*`) and refuses if it cannot `CREATE DATABASE`.
 
 ## 9. Application security baseline
 

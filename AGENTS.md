@@ -1,4 +1,4 @@
-# AGENTS.md — QueryDoctor AI
+# AGENTS.md — QueryCure
 
 Instructions for any coding agent (Codex, Claude Code, Cursor, etc.). [CLAUDE.md](CLAUDE.md) is the detailed version; this file is the tool-agnostic contract. Keep them aligned — when you change a rule here, change it there.
 

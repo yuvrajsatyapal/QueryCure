@@ -1,6 +1,6 @@
 # Deployment
 
-Status: Planned. Two operational profiles share one codebase; behaviour differs via `QD_PROFILE=local|demo` and feature flags.
+Status: Planned. Two operational profiles share one codebase; behaviour differs via `QC_PROFILE=local|demo` and feature flags.
 
 ## 1. Profiles
 
@@ -62,10 +62,10 @@ flowchart TB
 
 | Service | Image | Notes |
 |---|---|---|
-| `metadata-db` | `postgres:17` | port 5432 on localhost only; volume `qd_meta` |
+| `metadata-db` | `postgres:17` | port 5432 on localhost only; volume `qc_meta` |
 | `sandbox-db` | `postgres:17` + `hypopg` (optional) | networks: `sandbox_net` (internal: true); `cpus: 2`, `mem_limit: 2g`, `shm_size: 512m`; tuned `postgresql.conf` checked into repo |
-| `api` | built from `backend/Dockerfile` | `uvicorn querydoctor.api.main:app` |
-| `worker` | same image | `python -m querydoctor.worker`; joins default + `sandbox_net` |
+| `api` | built from `backend/Dockerfile` | `uvicorn querycure.api.main:app` |
+| `worker` | same image | `python -m querycure.worker`; joins default + `sandbox_net` |
 | `web` | `node:22` (dev) | `pnpm dev`; or run on host |
 
 Developers may run `api`/`worker`/`web` on the host and only the databases in Docker; both are supported.
@@ -77,7 +77,7 @@ Developers may run `api`/`worker`/`web` on the host and only the databases in Do
 | Web | Vercel Hobby | Native Next.js, free tier | Netlify, Cloudflare Pages |
 | API + worker | One small always-on container (Fly.io, Railway, or Render) | SSE needs long-lived connections; embedded worker needs CPU outside request handling (rules out scale-to-zero platforms that throttle CPU between requests) | Google Cloud Run with CPU always allocated (cost ↑) |
 | Metadata DB | Neon free tier | Serverless Postgres, branching for previews; supports `uuid-ossp` and `LISTEN/NOTIFY` on direct (non-pooled) connections | Supabase |
-| Secrets | Host's secret store | `QD_MASTER_KEY`, `DATABASE_URL`, OAuth secrets | — |
+| Secrets | Host's secret store | `QC_MASTER_KEY`, `DATABASE_URL`, OAuth secrets | — |
 
 **Neon caveat:** `LISTEN/NOTIFY` requires a direct (non-pgbouncer) connection; the API uses the direct endpoint for its single listener connection and the pooled endpoint for request traffic. Neon compute auto-suspend may add cold-start latency to the first request.
 
@@ -109,11 +109,11 @@ Migrations run as a separate release step before new API instances start; migrat
 
 | Variable | Purpose |
 |---|---|
-| `QD_PROFILE` | `local` or `demo` |
-| `DATABASE_URL` / `DATABASE_URL_DIRECT` | metadata DB pooled / direct (LISTEN), as the restricted `qd_app` role |
+| `QC_PROFILE` | `local` or `demo` |
+| `DATABASE_URL` / `DATABASE_URL_DIRECT` | metadata DB pooled / direct (LISTEN), as the restricted `qc_app` role |
 | `DATABASE_MIGRATION_URL` | owner role, used only by Alembic |
 | `SANDBOX_ADMIN_URL` | sandbox server admin DSN (local only) |
-| `QD_MASTER_KEY` | AES-256-GCM key (base64, 32 bytes) |
+| `QC_MASTER_KEY` | AES-256-GCM key (base64, 32 bytes) |
 | `ALLOW_PRIVATE_TARGETS` | SSRF guard bypass for local profile |
 | `FEATURE_LIVE_INSPECTION_PUBLIC`, `FEATURE_SANDBOX` | feature flags |
 | `WORKER_MODE` | `separate` or `embedded` |

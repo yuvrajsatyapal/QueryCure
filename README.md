@@ -1,4 +1,4 @@
-# QueryDoctor AI
+# QueryCure
 
 > Autonomous, multi-agent investigation and *verified* optimization of PostgreSQL query performance.
 
@@ -16,9 +16,9 @@ When a PostgreSQL query is slow, engineers typically:
 
 Step 3 is where things go wrong: a single timing is noise, the index may slow down writes, a "faster" rewrite may silently return different rows, and the warm cache may explain most of the improvement. Generic SQL chatbots make this worse — they produce confident advice with no evidence.
 
-## What QueryDoctor does
+## What QueryCure does
 
-QueryDoctor behaves like a small team of database performance engineers:
+QueryCure behaves like a small team of database performance engineers:
 
 | Step | What happens | Who does it |
 |---|---|---|
@@ -30,7 +30,7 @@ QueryDoctor behaves like a small team of database performance engineers:
 | Verify | Result-set correctness, statistical significance, regressions | Benchmark Auditor (deterministic rules first, LLM second) |
 | Report | Evidence-backed report with confidence, trade-offs, rollback | Report generator |
 
-**Core principle:** a recommendation is not a *verified improvement* until it has been benchmarked against a representative workload and passed correctness checks. QueryDoctor is allowed — and expected — to conclude "inconclusive" or "no candidate is sufficiently supported."
+**Core principle:** a recommendation is not a *verified improvement* until it has been benchmarked against a representative workload and passed correctness checks. QueryCure is allowed — and expected — to conclude "inconclusive" or "no candidate is sufficiently supported."
 
 Every claim in the UI is labeled as one of: **Observed** · **Hypothesis** · **Recommendation** · **Verified** · **Rejected** · **Inconclusive**.
 
@@ -81,13 +81,13 @@ Rationale for each choice: [docs/engineering/DECISIONS.md](docs/engineering/DECI
 
 Prerequisites: Docker (with Compose v2), [uv](https://docs.astral.sh/uv/), Node.js 22, and pnpm 10 (`corepack enable` provides the pinned version). uv installs Python 3.12 if needed.
 
-**1. Databases.** This starts the metadata DB on `127.0.0.1:5432` and the sandbox DB on an internal network. Both use dev-only passwords; the first start also creates the restricted `qd_app` role.
+**1. Databases.** This starts the metadata DB on `127.0.0.1:5432` and the sandbox DB on an internal network. Both use dev-only passwords; the first start also creates the restricted `qc_app` role.
 
 ```bash
 docker compose -f infra/docker/compose.yaml up -d --wait
 ```
 
-**2. Backend config.** Copy the example env file, then set `QD_MASTER_KEY`, which encrypts saved connection passwords.
+**2. Backend config.** Copy the example env file, then set `QC_MASTER_KEY`, which encrypts saved connection passwords.
 
 ```bash
 cp backend/.env.example backend/.env
@@ -97,16 +97,16 @@ cp backend/.env.example backend/.env
 python3 -c "import os,base64;print(base64.b64encode(os.urandom(32)).decode())"
 ```
 
-Paste the output after `QD_MASTER_KEY=` in `backend/.env`.
+Paste the output after `QC_MASTER_KEY=` in `backend/.env`.
 
-**3. Migrations and API.** The API runs as `qd_app`; migrations run as the owner role.
+**3. Migrations and API.** The API runs as `qc_app`; migrations run as the owner role.
 
 ```bash
 cd backend && uv sync && uv run alembic upgrade head
 ```
 
 ```bash
-cd backend && uv run uvicorn querydoctor.api.main:app --port 8000
+cd backend && uv run uvicorn querycure.api.main:app --port 8000
 ```
 
 `curl http://localhost:8000/api/v1/readyz` should return `{"status":"ok","database":"ok","migrations":"current"}`.
@@ -121,21 +121,21 @@ Open <http://localhost:3000/app>. A local session is created automatically.
 
 **5. Inspect a plan offline.** Go to **New investigation**, paste the output of `EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON) …`, and choose **Analyze plan**. Real example plans are in `backend/tests/fixtures/plans/pg17_*.json`.
 
-**6. Optional: live EXPLAIN against a demo database.** Load the `orders_ecommerce` workload (100k orders at `sf=0.1`) into its own database, then create a restricted role for QueryDoctor to connect as:
+**6. Optional: live EXPLAIN against a demo database.** Load the `orders_ecommerce` workload (100k orders at `sf=0.1`) into its own database, then create a restricted role for QueryCure to connect as:
 
 ```bash
-docker compose -f infra/docker/compose.yaml exec metadata-db psql -U qd_owner -d querydoctor -c "CREATE DATABASE qd_demo_orders"
+docker compose -f infra/docker/compose.yaml exec metadata-db psql -U qc_owner -d querycure -c "CREATE DATABASE qc_demo_orders"
 ```
 
 ```bash
-cd backend && uv run python -m querydoctor.workloads postgresql://qd_owner:qd_local_dev_only@127.0.0.1:5432/qd_demo_orders 'orders_ecommerce@v1:sf=0.1:seed=42'
+cd backend && uv run python -m querycure.workloads postgresql://qc_owner:qc_local_dev_only@127.0.0.1:5432/qc_demo_orders 'orders_ecommerce@v1:sf=0.1:seed=42'
 ```
 
 ```bash
-docker compose -f infra/docker/compose.yaml exec metadata-db psql -U qd_owner -d qd_demo_orders -c "CREATE ROLE qd_demo_inspector LOGIN PASSWORD 'demo_inspector_local_only'; GRANT CONNECT ON DATABASE qd_demo_orders TO qd_demo_inspector; GRANT USAGE ON SCHEMA public TO qd_demo_inspector; GRANT SELECT ON ALL TABLES IN SCHEMA public TO qd_demo_inspector; GRANT pg_read_all_stats TO qd_demo_inspector;"
+docker compose -f infra/docker/compose.yaml exec metadata-db psql -U qc_owner -d qc_demo_orders -c "CREATE ROLE qc_demo_inspector LOGIN PASSWORD 'demo_inspector_local_only'; GRANT CONNECT ON DATABASE qc_demo_orders TO qc_demo_inspector; GRANT USAGE ON SCHEMA public TO qc_demo_inspector; GRANT SELECT ON ALL TABLES IN SCHEMA public TO qc_demo_inspector; GRANT pg_read_all_stats TO qc_demo_inspector;"
 ```
 
-In **Connections**, add host `127.0.0.1`, port `5432`, database `qd_demo_orders`, user `qd_demo_inspector`, and password `demo_inspector_local_only`. Set **TLS** to `disable (local only)`, because the compose container has no TLS and the default `verify-full` will fail to connect. Then choose **Test**. The workspace's **Live EXPLAIN** tab can now plan queries such as `SELECT * FROM orders WHERE customer_id = 1024 ORDER BY created_at DESC LIMIT 20`. It runs plain EXPLAIN only, so nothing is executed. Superuser connections are refused.
+In **Connections**, add host `127.0.0.1`, port `5432`, database `qc_demo_orders`, user `qc_demo_inspector`, and password `demo_inspector_local_only`. Set **TLS** to `disable (local only)`, because the compose container has no TLS and the default `verify-full` will fail to connect. Then choose **Test**. The workspace's **Live EXPLAIN** tab can now plan queries such as `SELECT * FROM orders WHERE customer_id = 1024 ORDER BY created_at DESC LIMIT 20`. It runs plain EXPLAIN only, so nothing is executed. Superuser connections are refused.
 
 The demo database shares the local metadata server only for convenience. Private and loopback targets are allowed only because `ALLOW_PRIVATE_TARGETS=true` in the local profile.
 
@@ -172,6 +172,6 @@ See [docs/planning/ROADMAP.md](docs/planning/ROADMAP.md).
 
 ## Honesty policy
 
-- QueryDoctor never fabricates benchmark numbers. Example numbers in these docs (e.g. "2.4 s") are illustrative only.
+- QueryCure never fabricates benchmark numbers. Example numbers in these docs (e.g. "2.4 s") are illustrative only.
 - Prerecorded demo benchmarks are always labeled as such and are never presented as measurements of a user's database.
 - "Verified" always means "verified within the tested scope" — dataset, parameters, PostgreSQL version, and hardware are recorded alongside the result.

@@ -4,7 +4,7 @@ Status: Planned. These tokens are **binding** once Phase 1 UI work begins: no ra
 
 ## 1. Direction
 
-QueryDoctor is an instrument, not a chatbot. The UI should feel like a well-built profiler or observability console: dense, calm, precise, and honest about uncertainty.
+QueryCure is an instrument, not a chatbot. The UI should feel like a well-built profiler or observability console: dense, calm, precise, and honest about uncertainty.
 
 - **Evidence over decoration.** Color carries meaning (claim status, verdict); everything else is neutral.
 - **One accent.** A clinical teal used for primary actions, focus, and the single most important element on screen.

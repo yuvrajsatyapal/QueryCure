@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Trust boundaries and SQL paths · QueryDoctor AI</title>
+  <title>Trust boundaries and SQL paths · QueryCure</title>
   <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -37,7 +37,7 @@
 </head>
 <body>
   <div class="frame">
-    <p class="eyebrow">Security · Secure paved road · QueryDoctor AI</p>
+    <p class="eyebrow">Security · Secure paved road · QueryCure</p>
     <h1>Trust boundaries and SQL paths</h1>
     <p class="sub">Agent code is trusted; agent output is not. Every database route passes the tool gateway, and two routes are blocked by design.</p>
     <div class="diagram-container">
@@ -46,7 +46,7 @@
         <desc id="trust-boundaries-desc">Trust-boundary map: an untrusted browser reaches the API with session and CSRF checks; LLM agents reach databases only through a privileged tool gateway that allows plain EXPLAIN on user databases and approved DDL only in the isolated sandbox; raw SQL and AI DDL toward user databases are blocked.</desc>
         <defs><marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#566070"/></marker><marker id="arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#0A6F6A"/></marker><marker id="arrow-link" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#2C5BA8"/></marker><marker id="arrow-open" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polyline points="0 0, 8 3, 0 6" fill="none" stroke="#566070" stroke-width="1.2"/></marker></defs>
         <rect width="100%" height="100%" fill="#FAFAF9"/>
-<rect x="200" y="72" width="412" height="328" rx="8" fill="rgba(21,24,29,0.02)" stroke="rgba(21,24,29,0.1)" stroke-width="0.8"/><rect x="212" y="76" width="124" height="12" rx="2" fill="#FAFAF9"/><text x="274.0" y="85" fill="#5C6574" font-size="7" font-family="'IBM Plex Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.14em">QUERYDOCTOR · TRUSTED CODE</text>
+<rect x="200" y="72" width="412" height="328" rx="8" fill="rgba(21,24,29,0.02)" stroke="rgba(21,24,29,0.1)" stroke-width="0.8"/><rect x="212" y="76" width="124" height="12" rx="2" fill="#FAFAF9"/><text x="274.0" y="85" fill="#5C6574" font-size="7" font-family="'IBM Plex Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.14em">QUERYCURE · TRUSTED CODE</text>
 <rect x="660" y="204" width="260" height="100" rx="8" fill="rgba(21,24,29,0.02)" stroke="rgba(21,24,29,0.2)" stroke-width="0.8" stroke-dasharray="4,4"/><rect x="672" y="208" width="52" height="12" rx="2" fill="#FAFAF9"/><text x="698.0" y="217" fill="#5C6574" font-size="7" font-family="'IBM Plex Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.14em">USER-OWNED</text>
 <rect x="660" y="356" width="260" height="100" rx="8" fill="rgba(21,24,29,0.02)" stroke="rgba(21,24,29,0.2)" stroke-width="0.8" stroke-dasharray="4,4"/><rect x="672" y="360" width="80" height="12" rx="2" fill="#FAFAF9"/><text x="712.0" y="369" fill="#5C6574" font-size="7" font-family="'IBM Plex Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.14em">ISOLATED SANDBOX</text><path d="M 144,148 L 232,148" fill="none" stroke="#2C5BA8" stroke-width="1.2" marker-end="url(#arrow-link)"/>
 <path d="M 280,176 L 280,300" fill="none" stroke="#566070" stroke-width="1.2" marker-end="url(#arrow)"/>

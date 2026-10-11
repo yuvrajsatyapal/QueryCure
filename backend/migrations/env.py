@@ -1,7 +1,7 @@
 from alembic import context
 from sqlalchemy import engine_from_config, pool
 
-from querydoctor.core.config import Settings
+from querycure.core.config import Settings
 
 config = context.config
 

@@ -2,8 +2,8 @@ import pytest
 from fastapi import APIRouter
 from fastapi.testclient import TestClient
 
-from querydoctor.api.main import create_app
-from querydoctor.core.config import Settings
+from querycure.api.main import create_app
+from querycure.core.config import Settings
 
 
 def client() -> TestClient:
@@ -27,7 +27,7 @@ def test_mutations_without_matching_double_submit_token_are_refused(
 ) -> None:
     c = client()
     if cookie is not None:
-        c.cookies.set("qd_csrf", cookie)
+        c.cookies.set("qc_csrf", cookie)
     headers = {"X-CSRF-Token": header} if header is not None else {}
 
     r = c.post("/api/v1/test/mutate", headers=headers)
@@ -38,7 +38,7 @@ def test_mutations_without_matching_double_submit_token_are_refused(
 
 def test_matching_token_is_accepted() -> None:
     c = client()
-    c.cookies.set("qd_csrf", "tok-123")
+    c.cookies.set("qc_csrf", "tok-123")
 
     r = c.post("/api/v1/test/mutate", headers={"X-CSRF-Token": "tok-123"})
 

@@ -5,9 +5,9 @@ from collections.abc import AsyncIterator
 import httpx2 as httpx
 import pytest
 
-from querydoctor.api.main import create_app
-from querydoctor.core.config import Profile, Settings
-from querydoctor.db.engine import make_engine
+from querycure.api.main import create_app
+from querycure.core.config import Profile, Settings
+from querycure.db.engine import make_engine
 
 pytestmark = pytest.mark.integration
 
@@ -23,7 +23,7 @@ def demo_settings() -> Settings:
 
 async def make_client(migrated_db: str, settings: Settings) -> AsyncIterator[httpx.AsyncClient]:
     url = migrated_db.replace("postgresql://", "postgresql+psycopg://", 1)
-    engine = make_engine(url, set_role="qd_app")
+    engine = make_engine(url, set_role="qc_app")
     app = create_app(settings, engine=engine)
     transport = httpx.ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
@@ -57,8 +57,8 @@ async def test_local_session_resolves_the_single_local_user(
 
     assert r.status_code == 201
     assert r.json()["user"]["kind"] == "local"
-    assert "qd_session" in local_client.cookies
-    assert "qd_csrf" in local_client.cookies
+    assert "qc_session" in local_client.cookies
+    assert "qc_csrf" in local_client.cookies
     me = (await local_client.get("/api/v1/me")).json()
     assert me["user"]["id"] == r.json()["user"]["id"]
     assert me["profile"] == "local"
@@ -69,9 +69,9 @@ async def test_session_cookie_flags(local_client: httpx.AsyncClient) -> None:
     r = await local_client.post("/api/v1/session")
 
     session_cookie = next(
-        h for h in r.headers.get_list("set-cookie") if h.startswith("qd_session=")
+        h for h in r.headers.get_list("set-cookie") if h.startswith("qc_session=")
     )
-    csrf_cookie = next(h for h in r.headers.get_list("set-cookie") if h.startswith("qd_csrf="))
+    csrf_cookie = next(h for h in r.headers.get_list("set-cookie") if h.startswith("qc_csrf="))
     assert "httponly" in session_cookie.lower()
     assert "samesite=lax" in session_cookie.lower()
     assert "httponly" not in csrf_cookie.lower()
@@ -90,12 +90,12 @@ async def test_existing_valid_session_is_returned_not_duplicated(
     local_client: httpx.AsyncClient,
 ) -> None:
     first = await local_client.post("/api/v1/session")
-    cookie = local_client.cookies["qd_session"]
+    cookie = local_client.cookies["qc_session"]
 
     second = await local_client.post("/api/v1/session")
 
     assert second.status_code == 200
-    assert local_client.cookies["qd_session"] == cookie
+    assert local_client.cookies["qc_session"] == cookie
     assert second.json()["user"]["id"] == first.json()["user"]["id"]
 
 
@@ -116,13 +116,13 @@ async def test_demo_profile_cookie_is_secure_and_features_restricted(
     r = await demo_client.post("/api/v1/session")
 
     session_cookie = next(
-        h for h in r.headers.get_list("set-cookie") if h.startswith("qd_session=")
+        h for h in r.headers.get_list("set-cookie") if h.startswith("qc_session=")
     )
     assert "secure" in session_cookie.lower()
 
 
 async def test_forged_or_unknown_session_token_is_rejected(local_client: httpx.AsyncClient) -> None:
-    local_client.cookies.set("qd_session", "forged-token")
+    local_client.cookies.set("qc_session", "forged-token")
 
     r = await local_client.get("/api/v1/me")
 
@@ -131,7 +131,7 @@ async def test_forged_or_unknown_session_token_is_rejected(local_client: httpx.A
 
 async def test_only_the_token_hash_is_stored(local_client: httpx.AsyncClient, owner) -> None:  # type: ignore[no-untyped-def]
     await local_client.post("/api/v1/session")
-    token = local_client.cookies["qd_session"]
+    token = local_client.cookies["qc_session"]
 
     stored = [r[0] for r in owner.execute("SELECT token_hash FROM sessions")]
 

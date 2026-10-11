@@ -1,6 +1,6 @@
 # Learning Guide
 
-For the project author: what to learn in each phase, why it matters, where QueryDoctor uses it, and how to prove you understand it. Skips JS/TS basics; focuses on Python, PostgreSQL internals, agent orchestration, verification, concurrency, security, and production engineering.
+For the project author: what to learn in each phase, why it matters, where QueryCure uses it, and how to prove you understand it. Skips JS/TS basics; focuses on Python, PostgreSQL internals, agent orchestration, verification, concurrency, security, and production engineering.
 
 **How to use this:** before a phase, skim its section and do one exercise. After the phase, read the phase report's "What to study" list, open the listed modules, and answer the interview questions out loud without notes. If you can't, that's the next thing to study.
 
@@ -10,7 +10,7 @@ For the project author: what to learn in each phase, why it matters, where Query
 
 ### Concepts
 
-| Concept | Why it matters | How QueryDoctor uses it |
+| Concept | Why it matters | How QueryCure uses it |
 |---|---|---|
 | **FastAPI dependency injection** (`Depends`, yield-dependencies) | Clean request-scoped resources (DB sessions, current user) and testability | `api/deps.py` provides session, user, repositories; tests override deps |
 | **Pydantic v2** (validators, `extra="forbid"`, discriminated unions, `model_json_schema`) | Every boundary is validated; LLM structured output reuses the same models | `domain/`, `api/schemas/`, uploaded plan validation |
@@ -53,7 +53,7 @@ How a query goes from SQL text to a parsed, validated, fingerprinted artifact an
 
 ### Concepts
 
-| Concept | Why it matters | How QueryDoctor uses it |
+| Concept | Why it matters | How QueryCure uses it |
 |---|---|---|
 | **LangGraph StateGraph** (nodes, edges, conditional edges, reducers, `Send`) | Explicit, inspectable control flow vs. opaque agent loops | `agents/graph.py`, `agents/state.py` |
 | **Reducers & parallel fan-out** | Concurrent branches writing to shared state need merge semantics | `findings: Annotated[list, operator.add]` |
@@ -98,7 +98,7 @@ The full graph topology, which nodes are deterministic vs LLM, how state flows, 
 
 ### Concepts
 
-| Concept | Why it matters | How QueryDoctor uses it |
+| Concept | Why it matters | How QueryCure uses it |
 |---|---|---|
 | **Benchmark methodology** (warm-up, interleaving, sample size, noise sources) | A single timing proves nothing | `benchmark/engine.py`, `schedule.py` |
 | **Robust statistics** (median, percentiles, IQR, CV) | Latency distributions are skewed with outliers | `benchmark/stats.py` |
@@ -143,7 +143,7 @@ An experiment from approval to verdict: sandbox clone, DDL, warm-up, interleaved
 
 ### Concepts
 
-| Concept | Why it matters | How QueryDoctor uses it |
+| Concept | Why it matters | How QueryCure uses it |
 |---|---|---|
 | **Correctness vs semantic equivalence** | Equal results on tests ≠ equivalent queries | multiset/ordered fingerprints, "tested equivalence" labels |
 | **SQL NULL semantics** (`NOT IN` with NULLs, three-valued logic) | The classic rewrite trap | `rewrite_trap` workload |
@@ -178,7 +178,7 @@ How any claim in a report can be traced to source artifacts, how integrity is ve
 
 ### Concepts
 
-| Concept | Why it matters | How QueryDoctor uses it |
+| Concept | Why it matters | How QueryCure uses it |
 |---|---|---|
 | **OAuth 2.0 authorization code flow + PKCE, session cookies, CSRF** | Real auth without storing passwords | GitHub login, cookie sessions |
 | **Authenticated encryption (AES-GCM), nonces, associated data, key rotation** | BYOK keys and DB passwords at rest | `core/crypto.py` |

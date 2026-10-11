@@ -1,4 +1,4 @@
-from querydoctor.sql.validator import validate_select
+from querycure.sql.validator import validate_select
 
 
 def fp(sql: str) -> str:

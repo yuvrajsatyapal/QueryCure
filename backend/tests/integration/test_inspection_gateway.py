@@ -9,20 +9,20 @@ import pytest
 from pydantic import SecretStr
 from structlog.testing import capture_logs
 
-from querydoctor.connectors.inspection_gateway import (
+from querycure.connectors.inspection_gateway import (
     GatewayLimits,
     InspectionGateway,
     TargetConnection,
 )
-from querydoctor.connectors.ssrf_guard import TargetPolicy
-from querydoctor.core.errors import (
+from querycure.connectors.ssrf_guard import TargetPolicy
+from querycure.core.errors import (
     RoleTooPrivilegedError,
     SqlNotAllowedError,
     TargetBlockedError,
     TargetTimeoutError,
     TargetUnreachableError,
 )
-from querydoctor.sql.validator import SqlPolicy
+from querycure.sql.validator import SqlPolicy
 
 from .conftest import _db_url
 
@@ -51,7 +51,7 @@ async def test_session_is_hardened_and_verified(target: dict[str, Any]) -> None:
     assert settings["statement_timeout"] == "300ms"
     assert settings["lock_timeout"] == "200ms"
     assert settings["search_path"] == "pg_catalog, public"
-    assert settings["application_name"] == "querydoctor-inspector"
+    assert settings["application_name"] == "querycure-inspector"
 
 
 async def test_capabilities_of_restricted_role(target: dict[str, Any]) -> None:

@@ -39,17 +39,17 @@ def upgrade() -> None:
         """
         DO $$
         BEGIN
-            IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'qd_app') THEN
-                CREATE ROLE qd_app NOLOGIN;
+            IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'qc_app') THEN
+                CREATE ROLE qc_app NOLOGIN;
             END IF;
-            IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'qd_retention') THEN
-                CREATE ROLE qd_retention NOLOGIN;
+            IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'qc_retention') THEN
+                CREATE ROLE qc_retention NOLOGIN;
             END IF;
         END $$;
         """
     )
     op.execute("REVOKE CREATE ON SCHEMA public FROM PUBLIC")
-    op.execute("GRANT USAGE ON SCHEMA public TO qd_app, qd_retention")
+    op.execute("GRANT USAGE ON SCHEMA public TO qc_app, qc_retention")
 
     op.execute(
         """
@@ -122,7 +122,7 @@ def upgrade() -> None:
                 'environment', 'replay_manifest')),
             media_type TEXT NOT NULL CHECK (media_type IN ('application/json', 'text/sql', 'text/markdown')),
             content BYTEA NOT NULL CHECK (octet_length(content) <= 5242880),
-            canonicalization TEXT NOT NULL CHECK (canonicalization IN ('qd-json-v1', 'qd-text-v1', 'qd-raw-v1'))
+            canonicalization TEXT NOT NULL CHECK (canonicalization IN ('qc-json-v1', 'qc-text-v1', 'qc-raw-v1'))
         );
         CREATE UNIQUE INDEX idx_artifacts_sha256_unique ON artifacts (sha256);
 
@@ -141,12 +141,12 @@ def upgrade() -> None:
         op.execute(_updated_at_trigger(table))
 
     # Mutable tables: app soft-deletes (UPDATE), never hard-deletes. Sessions expire via retention.
-    op.execute("GRANT SELECT, INSERT, UPDATE ON users, sessions, database_connections TO qd_app")
+    op.execute("GRANT SELECT, INSERT, UPDATE ON users, sessions, database_connections TO qc_app")
     # Append-only: no UPDATE/DELETE for the app role; locking clauses therefore also fail.
-    op.execute("GRANT SELECT, INSERT ON artifacts, run_artifacts TO qd_app")
+    op.execute("GRANT SELECT, INSERT ON artifacts, run_artifacts TO qc_app")
     op.execute(
         "GRANT SELECT, DELETE ON users, sessions, database_connections, artifacts, run_artifacts "
-        "TO qd_retention"
+        "TO qc_retention"
     )
 
 

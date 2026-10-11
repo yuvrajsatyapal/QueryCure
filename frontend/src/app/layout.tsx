@@ -16,7 +16,7 @@ const plexMono = IBM_Plex_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "QueryDoctor AI",
+  title: "QueryCure",
   description: "Evidence-backed PostgreSQL performance investigations.",
 };
 

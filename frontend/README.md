@@ -1,4 +1,4 @@
-# QueryDoctor AI — web app
+# QueryCure — web app
 
 Next.js 16 (App Router) + TypeScript + Tailwind CSS 4 + Vitest. See the root [README](../README.md) and [docs/design/](../docs/design/).
 

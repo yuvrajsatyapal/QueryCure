@@ -1,4 +1,4 @@
-"""Artifact store under the restricted qd_app role (TESTING_STRATEGY §3)."""
+"""Artifact store under the restricted qc_app role (TESTING_STRATEGY §3)."""
 
 import asyncio
 import uuid
@@ -8,18 +8,18 @@ import psycopg
 import pytest
 from sqlalchemy.ext.asyncio import AsyncEngine
 
-from querydoctor.core.errors import ArtifactConflictError, PayloadTooLargeError
-from querydoctor.db.engine import make_engine
-from querydoctor.replay import artifact_store as store
-from querydoctor.replay.canonical import canonical_json
-from querydoctor.replay.digest import digest
+from querycure.core.errors import ArtifactConflictError, PayloadTooLargeError
+from querycure.db.engine import make_engine
+from querycure.replay import artifact_store as store
+from querycure.replay.canonical import canonical_json
+from querycure.replay.digest import digest
 
 pytestmark = pytest.mark.integration
 
 
 @pytest.fixture
 async def app_engine(migrated_db: str) -> AsyncIterator[AsyncEngine]:
-    engine = make_engine(migrated_db, set_role="qd_app")
+    engine = make_engine(migrated_db, set_role="qc_app")
     yield engine
     await engine.dispose()
 
@@ -29,11 +29,11 @@ async def test_store_json_canonicalizes_and_returns_digest(app_engine: AsyncEngi
         art = await store.store_json(conn, kind="plan", value={"b": 1, "a": [1.0, "x"]})
 
     assert art.content == b'{"a":[1,"x"],"b":1}'
-    assert art.sha256 == digest("qd-json-v1", art.content)
+    assert art.sha256 == digest("qc-json-v1", art.content)
     assert (art.kind, art.media_type, art.canonicalization) == (
         "plan",
         "application/json",
-        "qd-json-v1",
+        "qc-json-v1",
     )
 
 
@@ -56,7 +56,7 @@ async def test_concurrent_inserts_of_same_digest_produce_one_row(
 
     ids = await asyncio.gather(*(put() for _ in range(8)))
 
-    sha = digest("qd-json-v1", canonical_json(value))
+    sha = digest("qc-json-v1", canonical_json(value))
     count = owner.execute("SELECT count(*) FROM artifacts WHERE sha256 = %s", (sha,)).fetchone()
     assert len(set(ids)) == 1
     assert count == (1,)
@@ -87,7 +87,7 @@ async def test_text_artifacts_use_text_profile(app_engine: AsyncEngine) -> None:
         art = await store.store_text(conn, kind="report_md", text="# Report\r\n\r\n")
 
     assert art.content == b"# Report\n"
-    assert art.canonicalization == "qd-text-v1"
+    assert art.canonicalization == "qc-text-v1"
 
 
 async def test_get_verifies_digest_and_detects_corruption(
@@ -111,10 +111,10 @@ async def test_same_digest_with_different_profile_is_a_conflict(
     app_engine: AsyncEngine, owner: psycopg.Connection
 ) -> None:
     content = b'"x"'
-    sha = digest("qd-json-v1", content)
+    sha = digest("qc-json-v1", content)
     owner.execute(
         "INSERT INTO artifacts (sha256, kind, media_type, content, canonicalization) "
-        "VALUES (%s, 'query', 'text/sql', %s, 'qd-raw-v1')",
+        "VALUES (%s, 'query', 'text/sql', %s, 'qc-raw-v1')",
         (sha, content),
     )
 

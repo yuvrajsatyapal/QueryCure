@@ -3,7 +3,7 @@ import os
 
 import pytest
 
-from querydoctor.core.crypto import DecryptionError, SecretBox, secret_aad
+from querycure.core.crypto import DecryptionError, SecretBox, secret_aad
 
 
 def make_box(version: int = 1) -> SecretBox:

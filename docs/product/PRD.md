@@ -1,4 +1,4 @@
-# Product Requirements Document — QueryDoctor AI
+# Product Requirements Document — QueryCure
 
 Status: Draft v1 (Phase 0). Owner: project author. Related: [FEATURES.md](FEATURES.md), [ARCHITECTURE.md](../architecture/ARCHITECTURE.md).
 
@@ -13,7 +13,7 @@ PostgreSQL performance tuning needs skills most application developers lack: rea
 | Index advisors (e.g. HypoPG-based, Dexter) | Index-only; little explanation; no correctness or workload reasoning |
 | General LLM chat | Unverified, unevidenced, sometimes semantically wrong rewrites |
 
-QueryDoctor combines investigation (agents), proposal (agents), and **verification (deterministic engine)** with explicit evidence and uncertainty.
+QueryCure combines investigation (agents), proposal (agents), and **verification (deterministic engine)** with explicit evidence and uncertainty.
 
 ## 2. Target users & personas
 
@@ -28,7 +28,7 @@ Non-target: DBAs managing fleets, OLAP warehouses, non-PostgreSQL engines.
 ## 3. Use cases
 
 1. **UC-1 Diagnose a slow query (offline).** Paste SQL + `EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON)` output + schema DDL → hypotheses and recommendations (unverified).
-2. **UC-2 Diagnose against a live DB.** Connect with a restricted role → QueryDoctor collects plain `EXPLAIN`, schema, index and stats metadata → hypotheses.
+2. **UC-2 Diagnose against a live DB.** Connect with a restricted role → QueryCure collects plain `EXPLAIN`, schema, index and stats metadata → hypotheses.
 3. **UC-3 Verify a fix.** Benchmark candidates in a sandbox loaded with a demo workload or a user-provisioned sandbox DB → tournament → verified/rejected.
 4. **UC-4 Ask a question.** "Why is this slow?" / "Will this index hurt inserts?" — answered with cited evidence.
 5. **UC-5 Review and share.** Export a Markdown/JSON report; replay it later without LLM calls.
@@ -72,7 +72,7 @@ IDs are referenced from [FEATURES.md](FEATURES.md) and [TASKS.md](../planning/TA
 ### Inputs & connections
 - **FR-1** Accept SQL text (single statement, ≤ 100 KB) with optional named parameter sets.
 - **FR-2** Accept execution plans in PostgreSQL JSON format (`EXPLAIN (FORMAT JSON)`, with or without `ANALYZE/BUFFERS`); text-format plans are Post-MVP.
-- **FR-3** Accept schema metadata as DDL text or as a QueryDoctor schema-snapshot JSON.
+- **FR-3** Accept schema metadata as DDL text or as a QueryCure schema-snapshot JSON.
 - **FR-4** Register PostgreSQL connections (Mode B) with restricted credentials; test connectivity; detect capabilities (server version, `pg_stat_statements` presence, `pg_read_all_stats` membership, read-only status).
 - **FR-5** Provide built-in demo workloads with deterministic generators and scale factors.
 

@@ -4,8 +4,8 @@ from pathlib import Path
 
 import pytest
 
-from querydoctor.plans.metrics import compute_metrics
-from querydoctor.plans.parser import parse_plan
+from querycure.plans.metrics import compute_metrics
+from querycure.plans.parser import parse_plan
 
 FIXTURES = Path(__file__).parents[2] / "fixtures" / "plans"
 ANALYZED = ["pg17_canonical_hot_analyze.json", "pg17_join_aggregate_analyze.json"]

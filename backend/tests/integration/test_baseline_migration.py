@@ -74,14 +74,14 @@ def test_artifacts_store_exact_bytes_with_profile_and_size_checks(
     with pytest.raises(psycopg.errors.CheckViolation):
         owner.execute(
             "INSERT INTO artifacts (sha256, kind, media_type, content, canonicalization) "
-            "VALUES ('not-a-digest', 'query', 'text/sql', 'SELECT 1', 'qd-raw-v1')"
+            "VALUES ('not-a-digest', 'query', 'text/sql', 'SELECT 1', 'qc-raw-v1')"
         )
 
 
 def test_roles_exist(owner: psycopg.Connection) -> None:
-    roles = {r[0] for r in owner.execute("SELECT rolname FROM pg_roles WHERE rolname LIKE 'qd_%'")}
+    roles = {r[0] for r in owner.execute("SELECT rolname FROM pg_roles WHERE rolname LIKE 'qc_%'")}
 
-    assert {"qd_app", "qd_retention"} <= roles
+    assert {"qc_app", "qc_retention"} <= roles
 
 
 def test_upgrade_is_idempotent_and_reaches_single_head(migrated_db: str) -> None:

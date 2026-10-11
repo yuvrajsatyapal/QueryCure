@@ -10,14 +10,14 @@ from typing import Any
 
 import pytest
 
-from querydoctor.replay.canonical import (
+from querycure.replay.canonical import (
     CanonicalizationError,
     canonical_json,
     canonical_raw,
     canonical_text,
     to_canonical,
 )
-from querydoctor.replay.digest import digest
+from querycure.replay.digest import digest
 
 FIXTURES = Path(__file__).parents[2] / "fixtures" / "canonical"
 
@@ -32,15 +32,15 @@ def hex_to_float(bits: str) -> float:
     return value
 
 
-# --- qd-json-v1 golden vectors -------------------------------------------------------
+# --- qc-json-v1 golden vectors -------------------------------------------------------
 
 
-@pytest.mark.parametrize("case", vectors("qd_json_v1.json"), ids=lambda c: c["name"])
+@pytest.mark.parametrize("case", vectors("qc_json_v1.json"), ids=lambda c: c["name"])
 def test_json_golden_vectors(case: dict[str, Any]) -> None:
     out = canonical_json(json.loads(case["input"]))
 
     assert out == case["canonical"].encode()
-    assert digest("qd-json-v1", out) == case["digest"]
+    assert digest("qc-json-v1", out) == case["digest"]
 
 
 @pytest.mark.parametrize(
@@ -156,15 +156,15 @@ def test_pydantic_models_encode_through_python_values() -> None:
     assert out == {"note": None, "rows": 3, "taken_at": "2026-01-01T00:00:00.000000Z"}
 
 
-# --- qd-text-v1 / qd-raw-v1 ----------------------------------------------------------
+# --- qc-text-v1 / qc-raw-v1 ----------------------------------------------------------
 
 
-@pytest.mark.parametrize("case", vectors("qd_text_v1.json"), ids=lambda c: c["name"])
+@pytest.mark.parametrize("case", vectors("qc_text_v1.json"), ids=lambda c: c["name"])
 def test_text_golden_vectors(case: dict[str, Any]) -> None:
     out = canonical_text(case["input"])
 
     assert out == case["canonical"].encode()
-    assert digest("qd-text-v1", out) == case["digest"]
+    assert digest("qc-text-v1", out) == case["digest"]
 
 
 def test_text_rejects_bom_and_surrogates() -> None:
@@ -174,12 +174,12 @@ def test_text_rejects_bom_and_surrogates() -> None:
         canonical_text("bad \ud800")
 
 
-@pytest.mark.parametrize("case", vectors("qd_raw_v1.json"), ids=lambda c: c["name"])
+@pytest.mark.parametrize("case", vectors("qc_raw_v1.json"), ids=lambda c: c["name"])
 def test_raw_golden_vectors(case: dict[str, Any]) -> None:
     out = canonical_raw(case["input"].encode())
 
     assert out == case["input"].encode()
-    assert digest("qd-raw-v1", out) == case["digest"]
+    assert digest("qc-raw-v1", out) == case["digest"]
 
 
 @pytest.mark.parametrize("data", [b"\xff\xfe", b"\xef\xbb\xbfSELECT 1", b"SELECT '\xed\xa0\x80'"])
@@ -194,10 +194,10 @@ def test_raw_rejects_invalid_utf8_bom_and_encoded_surrogates(data: bytes) -> Non
 def test_digest_is_profile_tagged_sha256() -> None:
     body = b"{}"
 
-    assert digest("qd-json-v1", body) == hashlib.sha256(b"qd-json-v1\n{}").hexdigest()
-    assert digest("qd-json-v1", body) != digest("qd-raw-v1", body)
+    assert digest("qc-json-v1", body) == hashlib.sha256(b"qc-json-v1\n{}").hexdigest()
+    assert digest("qc-json-v1", body) != digest("qc-raw-v1", body)
 
 
 def test_digest_rejects_unknown_profile() -> None:
     with pytest.raises(CanonicalizationError, match="unknown profile"):
-        digest("qd-json-v9", b"{}")
+        digest("qc-json-v9", b"{}")

@@ -6,9 +6,9 @@ import httpx2 as httpx
 import psycopg
 import pytest
 
-from querydoctor.api.main import create_app
-from querydoctor.core.config import Settings
-from querydoctor.db.engine import make_engine
+from querycure.api.main import create_app
+from querycure.core.config import Settings
+from querycure.db.engine import make_engine
 
 pytestmark = pytest.mark.integration
 PLANS = Path(__file__).parents[1] / "fixtures" / "plans"
@@ -16,11 +16,11 @@ PLANS = Path(__file__).parents[1] / "fixtures" / "plans"
 
 @pytest.fixture
 async def client(migrated_db: str) -> AsyncIterator[httpx.AsyncClient]:
-    engine = make_engine(migrated_db, set_role="qd_app")
+    engine = make_engine(migrated_db, set_role="qc_app")
     transport = httpx.ASGITransport(app=create_app(Settings(_env_file=None), engine=engine))
     async with httpx.AsyncClient(transport=transport, base_url="https://test") as c:
         await c.post("/api/v1/session")
-        c.headers["X-CSRF-Token"] = c.cookies["qd_csrf"]
+        c.headers["X-CSRF-Token"] = c.cookies["qc_csrf"]
         yield c
     await engine.dispose()
 
@@ -60,7 +60,7 @@ async def test_inspect_plan_parses_and_stores_artifact(
     stored = owner.execute(
         "SELECT kind, canonicalization FROM artifacts WHERE sha256 = %s", (body["artifact_sha256"],)
     ).fetchone()
-    assert stored == ("plan_analyze", "qd-json-v1")
+    assert stored == ("plan_analyze", "qc-json-v1")
 
 
 async def test_identical_plans_dedupe(client: httpx.AsyncClient) -> None:
@@ -105,10 +105,10 @@ async def test_inspect_schema_parses_ddl_and_stores_artifact(
 
 
 async def test_inspect_requires_a_session(migrated_db: str) -> None:
-    engine = make_engine(migrated_db, set_role="qd_app")
+    engine = make_engine(migrated_db, set_role="qc_app")
     transport = httpx.ASGITransport(app=create_app(Settings(_env_file=None), engine=engine))
     async with httpx.AsyncClient(transport=transport, base_url="https://test") as c:
-        c.cookies.set("qd_csrf", "t")
+        c.cookies.set("qc_csrf", "t")
         r = await c.post(
             "/api/v1/inspect/sql", json={"query": "SELECT 1"}, headers={"X-CSRF-Token": "t"}
         )

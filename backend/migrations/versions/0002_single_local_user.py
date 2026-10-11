@@ -19,9 +19,9 @@ def upgrade() -> None:
         "WHERE kind = 'local' AND deleted_at IS NULL"
     )
     # /readyz compares the applied revision with head while connected as the restricted app role.
-    op.execute("GRANT SELECT ON alembic_version TO qd_app")
+    op.execute("GRANT SELECT ON alembic_version TO qc_app")
 
 
 def downgrade() -> None:
-    op.execute("REVOKE SELECT ON alembic_version FROM qd_app")
+    op.execute("REVOKE SELECT ON alembic_version FROM qc_app")
     op.execute("DROP INDEX IF EXISTS idx_users_single_local_unique")

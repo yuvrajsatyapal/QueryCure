@@ -4,8 +4,8 @@ from collections.abc import Iterator
 import psycopg
 import pytest
 
-from querydoctor.workloads.loader import load_workload, table_checksums
-from querydoctor.workloads.registry import WORKLOADS, WorkloadRef
+from querycure.workloads.loader import load_workload, table_checksums
+from querycure.workloads.registry import WORKLOADS, WorkloadRef
 
 from .conftest import ADMIN_URL, _db_url
 
@@ -21,7 +21,7 @@ def fresh_db() -> Iterator[str]:
     names: list[str] = []
 
     def make() -> str:
-        name = f"qd_wl_{uuid.uuid4().hex[:10]}"
+        name = f"qc_wl_{uuid.uuid4().hex[:10]}"
         admin.execute(f'CREATE DATABASE "{name}"')
         names.append(name)
         return _db_url(name)

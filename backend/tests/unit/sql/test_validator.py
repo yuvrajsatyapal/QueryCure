@@ -1,7 +1,7 @@
 import pytest
 
-from querydoctor.core.errors import SqlNotAllowedError, SqlParseError
-from querydoctor.sql.validator import SqlPolicy, validate_select
+from querycure.core.errors import SqlNotAllowedError, SqlParseError
+from querycure.sql.validator import SqlPolicy, validate_select
 
 CANONICAL = "SELECT * FROM orders WHERE customer_id = $1 ORDER BY created_at DESC LIMIT 20"
 

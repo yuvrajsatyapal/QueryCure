@@ -9,9 +9,9 @@ import httpx2 as httpx
 import psycopg
 import pytest
 
-from querydoctor.api.main import create_app
-from querydoctor.core.config import Profile, Settings
-from querydoctor.db.engine import make_engine
+from querycure.api.main import create_app
+from querycure.core.config import Profile, Settings
+from querycure.db.engine import make_engine
 
 pytestmark = pytest.mark.integration
 
@@ -23,12 +23,12 @@ def local_settings() -> Settings:
 
 
 async def api(migrated_db: str, settings: Settings) -> AsyncIterator[httpx.AsyncClient]:
-    engine = make_engine(migrated_db, set_role="qd_app")
+    engine = make_engine(migrated_db, set_role="qc_app")
     transport = httpx.ASGITransport(app=create_app(settings, engine=engine))
     async with httpx.AsyncClient(transport=transport, base_url="https://test") as client:
         r = await client.post("/api/v1/session")
         assert r.status_code in (200, 201)
-        client.headers["X-CSRF-Token"] = client.cookies["qd_csrf"]
+        client.headers["X-CSRF-Token"] = client.cookies["qc_csrf"]
         yield client
     await engine.dispose()
 
@@ -216,11 +216,11 @@ async def test_other_users_connections_are_invisible(
         "VALUES (%s, %s, now() + interval '1 hour')",
         (other, hashlib.sha256(token.encode()).hexdigest()),
     )
-    engine = make_engine(migrated_db, set_role="qd_app")
+    engine = make_engine(migrated_db, set_role="qc_app")
     transport = httpx.ASGITransport(app=create_app(local_settings(), engine=engine))
     async with httpx.AsyncClient(transport=transport, base_url="https://test") as intruder:
-        intruder.cookies.set("qd_session", token)
-        intruder.cookies.set("qd_csrf", "t")
+        intruder.cookies.set("qc_session", token)
+        intruder.cookies.set("qc_csrf", "t")
         intruder.headers["X-CSRF-Token"] = "t"
         cid = created["id"]
         listed = await intruder.get("/api/v1/connections")

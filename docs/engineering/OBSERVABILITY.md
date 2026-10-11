@@ -50,20 +50,20 @@ Span attributes never include secrets or full SQL text (use `query_fingerprint`)
 
 | Metric | Type | Labels |
 |---|---|---|
-| `qd_runs_total` | counter | outcome, profile |
-| `qd_run_duration_seconds` | histogram | outcome |
-| `qd_llm_calls_total`, `qd_llm_tokens_total` | counter | provider, model, agent, status |
-| `qd_llm_latency_seconds` | histogram | provider, agent |
-| `qd_tool_calls_total` | counter | tool, status |
-| `qd_structured_output_repairs_total` | counter | agent |
-| `qd_citations_removed_total` | counter | agent |
-| `qd_jobs_queue_depth` | gauge | kind |
-| `qd_job_lease_expired_total` | counter | kind |
-| `qd_benchmark_cv` | histogram | workload |
-| `qd_security_blocks_total` | counter | control |
-| `qd_replay_attempts_total` | counter | kind, status, failure_code |
-| `qd_finalization_failures_total` | counter | step |
-| `qd_sse_connections` | gauge | — |
+| `qc_runs_total` | counter | outcome, profile |
+| `qc_run_duration_seconds` | histogram | outcome |
+| `qc_llm_calls_total`, `qc_llm_tokens_total` | counter | provider, model, agent, status |
+| `qc_llm_latency_seconds` | histogram | provider, agent |
+| `qc_tool_calls_total` | counter | tool, status |
+| `qc_structured_output_repairs_total` | counter | agent |
+| `qc_citations_removed_total` | counter | agent |
+| `qc_jobs_queue_depth` | gauge | kind |
+| `qc_job_lease_expired_total` | counter | kind |
+| `qc_benchmark_cv` | histogram | workload |
+| `qc_security_blocks_total` | counter | control |
+| `qc_replay_attempts_total` | counter | kind, status, failure_code |
+| `qc_finalization_failures_total` | counter | step |
+| `qc_sse_connections` | gauge | — |
 
 Exported via OTel metrics; in local profile also viewable via a `/internal/metrics` page in dev builds only.
 
@@ -84,4 +84,4 @@ The UI timeline is derived from events, not from OTel. For deeper debugging, a d
 
 ## 8. Alerting (demo, minimal)
 
-Uptime check on `/readyz`; log-based alert on `level=error` rate spike; daily check of `qd_job_lease_expired_total`. No paging — this is a portfolio deployment.
+Uptime check on `/readyz`; log-based alert on `level=error` rate spike; daily check of `qc_job_lease_expired_total`. No paging — this is a portfolio deployment.

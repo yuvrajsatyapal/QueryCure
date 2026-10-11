@@ -1,8 +1,8 @@
 import httpx2 as httpx
 import pytest
 
-from querydoctor.api.main import create_app
-from querydoctor.core.config import Profile, Settings
+from querycure.api.main import create_app
+from querycure.core.config import Profile, Settings
 
 pytestmark = pytest.mark.integration
 

@@ -7,6 +7,6 @@ afterEach(cleanup);
 test("home page names the product and states the project phase", () => {
   render(<Page />);
 
-  expect(screen.getByRole("heading", { level: 1, name: "QueryDoctor AI" })).toBeDefined();
+  expect(screen.getByRole("heading", { level: 1, name: "QueryCure" })).toBeDefined();
   expect(screen.getByText(/Phase 1/)).toBeDefined();
 });

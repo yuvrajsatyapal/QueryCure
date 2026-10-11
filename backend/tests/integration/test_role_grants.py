@@ -1,4 +1,4 @@
-"""Append-only grants (DATABASE_DESIGN §5, TESTING_STRATEGY §3). Runs with qd_app privileges."""
+"""Append-only grants (DATABASE_DESIGN §5, TESTING_STRATEGY §3). Runs with qc_app privileges."""
 
 import psycopg
 import pytest
@@ -9,7 +9,7 @@ pytestmark = pytest.mark.integration
 def _insert_artifact(conn: psycopg.Connection, digest: str) -> object:
     row = conn.execute(
         "INSERT INTO artifacts (sha256, kind, media_type, content, canonicalization) "
-        "VALUES (%s, 'query', 'text/sql', %s, 'qd-raw-v1') RETURNING id",
+        "VALUES (%s, 'query', 'text/sql', %s, 'qc-raw-v1') RETURNING id",
         (digest, b"SELECT 1"),
     ).fetchone()
     assert row is not None

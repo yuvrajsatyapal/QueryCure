@@ -1,5 +1,5 @@
 {
-  "name": "querydoctor-web",
+  "name": "querycure-web",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -10,7 +10,7 @@
     "typecheck": "next typegen && tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "gen:api": "cd ../backend && uv run python -m querydoctor.api.export_openapi > ../frontend/src/lib/api/generated/openapi.json && cd ../frontend && openapi-typescript src/lib/api/generated/openapi.json -o src/lib/api/generated/schema.ts"
+    "gen:api": "cd ../backend && uv run python -m querycure.api.export_openapi > ../frontend/src/lib/api/generated/openapi.json && cd ../frontend && openapi-typescript src/lib/api/generated/openapi.json -o src/lib/api/generated/schema.ts"
   },
   "dependencies": {
     "@codemirror/commands": "^6.11.1",

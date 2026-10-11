@@ -52,8 +52,12 @@ Schema additions:
 - `benchmark_runs.latencies_ns` replaces `latencies_ms`;
 - `experiments` gains `environment`, `engine_version`, and `row_profile`;
 - new table `replay_attempts`;
-- `qd_app` / `qd_retention` DB roles.
+- `qc_app` / `qc_retention` DB roles.
 
 API: replay endpoints return `ReplayAttempt`; new error codes `NOT_FINALIZED` and `EXPERIMENT_NOT_REPLAYABLE`; new SSE events `replay.status_changed` and `replay.compared`.
 
 Changing the equivalence margin default or any profile requires updating REPLAY_ENGINE and the golden vectors.
+
+## Amendment (2026-10-11): profile IDs renamed before first release
+
+The project was renamed from QueryDoctor to QueryCure. The profile IDs became `qc-json-v1` / `qc-text-v1` / `qc-raw-v1` (and the planned `qc-row-v1`). This is the one permitted exception to "frozen": no release existed and no artifacts existed outside disposable local development databases. Canonical bytes are unchanged. Only the profile tag in the digest preimage changed, so the golden-vector digests were recomputed with plain `hashlib` (the method reproduced all 14 previous digests from the old IDs first). From here on the `qc-*` IDs are frozen without exception.

@@ -6,9 +6,9 @@ Status: Planned. Conventions: [ADR-0006](../engineering/adr/ADR-0006-metadata-sc
 
 | Database | Owner | Purpose | Access path | Lifecycle |
 |---|---|---|---|---|
-| **Metadata DB** | QueryDoctor | System of record: users, investigations, events, artifacts, evidence, jobs, checkpoints | SQLAlchemy async repositories (`querydoctor.db`) | Persistent; Neon in public demo, Docker locally |
+| **Metadata DB** | QueryCure | System of record: users, investigations, events, artifacts, evidence, jobs, checkpoints | SQLAlchemy async repositories (`querycure.db`) | Persistent; Neon in public demo, Docker locally |
 | **Target DB** | User | Read-only inspection (Mode B) | `connectors.inspection_gateway` only | Not ours; never written to |
-| **Sandbox DB** | QueryDoctor (ephemeral) | Benchmark clones (Mode C) | `sandbox` + `benchmark` modules | Template per workload version; clones per experiment arm, dropped after use |
+| **Sandbox DB** | QueryCure (ephemeral) | Benchmark clones (Mode C) | `sandbox` + `benchmark` modules | Template per workload version; clones per experiment arm, dropped after use |
 
 This document specifies the **metadata DB**. Sandbox layout is in [BENCHMARK_ENGINE.md](BENCHMARK_ENGINE.md#3-sandbox-layout).
 
@@ -217,11 +217,11 @@ Indexes on `run_id`; `agent_execution_id`.
 | kind | TEXT | `query`, `param_sets`, `schema_snapshot`, `plan`, `plan_analyze`, `stats_snapshot`, `workload_snapshot`, `experiment_config`, `agent_output`, `report_json`, `report_md`, `environment`, `replay_manifest` |
 | media_type | TEXT | `application/json`, `text/sql`, `text/markdown` |
 | content | BYTEA | exact canonical bytes; CHECK `octet_length ≤ 5 MB`. **Not JSONB/TEXT:** JSONB reorders keys, normalizes numbers and rejects `\u0000`, and TEXT rejects NUL, so either could make a stored artifact fail digest verification. Query JSON content ad hoc with `convert_from(content, 'UTF8')::jsonb`. |
-| canonicalization | TEXT | profile ID: `qd-json-v1`, `qd-text-v1`, `qd-raw-v1` (frozen; see REPLAY_ENGINE §2) |
+| canonicalization | TEXT | profile ID: `qc-json-v1`, `qc-text-v1`, `qc-raw-v1` (frozen; see REPLAY_ENGINE §2) |
 
 Artifacts are shared across runs by hash; ownership comes from `run_artifacts`. Because they are immutable and purged only by retention, `updated_at`/`deleted_at` stay NULL (no trigger fires: the app role cannot `UPDATE`).
 
-**Insert, dedupe, and read under the restricted `qd_app` role.** These paths need only `INSERT` and `SELECT`:
+**Insert, dedupe, and read under the restricted `qc_app` role.** These paths need only `INSERT` and `SELECT`:
 
 1. **Store.**
    - `INSERT … ON CONFLICT (sha256) DO NOTHING RETURNING id`. `DO NOTHING` needs only `INSERT`; `DO UPDATE` would need `UPDATE` and is forbidden here.
@@ -246,7 +246,7 @@ Mirror the Pydantic models in [AGENT_SYSTEM.md §4](AGENT_SYSTEM.md#key-models-a
 Index: `(run_id) WHERE status = 'pending'`.
 
 ### experiments
-`run_id`, `kind` (`single`, `tournament`), `status` (`pending`, `provisioning`, `running`, `completed`, `failed`, `cancelled`), `config_artifact_id` (full `ExperimentConfig`), `environment JSONB` (`EnvironmentFingerprint`), `environment_digest TEXT`, `engine_version TEXT` (`bench@N`), `row_profile TEXT` (`qd-row-v1`), `replay_of_experiment_id` (nullable, set by experiment replay), `round INT`, `started_at`, `finished_at`.
+`run_id`, `kind` (`single`, `tournament`), `status` (`pending`, `provisioning`, `running`, `completed`, `failed`, `cancelled`), `config_artifact_id` (full `ExperimentConfig`), `environment JSONB` (`EnvironmentFingerprint`), `environment_digest TEXT`, `engine_version TEXT` (`bench@N`), `row_profile TEXT` (`qc-row-v1`), `replay_of_experiment_id` (nullable, set by experiment replay), `round INT`, `started_at`, `finished_at`.
 
 ### benchmark_runs (append-only)
 `experiment_id`, `candidate_id` (NULL = baseline), `arm TEXT`, `param_set TEXT`, `block INT` (interleaving block index), `latencies_ns JSONB` (array of integers; raw samples, never floats — REPLAY_ENGINE §2.1 rule 4), `rows_returned INT`, `result_fingerprint TEXT`, `plan_artifact_id`, `buffers JSONB`, `index_size_bytes BIGINT`, `index_build_ns BIGINT`, `provenance TEXT`.
@@ -310,7 +310,7 @@ Index: `(run_after) WHERE status = 'pending'`; `(locked_until) WHERE status = 'r
 
 ## 5. Ownership & authorization
 
-**Database roles.** The application role (`qd_app`) has `INSERT`/`SELECT` but no `UPDATE`/`DELETE` on the append-only tables `artifacts`, `investigation_events`, and `benchmark_runs`, plus `USAGE` on any sequences those inserts need (e.g. the identity sequence of `investigation_events`). Each table's grants ship in the migration that creates the table, so the restriction exists from the first phase that uses the table. Roles are created in the Phase 1 baseline migration. Only `qd_retention`, used solely by the `retention_sweep` job, may delete from them. Migrations run as the owner role. This prevents application-level mutation of sealed evidence; it is not protection against a compromised owner credential ([REPLAY_ENGINE §6](REPLAY_ENGINE.md#6-integrity-scope-what-the-digests-do-and-do-not-prove)).
+**Database roles.** The application role (`qc_app`) has `INSERT`/`SELECT` but no `UPDATE`/`DELETE` on the append-only tables `artifacts`, `investigation_events`, and `benchmark_runs`, plus `USAGE` on any sequences those inserts need (e.g. the identity sequence of `investigation_events`). Each table's grants ship in the migration that creates the table, so the restriction exists from the first phase that uses the table. Roles are created in the Phase 1 baseline migration. Only `qc_retention`, used solely by the `retention_sweep` job, may delete from them. Migrations run as the owner role. This prevents application-level mutation of sealed evidence; it is not protection against a compromised owner credential ([REPLAY_ENGINE §6](REPLAY_ENGINE.md#6-integrity-scope-what-the-digests-do-and-do-not-prove)).
 
 
 Every user-facing row is reachable from `users.id` via `investigations.user_id` or a direct `user_id`. Repositories take `user_id` as a mandatory parameter for user-scoped reads (`get_run(user_id, run_id)` → returns `None` for another user's run; API maps to 404, never 403, to avoid existence leaks). Artifacts are only readable through a `run_artifacts` join scoped to the user.
@@ -355,4 +355,4 @@ Every user-facing row is reachable from `users.id` via `investigations.user_id` 
 
 ## 10. Indexing strategy summary
 
-All relationship columns indexed; partial indexes on active rows; append-only tables indexed by `(run_id, …)`; queue tables with partial indexes on actionable states. Expected sizes are small (thousands of runs), so the priority is correctness of predicates (always include `deleted_at IS NULL`), not exotic indexing. Fittingly, QueryDoctor's own slow queries make good eval fixtures later.
+All relationship columns indexed; partial indexes on active rows; append-only tables indexed by `(run_id, …)`; queue tables with partial indexes on actionable states. Expected sizes are small (thousands of runs), so the priority is correctness of predicates (always include `deleted_at IS NULL`), not exotic indexing. Fittingly, QueryCure's own slow queries make good eval fixtures later.

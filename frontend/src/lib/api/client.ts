@@ -68,7 +68,7 @@ export async function apiFetch<T>(path: string, request: ApiRequest = {}): Promi
   const hasBody = request.body !== undefined || request.rawJsonBody !== undefined;
   if (hasBody) headers.set("Content-Type", "application/json");
   if (method !== "GET") {
-    const csrf = readCookie("qd_csrf");
+    const csrf = readCookie("qc_csrf");
     if (csrf) headers.set("X-CSRF-Token", csrf);
   }
   let response: Response;
@@ -83,7 +83,7 @@ export async function apiFetch<T>(path: string, request: ApiRequest = {}): Promi
       signal: request.signal,
     });
   } catch {
-    throw new ApiError("NETWORK_ERROR", "Could not reach the QueryDoctor API.", 0, [], null);
+    throw new ApiError("NETWORK_ERROR", "Could not reach the QueryCure API.", 0, [], null);
   }
   if (!response.ok) throw await toApiError(response);
   if (response.status === 204) return undefined as T;

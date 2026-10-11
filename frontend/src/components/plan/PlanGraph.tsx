@@ -124,7 +124,7 @@ export function PlanGraph({
 
   return (
     <figure aria-label="Plan graph" className="flex flex-col gap-2">
-      <div className="qd-plan-graph h-[360px] overflow-hidden rounded-lg border border-border md:h-[480px]">
+      <div className="qc-plan-graph h-[360px] overflow-hidden rounded-lg border border-border md:h-[480px]">
         <ReactFlow
           nodes={nodes}
           edges={edges}

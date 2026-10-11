@@ -2,9 +2,9 @@ from fastapi import APIRouter
 from fastapi.testclient import TestClient
 from pydantic import BaseModel
 
-from querydoctor.api.main import create_app
-from querydoctor.core.config import Settings
-from querydoctor.core.errors import SqlNotAllowedError
+from querycure.api.main import create_app
+from querycure.core.config import Settings
+from querycure.core.errors import SqlNotAllowedError
 
 
 class Body(BaseModel):
@@ -51,7 +51,7 @@ def test_unknown_routes_use_the_envelope() -> None:
 
 def test_validation_errors_name_the_fields() -> None:
     c = client()
-    c.cookies.set("qd_csrf", "t")
+    c.cookies.set("qc_csrf", "t")
 
     r = c.post("/api/v1/test/echo", json={}, headers={"X-CSRF-Token": "t"})
 

@@ -13,7 +13,7 @@ from psycopg.conninfo import conninfo_to_dict
 
 BACKEND = Path(__file__).parents[2]
 ADMIN_URL = os.environ.get(
-    "QD_TEST_ADMIN_URL", "postgresql://qd_owner:qd_local_dev_only@127.0.0.1:5432/postgres"
+    "QC_TEST_ADMIN_URL", "postgresql://qc_owner:qc_local_dev_only@127.0.0.1:5432/postgres"
 )
 
 
@@ -29,11 +29,11 @@ def migrated_db() -> Iterator[str]:
         admin = psycopg.connect(ADMIN_URL, autocommit=True, connect_timeout=3)
     except psycopg.OperationalError as exc:
         reason = f"metadata DB not reachable ({exc.__class__.__name__}); run docker compose up"
-        # CI sets QD_REQUIRE_DB so a missing database fails loudly instead of silently skipping.
-        if os.environ.get("QD_REQUIRE_DB") == "1":
+        # CI sets QC_REQUIRE_DB so a missing database fails loudly instead of silently skipping.
+        if os.environ.get("QC_REQUIRE_DB") == "1":
             pytest.fail(reason)
         pytest.skip(reason)
-    name = f"qd_test_{uuid.uuid4().hex[:12]}"
+    name = f"qc_test_{uuid.uuid4().hex[:12]}"
     with admin:
         admin.execute(f'CREATE DATABASE "{name}"')
     url = _db_url(name)
@@ -56,16 +56,16 @@ def owner(migrated_db: str) -> Iterator[psycopg.Connection]:
 
 @pytest.fixture
 def as_app(migrated_db: str) -> Iterator[psycopg.Connection]:
-    """Connection with exactly the qd_app role's privileges."""
+    """Connection with exactly the qc_app role's privileges."""
     with psycopg.connect(migrated_db, autocommit=True) as conn:
-        conn.execute("SET ROLE qd_app")
+        conn.execute("SET ROLE qc_app")
         yield conn
 
 
 @pytest.fixture
 def as_retention(migrated_db: str) -> Iterator[psycopg.Connection]:
     with psycopg.connect(migrated_db, autocommit=True) as conn:
-        conn.execute("SET ROLE qd_retention")
+        conn.execute("SET ROLE qc_retention")
         yield conn
 
 
@@ -76,7 +76,7 @@ def target() -> Iterator[dict[str, Any]]:
     except psycopg.OperationalError:
         pytest.skip("metadata DB not reachable")
     suffix = uuid.uuid4().hex[:10]
-    db, role, password = f"qd_target_{suffix}", f"qd_test_inspector_{suffix}", secrets.token_hex(16)
+    db, role, password = f"qc_target_{suffix}", f"qc_test_inspector_{suffix}", secrets.token_hex(16)
     with admin:
         admin.execute(f'CREATE DATABASE "{db}"')
         admin.execute(f"CREATE ROLE {role} LOGIN PASSWORD '{password}'")

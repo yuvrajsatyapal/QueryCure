@@ -1,0 +1,65 @@
+{
+  "profile": "qc-json-v1",
+  "vectors": [
+    {
+      "name": "empty object",
+      "input": "{}",
+      "canonical": "{}",
+      "digest": "90507e4c7490a29fce44ec067ca57c02b47abeed0dfecbd732e55ca40b3619b1"
+    },
+    {
+      "name": "key order by utf-16 code units",
+      "input": "{\"\\u20ac\":\"Euro\",\"\\r\":\"CR\",\"\\ufb33\":\"Hebrew\",\"1\":\"One\",\"\\ud83d\\ude00\":\"Smiley\",\"\\u0080\":\"Ctrl\",\"\\u00f6\":\"Latin\"}",
+      "canonical": "{\"\\r\":\"CR\",\"1\":\"One\",\"\u0080\":\"Ctrl\",\"\u00f6\":\"Latin\",\"\u20ac\":\"Euro\",\"\ud83d\ude00\":\"Smiley\",\"\ufb33\":\"Hebrew\"}",
+      "digest": "c7bf4542e61eab1b8471d039679e86b2b232d3d489b5f6815a08e2d3720fe00a"
+    },
+    {
+      "name": "nested ordering and no whitespace",
+      "input": "{ \"b\" : [ 1 , { \"z\" : null , \"a\" : true } ] , \"a\" : false }",
+      "canonical": "{\"a\":false,\"b\":[1,{\"a\":true,\"z\":null}]}",
+      "digest": "e50e51dbe367e8438d5a66853e4cd7e922e801dc48e3abfd0e15c875fc731665"
+    },
+    {
+      "name": "array order preserved",
+      "input": "[3,1,2]",
+      "canonical": "[3,1,2]",
+      "digest": "fe58c770c7913df0584dc2d73f466c86fa7f932081cf143fe8c84c87b560a30e"
+    },
+    {
+      "name": "integral float prints as integer",
+      "input": "{\"x\":2.0,\"y\":-0.0}",
+      "canonical": "{\"x\":2,\"y\":0}",
+      "digest": "be8b8be8a0d36f449c7abe9eccd6d27d938e5c54f3da4a69fbdc0c8547ec63c6"
+    },
+    {
+      "name": "integer bounds",
+      "input": "[9007199254740991,-9007199254740991]",
+      "canonical": "[9007199254740991,-9007199254740991]",
+      "digest": "9b4efffc90a86d2fc2ce38c11c50ef184774173ac4bf3deb1e3c9fd4ed2f09f6"
+    },
+    {
+      "name": "small and large floats",
+      "input": "[1e-7,0.000001,1e21,1e20,0.5]",
+      "canonical": "[1e-7,0.000001,1e+21,100000000000000000000,0.5]",
+      "digest": "01a7907e5ef5c591eea2b12f813c83dad95275d3a05bcad08ecba1d0e639ff06"
+    },
+    {
+      "name": "escapes are minimal",
+      "input": "\"tab\\tnl\\ncr\\rbs\\bff\\fq\\\"bs\\\\ctl\\u0001 slash/ \\u007f\"",
+      "canonical": "\"tab\\tnl\\ncr\\rbs\\bff\\fq\\\"bs\\\\ctl\\u0001 slash/ \u007f\"",
+      "digest": "87c94bb471ec2af73c3ff52f9b6b2d15b709118532ecc23694ecab7a6a996e40"
+    },
+    {
+      "name": "non-ascii stays literal and is not normalized",
+      "input": "[\"caf\\u00e9\",\"cafe\\u0301\",\"\\ud83d\\ude00\"]",
+      "canonical": "[\"caf\u00e9\",\"cafe\u0301\",\"\ud83d\ude00\"]",
+      "digest": "f7d89faad81b7048eb50a6287620088244c7bdd3ffbc79cb8df8a8d2649ff364"
+    },
+    {
+      "name": "plan-like document",
+      "input": "{\"Plan\":{\"Node Type\":\"Seq Scan\",\"Total Cost\":900.25,\"Plan Rows\":500}}",
+      "canonical": "{\"Plan\":{\"Node Type\":\"Seq Scan\",\"Plan Rows\":500,\"Total Cost\":900.25}}",
+      "digest": "e4aa3415b3a09351a3eeb6a733495378844354d7d5739c07da7fb7564814e3f5"
+    }
+  ]
+}

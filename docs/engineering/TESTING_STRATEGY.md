@@ -7,9 +7,9 @@ Status: Planned. Testing is designed before implementation; each phase's exit cr
 | Layer | Tool | Scope | Runs in CI |
 |---|---|---|---|
 | Unit | pytest | Pure logic: SQL validation, plan parsing/metrics/diff, stats, correctness hashing, verdict rules, state transitions, routing functions, canonicalization | every PR |
-| Integration | pytest + real Postgres (compose locally; a `postgres:17` service in CI). Each session creates and drops its own database. Tests skip without a DB locally but **fail** when `QD_REQUIRE_DB=1` (CI) | Repositories, job queue, SSE replay, inspection gateway against a seeded "target", sandbox clone lifecycle, LangGraph with fake LLM, checkpoint resume | PRs touching backend |
+| Integration | pytest + real Postgres (compose locally; a `postgres:17` service in CI). Each session creates and drops its own database. Tests skip without a DB locally but **fail** when `QC_REQUIRE_DB=1` (CI) | Repositories, job queue, SSE replay, inspection gateway against a seeded "target", sandbox clone lifecycle, LangGraph with fake LLM, checkpoint resume | PRs touching backend |
 | Security | pytest | Negative tests per control (§4) | every PR |
-| Agent evals | custom runner (`querydoctor.evals`) | Decision quality on ground-truth fixtures (§5) | smoke (recorded) on PRs touching `agents/`; live nightly/manual |
+| Agent evals | custom runner (`querycure.evals`) | Decision quality on ground-truth fixtures (§5) | smoke (recorded) on PRs touching `agents/`; live nightly/manual |
 | Benchmark evals | integration + workloads | Engine verdicts on fixtures with known answers (§6) | nightly + before Phase 3/4 exit |
 | Frontend unit | Vitest + Testing Library | Components (ClaimBadge states, PlanTreeTable, SSE reducer, case conversion) | every PR |
 | E2E | Playwright | Core journeys against compose stack with stubbed LLM | PRs to `main`, nightly |
@@ -45,12 +45,12 @@ Coverage target: ≥ 85% lines on `sql`, `plans`, `benchmark`, `replay`, `eviden
 - **Inspection gateway:** against a seeded "target" Postgres with a restricted role: capabilities detected; EXPLAIN works; DML refused at validator; parser-bypass payload refused at read-only transaction; timeout enforced (`pg_sleep` via allowed path is impossible → use a deliberately expensive planning query fixture).
 - **Finalization:** fault injection after each step of `finalize_run` leaves no manifest, no report row, and an unchanged status; a re-run after a simulated post-commit crash is a no-op; content events and content writes after `finalized_at` are rejected; events gap aborts finalization.
 - **Report replay:** each `not_replayable` / `integrity_failed` code is reachable from a fixture (purged artifact, mutated artifact, deleted event, mutated record → `rebuild_mismatch`, retired builder → `verified_stored_only`); zero LLM transport calls.
-- **Append-only grants (required; integration tests run as `qd_app`, never as the owner role):**
+- **Append-only grants (required; integration tests run as `qc_app`, never as the owner role):**
   - **Negative:** `UPDATE`/`DELETE`/`FOR UPDATE` on `artifacts`, `investigation_events`, `benchmark_runs` fail.
   - **Positive:** first artifact insert; duplicate insert of the same digest (dedupe path returns the existing id); two concurrent inserts of the same digest (no error, one row); `run_artifacts` linking; retrieval with digest re-verification; profile mismatch on an existing digest → `ArtifactConflict`; event insertion with sequence assignment.
-  - **Role separation:** the `qd_retention` role can delete; `qd_app` cannot.
+  - **Role separation:** the `qc_retention` role can delete; `qc_app` cannot.
   - Each test lands in the phase that creates its table: artifacts in Phase 1, events in Phase 2, benchmark runs in Phase 3.
-- **Sandbox:** template build, clone, drop; failure cleanup leaves no `qd_clone_*` databases.
+- **Sandbox:** template build, clone, drop; failure cleanup leaves no `qc_clone_*` databases.
 - **LangGraph:** full graph with a **fake chat model** returning scripted structured outputs; interrupt/resume across process restart (kill worker after checkpoint N, restart, assert completion and no duplicate `benchmark_runs`).
 
 ## 4. Security tests

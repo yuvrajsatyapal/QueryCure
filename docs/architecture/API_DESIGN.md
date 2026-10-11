@@ -8,7 +8,7 @@ Status: Planned. Base path `/api/v1`. JSON is `snake_case`. Timestamps ISO 8601 
 
 | Topic | Rule |
 |---|---|
-| Auth | Session cookie `qd_session` (HttpOnly, Secure, SameSite=Lax). Mutating requests require `X-CSRF-Token` matching cookie `qd_csrf`. |
+| Auth | Session cookie `qc_session` (HttpOnly, Secure, SameSite=Lax). Mutating requests require `X-CSRF-Token` matching cookie `qc_csrf`. |
 | Authorization | Every resource scoped to the caller; foreign IDs return **404**. |
 | Pagination | Cursor-based: `?limit=20&cursor=<opaque>`; response `{ "items": [...], "next_cursor": "…" | null }`. Cursor = base64 of `(created_at, id)`. Max limit 100. |
 | Idempotency | `POST` that creates work accepts `Idempotency-Key` (UUID). Same key + same body → original response; same key + different body → 409. Keys retained 24 h. |
@@ -43,7 +43,7 @@ Status: Planned. Base path `/api/v1`. JSON is `snake_case`. Timestamps ISO 8601 
 | 422 | `VALIDATION_ERROR`, `EXPERIMENT_NOT_REPLAYABLE`, `SQL_NOT_ALLOWED`, `SQL_PARSE_ERROR`, `CONNECTION_TARGET_BLOCKED`, `ROLE_TOO_PRIVILEGED`, `TARGET_PERMISSION_DENIED` (role lacks e.g. SELECT on a table), `TARGET_QUERY_ERROR` (PostgreSQL rejected the EXPLAIN, e.g. unknown table) |
 | 429 | `RATE_LIMITED`, `CONCURRENCY_LIMIT` |
 | 502/504 | `TARGET_UNREACHABLE`, `TARGET_TIMEOUT` |
-| 503 | `SERVICE_UNAVAILABLE` (metadata DB not configured or unreachable), `CONFIGURATION_ERROR` (e.g. `QD_MASTER_KEY` missing, so credentials cannot be stored) |
+| 503 | `SERVICE_UNAVAILABLE` (metadata DB not configured or unreachable), `CONFIGURATION_ERROR` (e.g. `QC_MASTER_KEY` missing, so credentials cannot be stored) |
 
 Error messages never include credentials, DSNs, or raw driver errors (driver errors are mapped to codes; originals go to logs, redacted).
 
@@ -179,4 +179,4 @@ data: {"run_id":"…","seq":42,"ts":"2026-10-11T12:00:03.120Z","type":"hypothesi
 
 ## 5. Models location
 
-Pydantic request/response models live in `querydoctor/api/schemas/`, re-using domain models from `querydoctor/domain/` where the shape is identical. Response models never include secret fields — enforced by a test that scans response schemas for forbidden field names.
+Pydantic request/response models live in `querycure/api/schemas/`, re-using domain models from `querycure/domain/` where the shape is identical. Response models never include secret fields — enforced by a test that scans response schemas for forbidden field names.

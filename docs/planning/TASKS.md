@@ -9,11 +9,11 @@ IDs `T<phase>.<n>`. Priority: **P0** blocks the phase exit, **P1** needed for ph
 | T1.1 | Repo scaffolding: `backend/` (uv, ruff, mypy, pytest, import-linter), `frontend/` (Next.js, Tailwind, shadcn, Vitest), `infra/docker/compose.yaml` (metadata-db, sandbox-db) | P0 | — | `uv run pytest`, `pnpm build`, `docker compose up` all succeed on a clean clone |
 | T1.2 | CI workflow `ci.yml` (lint, types, unit, build) | P0 | T1.1 | Green on main; fails on a deliberate type error |
 | T1.3 | `core/`: settings (profiles), structlog + redaction, error types, AES-GCM crypto helper | P0 | T1.1 | Redaction test: secrets never in captured logs; crypto round-trip + tamper tests |
-| T1.4 | Alembic baseline: extension, `qd_app`/`qd_retention` roles, `set_updated_at()`, `users`, `sessions`, `database_connections`, `artifacts`, `run_artifacts` | P0 | T1.1 | Upgrade from empty works; conventions per ADR-0006 |
+| T1.4 | Alembic baseline: extension, `qc_app`/`qc_retention` roles, `set_updated_at()`, `users`, `sessions`, `database_connections`, `artifacts`, `run_artifacts` | P0 | T1.1 | Upgrade from empty works; conventions per ADR-0006 |
 | T1.5 | Session API (`POST /session`, `GET /me`), CSRF middleware, error envelope | P0 | T1.3, T1.4 | Anonymous + local sessions; CSRF negative test |
 | T1.6 | `sql/` parser, validator, fingerprint | P0 | T1.1 | Full validator suite (TESTING_STRATEGY §2) |
 | T1.7 | `plans/` parser + metrics (PG 13–17 fixtures) | P0 | T1.1 | Loops-aware self time matches hand-computed fixtures |
-| T1.8 | Canonicalization profiles (`qd-json-v1`, `qd-text-v1`, `qd-raw-v1`) + artifact store with profile-tagged digests | P0 | T1.4 | Golden-vector suite (REPLAY_ENGINE §2.4) passes on Python 3.12 and 3.13; integrity failure detected; canonicalizer rejects non-primitive input; integration tests for insert/dedupe/concurrent-insert/retrieval run as restricted `qd_app` role (TESTING_STRATEGY §3) |
+| T1.8 | Canonicalization profiles (`qc-json-v1`, `qc-text-v1`, `qc-raw-v1`) + artifact store with profile-tagged digests | P0 | T1.4 | Golden-vector suite (REPLAY_ENGINE §2.4) passes on Python 3.12 and 3.13; integrity failure detected; canonicalizer rejects non-primitive input; integration tests for insert/dedupe/concurrent-insert/retrieval run as restricted `qc_app` role (TESTING_STRATEGY §3) |
 | T1.9 | `connectors/ssrf_guard.py` | P0 | T1.3 | All SSRF security cases pass |
 | T1.10 | Hardened sessions + inspection gateway + catalog templates + capabilities | P0 | T1.6, T1.9 | Integration: restricted role works; superuser refused; DML blocked at validator and at read-only txn; timeouts enforced; unqualified user-defined function (resolved via `search_path`) refused by the `pg_proc` check |
 | T1.11 | Statistics redaction (no MCV/histogram values) | P0 | T1.10 | Test asserts gateway output contains no `most_common_vals` |
@@ -30,7 +30,7 @@ IDs `T<phase>.<n>`. Priority: **P0** blocks the phase exit, **P1** needed for ph
 
 | ID | Task | Pri | Deps | Acceptance criteria |
 |---|---|---|---|---|
-| T2.1 | Migrations: investigations, runs (+`last_event_seq`), events, agent/tool executions, evidence, hypotheses, jobs | P0 | T1.4 | Conventions; `transition_run` enforces state machine; `investigation_events` grants (INSERT/SELECT + sequence USAGE) for `qd_app` with grant tests |
+| T2.1 | Migrations: investigations, runs (+`last_event_seq`), events, agent/tool executions, evidence, hypotheses, jobs | P0 | T1.4 | Conventions; `transition_run` enforces state machine; `investigation_events` grants (INSERT/SELECT + sequence USAGE) for `qc_app` with grant tests |
 | T2.2 | Job queue (claim/lease/heartbeat/retry/dead-letter/dedupe) + worker entrypoint | P0 | T2.1 | Concurrency test: no double execution; lease reclaim works |
 | T2.3 | Event emitter (same-txn insert + NOTIFY) + SSE endpoint with resume + history endpoint | P0 | T2.1 | Exactly-once delivery across reconnect test |
 | T2.4 | LLM layer: providers, structured output + repair, env-key fallback, rate-limit backoff | P0 | T1.3 | Fake-model tests for repair and backoff; no keys in logs |
@@ -43,7 +43,7 @@ IDs `T<phase>.<n>`. Priority: **P0** blocks the phase exit, **P1** needed for ph
 | T2.11 | Investigations/runs API (create, list, detail, cancel, findings, evidence) | P0 | T2.2, T2.3 | Idempotency-Key behaviour; 404 cross-user |
 | T2.12 | Frontend: start run (incl. param sets editor deferred from T1.17), AgentTimeline (SSE → query cache), Findings tab, EvidenceChip → plan highlight | P0 | T2.11 | Playwright with stubbed LLM |
 | T2.13 | History page | P1 | T2.11 | Cursor pagination; soft delete + undo |
-| T2.14 | Eval runner, recordings format, first 5 cases | P0 | T2.9 | `python -m querydoctor.evals run --suite smoke` deterministic |
+| T2.14 | Eval runner, recordings format, first 5 cases | P0 | T2.9 | `python -m querycure.evals run --suite smoke` deterministic |
 
 ## Phase 3 — Optimization & benchmarking
 
@@ -53,7 +53,7 @@ IDs `T<phase>.<n>`. Priority: **P0** blocks the phase exit, **P1** needed for ph
 | T3.2 | Sandbox provisioner (template build, clone, drop, advisory lock, orphan cleanup) | P0 | T1.14 | No orphan clones after failure tests |
 | T3.3 | Remaining workloads: `join_fanout`, `stale_stats`, `index_regression` | P0 | T1.14 | Deterministic |
 | T3.4 | Benchmark schedule + timing + cancellation | P0 | T3.2 | Balanced, seeded schedule; cancel within one block; samples stored as integer ns; `EnvironmentFingerprint` captured |
-| T3.5 | Correctness fingerprints with `qd-row-v1` (ordered/multiset, ties, truncation) | P0 | T3.4 | Unit + `rewrite_trap` integration; row-profile golden vectors |
+| T3.5 | Correctness fingerprints with `qc-row-v1` (ordered/multiset, ties, truncation) | P0 | T3.4 | Unit + `rewrite_trap` integration; row-profile golden vectors |
 | T3.6 | Stats (median, p95 rule, CV, bootstrap CI) | P0 | — | Unit + property tests |
 | T3.7 | Verdict gates 1–6 + tournament ranking | P0 | T3.5, T3.6 | Benchmark-engine eval table passes |
 | T3.8 | DDL allowlist + candidate SQL validation | P0 | T1.6 | Security tests |
@@ -71,7 +71,7 @@ IDs `T<phase>.<n>`. Priority: **P0** blocks the phase exit, **P1** needed for ph
 | T4.2 | Benchmark Auditor (downgrade-only) | P0 | T3.7 | Cannot upgrade (unit test); eval downgrade rate tracked |
 | T4.3 | Plan diff (structural + metrics) + API + UI diff mode | P0 | T1.7 | Fixture diffs correct |
 | T4.4 | Report builder@1 + md renderer@1 (pure, versioned) + MD/JSON export with manifest digest footer + provenance scan | P0 | T4.1 | Unlabeled-number test; byte-identical rebuild test |
-| T4.5 | `finalize_run` (atomic): cutoff, `qd-events-v1` digest, report, manifest, status; emitter/repository sealing | P0 | T4.4 | Finalization fault-injection and idempotency tests (TESTING_STRATEGY §3) |
+| T4.5 | `finalize_run` (atomic): cutoff, `qc-events-v1` digest, report, manifest, status; emitter/repository sealing | P0 | T4.4 | Finalization fault-injection and idempotency tests (TESTING_STRATEGY §3) |
 | T4.6 | Report replay attempts: ordered checks, status + failure codes, renderer fallback | P0 | T4.5 | Every code in REPLAY_ENGINE §8.1 reachable from a fixture; zero LLM calls |
 | T4.7 | Experiment replay (preconditions, replay run, same seed) + statistical comparison + environment diff | P1 | T4.5, T3.7 | Classification unit tests; same-machine replay of `orders_ecommerce` yields `reproduced` or a documented `inconclusive` |
 | T4.8 | Lineage drawer UI + replay page | P1 | T4.5 | "Why?" walks to source artifact |

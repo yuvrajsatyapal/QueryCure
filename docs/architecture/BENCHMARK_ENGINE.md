@@ -36,18 +36,18 @@ class ExperimentResult(BaseModel):
     stats: list[SpeedupStats]                # per candidate × param set
     verdicts: list[RuleVerdict]              # deterministic verdict + reason codes
 
-class EnvironmentFingerprint(BaseModel):     # canonicalized with qd-json-v1; digest stored as environment_digest
+class EnvironmentFingerprint(BaseModel):     # canonicalized with qc-json-v1; digest stored as environment_digest
     pg_version: str                          # server_version_num, e.g. "170002"
     pg_settings: dict[str, str]              # fixed list of planner/memory GUCs (REPLAY_ENGINE §9.3)
     sandbox_image_digest: str                # container image digest
     workload_id: str
     workload_data_digest: str                # digest of the template DB's table checksums
-    row_profile: Literal["qd-row-v1"]
+    row_profile: Literal["qc-row-v1"]
     cpu_arch: str; cpu_model: str; cpu_count: int; memory_bytes: int
     os: str; container_runtime: str
 ```
 
-Samples are stored as integer nanoseconds (`perf_counter_ns`); milliseconds are a display unit only. This keeps raw evidence exact under canonicalization ([REPLAY_ENGINE §2.1](REPLAY_ENGINE.md#21-qd-json-v1-rules)) and lets any statistic be recomputed for replay comparison.
+Samples are stored as integer nanoseconds (`perf_counter_ns`); milliseconds are a display unit only. This keeps raw evidence exact under canonicalization ([REPLAY_ENGINE §2.1](REPLAY_ENGINE.md#21-qc-json-v1-rules)) and lets any statistic be recomputed for replay comparison.
 
 ## 2. Lifecycle
 
@@ -77,8 +77,8 @@ Each state transition emits a `benchmark.progress` event. Persistence is coarser
 ## 3. Sandbox layout
 
 - One sandbox **server** (Docker `postgres:17` in local profile; version recorded) on an internal network.
-- Per workload version a **template database** `qd_tpl_<workload_hash>` built once: schema + deterministic data + `ANALYZE` + `VACUUM (FREEZE)`; marked `datistemplate`.
-- Per experiment arm a **clone** `qd_clone_<experiment>_<arm>` via `CREATE DATABASE … TEMPLATE qd_tpl_…` (file-level copy; far faster than reloading data). Clones are dropped at the end.
+- Per workload version a **template database** `qc_tpl_<workload_hash>` built once: schema + deterministic data + `ANALYZE` + `VACUUM (FREEZE)`; marked `datistemplate`.
+- Per experiment arm a **clone** `qc_clone_<experiment>_<arm>` via `CREATE DATABASE … TEMPLATE qc_tpl_…` (file-level copy; far faster than reloading data). Clones are dropped at the end.
 - Same server for all arms of an experiment → comparable hardware/config; one experiment at a time per server (advisory lock) → no neighbour interference from ourselves.
 - Settings pinned and recorded: `shared_buffers`, `work_mem`, `effective_cache_size`, `random_page_cost`, `jit`, `max_parallel_workers_per_gather`. Default: `jit=off` (JIT compile time adds variance on short queries; recorded as a limitation).
 
@@ -103,7 +103,7 @@ For each param set:
 | Truncation | > `row_hash_cap` rows | `inconclusive: result_too_large` |
 | Error parity | baseline vs candidate errors | candidate errors where baseline doesn't |
 
-Row canonicalization uses the frozen `qd-row-v1` profile ([REPLAY_ENGINE §2.2](REPLAY_ENGINE.md#22-qd-text-v1-qd-raw-v1-qd-row-v1)), so fingerprints from an original experiment and its replay are comparable across Python and driver versions.
+Row canonicalization uses the frozen `qc-row-v1` profile ([REPLAY_ENGINE §2.2](REPLAY_ENGINE.md#22-qc-text-v1-qc-raw-v1-qc-row-v1)), so fingerprints from an original experiment and its replay are comparable across Python and driver versions.
 
 **Scope of claims.** Matching fingerprints across the tested param sets show *equivalence on the tested data*, not formal SQL equivalence. Reports say exactly that. Rewrites (which can change semantics, e.g., `NOT IN` vs `NOT EXISTS` with NULLs) require **≥ 3 param sets** including at least one designed edge case (NULL-bearing, empty result), and are labeled "tested equivalence" in the UI. Index-only candidates cannot change semantics by construction, but are still fingerprinted (catches collation/planner bugs and our own harness bugs).
 

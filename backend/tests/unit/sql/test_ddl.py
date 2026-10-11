@@ -1,7 +1,7 @@
 import pytest
 
-from querydoctor.core.errors import PayloadTooLargeError, SqlParseError
-from querydoctor.sql.ddl import parse_ddl
+from querycure.core.errors import PayloadTooLargeError, SqlParseError
+from querycure.sql.ddl import parse_ddl
 
 PG_DUMP_STYLE = """
 SET statement_timeout = 0;
