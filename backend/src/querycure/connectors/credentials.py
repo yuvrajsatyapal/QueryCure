@@ -4,7 +4,7 @@ import uuid
 
 from querycure.connectors.models import TargetConnection
 from querycure.core.config import Settings
-from querycure.core.crypto import SecretBox, secret_aad
+from querycure.core.crypto import DecryptionError, SecretBox, secret_aad
 from querycure.core.errors import ConfigurationError, NotFoundError
 from querycure.db.repositories.connections import ConnectionRecord
 
@@ -30,7 +30,14 @@ def target_from_record(
     sealed = record.sealed_password()
     if sealed is None:
         raise NotFoundError("Connection not found.")
-    password = secret_box(settings).decrypt(sealed, aad=connection_aad(record.id, user_id))
+    try:
+        password = secret_box(settings).decrypt(sealed, aad=connection_aad(record.id, user_id))
+    except DecryptionError:
+        # Typically QC_MASTER_KEY changed since the password was saved.
+        raise ConfigurationError(
+            "Stored credentials for this connection cannot be decrypted with the current "
+            "QC_MASTER_KEY. Re-enter the password."
+        ) from None
     return TargetConnection(
         host=record.host,
         port=record.port,

@@ -20,7 +20,7 @@ from querycure.jobs import queue
 from querycure.jobs.queue import Job, JobKind, ReapedJob
 
 Handler = Callable[[Job], Coroutine[Any, Any, None]]
-ReapedCallback = Callable[[ReapedJob], Awaitable[None]]
+DeadCallback = Callable[[Job | ReapedJob], Awaitable[None]]
 
 log = get_logger(__name__)
 
@@ -49,7 +49,7 @@ class Worker:
         worker_id: str | None = None,
         concurrency: int = 1,
         timings: WorkerTimings | None = None,
-        on_reaped: ReapedCallback | None = None,
+        on_dead: DeadCallback | None = None,
     ) -> None:
         if concurrency < 1:
             raise ValueError("concurrency must be at least 1")
@@ -58,7 +58,7 @@ class Worker:
         self.worker_id = worker_id or f"worker-{uuid.uuid4().hex[:12]}"
         self._concurrency = concurrency
         self._timings = timings or WorkerTimings()
-        self._on_reaped = on_reaped
+        self._on_dead = on_dead
         self._stopping = asyncio.Event()
 
     async def run(self) -> None:
@@ -92,8 +92,8 @@ class Worker:
             reaped = await queue.reap_exhausted(conn)
         for dead in reaped:
             log.warning("job_dead_lettered", job_id=str(dead.id), kind=dead.kind, reason="lease")
-            if self._on_reaped is not None:
-                await self._on_reaped(dead)
+            if self._on_dead is not None:
+                await self._on_dead(dead)
         async with self._engine.begin() as conn:
             return await queue.claim(
                 conn, worker_id=self.worker_id, lease_seconds=self._timings.lease_seconds
@@ -143,9 +143,11 @@ class Worker:
 
     async def _fail(self, job: Job, error: dict[str, str], *, retryable: bool) -> None:
         async with self._engine.begin() as conn:
-            await queue.fail(
+            status = await queue.fail(
                 conn, job_id=job.id, worker_id=self.worker_id, error=error, retryable=retryable
             )
+        if status == "dead" and self._on_dead is not None:
+            await self._on_dead(job)
 
     async def _heartbeat(self, job: Job, work: asyncio.Task[None]) -> None:
         while True:

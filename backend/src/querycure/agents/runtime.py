@@ -3,7 +3,7 @@
 import asyncio
 import time
 import uuid
-from collections.abc import Awaitable, Callable
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any, Protocol
 
@@ -75,7 +75,12 @@ class RunContext:
         return self.engine
 
 
-NodeFn = Callable[[InvestigationState, Runtime[RunContext]], Awaitable[dict[str, Any]]]
+class NodeFn(Protocol):
+    __name__: str
+
+    async def __call__(
+        self, state: InvestigationState, runtime: Runtime[RunContext]
+    ) -> dict[str, Any]: ...
 
 
 def guarded(

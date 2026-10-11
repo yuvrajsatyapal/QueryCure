@@ -169,7 +169,7 @@ async def test_exhausted_crashed_jobs_are_reported(
     reaped: list[ReapedJob] = []
     run_id = uuid.uuid4()
 
-    async def on_reaped(job: ReapedJob) -> None:
+    async def on_reaped(job: Job | ReapedJob) -> None:
         reaped.append(job)
 
     job_id = await _enqueue(app_engine, run_id=run_id, max_attempts=1)
@@ -178,7 +178,7 @@ async def test_exhausted_crashed_jobs_are_reported(
         "locked_until = now() - interval '1 second' WHERE id = %s",
         (job_id,),
     )
-    worker = Worker(app_engine, {}, worker_id="w1", timings=FAST, on_reaped=on_reaped)
+    worker = Worker(app_engine, {}, worker_id="w1", timings=FAST, on_dead=on_reaped)
     task = asyncio.create_task(worker.run())
     await _until(lambda: len(reaped) == 1)
     await worker.stop()

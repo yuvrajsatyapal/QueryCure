@@ -37,7 +37,9 @@ ACTIVE_STATUSES = frozenset(
 
 # AGENT_SYSTEM §9. The only place run transitions are defined; transition_run() enforces it.
 ALLOWED_TRANSITIONS: dict[RunStatus, frozenset[RunStatus]] = {
-    RunStatus.QUEUED: frozenset({RunStatus.RUNNING, RunStatus.CANCELLED}),
+    # queued -> failed: the job was dead-lettered before the run could start (worker crashes
+    # exhausted its attempts). Not in the original AGENT_SYSTEM §9 diagram; documented there.
+    RunStatus.QUEUED: frozenset({RunStatus.RUNNING, RunStatus.CANCELLED, RunStatus.FAILED}),
     RunStatus.RUNNING: frozenset(
         {
             RunStatus.AWAITING_APPROVAL,

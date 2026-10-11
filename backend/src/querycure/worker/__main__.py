@@ -7,7 +7,7 @@ from querycure.core.config import Settings
 from querycure.core.errors import ConfigurationError
 from querycure.core.logging import configure_logging
 from querycure.db.engine import make_engine
-from querycure.jobs.handlers import build_handlers
+from querycure.jobs.handlers import build_handlers, build_services, dead_job_handler
 from querycure.worker.runner import Worker, WorkerTimings
 
 
@@ -17,9 +17,11 @@ async def main() -> None:
     if settings.database_url is None:
         raise ConfigurationError("DATABASE_URL is required for the worker")
     engine = make_engine(settings.database_url.get_secret_value())
+    services = build_services(engine, settings)
     worker = Worker(
         engine,
-        build_handlers(engine, settings),
+        build_handlers(services),
+        on_dead=dead_job_handler(services),
         concurrency=settings.worker_concurrency or 1,
         timings=WorkerTimings(
             lease_seconds=settings.worker_lease_seconds,

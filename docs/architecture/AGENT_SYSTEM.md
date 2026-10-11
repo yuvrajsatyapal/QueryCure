@@ -204,6 +204,14 @@ The worker uses `asyncio`; parallel branches share one event loop. Per-run concu
 - **Finalization**: `write_report` executes `finalize_run` atomically (events cutoff, events digest, report artifacts, manifest, terminal status) — [REPLAY_ENGINE §5](REPLAY_ENGINE.md#5-atomic-finalization). If it re-runs after a crash, it detects `finalized_at` and is a no-op. Cancelled and failed runs are finalized the same way with partial reports.
 - Checkpoints are retained for 30 days after a run reaches a terminal state, then deleted (report replay does not need them; see [REPLAY_ENGINE.md](REPLAY_ENGINE.md)).
 
+**Implemented (T2.10):** `agents/graph.py` assembles the Phase 2 subset (through `synthesize_hypotheses → write_report`); `agents/run.execute_run` is the job handler body.
+- The checkpointer (`agents/checkpointer.py`) uses a psycopg pool with `search_path=langgraph` and a **strict** serializer. `setup()` is never called (migration `0004` created the tables as the owner).
+- A job finds out whether to resume with `aget_tuple(thread)`: if a checkpoint exists it calls `ainvoke(None)`, otherwise it starts fresh. Already-terminal runs are a no-op.
+- A reclaimed job (lease expired) records `running → queued → running`.
+- Tested: a crash raised during synthesis, after the analyst fan-out was checkpointed, resumes on the next attempt without calling the analysts again and without adding evidence or findings (ROADMAP Phase 2 acceptance #2); a worker job that crashes is retried and completes.
+- Missing LLM configuration fails the run with `CONFIGURATION_ERROR` before the graph starts. A dead-lettered job fails its run (`JOB_DEAD_LETTERED`) via the worker's `on_dead` callback, which now fires for both dead-letter paths.
+- Phase 2 `write_report` is deterministic: outcome from stop reason → hypotheses (`unverified_recommendations`, since nothing is benchmarked yet) → cited `no_action_evidence` (`no_action_needed`) → `inconclusive`. A `cancelling` run always ends `cancelled`. It stores an interim report (`reports/interim.py`, builder `interim-report@1`, no clock reads) as `report_json`/`report_md` artifacts, roles `output.report_json`/`output.report_md`, then changes status in the same transaction. `report.ready` is not emitted until Phase 4 (it carries a manifest digest). Runs failed by dead-lettering have no report (they never reached `write_report`); Phase 4 finalization covers them.
+
 ## 8. Human-in-the-loop
 
 Approval is required for:
@@ -231,6 +239,7 @@ stateDiagram-v2
   running --> cancelling: cancel requested
   awaiting_approval --> cancelled: cancel requested
   queued --> cancelled: cancel requested
+  queued --> failed: job dead-lettered before the run started
   cancelling --> cancelled: worker reached safe point
   running --> queued: lease expired (worker crash) and reclaimed
   completed --> [*]

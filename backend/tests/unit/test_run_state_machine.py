@@ -33,5 +33,9 @@ def test_sources_for_cancelled() -> None:
     }
 
 
+def test_dead_lettered_queued_run_can_fail() -> None:
+    assert RunStatus.FAILED in ALLOWED_TRANSITIONS[RunStatus.QUEUED]
+
+
 def test_queued_cannot_jump_to_completed() -> None:
     assert RunStatus.COMPLETED not in ALLOWED_TRANSITIONS[RunStatus.QUEUED]

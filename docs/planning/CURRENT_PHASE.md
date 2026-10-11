@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | Phase | **2 — Multi-agent intelligence** (Phase 1 complete: [PHASE_1_REPORT](reports/PHASE_1_REPORT.md)) |
-| Status | **Phase 2 in progress.** T2.1–T2.9 done (T2.9's eval smoke waits for T2.14 recordings) |
+| Status | **Phase 2 in progress.** T2.1–T2.10 done (T2.9's eval smoke waits for T2.14 recordings) |
 | Last updated | 2026-10-12 |
 | Application code | Phase 1 foundation: API (session, connections, inspect, workloads, health), metadata DB migrations, SQL/plan parsing, inspection gateway, artifact store, demo workloads; web app with connections and plan workspace (tree + graph). No agents yet. |
 
@@ -225,6 +225,13 @@
   - Workload templates checked against the real PG 17 target as the restricted role: idle-in-transaction session aggregated, a real `ACCESS EXCLUSIVE` lock and its waiter counted, table I/O read; `pg_stat_statements` refused cleanly when absent.
   - Tests: 4 gateway workload integration tests; 9 analyst integration tests (tool use + fenced result + row linkage + events; **injection fixture: a model obeying planted instructions is refused for a non-allowlisted tool and for another agent's tool**; per-agent budget soft stop; run-wide budget stops the run; invalid arguments; failure isolation; crash re-run reuses findings with zero model calls; index size 28 bytes/entry → 12 pages from live stats; workload tools on the live target). Full suite 666 passed; ruff, format, mypy clean.
   - **Not yet done:** "eval smoke on 3 workloads" needs recorded model responses (T2.14, after an API key is configured).
+- [x] **T2.10 graph assembly, Postgres checkpointer, resume** (`agents/graph.py`, `agents/checkpointer.py`, `agents/run.py`, `agents/nodes/write_report.py`, `reports/interim.py`, `jobs/handlers.py`).
+  - Graph: intake → collect_context → supervisor_plan → `Send` fan-out → synthesize_hypotheses → write_report, with stop routing at every step. Strict checkpoint serializer; checkpointer connects with `search_path=langgraph` and runs as `qc_app` in tests (grants suffice).
+  - Worker: `run_start`/`run_resume` handlers, `on_dead` for both dead-letter paths, reclaimed jobs record `running → queued → running`.
+  - **Deviation:** `queued → failed` added to the state machine (a job can die before its run starts). AGENT_SYSTEM §9 diagram updated.
+  - **Bug found by a test:** a stored connection whose password no longer decrypts (changed `QC_MASTER_KEY`) raised a bare `DecryptionError` that crashed the graph, so the job would retry until dead. `target_from_record` now raises `ConfigurationError` with a "re-enter the password" message: the worker degrades to `tool_error` evidence and the connections API answers 503 instead of 500.
+  - Tests: 11 end-to-end integration tests with scripted model responses and everything else real: full offline run (`unverified_recommendations`, ranked hypothesis, both analysts' findings, report JSON + Markdown, ≥ 5 checkpoints); **budget exhaustion → `inconclusive` + partial report (acceptance #5)**; cancellation → `cancelled` + partial report; **crash after the fan-out → resume without re-running analysts and with no duplicate evidence or findings (acceptance #2, in-process crash)**; worker retry to completion; dead-lettered job fails its run; missing key → `CONFIGURATION_ERROR`; invalid input → `inconclusive` without model calls; finished runs not re-executed; **no secrets in checkpoints** (target password, API key held by the client, master key, DSNs absent from checkpoints, blobs and writes); undecryptable credentials degrade. Stable across 5 repeated runs. Full suite 678 passed; ruff, format, mypy clean.
+  - Still to do: a SIGKILL test of a real worker process, which needs the replay LLM provider from T2.14.
 
 ## Blockers
 
