@@ -64,7 +64,7 @@ Notes:
 
 ## 4. State
 
-`InvestigationState` is a `TypedDict` (LangGraph requirement) whose values are Pydantic models or primitives. Lists that parallel branches write to use `Annotated[list[T], operator.add]` reducers.
+`InvestigationState` is a `TypedDict` (LangGraph requirement). **Implemented (T2.5): values are JSON only** (str/int/bool/None, lists, dicts); domain models in `domain/investigation.py` are dumped on write and validated on read (`findings_of`, `plan_of`, …). The checkpointer then never revives Python classes from database content: `langgraph-checkpoint`'s default serializer is permissive (it imports any class named in the checkpoint, with a warning), and we construct it strict. Lists that parallel branches write to use `Annotated[list[T], operator.add]` reducers; `stop_reason` has a priority reducer (`cancelled` > `failed` > `budget_exhausted` > `invalid_input`) because parallel branches may stop for different reasons in the same step. The block below is the target shape; Phase 2 implements the subset up to hypotheses, with IDs as strings.
 
 ```python
 class InvestigationState(TypedDict):
@@ -246,6 +246,14 @@ Defaults (configurable per profile in `agents/budgets.py`; demo profile is stric
 | Worker concurrency | 2 | 1 |
 
 `budget_guard` checks **before** each LLM/tool call; exceeding a limit raises `BudgetExhausted`, caught by the node wrapper, which routes to `write_report`.
+
+Implementation (T2.5, `agents/budgets.py`, `agents/runtime.py`):
+- Counters live in `investigation_runs.usage` (`llm_calls`, `input_tokens`, `output_tokens`, `tool_calls`), not in graph state: parallel branches cannot see each other's state, so a per-branch counter could overspend. Each charge is one conditional `UPDATE … RETURNING`, so concurrent branches share one budget without races and counts survive a crash.
+- The same statement requires `cancel_requested_at IS NULL` and elapsed wall clock under the limit, so every LLM/tool charge is also a cancellation point. `guard.check()` is the between-nodes safe point.
+- Tokens are recorded after each call; the token limit is enforced on the next charge (a single call can overshoot by its own size).
+- Tool calls: run-wide counter in the DB plus a per-invocation cap held in memory (`ToolAllowance`).
+- `budget.warning` is emitted once per budget, in the charging transaction, when usage reaches 80%.
+- `guarded(node)` wraps every node: skip if a stop is recorded, `guard.check()`, `node.started`/`node.completed` events; `BudgetExhausted` → `stop_reason=budget_exhausted` (+ `error` event), `RunCancelled` → `stop_reason=cancelled`; any other exception propagates so the job retries from the last checkpoint. `write_report` is `terminal`: it always runs, without the guard check, so cancelled and exhausted runs still get a partial report. Routers use `unless_stopped(next)`.
 
 ## 12. Termination criteria
 

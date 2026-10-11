@@ -10,7 +10,7 @@ import uuid
 from typing import Any
 
 from sqlalchemy import text
-from sqlalchemy.ext.asyncio import AsyncConnection
+from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine
 
 from querycure.core.errors import InvalidStateError, RunFinalizedError
 from querycure.db.repositories.runs import transition_run
@@ -61,3 +61,15 @@ async def change_status(
         payload["outcome"] = outcome.value
     await emit(conn, run_id, EventType.RUN_STATUS_CHANGED, payload)
     return previous
+
+
+class RunEventSink:
+    """Progress events from graph nodes, each committed on its own so SSE shows it at once."""
+
+    def __init__(self, engine: AsyncEngine, run_id: uuid.UUID) -> None:
+        self._engine = engine
+        self._run_id = run_id
+
+    async def emit(self, type: EventType, payload: dict[str, Any]) -> None:
+        async with self._engine.begin() as conn:
+            await emit(conn, self._run_id, type, payload)

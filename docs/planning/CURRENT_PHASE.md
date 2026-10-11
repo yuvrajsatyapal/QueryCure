@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | Phase | **2 — Multi-agent intelligence** (Phase 1 complete: [PHASE_1_REPORT](reports/PHASE_1_REPORT.md)) |
-| Status | **Phase 2 in progress.** T2.1–T2.4 done |
+| Status | **Phase 2 in progress.** T2.1–T2.5 done |
 | Last updated | 2026-10-12 |
 | Application code | Phase 1 foundation: API (session, connections, inspect, workloads, health), metadata DB migrations, SQL/plan parsing, inspection gateway, artifact store, demo workloads; web app with connections and plan workspace (tree + graph). No agents yet. |
 
@@ -195,6 +195,12 @@
   - New dependencies: `langchain-google-genai`, `langchain-openai` (the roadmap names Gemini + OpenRouter via LangChain).
   - Tests: 21 unit tests with scripted fake clients: parsing, fenced JSON, repair with errors, no third call, backoff 2/4/8/16/30/30 s, jitter bounds, fallback, no retry on auth failure, budget hook stops a retry before it is sent, records for every call, logs contain no prompt/output text; key resolution per profile; no key in client reprs; message merging; adapter usage extraction.
   - **Not verified live:** no `GEMINI_API_KEY` or `OPENROUTER_API_KEY` is configured on this machine, so no real provider call has been made. The adapters are exercised only through LangChain's fake chat model.
+- [x] **T2.5 state, budgets, cancellation** (`domain/investigation.py`, `agents/state.py`, `agents/budgets.py`, `agents/runtime.py`).
+  - Domain models: Evidence, Finding, Hypothesis, InvestigationPlan, NodeError, RunBudget, BudgetUsage (strict: `extra="forbid"`, citation IDs pattern-checked).
+  - **Decision:** graph state holds JSON values only, and the checkpointer will run with a strict serializer (its default revives arbitrary classes from checkpoint content).
+  - **Decision:** budget counters are DB-side (`investigation_runs.usage`) with atomic conditional updates, so the three parallel analysts share one budget; the same statements observe cancellation and wall clock. AGENT_SYSTEM §11 defaults per profile.
+  - `guarded()` node wrapper + `unless_stopped()` router: budget exhaustion or cancellation becomes a `stop_reason` and routes to `write_report`, which always runs (partial reports). `RunEventSink` commits each progress event on its own.
+  - Tests: 8 integration (profile defaults, limit, 3 parallel guards grant exactly 5 of 5, tokens enforced on the next call, per-invocation and run tool limits, cancellation observed, wall clock, single 80% warning event); 7 unit routing tests on real LangGraph graphs (happy path + events, exhaustion skips to report with `inconclusive`, cancellation still writes the report, parallel stop reasons merge, unexpected errors propagate); 1 sink test. Full suite 581 passed; ruff, format, mypy clean.
 
 ## Blockers
 

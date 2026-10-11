@@ -162,3 +162,17 @@ async def test_rejected_transition_emits_nothing(
             await change_status(conn, run_id, RunStatus.RUNNING)
 
     assert seqs(owner, run_id) == []
+
+
+async def test_run_event_sink_commits_each_event(
+    app_engine: AsyncEngine, owner: psycopg.Connection
+) -> None:
+    from querycure.events.emitter import RunEventSink
+
+    run_id = await new_run(app_engine)
+    sink = RunEventSink(app_engine, run_id)
+
+    await sink.emit(EventType.NODE_STARTED, {"node": "intake"})
+    await sink.emit(EventType.NODE_COMPLETED, {"node": "intake"})
+
+    assert seqs(owner, run_id) == [1, 2]
