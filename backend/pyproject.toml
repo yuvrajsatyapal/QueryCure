@@ -37,8 +37,8 @@ target-version = "py312"
 select = ["E", "W", "F", "I", "B", "UP", "ASYNC", "S", "RUF", "SIM", "PT"]
 
 [tool.ruff.lint.per-file-ignores]
-# Tests build hostile SQL from strings on purpose (S608).
-"tests/**" = ["S101", "S608"]
+# Tests build hostile SQL (S608) and hostile addresses like 0.0.0.0 (S104) on purpose.
+"tests/**" = ["S101", "S104", "S608"]
 
 [tool.mypy]
 python_version = "3.12"
