@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 from querycure.agents.run import RunServices, env_clients, execute_run, fail_run
 from querycure.core.config import Settings
 from querycure.jobs.queue import Job, JobKind, ReapedJob
+from querycure.llm.rate_limit import DailyQuota, LlmGate, MinuteRateLimiter
 from querycure.worker.runner import DeadCallback, Handler, PermanentJobError
 
 
@@ -33,6 +34,10 @@ def build_services(engine: AsyncEngine, settings: Settings) -> RunServices:
         settings=settings,
         checkpoint_url=settings.database_url.get_secret_value(),
         clients=env_clients(settings),
+        llm_gate=LlmGate(
+            MinuteRateLimiter(settings.llm_requests_per_minute),
+            DailyQuota(engine, settings.llm_daily_request_limit),
+        ),
     )
 
 

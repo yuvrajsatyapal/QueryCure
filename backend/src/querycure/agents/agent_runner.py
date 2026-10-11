@@ -26,7 +26,12 @@ from querycure.db.repositories import agents as executions
 from querycure.events.types import EventType
 from querycure.evidence.sanitize import clean_text
 from querycure.evidence.store import ensure_writable, list_evidence, record_evidence
-from querycure.llm.structured import LLMError, call_structured
+from querycure.llm.structured import (
+    LLMError,
+    LLMPaidUsageBlockedError,
+    LLMQuotaExhaustedError,
+    call_structured,
+)
 from querycure.llm.types import CallRecord, ChatMessage
 from querycure.replay.artifact_store import get_artifact, link, store_json
 
@@ -108,7 +113,7 @@ async def run_agent[T: BaseModel](
                     output_type,
                     fallback=clients.fallback,
                     policy=ctx.llm_retry,
-                    before_call=ctx.guard.charge_llm_call,
+                    before_call=ctx.before_llm_call,
                     after_call=record_call,
                 )
             cleaned, report = judge(result.value, kinds)
@@ -131,6 +136,7 @@ async def run_agent[T: BaseModel](
             break
     except LLMError as exc:
         await _persist(ctx, agent, node, invocation_key, prompt_version, attempt, rows, None)
+        _stop_on_policy(exc)
         raise AgentFailedError(
             f"The {agent} agent did not produce usable output.", details=[{"code": exc.code}]
         ) from None
@@ -166,6 +172,15 @@ async def run_agent[T: BaseModel](
         if winner is not None:
             return AgentResult(output=winner, report=None, reused=True)
     return AgentResult(output=accepted, report=report, reused=False)
+
+
+def _stop_on_policy(exc: LLMError) -> None:
+    """Free quota exhausted or paid usage detected: stop the run gracefully (partial report)
+    instead of letting other agents try and fail the same way (ADR-0016)."""
+    if isinstance(exc, LLMQuotaExhaustedError | LLMPaidUsageBlockedError):
+        raise BudgetExhaustedError(
+            exc.message, details=[{"budget": "llm_free_tier", "code": exc.code}]
+        ) from None
 
 
 def _error(record: CallRecord) -> dict[str, Any] | None:
@@ -406,7 +421,7 @@ async def run_tool_agent(
                     AgentTurn,
                     fallback=clients.fallback,
                     policy=ctx.llm_retry,
-                    before_call=ctx.guard.charge_llm_call,
+                    before_call=ctx.before_llm_call,
                     after_call=on_call,
                 )
             row = pending.pop()
@@ -487,6 +502,7 @@ async def run_tool_agent(
                     return AgentResult(output=winner, report=None, reused=True)
             return AgentResult(output=cleaned, report=report, reused=False)
     except LLMError as exc:
+        _stop_on_policy(exc)
         raise AgentFailedError(
             f"The {agent} agent did not produce usable output.", details=[{"code": exc.code}]
         ) from None

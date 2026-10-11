@@ -16,6 +16,7 @@ from querycure.core.errors import BudgetExhaustedError, RunCancelledError
 from querycure.core.logging import get_logger
 from querycure.domain.investigation import NodeError, RunBudget
 from querycure.events.types import EventType
+from querycure.llm.rate_limit import LlmGate
 from querycure.llm.structured import RetryPolicy
 from querycure.llm.types import ChatClient
 
@@ -61,8 +62,16 @@ class RunContext:
     inspectors: InspectorFactory | None = None
     llm: "LlmClients | None" = None
     llm_retry: RetryPolicy = field(default_factory=RetryPolicy)
+    # Free-tier minute window + daily quota, shared by every run in the process (ADR-0016).
+    llm_gate: LlmGate | None = None
     # Per-run cap on concurrent LLM calls across parallel branches (AGENT_SYSTEM §6).
     llm_slots: asyncio.Semaphore = field(default_factory=lambda: asyncio.Semaphore(3))
+
+    async def before_llm_call(self) -> None:
+        """Run budget first, then the provider's free-tier limits."""
+        await self.guard.charge_llm_call()
+        if self.llm_gate is not None:
+            await self.llm_gate.before_call()
 
     def clients(self) -> "LlmClients":
         if self.llm is None:

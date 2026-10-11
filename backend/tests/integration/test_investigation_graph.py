@@ -485,3 +485,23 @@ async def test_undecryptable_credentials_degrade_instead_of_crashing(
         "SELECT data->>'code' FROM evidence WHERE run_id = %s AND kind = 'tool_error'", (run_id,)
     ).fetchone()
     assert tool_error == ("CONFIGURATION_ERROR",)
+
+
+async def test_daily_free_quota_stops_the_run_gracefully(
+    app_engine: AsyncEngine, owner: psycopg.Connection, migrated_db: str
+) -> None:
+    from querycure.llm.rate_limit import DailyQuota, LlmGate, MinuteRateLimiter
+
+    run_id = await create_run(app_engine)
+    quota = DailyQuota(app_engine, limit=1)
+    quota.limit = await quota.used_today() + 1  # exactly one free request left today
+    svc = services(app_engine, migrated_db, RoleClient(happy_scripts()))
+    svc.llm_gate = LlmGate(MinuteRateLimiter(100), quota)
+
+    await execute_run(svc, run_id, attempt=1, reclaimed=False)
+
+    assert run_row(owner, run_id) == ("completed", "inconclusive", None)
+    body = report(owner, run_id)
+    assert body["stop_reason"] == "budget_exhausted"
+    assert body["partial"] is True
+    assert any("free model requests are used up" in e["message"] for e in body["errors"])

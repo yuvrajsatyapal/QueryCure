@@ -124,5 +124,7 @@ Migrations run as a separate release step before new API instances start; migrat
 | `SESSION_TTL_SECONDS` | session and CSRF cookie lifetime (default 30 days) |
 | `OTEL_EXPORTER_OTLP_ENDPOINT`, `LANGSMITH_API_KEY` | optional observability |
 | `GEMINI_API_KEY`, `OPENROUTER_API_KEY` | local-profile fallback only; ignored in demo |
-| `LLM_PROVIDER` / `LLM_MODEL` / `LLM_FALLBACK_MODEL` | default `gemini` / `gemini-2.5-flash` / none (open decision D3: chosen after Phase 2 evals) |
+| `LLM_PROVIDER` / `LLM_MODEL` / `LLM_FALLBACK_MODEL` | default `openrouter` / `openrouter/free` / none; must be free models while `LLM_FREE_ONLY` is on ([ADR-0016](../engineering/adr/ADR-0016-free-openrouter-models-only.md)); the eval-chosen model is pinned with `LLM_MODEL` |
+| `LLM_FREE_ONLY` | default `true`: refuse non-free models at startup and stop a run on any non-zero-cost response |
+| `LLM_REQUESTS_PER_MINUTE` / `LLM_DAILY_REQUEST_LIMIT` / `LLM_MAX_CONCURRENCY` | free-tier limits: 16 / 45 / 1 by default (OpenRouter free tier: ~20/min, 50/day without credits) |
 | `OPENROUTER_BASE_URL` | default `https://openrouter.ai/api/v1` |

@@ -13,7 +13,8 @@ from pydantic import SecretStr
 
 from querycure.core.config import Settings
 from querycure.llm.credentials import Provider
-from querycure.llm.types import ChatMessage, RawCompletion
+from querycure.llm.openrouter import OpenRouterClient
+from querycure.llm.types import ChatClient, ChatMessage, RawCompletion
 
 PROVIDER_TIMEOUT_SECONDS = 60.0
 
@@ -52,7 +53,16 @@ class LangChainJsonClient:
 
 def build_client(
     provider: Provider, model: str, api_key: SecretStr, *, settings: Settings
-) -> LangChainJsonClient:
+) -> ChatClient:
+    """OpenRouter goes through its OpenAI-compatible API directly (served model, upstream
+    provider and cost are needed for the free-tier policy, ADR-0016)."""
+    if provider == "openrouter":
+        return OpenRouterClient(
+            api_key=api_key,
+            model=model,
+            base_url=settings.openrouter_base_url,
+            free_only=settings.llm_free_only,
+        )
     chat_model: BaseChatModel
     if provider == "gemini":
         from langchain_google_genai import ChatGoogleGenerativeAI

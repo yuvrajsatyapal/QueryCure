@@ -25,6 +25,7 @@ from pydantic import BaseModel, ValidationError
 
 from querycure.core.errors import QueryCureError
 from querycure.core.logging import get_logger
+from querycure.llm.openrouter import FreeQuotaExhaustedError, PaidUsageError
 from querycure.llm.types import CallRecord, CallStatus, ChatClient, ChatMessage, RawCompletion
 
 log = get_logger(__name__)
@@ -78,6 +79,18 @@ class LLMAuthFailedError(LLMRequestError):
 
 class InvalidStructuredOutputError(LLMError):
     code = "LLM_INVALID_OUTPUT"
+
+
+class LLMQuotaExhaustedError(LLMError):
+    """Free-tier allowance used up. Never retried and never sent to a fallback (ADR-0016)."""
+
+    code = "LLM_FREE_QUOTA_EXHAUSTED"
+
+
+class LLMPaidUsageBlockedError(LLMError):
+    """A response was not free while free-only mode is on: stop before anything else runs."""
+
+    code = "LLM_PAID_USAGE_BLOCKED"
 
 
 @dataclass(frozen=True)
@@ -156,6 +169,8 @@ class _Caller:
             "llm_call",
             provider=record.provider,
             model=record.model,
+            requested_model=record.requested_model,
+            served_by=record.served_by,
             status=record.status,
             latency_ms=record.latency_ms,
             input_tokens=record.input_tokens,
@@ -183,12 +198,27 @@ class _Caller:
                 async with asyncio.timeout(self.policy.call_timeout_seconds):
                     completion = await client.complete_json(messages)
                 return completion, started
+            except (FreeQuotaExhaustedError, PaidUsageError) as exc:
+                quota = isinstance(exc, FreeQuotaExhaustedError)
+                stop = LLMQuotaExhaustedError if quota else LLMPaidUsageBlockedError
+                await self.record(
+                    CallRecord(
+                        provider=client.provider,
+                        model=client.model,
+                        requested_model=client.model,
+                        status="failed",
+                        latency_ms=int((time.monotonic() - started) * 1000),
+                        error_code=stop.code,
+                    )
+                )
+                raise stop("The free model allowance is not available.", calls=self.calls) from None
             except (ModelError, TimeoutError) as exc:
                 code, retryable = _classify(exc)
                 await self.record(
                     CallRecord(
                         provider=client.provider,
                         model=client.model,
+                        requested_model=client.model,
                         status="failed",
                         latency_ms=int((time.monotonic() - started) * 1000),
                         error_code=code,
@@ -264,6 +294,8 @@ def _completed(
     return CallRecord(
         provider=client.provider,
         model=completion.model,
+        requested_model=client.model,
+        served_by=completion.served_by,
         status=status,
         latency_ms=int((time.monotonic() - started) * 1000),
         input_tokens=completion.input_tokens,

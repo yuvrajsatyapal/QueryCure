@@ -1,5 +1,6 @@
 """Execute (or resume) one investigation run inside a worker job."""
 
+import asyncio
 import json
 import uuid
 from collections.abc import Callable
@@ -26,6 +27,7 @@ from querycure.domain.runs import TERMINAL_STATUSES, RunStatus
 from querycure.events.emitter import RunEventSink, change_status
 from querycure.llm.credentials import resolve_api_key
 from querycure.llm.providers import build_client
+from querycure.llm.rate_limit import LlmGate
 
 log = get_logger(__name__)
 
@@ -54,6 +56,7 @@ class RunServices:
     settings: Settings
     checkpoint_url: str
     clients: ClientsFactory
+    llm_gate: LlmGate | None = None  # one per process: free-tier limits span every run
     checkpoint_role: str | None = None  # tests only
 
 
@@ -123,6 +126,8 @@ async def execute_run(
         engine=engine,
         inspectors=GatewayInspectorFactory(engine, services.settings, inputs.user_id),
         llm=clients,
+        llm_gate=services.llm_gate,
+        llm_slots=asyncio.Semaphore(services.settings.llm_max_concurrency),
     )
     config: RunnableConfig = {"configurable": {"thread_id": str(run_id)}}
     async with open_checkpointer(services.checkpoint_url, role=services.checkpoint_role) as saver:

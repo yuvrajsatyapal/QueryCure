@@ -55,11 +55,11 @@ async def insert_execution(
     result = await conn.execute(
         text(
             "INSERT INTO agent_executions (id, run_id, agent, node, invocation_key, attempt, "
-            "prompt_version, model, input_tokens, output_tokens, latency_ms, status, "
-            "output_artifact_id, error) VALUES (coalesce(:id, uuid_generate_v4()), :run_id, "
-            ":agent, :node, :key, :attempt, "
-            ":prompt_version, :model, :input_tokens, :output_tokens, :latency_ms, :status, "
-            ":artifact_id, CAST(:error AS JSONB)) "
+            "prompt_version, model, requested_model, served_by, input_tokens, output_tokens, "
+            "latency_ms, status, output_artifact_id, error) VALUES (coalesce(:id, "
+            "uuid_generate_v4()), :run_id, :agent, :node, :key, :attempt, :prompt_version, "
+            ":model, :requested_model, :served_by, :input_tokens, :output_tokens, :latency_ms, "
+            ":status, :artifact_id, CAST(:error AS JSONB)) "
             "ON CONFLICT (run_id, invocation_key) WHERE status = 'succeeded' DO NOTHING"
         ),
         {
@@ -71,6 +71,8 @@ async def insert_execution(
             "attempt": attempt,
             "prompt_version": prompt_version,
             "model": record.model,
+            "requested_model": record.requested_model,
+            "served_by": record.served_by,
             "input_tokens": record.input_tokens,
             "output_tokens": record.output_tokens,
             "latency_ms": record.latency_ms,

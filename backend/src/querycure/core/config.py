@@ -21,6 +21,15 @@ def _env(name: str) -> AliasChoices:
     return AliasChoices(name, name.lower())
 
 
+FREE_ROUTER = "openrouter/free"
+
+
+def is_free_model(model: str) -> bool:
+    """`openrouter/auto` is listed at $0 but routes to paid models, so only the explicit
+    free router and `:free` variants qualify."""
+    return model == FREE_ROUTER or (model.endswith(":free") and "/" in model)
+
+
 class Settings(BaseSettings):
     """Env vars from DEPLOYMENT.md §6. Secrets are SecretStr and never printed."""
 
@@ -67,10 +76,21 @@ class Settings(BaseSettings):
     openrouter_api_key: SecretStr | None = Field(
         default=None, validation_alias=_env("OPENROUTER_API_KEY")
     )
+    # ADR-0016: free OpenRouter models only, by default and for every run unless an operator
+    # explicitly turns LLM_FREE_ONLY off. Nothing ever falls back to a paid model.
     llm_provider: Literal["gemini", "openrouter"] = Field(
-        default="gemini", validation_alias=_env("LLM_PROVIDER")
+        default="openrouter", validation_alias=_env("LLM_PROVIDER")
     )
-    llm_model: str = Field(default="gemini-2.5-flash", validation_alias=_env("LLM_MODEL"))
+    llm_model: str = Field(default="openrouter/free", validation_alias=_env("LLM_MODEL"))
+    llm_free_only: bool = Field(default=True, validation_alias=_env("LLM_FREE_ONLY"))
+    # OpenRouter free tier: ~20 requests/min and 50/day without purchased credits.
+    llm_requests_per_minute: int = Field(
+        default=16, ge=1, validation_alias=_env("LLM_REQUESTS_PER_MINUTE")
+    )
+    llm_daily_request_limit: int = Field(
+        default=45, ge=1, validation_alias=_env("LLM_DAILY_REQUEST_LIMIT")
+    )
+    llm_max_concurrency: int = Field(default=1, ge=1, validation_alias=_env("LLM_MAX_CONCURRENCY"))
     llm_fallback_model: str | None = Field(
         default=None, validation_alias=_env("LLM_FALLBACK_MODEL")
     )
@@ -99,6 +119,26 @@ class Settings(BaseSettings):
         if len(raw) != 32:
             raise ValueError("QC_MASTER_KEY must decode to 32 bytes")
         return value
+
+    @model_validator(mode="after")
+    def _free_models_only(self) -> Self:
+        if not self.llm_free_only:
+            return self
+        if self.llm_provider != "openrouter":
+            raise ValueError(
+                "LLM_FREE_ONLY requires LLM_PROVIDER=openrouter: only free OpenRouter models "
+                "are allowed"
+            )
+        for name, model in (
+            ("LLM_MODEL", self.llm_model),
+            ("LLM_FALLBACK_MODEL", self.llm_fallback_model),
+        ):
+            if model is not None and not is_free_model(model):
+                raise ValueError(
+                    f"{name} must be a free OpenRouter model (an id ending in ':free', or "
+                    "openrouter/free) while LLM_FREE_ONLY is on"
+                )
+        return self
 
     @model_validator(mode="after")
     def _apply_profile_rules(self) -> Self:

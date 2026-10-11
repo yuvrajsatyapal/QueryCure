@@ -19,6 +19,7 @@ Index of decisions. Full records (context, alternatives, decision, rationale, tr
 | [0013](adr/ADR-0013-auth-strategy.md) | Backend-owned cookie sessions; OAuth in Phase 5 | One authority vs DIY CSRF |
 | [0014](adr/ADR-0014-python-tooling.md) | uv, ruff, mypy --strict, pytest, import-linter | Rigor vs early velocity |
 | [0015](adr/ADR-0015-canonicalization-finalization-integrity.md) | Frozen RFC 8785-based canonicalization profiles, atomic finalization, integrity ≠ authenticity, equivalence-margin replay comparison (amends 0010) | Cross-version stability vs owning canonicalization code; no signing yet |
+| [0016](adr/ADR-0016-free-openrouter-models-only.md) | Free OpenRouter models only: config guard, per-response zero-cost check, no paid fallback, free-tier rate and daily limits, served-model provenance | Zero spend and graceful stops vs fewer runs per day and weaker models |
 
 ## Smaller decisions (not worth a full ADR)
 

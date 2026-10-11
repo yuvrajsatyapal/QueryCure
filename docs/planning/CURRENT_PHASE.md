@@ -238,6 +238,12 @@
   - Repository SQL is fully static; optional filters use `CAST(:p AS type) IS NULL OR …`.
   - Tests: 24 API integration tests as `qc_app` (creation side effects; 9 validation cases; production/foreign/missing connections; **idempotent replay; different body → 409; another user's key → 409 without leaking; 4 concurrent duplicates → one run; malformed key → 400**; concurrency limit; pagination + filters; **cross-user 404 on every route**; cancel idempotency and state machine; delete/restore; findings/evidence/plans/artifact reads; artifact access only through an owned run; models endpoint). The response-schema secret scan now allows token-*count* fields by exact name. Full suite 702 passed; ruff, format, mypy clean.
   - Live check (uvicorn as `qc_app`): create 202, replay with the same key → same run, `run_start` job pending, cancel 202 → `cancelled`, list/filter, events `queued` → `cancelled`.
+- [x] **Free-tier LLM policy (ADR-0016)**, requested by the owner after T2.11: free OpenRouter models only, every phase.
+  - Discovery (public catalogue): 26 zero-priced models; with tools and structured JSON output: `openrouter/free`, `nvidia/nemotron-3-super-120b-a12b:free`, `google/gemma-4-31b-it:free`, `google/gemma-4-26b-a4b-it:free`, `dots-studio/dots-3-note-preview:free`, `apodex/apodex-1.1-mini:free`, `liquid/lfm-2.5-2.6b:free`. **`openrouter/auto` is listed at $0 but routes to paid models**, so only `:free` IDs and `openrouter/free` are accepted.
+  - Key check: `is_free_tier: true`, usage $0 (OpenRouter free tier ≈ 20 requests/min, 50/day without credits).
+  - One probe request: `openrouter/free` was served by `nvidia/nemotron-3-super-120b-a12b:free` (provider `Nvidia`), `usage.cost: 0`, 37 of 44 completion tokens were reasoning.
+  - Implemented: config guard (refuses paid models at startup); direct OpenRouter client (`openai` SDK) that checks `usage.cost == 0` on every response; quota exhaustion and paid usage are non-retryable, never use the fallback, and stop the run gracefully (`inconclusive` partial report); per-process 16/min window; DB-counted daily quota (45); per-run LLM concurrency 1; `require_parameters`; served model and upstream provider recorded per call (migration `0007`). Defaults are now `openrouter` / `openrouter/free`.
+  - Tests: 21 unit tests (free-ID rules incl. `openrouter/auto` refused; paid configs refused; served model/provider/cost captured and request body checked via an HTTP mock transport; non-zero or missing cost blocked; per-day 429 and 402 → quota exhaustion without retry or fallback; per-minute 429 retried; limiter window; no key in repr) + 1 integration test (daily quota stops a real run gracefully). Full suite 726 passed.
 
 ## Blockers
 
@@ -280,7 +286,7 @@ Defaults are chosen so implementation can proceed; change any before the listed 
 |---|---|---|---|
 | D1 | Public demo backend host (Fly.io / Railway / Render / Cloud Run) | Any small always-on container; decide on price at deploy time | Phase 5 (T5.8) |
 | D2 | Enable Mode B (live inspection) on the public demo? | Disabled | Phase 5 |
-| D3 | Default LLM models per agent (Gemini tier vs OpenRouter models) | Configurable; pick after Phase 2 evals compare cost/quality | Phase 2 exit |
+| D3 | Default LLM models per agent | **Decided by the owner (2026-10-12): free OpenRouter models only, every phase** ([ADR-0016](../engineering/adr/ADR-0016-free-openrouter-models-only.md)). The specific `:free` model is pinned from the Phase 2 eval benchmark | Phase 2 exit (model pin) |
 | D4 | Allow user-provisioned sandbox connections (Mode C on user's own non-prod DB) in MVP? | Yes in local profile only, with attestation | Phase 3 |
 | D5 | Custom domain for demo (needed for same-site cookies) | Required; name TBD | Phase 5 |
 | D6 | Write-overhead benchmark in MVP or Post-MVP | Post-MVP (qualitative class shown until then) | Phase 3 |
