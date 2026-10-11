@@ -1,6 +1,407 @@
 {
   "components": {
     "schemas": {
+      "ColumnRef": {
+        "properties": {
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "table": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Table"
+          }
+        },
+        "required": [
+          "table",
+          "name"
+        ],
+        "title": "ColumnRef",
+        "type": "object"
+      },
+      "ColumnStats": {
+        "description": "Numeric planner statistics only \u2014 never value samples (T1.11).",
+        "properties": {
+          "avg_width": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Avg Width"
+          },
+          "correlation": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Correlation"
+          },
+          "data_type": {
+            "title": "Data Type",
+            "type": "string"
+          },
+          "n_distinct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "N Distinct"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "not_null": {
+            "title": "Not Null",
+            "type": "boolean"
+          },
+          "null_frac": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Null Frac"
+          },
+          "position": {
+            "title": "Position",
+            "type": "integer"
+          },
+          "schema_name": {
+            "title": "Schema Name",
+            "type": "string"
+          },
+          "table_name": {
+            "title": "Table Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "schema_name",
+          "table_name",
+          "name",
+          "data_type",
+          "not_null",
+          "position",
+          "null_frac",
+          "n_distinct",
+          "avg_width",
+          "correlation"
+        ],
+        "title": "ColumnStats",
+        "type": "object"
+      },
+      "ConnectionList": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ConnectionSummary"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "ConnectionList",
+        "type": "object"
+      },
+      "ConnectionSummary": {
+        "properties": {
+          "capabilities": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Capabilities"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "dbname": {
+            "title": "Dbname",
+            "type": "string"
+          },
+          "environment": {
+            "title": "Environment",
+            "type": "string"
+          },
+          "has_password": {
+            "title": "Has Password",
+            "type": "boolean"
+          },
+          "host": {
+            "title": "Host",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "last_test_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Test Status"
+          },
+          "last_tested_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Tested At"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "port": {
+            "title": "Port",
+            "type": "integer"
+          },
+          "purpose": {
+            "title": "Purpose",
+            "type": "string"
+          },
+          "sslmode": {
+            "title": "Sslmode",
+            "type": "string"
+          },
+          "username": {
+            "title": "Username",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "host",
+          "port",
+          "dbname",
+          "username",
+          "sslmode",
+          "environment",
+          "purpose",
+          "has_password",
+          "capabilities",
+          "last_tested_at",
+          "last_test_status",
+          "created_at"
+        ],
+        "title": "ConnectionSummary",
+        "type": "object"
+      },
+      "ConnectionTestResponse": {
+        "properties": {
+          "capabilities": {
+            "$ref": "#/components/schemas/TargetCapabilities"
+          },
+          "status": {
+            "const": "ok",
+            "title": "Status",
+            "type": "string"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "status",
+          "capabilities",
+          "warnings"
+        ],
+        "title": "ConnectionTestResponse",
+        "type": "object"
+      },
+      "CreateConnectionRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "dbname": {
+            "maxLength": 63,
+            "minLength": 1,
+            "title": "Dbname",
+            "type": "string"
+          },
+          "environment": {
+            "enum": [
+              "development",
+              "staging",
+              "production"
+            ],
+            "title": "Environment",
+            "type": "string"
+          },
+          "host": {
+            "maxLength": 253,
+            "minLength": 1,
+            "title": "Host",
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "password": {
+            "format": "password",
+            "maxLength": 1024,
+            "minLength": 1,
+            "title": "Password",
+            "type": "string",
+            "writeOnly": true
+          },
+          "port": {
+            "default": 5432,
+            "maximum": 65535.0,
+            "minimum": 1.0,
+            "title": "Port",
+            "type": "integer"
+          },
+          "purpose": {
+            "default": "inspection",
+            "enum": [
+              "inspection",
+              "sandbox"
+            ],
+            "title": "Purpose",
+            "type": "string"
+          },
+          "sslmode": {
+            "default": "verify-full",
+            "enum": [
+              "disable",
+              "require",
+              "verify-ca",
+              "verify-full"
+            ],
+            "title": "Sslmode",
+            "type": "string"
+          },
+          "username": {
+            "maxLength": 63,
+            "minLength": 1,
+            "title": "Username",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "host",
+          "dbname",
+          "username",
+          "password",
+          "environment"
+        ],
+        "title": "CreateConnectionRequest",
+        "type": "object"
+      },
+      "ExplainRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "allow_user_functions": {
+            "default": false,
+            "title": "Allow User Functions",
+            "type": "boolean"
+          },
+          "query": {
+            "maxLength": 100000,
+            "minLength": 1,
+            "title": "Query",
+            "type": "string"
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "title": "ExplainRequest",
+        "type": "object"
+      },
+      "ExplainResponse": {
+        "properties": {
+          "generic_plan": {
+            "title": "Generic Plan",
+            "type": "boolean"
+          },
+          "metrics": {
+            "items": {
+              "$ref": "#/components/schemas/NodeMetrics"
+            },
+            "title": "Metrics",
+            "type": "array"
+          },
+          "plan": {
+            "$ref": "#/components/schemas/PlanTree"
+          },
+          "query": {
+            "$ref": "#/components/schemas/QueryInfo"
+          }
+        },
+        "required": [
+          "plan",
+          "metrics",
+          "generic_plan",
+          "query"
+        ],
+        "title": "ExplainResponse",
+        "type": "object"
+      },
       "Features": {
         "properties": {
           "live_inspection": {
@@ -19,6 +420,19 @@
         "title": "Features",
         "type": "object"
       },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "title": "Detail",
+            "type": "array"
+          }
+        },
+        "title": "HTTPValidationError",
+        "type": "object"
+      },
       "HealthResponse": {
         "properties": {
           "status": {
@@ -30,6 +444,66 @@
           "status"
         ],
         "title": "HealthResponse",
+        "type": "object"
+      },
+      "IndexInfo": {
+        "properties": {
+          "definition": {
+            "title": "Definition",
+            "type": "string"
+          },
+          "idx_scan": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Idx Scan"
+          },
+          "is_primary": {
+            "title": "Is Primary",
+            "type": "boolean"
+          },
+          "is_unique": {
+            "title": "Is Unique",
+            "type": "boolean"
+          },
+          "is_valid": {
+            "title": "Is Valid",
+            "type": "boolean"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "schema_name": {
+            "title": "Schema Name",
+            "type": "string"
+          },
+          "size_bytes": {
+            "title": "Size Bytes",
+            "type": "integer"
+          },
+          "table_name": {
+            "title": "Table Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "schema_name",
+          "table_name",
+          "name",
+          "definition",
+          "is_unique",
+          "is_primary",
+          "is_valid",
+          "size_bytes",
+          "idx_scan"
+        ],
+        "title": "IndexInfo",
         "type": "object"
       },
       "MeResponse": {
@@ -52,6 +526,611 @@
         "title": "MeResponse",
         "type": "object"
       },
+      "NodeMetrics": {
+        "description": "Derived, deterministic numbers. None means \"not measurable from this plan\", never zero.",
+        "properties": {
+          "estimate_direction": {
+            "anyOf": [
+              {
+                "enum": [
+                  "under",
+                  "over",
+                  "exact"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Estimate Direction"
+          },
+          "estimate_error_ratio": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Estimate Error Ratio"
+          },
+          "inclusive_time_ms": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Inclusive Time Ms"
+          },
+          "node_id": {
+            "title": "Node Id",
+            "type": "integer"
+          },
+          "rows_removed_by_filter_total": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rows Removed By Filter Total"
+          },
+          "self_shared_hit_blocks": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Self Shared Hit Blocks"
+          },
+          "self_shared_read_blocks": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Self Shared Read Blocks"
+          },
+          "self_temp_read_blocks": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Self Temp Read Blocks"
+          },
+          "self_temp_written_blocks": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Self Temp Written Blocks"
+          },
+          "self_time_ms": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Self Time Ms"
+          },
+          "self_time_share": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Self Time Share"
+          },
+          "sort_spilled": {
+            "title": "Sort Spilled",
+            "type": "boolean"
+          },
+          "total_actual_rows": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Actual Rows"
+          }
+        },
+        "required": [
+          "node_id",
+          "inclusive_time_ms",
+          "self_time_ms",
+          "self_time_share",
+          "total_actual_rows",
+          "estimate_error_ratio",
+          "estimate_direction",
+          "rows_removed_by_filter_total",
+          "sort_spilled",
+          "self_shared_hit_blocks",
+          "self_shared_read_blocks",
+          "self_temp_read_blocks",
+          "self_temp_written_blocks"
+        ],
+        "title": "NodeMetrics",
+        "type": "object"
+      },
+      "PlanNode": {
+        "description": "A node of an `EXPLAIN (FORMAT JSON)` plan. Times are per loop, as PostgreSQL reports.",
+        "properties": {
+          "actual_loops": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actual Loops"
+          },
+          "actual_rows": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actual Rows"
+          },
+          "actual_startup_time_ms": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actual Startup Time Ms"
+          },
+          "actual_total_time_ms": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actual Total Time Ms"
+          },
+          "alias": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Alias"
+          },
+          "children": {
+            "items": {
+              "$ref": "#/components/schemas/PlanNode"
+            },
+            "title": "Children",
+            "type": "array"
+          },
+          "extra": {
+            "additionalProperties": true,
+            "title": "Extra",
+            "type": "object"
+          },
+          "filter": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Filter"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "index_cond": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Index Cond"
+          },
+          "index_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Index Name"
+          },
+          "join_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Join Type"
+          },
+          "locator": {
+            "title": "Locator",
+            "type": "string"
+          },
+          "node_type": {
+            "title": "Node Type",
+            "type": "string"
+          },
+          "parallel_aware": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parallel Aware"
+          },
+          "parent_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Id"
+          },
+          "parent_relationship": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Relationship"
+          },
+          "plan_rows": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Plan Rows"
+          },
+          "plan_width": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Plan Width"
+          },
+          "relation_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Relation Name"
+          },
+          "rows_removed_by_filter": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rows Removed By Filter"
+          },
+          "schema_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Schema Name"
+          },
+          "shared_dirtied_blocks": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Shared Dirtied Blocks"
+          },
+          "shared_hit_blocks": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Shared Hit Blocks"
+          },
+          "shared_read_blocks": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Shared Read Blocks"
+          },
+          "shared_written_blocks": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Shared Written Blocks"
+          },
+          "sort_key": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sort Key"
+          },
+          "sort_method": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sort Method"
+          },
+          "sort_space_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sort Space Type"
+          },
+          "sort_space_used_kb": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sort Space Used Kb"
+          },
+          "startup_cost": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Startup Cost"
+          },
+          "subplan_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Subplan Name"
+          },
+          "temp_read_blocks": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Temp Read Blocks"
+          },
+          "temp_written_blocks": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Temp Written Blocks"
+          },
+          "total_cost": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Cost"
+          },
+          "workers_launched": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Workers Launched"
+          },
+          "workers_planned": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Workers Planned"
+          }
+        },
+        "required": [
+          "id",
+          "parent_id",
+          "locator",
+          "node_type"
+        ],
+        "title": "PlanNode",
+        "type": "object"
+      },
+      "PlanTree": {
+        "properties": {
+          "analyzed": {
+            "title": "Analyzed",
+            "type": "boolean"
+          },
+          "execution_time_ms": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Execution Time Ms"
+          },
+          "has_buffers": {
+            "title": "Has Buffers",
+            "type": "boolean"
+          },
+          "has_timing": {
+            "title": "Has Timing",
+            "type": "boolean"
+          },
+          "nodes": {
+            "items": {
+              "$ref": "#/components/schemas/PlanNode"
+            },
+            "title": "Nodes",
+            "type": "array"
+          },
+          "planning_time_ms": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Planning Time Ms"
+          },
+          "root": {
+            "$ref": "#/components/schemas/PlanNode"
+          }
+        },
+        "required": [
+          "root",
+          "nodes",
+          "analyzed",
+          "has_timing",
+          "has_buffers"
+        ],
+        "title": "PlanTree",
+        "type": "object"
+      },
       "Profile": {
         "enum": [
           "local",
@@ -59,6 +1138,111 @@
         ],
         "title": "Profile",
         "type": "string"
+      },
+      "QueryFingerprint": {
+        "description": "Groups similar queries. Metadata only, never artifact identity (REPLAY_ENGINE \u00a72.2).",
+        "properties": {
+          "digest": {
+            "title": "Digest",
+            "type": "string"
+          },
+          "normalized_sql": {
+            "title": "Normalized Sql",
+            "type": "string"
+          }
+        },
+        "required": [
+          "normalized_sql",
+          "digest"
+        ],
+        "title": "QueryFingerprint",
+        "type": "object"
+      },
+      "QueryInfo": {
+        "properties": {
+          "fingerprint": {
+            "$ref": "#/components/schemas/QueryFingerprint"
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/QueryMetadata"
+          },
+          "statement_type": {
+            "title": "Statement Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "statement_type",
+          "fingerprint",
+          "metadata"
+        ],
+        "title": "QueryInfo",
+        "type": "object"
+      },
+      "QueryMetadata": {
+        "properties": {
+          "columns": {
+            "items": {
+              "$ref": "#/components/schemas/ColumnRef"
+            },
+            "title": "Columns",
+            "type": "array"
+          },
+          "functions": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Functions",
+            "type": "array"
+          },
+          "functions_to_resolve": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Functions To Resolve",
+            "type": "array"
+          },
+          "limit": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Limit"
+          },
+          "order_by": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Order By",
+            "type": "array"
+          },
+          "parameter_count": {
+            "title": "Parameter Count",
+            "type": "integer"
+          },
+          "tables": {
+            "items": {
+              "$ref": "#/components/schemas/TableRef"
+            },
+            "title": "Tables",
+            "type": "array"
+          }
+        },
+        "required": [
+          "tables",
+          "columns",
+          "order_by",
+          "limit",
+          "parameter_count",
+          "functions",
+          "functions_to_resolve"
+        ],
+        "title": "QueryMetadata",
+        "type": "object"
       },
       "ReadinessResponse": {
         "properties": {
@@ -83,6 +1267,46 @@
         "title": "ReadinessResponse",
         "type": "object"
       },
+      "SchemaSnapshot": {
+        "properties": {
+          "columns": {
+            "items": {
+              "$ref": "#/components/schemas/ColumnStats"
+            },
+            "title": "Columns",
+            "type": "array"
+          },
+          "indexes": {
+            "items": {
+              "$ref": "#/components/schemas/IndexInfo"
+            },
+            "title": "Indexes",
+            "type": "array"
+          },
+          "tables": {
+            "items": {
+              "$ref": "#/components/schemas/TableStats"
+            },
+            "title": "Tables",
+            "type": "array"
+          },
+          "unresolved": {
+            "items": {
+              "$ref": "#/components/schemas/TableRef"
+            },
+            "title": "Unresolved",
+            "type": "array"
+          }
+        },
+        "required": [
+          "tables",
+          "columns",
+          "indexes",
+          "unresolved"
+        ],
+        "title": "SchemaSnapshot",
+        "type": "object"
+      },
       "SessionResponse": {
         "properties": {
           "user": {
@@ -93,6 +1317,235 @@
           "user"
         ],
         "title": "SessionResponse",
+        "type": "object"
+      },
+      "TableRef": {
+        "properties": {
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "schema_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Schema Name"
+          }
+        },
+        "required": [
+          "schema_name",
+          "name"
+        ],
+        "title": "TableRef",
+        "type": "object"
+      },
+      "TableStats": {
+        "properties": {
+          "estimated_rows": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Estimated Rows"
+          },
+          "idx_scan": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Idx Scan"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "last_analyze": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Analyze"
+          },
+          "last_autoanalyze": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Autoanalyze"
+          },
+          "n_dead_tup": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "N Dead Tup"
+          },
+          "n_live_tup": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "N Live Tup"
+          },
+          "n_mod_since_analyze": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "N Mod Since Analyze"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "pages": {
+            "title": "Pages",
+            "type": "integer"
+          },
+          "schema_name": {
+            "title": "Schema Name",
+            "type": "string"
+          },
+          "seq_scan": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Seq Scan"
+          },
+          "total_bytes": {
+            "title": "Total Bytes",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "schema_name",
+          "name",
+          "kind",
+          "estimated_rows",
+          "pages",
+          "total_bytes",
+          "n_live_tup",
+          "n_dead_tup",
+          "n_mod_since_analyze",
+          "seq_scan",
+          "idx_scan",
+          "last_analyze",
+          "last_autoanalyze"
+        ],
+        "title": "TableStats",
+        "type": "object"
+      },
+      "TargetCapabilities": {
+        "properties": {
+          "bypasses_rls": {
+            "title": "Bypasses Rls",
+            "type": "boolean"
+          },
+          "can_create_role": {
+            "title": "Can Create Role",
+            "type": "boolean"
+          },
+          "can_read_all_stats": {
+            "title": "Can Read All Stats",
+            "type": "boolean"
+          },
+          "has_pg_stat_statements": {
+            "title": "Has Pg Stat Statements",
+            "type": "boolean"
+          },
+          "is_replication_role": {
+            "title": "Is Replication Role",
+            "type": "boolean"
+          },
+          "is_superuser": {
+            "title": "Is Superuser",
+            "type": "boolean"
+          },
+          "owned_tables": {
+            "title": "Owned Tables",
+            "type": "integer"
+          },
+          "schemas": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Schemas",
+            "type": "array"
+          },
+          "server_version": {
+            "title": "Server Version",
+            "type": "string"
+          },
+          "server_version_num": {
+            "title": "Server Version Num",
+            "type": "integer"
+          },
+          "ssl_in_use": {
+            "title": "Ssl In Use",
+            "type": "boolean"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "server_version_num",
+          "server_version",
+          "is_superuser",
+          "can_create_role",
+          "bypasses_rls",
+          "is_replication_role",
+          "can_read_all_stats",
+          "has_pg_stat_statements",
+          "ssl_in_use",
+          "owned_tables",
+          "schemas"
+        ],
+        "title": "TargetCapabilities",
         "type": "object"
       },
       "UserKind": {
@@ -133,6 +1586,46 @@
         ],
         "title": "UserOut",
         "type": "object"
+      },
+      "ValidationError": {
+        "properties": {
+          "ctx": {
+            "title": "Context",
+            "type": "object"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "title": "Location",
+            "type": "array"
+          },
+          "msg": {
+            "title": "Message",
+            "type": "string"
+          },
+          "type": {
+            "title": "Error Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError",
+        "type": "object"
       }
     }
   },
@@ -142,6 +1635,251 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/api/v1/connections": {
+      "get": {
+        "operationId": "list_connections_api_v1_connections_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConnectionList"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Connections",
+        "tags": [
+          "connections"
+        ]
+      },
+      "post": {
+        "operationId": "create_connection_api_v1_connections_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateConnectionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConnectionSummary"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Connection",
+        "tags": [
+          "connections"
+        ]
+      }
+    },
+    "/api/v1/connections/{connection_id}": {
+      "delete": {
+        "operationId": "delete_connection_api_v1_connections__connection_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "connection_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Connection Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Connection",
+        "tags": [
+          "connections"
+        ]
+      }
+    },
+    "/api/v1/connections/{connection_id}/explain": {
+      "post": {
+        "operationId": "explain_api_v1_connections__connection_id__explain_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "connection_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Connection Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExplainRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExplainResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Explain",
+        "tags": [
+          "connections"
+        ]
+      }
+    },
+    "/api/v1/connections/{connection_id}/schema": {
+      "get": {
+        "operationId": "schema_snapshot_api_v1_connections__connection_id__schema_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "connection_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Connection Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "tables",
+            "required": true,
+            "schema": {
+              "maxLength": 4000,
+              "title": "Tables",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SchemaSnapshot"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Schema Snapshot",
+        "tags": [
+          "connections"
+        ]
+      }
+    },
+    "/api/v1/connections/{connection_id}/test": {
+      "post": {
+        "operationId": "test_connection_api_v1_connections__connection_id__test_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "connection_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Connection Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConnectionTestResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Test Connection",
+        "tags": [
+          "connections"
+        ]
+      }
+    },
     "/api/v1/healthz": {
       "get": {
         "description": "Liveness only: the process is up.",

@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | Phase | **1 — Foundation** (Phase 0 documentation complete) |
-| Status | In progress: T1.1–T1.11 done (T1.7 still needs real plan captures), T1.15 done |
+| Status | In progress: T1.1–T1.12 and T1.15 done (T1.7 still needs real plan captures) |
 | Last updated | 2026-10-11 |
 | Application code | Scaffolding only: FastAPI app factory with `/api/v1/healthz`; Next.js shell page; local Compose file. |
 
@@ -101,7 +101,15 @@
   - Validator fixes found while building it: unquoted identifiers fold to lower case like PostgreSQL, and `functions_to_resolve` lists unrecognized unqualified names.
   - 15 integration tests on a seeded target DB with a throwaway restricted login role. They cover hardening verification; L3 holding with the validator bypassed (`EXPLAIN ANALYZE DELETE`, DDL, and a `SET … ; DELETE` all fail, with the row count unchanged); statement and lock timeouts; the `pg_proc` refusal and opt-in; redaction with planted secret emails; superuser refusal; SSRF block before connecting; a wrong password not leaking; and concurrent gateways.
   - SQL templates verified present in the built wheel.
-- [ ] **Remaining:** T1.12–T1.14, T1.16–T1.19, and real PG 17 plan captures for T1.7.
+- [x] **T1.12 connections API** (`/connections`: create, list, test, explain, schema, delete).
+  - Passwords are sealed with AES-GCM, bound to the row and user ID. The row ID is generated before encryption.
+  - Delete soft-deletes the row and wipes the ciphertext immediately.
+  - Blocked targets are refused at creation and re-checked on every use. `sslmode=disable` is local only.
+  - A `test` outcome (ok, refused, or failed) is recorded in its own transaction, so it survives an error response.
+  - Explain returns the parsed plan plus metrics. Production connections answer `409 APPROVAL_REQUIRED`.
+  - Other users' IDs get 404 on every route. The demo profile answers `FEATURE_DISABLED`. A missing `QD_MASTER_KEY` gives `CONFIGURATION_ERROR` rather than plaintext storage.
+  - 15 integration tests plus a unit test that scans every OpenAPI response schema for secret-like fields.
+- [ ] **Remaining:** T1.13–T1.14, T1.16–T1.19, and real PG 17 plan captures for T1.7.
 
 ## Blockers
 
@@ -125,7 +133,7 @@
 | Required files exist | See Phase 0 validation in the final summary |
 | Internal links | Checked by script during Phase 0 |
 | Mermaid syntax | Reviewed manually (no renderer installed; not executed) |
-| Backend (through T1.11) | `uv run pytest -q` → 376 passed: 320 unit/security + 56 integration on PG 17.11, Python 3.12; CI also runs 3.13 and a `postgres:17` integration job. `ruff check`/`format --check` clean; `mypy --strict` clean on 47 files. Live API check as `qd_app`: readyz ok, session flow 401 → 201 → 200, CSRF 403 envelope |
+| Backend (through T1.12) | `uv run pytest -q` → 392 passed: 321 unit/security + 71 integration on PG 17.11, Python 3.12; CI also runs 3.13 and a `postgres:17` integration job. `ruff check`/`format --check` clean; `mypy --strict` clean on 50 files. Live API check as `qd_app`: readyz ok, session flow 401 → 201 → 200, CSRF 403 envelope |
 | Frontend (through T1.15) | `pnpm lint` clean; `pnpm typecheck` clean; `pnpm test` → 13 passed; `pnpm build` → compiled, `/` and `/app` prerendered static |
 | Compose | Running: `metadata-db` and `sandbox-db` healthy; `alembic current` → `0002 (head)`; `qd_app` login verified (INSERT yes, UPDATE no on `artifacts`) |
 

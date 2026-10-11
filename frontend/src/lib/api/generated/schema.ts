@@ -4,6 +4,92 @@
  */
 
 export interface paths {
+    "/api/v1/connections": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Connections */
+        get: operations["list_connections_api_v1_connections_get"];
+        put?: never;
+        /** Create Connection */
+        post: operations["create_connection_api_v1_connections_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/connections/{connection_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete Connection */
+        delete: operations["delete_connection_api_v1_connections__connection_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/connections/{connection_id}/explain": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Explain */
+        post: operations["explain_api_v1_connections__connection_id__explain_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/connections/{connection_id}/schema": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Schema Snapshot */
+        get: operations["schema_snapshot_api_v1_connections__connection_id__schema_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/connections/{connection_id}/test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Test Connection */
+        post: operations["test_connection_api_v1_connections__connection_id__test_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/healthz": {
         parameters: {
             query?: never;
@@ -82,6 +168,153 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** ColumnRef */
+        ColumnRef: {
+            /** Name */
+            name: string;
+            /** Table */
+            table: string | null;
+        };
+        /**
+         * ColumnStats
+         * @description Numeric planner statistics only — never value samples (T1.11).
+         */
+        ColumnStats: {
+            /** Avg Width */
+            avg_width: number | null;
+            /** Correlation */
+            correlation: number | null;
+            /** Data Type */
+            data_type: string;
+            /** N Distinct */
+            n_distinct: number | null;
+            /** Name */
+            name: string;
+            /** Not Null */
+            not_null: boolean;
+            /** Null Frac */
+            null_frac: number | null;
+            /** Position */
+            position: number;
+            /** Schema Name */
+            schema_name: string;
+            /** Table Name */
+            table_name: string;
+        };
+        /** ConnectionList */
+        ConnectionList: {
+            /** Items */
+            items: components["schemas"]["ConnectionSummary"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
+        };
+        /** ConnectionSummary */
+        ConnectionSummary: {
+            /** Capabilities */
+            capabilities: {
+                [key: string]: unknown;
+            } | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Dbname */
+            dbname: string;
+            /** Environment */
+            environment: string;
+            /** Has Password */
+            has_password: boolean;
+            /** Host */
+            host: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Last Test Status */
+            last_test_status: string | null;
+            /** Last Tested At */
+            last_tested_at: string | null;
+            /** Name */
+            name: string;
+            /** Port */
+            port: number;
+            /** Purpose */
+            purpose: string;
+            /** Sslmode */
+            sslmode: string;
+            /** Username */
+            username: string;
+        };
+        /** ConnectionTestResponse */
+        ConnectionTestResponse: {
+            capabilities: components["schemas"]["TargetCapabilities"];
+            /**
+             * Status
+             * @constant
+             */
+            status: "ok";
+            /** Warnings */
+            warnings: string[];
+        };
+        /** CreateConnectionRequest */
+        CreateConnectionRequest: {
+            /** Dbname */
+            dbname: string;
+            /**
+             * Environment
+             * @enum {string}
+             */
+            environment: "development" | "staging" | "production";
+            /** Host */
+            host: string;
+            /** Name */
+            name: string;
+            /**
+             * Password
+             * Format: password
+             */
+            password: string;
+            /**
+             * Port
+             * @default 5432
+             */
+            port: number;
+            /**
+             * Purpose
+             * @default inspection
+             * @enum {string}
+             */
+            purpose: "inspection" | "sandbox";
+            /**
+             * Sslmode
+             * @default verify-full
+             * @enum {string}
+             */
+            sslmode: "disable" | "require" | "verify-ca" | "verify-full";
+            /** Username */
+            username: string;
+        };
+        /** ExplainRequest */
+        ExplainRequest: {
+            /**
+             * Allow User Functions
+             * @default false
+             */
+            allow_user_functions: boolean;
+            /** Query */
+            query: string;
+        };
+        /** ExplainResponse */
+        ExplainResponse: {
+            /** Generic Plan */
+            generic_plan: boolean;
+            /** Metrics */
+            metrics: components["schemas"]["NodeMetrics"][];
+            plan: components["schemas"]["PlanTree"];
+            query: components["schemas"]["QueryInfo"];
+        };
         /** Features */
         Features: {
             /** Live Inspection */
@@ -89,10 +322,36 @@ export interface components {
             /** Sandbox */
             sandbox: boolean;
         };
+        /** HTTPValidationError */
+        HTTPValidationError: {
+            /** Detail */
+            detail?: components["schemas"]["ValidationError"][];
+        };
         /** HealthResponse */
         HealthResponse: {
             /** Status */
             status: string;
+        };
+        /** IndexInfo */
+        IndexInfo: {
+            /** Definition */
+            definition: string;
+            /** Idx Scan */
+            idx_scan: number | null;
+            /** Is Primary */
+            is_primary: boolean;
+            /** Is Unique */
+            is_unique: boolean;
+            /** Is Valid */
+            is_valid: boolean;
+            /** Name */
+            name: string;
+            /** Schema Name */
+            schema_name: string;
+            /** Size Bytes */
+            size_bytes: number;
+            /** Table Name */
+            table_name: string;
         };
         /** MeResponse */
         MeResponse: {
@@ -101,10 +360,174 @@ export interface components {
             user: components["schemas"]["UserOut"];
         };
         /**
+         * NodeMetrics
+         * @description Derived, deterministic numbers. None means "not measurable from this plan", never zero.
+         */
+        NodeMetrics: {
+            /** Estimate Direction */
+            estimate_direction: ("under" | "over" | "exact") | null;
+            /** Estimate Error Ratio */
+            estimate_error_ratio: number | null;
+            /** Inclusive Time Ms */
+            inclusive_time_ms: number | null;
+            /** Node Id */
+            node_id: number;
+            /** Rows Removed By Filter Total */
+            rows_removed_by_filter_total: number | null;
+            /** Self Shared Hit Blocks */
+            self_shared_hit_blocks: number | null;
+            /** Self Shared Read Blocks */
+            self_shared_read_blocks: number | null;
+            /** Self Temp Read Blocks */
+            self_temp_read_blocks: number | null;
+            /** Self Temp Written Blocks */
+            self_temp_written_blocks: number | null;
+            /** Self Time Ms */
+            self_time_ms: number | null;
+            /** Self Time Share */
+            self_time_share: number | null;
+            /** Sort Spilled */
+            sort_spilled: boolean;
+            /** Total Actual Rows */
+            total_actual_rows: number | null;
+        };
+        /**
+         * PlanNode
+         * @description A node of an `EXPLAIN (FORMAT JSON)` plan. Times are per loop, as PostgreSQL reports.
+         */
+        PlanNode: {
+            /** Actual Loops */
+            actual_loops?: number | null;
+            /** Actual Rows */
+            actual_rows?: number | null;
+            /** Actual Startup Time Ms */
+            actual_startup_time_ms?: number | null;
+            /** Actual Total Time Ms */
+            actual_total_time_ms?: number | null;
+            /** Alias */
+            alias?: string | null;
+            /** Children */
+            children?: components["schemas"]["PlanNode"][];
+            /** Extra */
+            extra?: {
+                [key: string]: unknown;
+            };
+            /** Filter */
+            filter?: string | null;
+            /** Id */
+            id: number;
+            /** Index Cond */
+            index_cond?: string | null;
+            /** Index Name */
+            index_name?: string | null;
+            /** Join Type */
+            join_type?: string | null;
+            /** Locator */
+            locator: string;
+            /** Node Type */
+            node_type: string;
+            /** Parallel Aware */
+            parallel_aware?: boolean | null;
+            /** Parent Id */
+            parent_id: number | null;
+            /** Parent Relationship */
+            parent_relationship?: string | null;
+            /** Plan Rows */
+            plan_rows?: number | null;
+            /** Plan Width */
+            plan_width?: number | null;
+            /** Relation Name */
+            relation_name?: string | null;
+            /** Rows Removed By Filter */
+            rows_removed_by_filter?: number | null;
+            /** Schema Name */
+            schema_name?: string | null;
+            /** Shared Dirtied Blocks */
+            shared_dirtied_blocks?: number | null;
+            /** Shared Hit Blocks */
+            shared_hit_blocks?: number | null;
+            /** Shared Read Blocks */
+            shared_read_blocks?: number | null;
+            /** Shared Written Blocks */
+            shared_written_blocks?: number | null;
+            /** Sort Key */
+            sort_key?: string[] | null;
+            /** Sort Method */
+            sort_method?: string | null;
+            /** Sort Space Type */
+            sort_space_type?: string | null;
+            /** Sort Space Used Kb */
+            sort_space_used_kb?: number | null;
+            /** Startup Cost */
+            startup_cost?: number | null;
+            /** Subplan Name */
+            subplan_name?: string | null;
+            /** Temp Read Blocks */
+            temp_read_blocks?: number | null;
+            /** Temp Written Blocks */
+            temp_written_blocks?: number | null;
+            /** Total Cost */
+            total_cost?: number | null;
+            /** Workers Launched */
+            workers_launched?: number | null;
+            /** Workers Planned */
+            workers_planned?: number | null;
+        };
+        /** PlanTree */
+        PlanTree: {
+            /** Analyzed */
+            analyzed: boolean;
+            /** Execution Time Ms */
+            execution_time_ms?: number | null;
+            /** Has Buffers */
+            has_buffers: boolean;
+            /** Has Timing */
+            has_timing: boolean;
+            /** Nodes */
+            nodes: components["schemas"]["PlanNode"][];
+            /** Planning Time Ms */
+            planning_time_ms?: number | null;
+            root: components["schemas"]["PlanNode"];
+        };
+        /**
          * Profile
          * @enum {string}
          */
         Profile: "local" | "demo";
+        /**
+         * QueryFingerprint
+         * @description Groups similar queries. Metadata only, never artifact identity (REPLAY_ENGINE §2.2).
+         */
+        QueryFingerprint: {
+            /** Digest */
+            digest: string;
+            /** Normalized Sql */
+            normalized_sql: string;
+        };
+        /** QueryInfo */
+        QueryInfo: {
+            fingerprint: components["schemas"]["QueryFingerprint"];
+            metadata: components["schemas"]["QueryMetadata"];
+            /** Statement Type */
+            statement_type: string;
+        };
+        /** QueryMetadata */
+        QueryMetadata: {
+            /** Columns */
+            columns: components["schemas"]["ColumnRef"][];
+            /** Functions */
+            functions: string[];
+            /** Functions To Resolve */
+            functions_to_resolve: string[];
+            /** Limit */
+            limit: number | null;
+            /** Order By */
+            order_by: string[];
+            /** Parameter Count */
+            parameter_count: number;
+            /** Tables */
+            tables: components["schemas"]["TableRef"][];
+        };
         /** ReadinessResponse */
         ReadinessResponse: {
             /** Database */
@@ -114,9 +537,83 @@ export interface components {
             /** Status */
             status: string;
         };
+        /** SchemaSnapshot */
+        SchemaSnapshot: {
+            /** Columns */
+            columns: components["schemas"]["ColumnStats"][];
+            /** Indexes */
+            indexes: components["schemas"]["IndexInfo"][];
+            /** Tables */
+            tables: components["schemas"]["TableStats"][];
+            /** Unresolved */
+            unresolved: components["schemas"]["TableRef"][];
+        };
         /** SessionResponse */
         SessionResponse: {
             user: components["schemas"]["UserOut"];
+        };
+        /** TableRef */
+        TableRef: {
+            /** Name */
+            name: string;
+            /** Schema Name */
+            schema_name: string | null;
+        };
+        /** TableStats */
+        TableStats: {
+            /** Estimated Rows */
+            estimated_rows: number | null;
+            /** Idx Scan */
+            idx_scan: number | null;
+            /** Kind */
+            kind: string;
+            /** Last Analyze */
+            last_analyze: string | null;
+            /** Last Autoanalyze */
+            last_autoanalyze: string | null;
+            /** N Dead Tup */
+            n_dead_tup: number | null;
+            /** N Live Tup */
+            n_live_tup: number | null;
+            /** N Mod Since Analyze */
+            n_mod_since_analyze: number | null;
+            /** Name */
+            name: string;
+            /** Pages */
+            pages: number;
+            /** Schema Name */
+            schema_name: string;
+            /** Seq Scan */
+            seq_scan: number | null;
+            /** Total Bytes */
+            total_bytes: number;
+        };
+        /** TargetCapabilities */
+        TargetCapabilities: {
+            /** Bypasses Rls */
+            bypasses_rls: boolean;
+            /** Can Create Role */
+            can_create_role: boolean;
+            /** Can Read All Stats */
+            can_read_all_stats: boolean;
+            /** Has Pg Stat Statements */
+            has_pg_stat_statements: boolean;
+            /** Is Replication Role */
+            is_replication_role: boolean;
+            /** Is Superuser */
+            is_superuser: boolean;
+            /** Owned Tables */
+            owned_tables: number;
+            /** Schemas */
+            schemas: string[];
+            /** Server Version */
+            server_version: string;
+            /** Server Version Num */
+            server_version_num: number;
+            /** Ssl In Use */
+            ssl_in_use: boolean;
+            /** Warnings */
+            warnings?: string[];
         };
         /**
          * UserKind
@@ -134,6 +631,19 @@ export interface components {
             id: string;
             kind: components["schemas"]["UserKind"];
         };
+        /** ValidationError */
+        ValidationError: {
+            /** Context */
+            ctx?: Record<string, never>;
+            /** Input */
+            input?: unknown;
+            /** Location */
+            loc: (string | number)[];
+            /** Message */
+            msg: string;
+            /** Error Type */
+            type: string;
+        };
     };
     responses: never;
     parameters: never;
@@ -143,6 +653,187 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    list_connections_api_v1_connections_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConnectionList"];
+                };
+            };
+        };
+    };
+    create_connection_api_v1_connections_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateConnectionRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConnectionSummary"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_connection_api_v1_connections__connection_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                connection_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    explain_api_v1_connections__connection_id__explain_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                connection_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExplainRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExplainResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    schema_snapshot_api_v1_connections__connection_id__schema_get: {
+        parameters: {
+            query: {
+                tables: string;
+            };
+            header?: never;
+            path: {
+                connection_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SchemaSnapshot"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    test_connection_api_v1_connections__connection_id__test_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                connection_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConnectionTestResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     healthz_api_v1_healthz_get: {
         parameters: {
             query?: never;

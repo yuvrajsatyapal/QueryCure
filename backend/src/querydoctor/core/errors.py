@@ -49,6 +49,16 @@ class FeatureDisabledError(QueryDoctorError):
     status = 403
 
 
+class ApprovalRequiredError(QueryDoctorError):
+    code = "APPROVAL_REQUIRED"
+    status = 409
+
+
+class ConfigurationError(QueryDoctorError):
+    code = "CONFIGURATION_ERROR"
+    status = 503
+
+
 class NotFoundError(QueryDoctorError):
     code = "NOT_FOUND"
     status = 404

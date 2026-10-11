@@ -37,12 +37,12 @@ Status: Planned. Base path `/api/v1`. JSON is `snake_case`. Timestamps ISO 8601 
 | 401 | `UNAUTHENTICATED` |
 | 403 | `CSRF_FAILED`, `FEATURE_DISABLED` (e.g. Mode B on public demo) |
 | 404 | `NOT_FOUND`, `NOT_FINALIZED` (manifest requested for an unfinalized run) |
-| 409 | `INVALID_STATE` (e.g. approving a non-pending request), `IDEMPOTENCY_CONFLICT` |
+| 409 | `INVALID_STATE` (e.g. approving a non-pending request), `IDEMPOTENCY_CONFLICT`, `APPROVAL_REQUIRED` |
 | 413 | `PAYLOAD_TOO_LARGE` |
 | 422 | `VALIDATION_ERROR`, `EXPERIMENT_NOT_REPLAYABLE`, `SQL_NOT_ALLOWED`, `SQL_PARSE_ERROR`, `CONNECTION_TARGET_BLOCKED`, `ROLE_TOO_PRIVILEGED`, `TARGET_PERMISSION_DENIED` (role lacks e.g. SELECT on a table), `TARGET_QUERY_ERROR` (PostgreSQL rejected the EXPLAIN, e.g. unknown table) |
 | 429 | `RATE_LIMITED`, `CONCURRENCY_LIMIT` |
 | 502/504 | `TARGET_UNREACHABLE`, `TARGET_TIMEOUT` |
-| 503 | `SERVICE_UNAVAILABLE` (metadata DB not configured or unreachable) |
+| 503 | `SERVICE_UNAVAILABLE` (metadata DB not configured or unreachable), `CONFIGURATION_ERROR` (e.g. `QD_MASTER_KEY` missing, so credentials cannot be stored) |
 
 Error messages never include credentials, DSNs, or raw driver errors (driver errors are mapped to codes; originals go to logs, redacted).
 
@@ -62,10 +62,10 @@ Error messages never include credentials, DSNs, or raw driver errors (driver err
 ### Connections (Mode B / user sandbox)
 | Method | Path | Body / Response | Phase |
 |---|---|---|---|
-| GET | `/connections` | `ConnectionSummary[]` (no secrets) | 1 |
+| GET | `/connections` | `{items: ConnectionSummary[], next_cursor}` (no secrets; `has_password` only) | 1 |
 | POST | `/connections` | `{name, host, port, dbname, username, password, sslmode, environment, purpose}` → `ConnectionSummary` | 1 |
 | POST | `/connections/{id}/test` | → `{status, capabilities: TargetCapabilities, warnings[]}` | 1 |
-| DELETE | `/connections/{id}` | soft delete + secret wipe | 1 |
+| DELETE | `/connections/{id}` | 204; soft delete + immediate secret wipe | 1 |
 
 `TargetCapabilities`: `{server_version, is_read_only_role, has_pg_stat_statements, can_read_all_stats, is_superuser, ssl_in_use, schemas[]}`.
 
@@ -75,8 +75,8 @@ Error messages never include credentials, DSNs, or raw driver errors (driver err
 | POST | `/inspect/sql` | Parse + validate + fingerprint `{query, dialect}` → `SqlAnalysis` | 1 |
 | POST | `/inspect/plan` | Parse uploaded plan JSON → `PlanTree` + metrics; stores artifact | 1 |
 | POST | `/inspect/schema` | Parse DDL → `SchemaSnapshot`; stores artifact | 1 |
-| POST | `/connections/{id}/explain` | Plain EXPLAIN of validated query → `PlanTree` (approval required if production → returns 409 `APPROVAL_REQUIRED` outside an investigation) | 1 |
-| GET | `/connections/{id}/schema` | Schema/index/stats snapshot (redacted) | 1 |
+| POST | `/connections/{id}/explain` | `{query, allow_user_functions?}` → `{plan: PlanTree, metrics: NodeMetrics[], generic_plan, query}`; plain EXPLAIN only. Production connections → 409 `APPROVAL_REQUIRED` outside an investigation | 1 |
+| GET | `/connections/{id}/schema?tables=public.orders,customers` | Redacted `SchemaSnapshot` (tables, columns with numeric stats only, indexes, unresolved names); 1–50 tables | 1 |
 
 ### Workloads
 | Method | Path | Purpose | Phase |

@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 
 from querydoctor import __version__
 from querydoctor.api.middleware import CsrfMiddleware, RequestIdMiddleware, install_error_handlers
-from querydoctor.api.routers import health, session
+from querydoctor.api.routers import connections, health, session
 from querydoctor.core.config import Settings
 from querydoctor.core.logging import configure_logging
 from querydoctor.db.engine import make_engine
@@ -54,6 +54,7 @@ def create_app(settings: Settings | None = None, engine: AsyncEngine | None = No
     )
     app.include_router(health.router, prefix=API_PREFIX)
     app.include_router(session.router, prefix=API_PREFIX)
+    app.include_router(connections.router, prefix=API_PREFIX)
     return app
 
 
