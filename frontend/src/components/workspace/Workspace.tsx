@@ -5,12 +5,14 @@ import { useState, type ChangeEvent } from "react";
 import { ErrorNotice } from "@/components/common/ErrorNotice";
 import { SqlEditor } from "@/components/editor/SqlEditor";
 import { NodeDetails } from "@/components/plan/NodeDetails";
+import { PlanGraph } from "@/components/plan/PlanGraph";
 import { PlanTreeTable } from "@/components/plan/PlanTreeTable";
 import { connectionKeys, explainOnConnection, listConnections } from "@/lib/api/connections";
 import { inspectPlan } from "@/lib/api/inspect";
 import type { NodeMetrics, PlanTree } from "@/lib/api/types";
 
 type Source = "upload" | "live";
+type View = "tree" | "graph";
 interface PlanResult {
   plan: PlanTree;
   metrics: NodeMetrics[];
@@ -30,6 +32,7 @@ export function Workspace() {
   const [connectionId, setConnectionId] = useState("");
   const [result, setResult] = useState<PlanResult | null>(null);
   const [selected, setSelected] = useState<number | null>(null);
+  const [view, setView] = useState<View>("tree");
 
   const connections = useQuery({
     queryKey: connectionKeys.all,
@@ -146,8 +149,22 @@ export function Workspace() {
       <section aria-label="Plan" className="flex min-w-0 flex-col gap-4">
         {result ? (
           <>
-            <p className="font-mono text-xs uppercase tracking-wider text-muted">{result.origin}</p>
-            <PlanTreeTable plan={result.plan} metrics={result.metrics} onSelect={setSelected} selectedId={selected} />
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="font-mono text-xs uppercase tracking-wider text-muted">{result.origin}</p>
+              <div role="tablist" aria-label="Plan view" className="flex gap-2">
+                <button role="tab" aria-selected={view === "tree"} className={tabClass(view === "tree")} onClick={() => setView("tree")}>
+                  Tree
+                </button>
+                <button role="tab" aria-selected={view === "graph"} className={tabClass(view === "graph")} onClick={() => setView("graph")}>
+                  Graph
+                </button>
+              </div>
+            </div>
+            {view === "tree" ? (
+              <PlanTreeTable plan={result.plan} metrics={result.metrics} onSelect={setSelected} selectedId={selected} />
+            ) : (
+              <PlanGraph plan={result.plan} metrics={result.metrics} onSelect={setSelected} selectedId={selected} />
+            )}
             {selectedNode ? (
               <NodeDetails node={selectedNode} metrics={result.metrics.find((m) => m.nodeId === selectedNode.id)} />
             ) : (

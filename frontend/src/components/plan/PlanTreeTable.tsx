@@ -2,6 +2,8 @@
 
 import { useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { formatMs, formatPct, formatRows } from "@/lib/format";
+import { estimateLabel, isMisestimate } from "@/lib/plan/estimate";
+import { hottestNodeId } from "@/lib/plan/hottest";
 import type { NodeMetrics, PlanNode, PlanTree } from "@/lib/api/types";
 
 interface Row {
@@ -9,8 +11,6 @@ interface Row {
   level: number;
   hasChildren: boolean;
 }
-
-const ESTIMATE_WARN = 10;
 
 function visibleRows(root: PlanNode, collapsed: Set<number>): Row[] {
   const out: Row[] = [];
@@ -45,11 +45,7 @@ export function PlanTreeTable({
   const byId = useMemo(() => new Map(metrics.map((m) => [m.nodeId, m])), [metrics]);
   const rows = useMemo(() => visibleRows(plan.root, collapsed), [plan.root, collapsed]);
   const parents = useMemo(() => new Map(plan.nodes.map((n) => [n.id, n.parentId ?? null])), [plan.nodes]);
-  const hottestId = useMemo(() => {
-    let best: NodeMetrics | null = null;
-    for (const m of metrics) if (m.selfTimeMs != null && (best === null || m.selfTimeMs > (best.selfTimeMs ?? 0))) best = m;
-    return best?.nodeId ?? null;
-  }, [metrics]);
+  const hottestId = useMemo(() => hottestNodeId(metrics), [metrics]);
 
   const focusRow = (id: number) => {
     setFocusId(id);
@@ -108,7 +104,6 @@ export function PlanTreeTable({
               const m = byId.get(row.node.id);
               const hottest = row.node.id === hottestId;
               const selected = row.node.id === selectedId;
-              const ratio = m?.estimateErrorRatio;
               return (
                 <tr
                   key={row.node.id}
@@ -149,12 +144,8 @@ export function PlanTreeTable({
                   </td>
                   <td role="gridcell" className="px-3 py-2 text-right">{formatRows(row.node.planRows)}</td>
                   <td role="gridcell" className="px-3 py-2 text-right">{formatRows(row.node.actualRows)}</td>
-                  <td role="gridcell" className={`px-3 py-2 ${ratio != null && ratio >= ESTIMATE_WARN ? "text-inconclusive" : "text-muted"}`}>
-                    {ratio != null && m?.estimateDirection && m.estimateDirection !== "exact"
-                      ? `${ratio.toFixed(ratio >= 10 ? 0 : 1)}× ${m.estimateDirection}`
-                      : ratio != null
-                        ? "exact"
-                        : "—"}
+                  <td role="gridcell" className={`px-3 py-2 ${isMisestimate(m) ? "text-inconclusive" : "text-muted"}`}>
+                    {estimateLabel(m)}
                   </td>
                   <td role="gridcell" className="px-3 py-2">
                     {m?.selfTimeMs != null ? `${formatMs(m.selfTimeMs)} · ${formatPct(m.selfTimeShare)}` : "—"}

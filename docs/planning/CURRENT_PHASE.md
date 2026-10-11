@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | Phase | **1 — Foundation** (Phase 0 documentation complete) |
-| Status | In progress: backend Phase 1 complete (T1.1–T1.14); frontend T1.15–T1.17 done, T1.18–T1.19 remaining |
+| Status | In progress: backend Phase 1 complete (T1.1–T1.14); frontend T1.15–T1.18 done, T1.19 remaining |
 | Last updated | 2026-10-11 |
 | Application code | Scaffolding only: FastAPI app factory with `/api/v1/healthz`; Next.js shell page; local Compose file. |
 
@@ -141,7 +141,16 @@
   - Next 16: `instant = false` is needed on each session-gated page, not only the `/app` layout. The dev overlay flagged every page as a dropped segment until then.
   - Vitest: 7 plan-tree tests and 3 workspace tests (29 frontend tests in total).
   - **Verified in the browser** against the live API: a real PG 17 `EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON)` plan from the sf=1 demo rendered Limit → Gather Merge → Sort → Seq Scan on orders. Seq Scan was labelled hottest at 62.6 ms (91.1% self time), matching hand-computed values (ROADMAP Phase 1 acceptance #2). Live EXPLAIN on the `qd_demo_inspector` connection returned the same shape with the "Estimates only" banner.
-- [ ] **Remaining:** T1.18 plan graph, T1.19 README run-locally.
+- [x] **T1.18 plan graph** (Tree / Graph toggle in the workspace).
+  - `lib/plan/layout.ts`: pure dagre top-down layout. Edges carry rows across all loops (planner estimates, labelled "est.", for plain EXPLAIN). Edge width is log-scaled between fixed bounds.
+  - `PlanGraph`: React Flow with a custom PlanNode card showing node type, relation, per-loop est vs actual, misestimate (≥10× in `--inconclusive`), and a self-time bar. Only the hottest node gets the accent border and a "hottest" label. Selection is shared with the tree and the details panel. Theme follows tokens through `--xy-*` variables in `globals.css`.
+  - Shared helpers `hottestNodeId` and `estimateLabel` are now used by both the tree and the graph, so the two views can't disagree.
+  - The tree stays the default view. The graph's caption points keyboard and screen-reader users to it (DESIGN_SYSTEM §accessibility).
+  - Tests: 6 layout/helper unit tests, 5 PlanGraph tests, and 1 workspace test showing the graph has the same node set as the tree with selection carried across views (41 frontend tests in total). In jsdom the click test uses `fireEvent.click`, because user-event's `mousedown` has `view=null`, which d3-zoom dereferences.
+  - **Verified in the browser** with the real PG 17 plan: 4 cards matching the 4 tree rows, only Seq Scan accented (62.6 ms, 91.1%), and edge labels 20 / 48 / 10,014 rows (16×3 and 3,338×3 across loops). Checked in dark and light themes and at 375 px with no page-level horizontal scroll.
+  - Fixed during verification: a card overflowed and hid its relation line; the selected card's tint was overridden by `bg-surface`.
+  - Note: running `pnpm build` while `pnpm dev` is up left the dev server serving stale CSS until it was restarted.
+- [ ] **Remaining:** T1.19 README run-locally, then the Phase 1 report.
 
 ## Blockers
 
@@ -156,8 +165,8 @@
 
 ## Next actions
 
-1. T1.18 plan graph (React Flow + dagre), same nodes as the tree, hottest node accented.
-2. T1.19 README "Run locally", verified from a fresh clone; then the Phase 1 report.
+1. T1.19 README "Run locally", verified from a fresh clone.
+2. Check every Phase 1 acceptance criterion, then write `docs/planning/reports/PHASE_1_REPORT.md`.
 
 ## Verification status
 
@@ -167,7 +176,7 @@
 | Internal links | Checked by script during Phase 0 |
 | Mermaid syntax | Reviewed manually (no renderer installed; not executed) |
 | Backend (through T1.14) | `uv run pytest -q` → 438 passed: 351 unit/security + 87 integration on PG 17.11, Python 3.12; CI also runs 3.13 and a `postgres:17` integration job. `ruff check`/`format --check` clean; `mypy --strict` clean on 58 files. Live API check as `qd_app`: readyz ok, session flow 401 → 201 → 200, CSRF 403 envelope |
-| Frontend (through T1.17) | `pnpm lint` and `pnpm typecheck` clean; `pnpm test` → 29 passed; `pnpm build` compiles; browser-verified against the live API, including 375 px width |
+| Frontend (through T1.18) | `pnpm lint` and `pnpm typecheck` clean; `pnpm test` → 41 passed; `pnpm build` compiles; browser-verified against the live API, including 375 px width |
 | Compose | Running: `metadata-db` and `sandbox-db` healthy; `alembic current` → `0002 (head)`; `qd_app` login verified (INSERT yes, UPDATE no on `artifacts`) |
 
 ## Open decisions
