@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | Phase | **1 — Foundation** (Phase 0 documentation complete) |
-| Status | In progress: T1.1–T1.3, T1.6, T1.7 (logic), T1.9 done on `main` |
+| Status | In progress: T1.1–T1.3, T1.6, T1.7 (logic), T1.9 done; T1.8 canonicalization done |
 | Last updated | 2026-10-11 |
 | Application code | Scaffolding only: FastAPI app factory with `/api/v1/healthz`; Next.js shell page; local Compose file. |
 
@@ -59,7 +59,15 @@
   - Returns a pinned `hostaddr` plus the original `host` for TLS. Error details never echo resolved addresses.
   - 70 security tests, including a rebinding resolver (one lookup only) and the real system resolver path.
   - Bug caught by the tests: Python reports `::1` as `is_reserved`, so loopback is now classified before the reserved rule.
-- [ ] T1.4–T1.5, T1.8, T1.10–T1.19 per [TASKS.md](TASKS.md). Doing Docker-free tasks first (T1.7, T1.9, the canonicalization part of T1.8, T1.15, T1.17–T1.18) while Docker is down.
+- [~] **T1.8, canonicalization half done; store half pending T1.4 / Docker.**
+  - `replay/canonical/`: frozen `qd-json-v1` (RFC 8785: UTF-16 key order, minimal escapes, ECMAScript number text, ±2^53 integer bound, primitives only).
+  - Also `qd-text-v1` (LF, single trailing LF, no BOM) and `qd-raw-v1` (exact bytes, strict UTF-8, no BOM).
+  - Typed encoders: UTC instants with 6 fractional digits, UUID, Enum, Decimal, base64url bytes, Pydantic models; naive datetimes and sets are rejected.
+  - `replay/digest.py` computes the profile-tagged SHA-256.
+  - Golden vectors in `tests/fixtures/canonical/`: RFC 8785 Appendix B numbers, plus hand-written canonical strings with digests computed independently via `hashlib`.
+  - 64 tests, passing on Python 3.12 and 3.13.
+  - Still to do: the `artifacts`/`run_artifacts` store and its integration tests as the restricted `qd_app` role. These need the metadata DB.
+- [ ] T1.4–T1.5, T1.10–T1.19 per [TASKS.md](TASKS.md). Doing Docker-free tasks first (T1.7, T1.9, the canonicalization part of T1.8, T1.15, T1.17–T1.18) while Docker is down.
 
 ## Blockers
 
@@ -83,7 +91,7 @@
 | Required files exist | See Phase 0 validation in the final summary |
 | Internal links | Checked by script during Phase 0 |
 | Mermaid syntax | Reviewed manually (no renderer installed; not executed) |
-| Backend (through T1.3) | `uv run pytest -q` → 241 passed (3.12; CI also 3.13); `ruff check` and `ruff format --check` clean; `mypy` strict → no issues in 21 files; uvicorn smoke test: `/api/v1/healthz` 200, `/api/v1/openapi.json` 200 |
+| Backend (through T1.3) | `uv run pytest -q` → 305 passed (also 305 on 3.13 locally) (3.12; CI also 3.13); `ruff check` and `ruff format --check` clean; `mypy` strict → no issues in 29 files; uvicorn smoke test: `/api/v1/healthz` 200, `/api/v1/openapi.json` 200 |
 | Frontend (T1.1) | `pnpm lint` clean; `pnpm typecheck` clean; `pnpm test` → 1 passed; `pnpm build` → compiled, `/` prerendered static |
 | Compose | `docker compose config` valid; **not started** (daemon down) |
 

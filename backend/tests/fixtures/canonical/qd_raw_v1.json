@@ -1,0 +1,10 @@
+{
+  "profile": "qd-raw-v1",
+  "vectors": [
+    {
+      "name": "raw sql bytes are untouched",
+      "input": "SELECT *  FROM orders -- keep me\r\nWHERE id = 1",
+      "digest": "b6c0f70420f432f7c99761d9b14e3304476cbac0a2b275a625d5aba4e52b6726"
+    }
+  ]
+}
