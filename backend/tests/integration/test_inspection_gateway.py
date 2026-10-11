@@ -7,6 +7,7 @@ from typing import Any
 import psycopg
 import pytest
 from pydantic import SecretStr
+from structlog.testing import capture_logs
 
 from querydoctor.connectors.inspection_gateway import (
     GatewayLimits,
@@ -183,6 +184,33 @@ async def test_wrong_password_is_unreachable_and_does_not_leak(target: dict[str,
 
     assert "wrong-password-xyz" not in str(info.value)
     assert "wrong-password-xyz" not in repr(bad)
+
+
+async def test_connect_failure_logs_cause_without_secrets(target: dict[str, Any]) -> None:
+    bad = conn_for(target).model_copy(update={"password": SecretStr("wrong-password-xyz")})
+
+    with capture_logs() as logs, pytest.raises(TargetUnreachableError):
+        async with InspectionGateway.open(bad, policy=LOCAL):
+            pass
+
+    events = [e for e in logs if e["event"] == "target_connect_failed"]
+    assert len(events) == 1
+    assert events[0]["error_class"] == "OperationalError"
+    # A fixed reason code, never libpq's message (which names host and user).
+    assert events[0]["reason"] == "auth_failed"
+    assert "wrong-password-xyz" not in repr(logs)
+    assert target["role"] not in repr(events)
+
+
+async def test_auth_failure_tells_the_user_which_part_failed(target: dict[str, Any]) -> None:
+    bad = conn_for(target).model_copy(update={"password": SecretStr("wrong-password-xyz")})
+
+    with pytest.raises(TargetUnreachableError) as info:
+        async with InspectionGateway.open(bad, policy=LOCAL):
+            pass
+
+    hint = "Authentication failed: check the username and password."
+    assert info.value.details == [{"field": "connection", "message": hint}]
 
 
 async def test_concurrent_gateways_do_not_interfere(target: dict[str, Any]) -> None:

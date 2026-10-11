@@ -38,7 +38,10 @@ from querydoctor.core.errors import (
     TargetUnreachableError,
     ValidationFailedError,
 )
+from querydoctor.core.logging import get_logger
 from querydoctor.sql.validator import SqlPolicy, TableRef, validate_select
+
+log = get_logger("querydoctor.connectors.gateway")
 
 APPLICATION_NAME = "querydoctor-inspector"
 SEARCH_PATH = "pg_catalog, public"
@@ -57,6 +60,50 @@ _VERIFIED_SETTINGS = (
 def _template(name: str) -> str:
     # Trusted files shipped with the package; values are always passed as parameters.
     return files("querydoctor.connectors.catalog_queries").joinpath(name).read_text()
+
+
+# Ordered (needle, reason) pairs matched against libpq's connect error text. Only the reason
+# code leaves this module; the text itself names the host and user.
+_CONNECT_FAILURES: tuple[tuple[str, str], ...] = (
+    ("password authentication failed", "auth_failed"),
+    ('role "', "auth_failed"),
+    ('database "', "database_missing"),
+    ("does not support ssl", "tls_unsupported"),
+    ("ssl", "tls_failed"),
+)
+
+# Only failures past the network layer are explained to the user; refused vs timed out stays
+# generic so the endpoint can't be used to map which ports answer.
+_CONNECT_HINTS = {
+    "auth_failed": "Authentication failed: check the username and password.",
+    "database_missing": "The database does not exist on that server.",
+    "tls_unsupported": (
+        "The server does not support TLS. For a local-only server, set TLS to disable."
+    ),
+    "tls_failed": "The TLS handshake or certificate check failed.",
+}
+
+
+def connect_failure_reason(message: str) -> str:
+    lowered = message.lower()
+    for needle, reason in _CONNECT_FAILURES:
+        if needle in lowered:
+            return reason
+    return "unreachable"
+
+
+def _connect_error(exc: psycopg.Error) -> QueryDoctorError:
+    reason = connect_failure_reason(str(exc))
+    log.warning(
+        "target_connect_failed",
+        error_class=type(exc).__name__,
+        reason=reason,
+    )
+    hint = _CONNECT_HINTS.get(reason)
+    return TargetUnreachableError(
+        "Could not connect to the target database.",
+        details=[{"field": "connection", "message": hint}] if hint else None,
+    )
 
 
 def _map_error(exc: psycopg.Error) -> QueryDoctorError:
@@ -123,7 +170,7 @@ class InspectionGateway:
                 autocommit=True,
             )
         except psycopg.Error as exc:
-            raise _map_error(exc) from None
+            raise _connect_error(exc) from None
         try:
             await cls._harden(conn, limits)
             gateway = cls(conn, await cls._read_capabilities(conn))

@@ -2,8 +2,7 @@
 
 > Autonomous, multi-agent investigation and *verified* optimization of PostgreSQL query performance.
 
-**Project status: Phase 0 — Documentation & planning. No application code exists yet.**
-Everything described below is *planned*. See [docs/planning/CURRENT_PHASE.md](docs/planning/CURRENT_PHASE.md) for live status.
+**Project status: Phase 1 — Foundation.** What runs today: SQL and plan parsing, an offline plan explorer (tree and graph), restricted live `EXPLAIN` against a database you connect, and demo workload generators. **No LLM agents, benchmarks, or reports yet.** Those arrive in Phases 2–4. Features below marked *planned* do not exist yet. See [docs/planning/CURRENT_PHASE.md](docs/planning/CURRENT_PHASE.md) for live status.
 
 ---
 
@@ -78,12 +77,76 @@ Full details: [docs/architecture/ARCHITECTURE.md](docs/architecture/ARCHITECTURE
 
 Rationale for each choice: [docs/engineering/DECISIONS.md](docs/engineering/DECISIONS.md).
 
+## Run locally
+
+Prerequisites: Docker (with Compose v2), [uv](https://docs.astral.sh/uv/), Node.js 22, and pnpm 10 (`corepack enable` provides the pinned version). uv installs Python 3.12 if needed.
+
+**1. Databases.** This starts the metadata DB on `127.0.0.1:5432` and the sandbox DB on an internal network. Both use dev-only passwords; the first start also creates the restricted `qd_app` role.
+
+```bash
+docker compose -f infra/docker/compose.yaml up -d --wait
+```
+
+**2. Backend config.** Copy the example env file, then set `QD_MASTER_KEY`, which encrypts saved connection passwords.
+
+```bash
+cp backend/.env.example backend/.env
+```
+
+```bash
+python3 -c "import os,base64;print(base64.b64encode(os.urandom(32)).decode())"
+```
+
+Paste the output after `QD_MASTER_KEY=` in `backend/.env`.
+
+**3. Migrations and API.** The API runs as `qd_app`; migrations run as the owner role.
+
+```bash
+cd backend && uv sync && uv run alembic upgrade head
+```
+
+```bash
+cd backend && uv run uvicorn querydoctor.api.main:app --port 8000
+```
+
+`curl http://localhost:8000/api/v1/readyz` should return `{"status":"ok","database":"ok","migrations":"current"}`.
+
+**4. Web app** (in a second terminal):
+
+```bash
+cd frontend && pnpm install && pnpm dev
+```
+
+Open <http://localhost:3000/app>. A local session is created automatically.
+
+**5. Inspect a plan offline.** Go to **New investigation**, paste the output of `EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON) …`, and choose **Analyze plan**. Real example plans are in `backend/tests/fixtures/plans/pg17_*.json`.
+
+**6. Optional: live EXPLAIN against a demo database.** Load the `orders_ecommerce` workload (100k orders at `sf=0.1`) into its own database, then create a restricted role for QueryDoctor to connect as:
+
+```bash
+docker compose -f infra/docker/compose.yaml exec metadata-db psql -U qd_owner -d querydoctor -c "CREATE DATABASE qd_demo_orders"
+```
+
+```bash
+cd backend && uv run python -m querydoctor.workloads postgresql://qd_owner:qd_local_dev_only@127.0.0.1:5432/qd_demo_orders 'orders_ecommerce@v1:sf=0.1:seed=42'
+```
+
+```bash
+docker compose -f infra/docker/compose.yaml exec metadata-db psql -U qd_owner -d qd_demo_orders -c "CREATE ROLE qd_demo_inspector LOGIN PASSWORD 'demo_inspector_local_only'; GRANT CONNECT ON DATABASE qd_demo_orders TO qd_demo_inspector; GRANT USAGE ON SCHEMA public TO qd_demo_inspector; GRANT SELECT ON ALL TABLES IN SCHEMA public TO qd_demo_inspector; GRANT pg_read_all_stats TO qd_demo_inspector;"
+```
+
+In **Connections**, add host `127.0.0.1`, port `5432`, database `qd_demo_orders`, user `qd_demo_inspector`, and password `demo_inspector_local_only`. Set **TLS** to `disable (local only)`, because the compose container has no TLS and the default `verify-full` will fail to connect. Then choose **Test**. The workspace's **Live EXPLAIN** tab can now plan queries such as `SELECT * FROM orders WHERE customer_id = 1024 ORDER BY created_at DESC LIMIT 20`. It runs plain EXPLAIN only, so nothing is executed. Superuser connections are refused.
+
+The demo database shares the local metadata server only for convenience. Private and loopback targets are allowed only because `ALLOW_PRIVATE_TARGETS=true` in the local profile.
+
+**Checks:** see the verification commands in [CLAUDE.md §7](CLAUDE.md#7-verification-commands-valid-once-phase-1-scaffolding-exists). Integration tests need the compose databases running.
+
 ## Development phases
 
 | Phase | Theme | Status |
 |---|---|---|
-| 0 | Documentation & architecture | **In progress** |
-| 1 | Foundation: repo, API, metadata DB, SQL/plan parsing, demo workloads, editor | Planned |
+| 0 | Documentation & architecture | Done |
+| 1 | Foundation: repo, API, metadata DB, SQL/plan parsing, demo workloads, editor | **In progress** |
 | 2 | Multi-agent intelligence: LangGraph supervisor, analyzer agents, streaming | Planned |
 | 3 | Optimization & benchmarking: sandbox, benchmark engine, tournament | Planned |
 | 4 | Verification & replay: auditor, lineage, replay, regression detection | Planned |

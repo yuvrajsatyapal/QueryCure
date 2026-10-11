@@ -60,7 +60,7 @@ Key insight: **LLM output is untrusted** even though the agent code is trusted. 
 | T5 | SSRF / network pivot | Connection host = `169.254.169.254`, `localhost`, internal DNS, DNS rebinding | SSRF guard: resolve, block ranges, pin `hostaddr`, port allowlist; Mode B disabled on public demo by default | Users on local profile may target localhost by design |
 | T6 | Credential exposure | Logs, exceptions, events, LLM prompts, API responses | Encryption at rest, `SecretStr`, structlog redaction processor, DSNs never built as strings in logs, responses expose `key_hint` only | Memory dumps of the worker process |
 | T7 | Cross-user data leak | IDOR on run/artifact IDs | Repository-level `user_id` scoping, 404 on foreign IDs, artifact access via `run_artifacts` join | Shared artifact dedupe: hash existence is not observable via API |
-| T8 | Unsafe functions | `pg_sleep`, `dblink`, `lo_import`, `pg_read_file`, `COPY … PROGRAM` | Function denylist in validator; read-only txn; restricted role; sandbox has no extensions beyond allowlist and no egress | Immutable functions evaluated at plan time (see §5.3) |
+| T8 | Unsafe functions | `pg_sleep`, `dblink`, `lo_import`, `pg_read_file`, `COPY … PROGRAM` | Function denylist in validator; read-only txn; restricted role; sandbox has no extensions beyond allowlist and no egress | Immutable functions evaluated at plan time (see §4.3) |
 | T9 | Long-running transactions | Idle sessions holding snapshots | `idle_in_transaction_session_timeout` 10 s; sessions closed after each tool call batch | Low |
 | T10 | Unbounded results | Huge result sets in sandbox | Server-side cursor, row cap (100k rows hashed, then `truncated=true` → inconclusive correctness), `statement_timeout` per benchmark query | Low |
 | T11 | Malicious uploads | Huge JSON, deep nesting, zip bombs, non-UTF-8 | Size caps, JSON depth limit (64), schema validation, no archives accepted, UTF-8 only | Low |
@@ -114,7 +114,12 @@ Plain `EXPLAIN` does not execute the query, but the planner may evaluate `IMMUTA
 ### 5.2 TLS
 `sslmode=verify-full` default for public profile; `require` accepted with a warning; `disable` only in local profile.
 
-### 5.3 Public demo stance
+### 5.3 Connection failure disclosure
+libpq's error text names the host and user, so it is never returned or logged. The gateway maps it to a fixed reason code (`connectors/inspection_gateway.py::connect_failure_reason`) and logs `target_connect_failed` with the error class and reason only.
+- **Explained to the user:** failures past the network layer (`auth_failed`, `database_missing`, `tls_unsupported`, `tls_failed`). Each gets a hint in the error's `details`.
+- **Kept generic:** `unreachable` (refused, timed out, unresolvable) stays a bare `TARGET_UNREACHABLE`, so the endpoint can't be used to map which hosts and ports answer.
+
+### 5.4 Public demo stance
 Mode B is **disabled by default** on the public demo (`FEATURE_LIVE_INSPECTION_PUBLIC=false`). Enabling it requires: SSRF guard, `verify-full` TLS, rate limits, and per-user connection caps. See [CURRENT_PHASE open decisions](../planning/CURRENT_PHASE.md#open-decisions).
 
 ## 6. Prompt injection
