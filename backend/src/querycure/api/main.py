@@ -12,7 +12,19 @@ from querycure.api.middleware import (
     RequestIdMiddleware,
     install_error_handlers,
 )
-from querycure.api.routers import connections, health, inspect, runs, session, workloads
+from querycure.api.routers import (
+    artifacts,
+    connections,
+    health,
+    inspect,
+    investigations,
+    runs,
+    session,
+    workloads,
+)
+from querycure.api.routers import (
+    settings as settings_router,
+)
 from querycure.core.config import Settings
 from querycure.core.logging import configure_logging
 from querycure.db.engine import make_engine
@@ -67,6 +79,9 @@ def create_app(settings: Settings | None = None, engine: AsyncEngine | None = No
     app.include_router(inspect.router, prefix=API_PREFIX)
     app.include_router(workloads.router, prefix=API_PREFIX)
     app.include_router(runs.router, prefix=API_PREFIX)
+    app.include_router(investigations.router, prefix=API_PREFIX)
+    app.include_router(artifacts.router, prefix=API_PREFIX)
+    app.include_router(settings_router.router, prefix=API_PREFIX)
     return app
 
 

@@ -6,6 +6,8 @@ from querycure.api.main import create_app
 from querycure.core.config import Settings
 
 FORBIDDEN = re.compile(r"password|secret|token|api_key|ciphertext|nonce|master_key", re.IGNORECASE)
+# Exact names that match the pattern but are not secrets: a flag and LLM token *counts*.
+ALLOWED = {"has_password", "total_tokens", "input_tokens", "output_tokens"}
 
 
 def test_no_response_schema_has_secret_fields() -> None:
@@ -20,7 +22,7 @@ def test_no_response_schema_has_secret_fields() -> None:
         f"{name}.{field}"
         for name, schema in response_schemas.items()
         for field in schema.get("properties", {})
-        if FORBIDDEN.search(field) and field != "has_password"
+        if FORBIDDEN.search(field) and field not in ALLOWED
     ]
 
     assert response_schemas, "expected some response schemas"

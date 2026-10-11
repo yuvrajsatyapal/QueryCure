@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | Phase | **2 — Multi-agent intelligence** (Phase 1 complete: [PHASE_1_REPORT](reports/PHASE_1_REPORT.md)) |
-| Status | **Phase 2 in progress.** T2.1–T2.10 done (T2.9's eval smoke waits for T2.14 recordings) |
+| Status | **Phase 2 in progress.** T2.1–T2.11 done (T2.9's eval smoke waits for T2.14 recordings) |
 | Last updated | 2026-10-12 |
 | Application code | Phase 1 foundation: API (session, connections, inspect, workloads, health), metadata DB migrations, SQL/plan parsing, inspection gateway, artifact store, demo workloads; web app with connections and plan workspace (tree + graph). No agents yet. |
 
@@ -232,6 +232,12 @@
   - **Bug found by a test:** a stored connection whose password no longer decrypts (changed `QC_MASTER_KEY`) raised a bare `DecryptionError` that crashed the graph, so the job would retry until dead. `target_from_record` now raises `ConfigurationError` with a "re-enter the password" message: the worker degrades to `tool_error` evidence and the connections API answers 503 instead of 500.
   - Tests: 11 end-to-end integration tests with scripted model responses and everything else real: full offline run (`unverified_recommendations`, ranked hypothesis, both analysts' findings, report JSON + Markdown, ≥ 5 checkpoints); **budget exhaustion → `inconclusive` + partial report (acceptance #5)**; cancellation → `cancelled` + partial report; **crash after the fan-out → resume without re-running analysts and with no duplicate evidence or findings (acceptance #2, in-process crash)**; worker retry to completion; dead-lettered job fails its run; missing key → `CONFIGURATION_ERROR`; invalid input → `inconclusive` without model calls; finished runs not re-executed; **no secrets in checkpoints** (target password, API key held by the client, master key, DSNs absent from checkpoints, blobs and writes); undecryptable credentials degrade. Stable across 5 repeated runs. Full suite 678 passed; ruff, format, mypy clean.
   - Still to do: a SIGKILL test of a real worker process, which needs the replay LLM provider from T2.14.
+- [x] **T2.11 investigations/runs API** (`api/routers/{investigations,runs,artifacts,settings}.py`, `api/schemas/investigations.py`, `db/repositories/{investigations,artifacts}.py`, `domain/budgets.py`).
+  - Create (202, one transaction: investigation, run, input artifacts, first event, job), list (cursor pagination; filters `status`, `outcome`, `q` with LIKE escaping), detail, soft delete + restore, run detail, idempotent cancel, findings + hypotheses, evidence with lineage (artifact + citing findings/hypotheses), parsed plans per run, owner-scoped artifact download, models endpoint.
+  - Budget defaults moved to `domain/budgets.py`: the API must not import `agents` (FILE_MAP dependency rule).
+  - Repository SQL is fully static; optional filters use `CAST(:p AS type) IS NULL OR …`.
+  - Tests: 24 API integration tests as `qc_app` (creation side effects; 9 validation cases; production/foreign/missing connections; **idempotent replay; different body → 409; another user's key → 409 without leaking; 4 concurrent duplicates → one run; malformed key → 400**; concurrency limit; pagination + filters; **cross-user 404 on every route**; cancel idempotency and state machine; delete/restore; findings/evidence/plans/artifact reads; artifact access only through an owned run; models endpoint). The response-schema secret scan now allows token-*count* fields by exact name. Full suite 702 passed; ruff, format, mypy clean.
+  - Live check (uvicorn as `qc_app`): create 202, replay with the same key → same run, `run_start` job pending, cancel 202 → `cancelled`, list/filter, events `queued` → `cancelled`.
 
 ## Blockers
 

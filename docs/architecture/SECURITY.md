@@ -122,6 +122,10 @@ libpq's error text names the host and user, so it is never returned or logged. T
 ### 5.4 Public demo stance
 Mode B is **disabled by default** on the public demo (`FEATURE_LIVE_INSPECTION_PUBLIC=false`). Enabling it requires: SSRF guard, `verify-full` TLS, rate limits, and per-user connection caps. See [CURRENT_PHASE open decisions](../planning/CURRENT_PHASE.md#open-decisions).
 
+### Upload digests as capabilities (Phase 2 trade-off)
+
+`/inspect/plan` and `/inspect/schema` store content-addressed artifacts without an owner. `POST /investigations` accepts their digests, after which they become readable through the new run. Naming a digest therefore requires having seen it (it is shown only to the uploader) or having the content (a SHA-256 cannot be guessed). Planned hardening: per-user upload records, so a digest is accepted only from the user who uploaded it.
+
 ## 6. Prompt injection
 
 Untrusted text sources: user objective, query text and comments, identifiers, table/column comments, plan JSON, workload query texts from `pg_stat_statements` (other users' queries!).

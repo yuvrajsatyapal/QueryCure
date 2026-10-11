@@ -90,7 +90,8 @@ Error messages never include credentials, DSNs, or raw driver errors (driver err
 | POST | `/investigations` | `CreateInvestigation` → 202 `{investigation, run}` | 2 |
 | GET | `/investigations` | paginated `InvestigationSummary[]`; filters `outcome`, `status`, `q` | 2 |
 | GET | `/investigations/{id}` | `InvestigationDetail` (latest run summary) | 2 |
-| DELETE | `/investigations/{id}` | soft delete | 2 |
+| DELETE | `/investigations/{id}` | soft delete; 409 `INVALID_STATE` while a run is active | 2 |
+| POST | `/investigations/{id}/restore` | undo a soft delete (history page) | 2 |
 | GET | `/runs/{run_id}` | `RunDetail` (status, outcome, usage, budget) | 2 |
 | POST | `/runs/{run_id}/cancel` | → 202; idempotent | 2 |
 | GET | `/runs/{run_id}/events` | **SSE** stream (see §3) | 2 |
@@ -125,6 +126,17 @@ Error messages never include credentials, DSNs, or raw driver errors (driver err
   "pre_authorize_demo_sandbox": false
 }
 ```
+
+Implemented in T2.11. Phase 2 rules for `POST /investigations`:
+- `sandbox_benchmark` → 403 `FEATURE_DISABLED` (Phase 3); `llm.credential_id` → 403 `FEATURE_DISABLED` (BYOK, Phase 5).
+- A query or `plan_artifact_sha256` is required; the query is validated at creation (422 `SQL_NOT_ALLOWED` / `SQL_PARSE_ERROR`).
+- `live_inspection` needs an owned connection (404 otherwise) and the query; production connections → 409 `APPROVAL_REQUIRED` until the Phase 3 approval gate.
+- Referenced uploads must exist with the right kind (`plan`/`plan_analyze`, `schema_snapshot`). Uploads are content-addressed without an owner, so a digest acts as a capability: naming one requires having seen it or its content (see SECURITY §4).
+- `Idempotency-Key` must be a UUID (400 otherwise). The request hash is SHA-256 over the `qc-json-v1` canonical body. Same key + same body from the same user → the original 202 response; a different body, or a key already used by another user → 409 `IDEMPOTENCY_CONFLICT` (nothing about the other request is returned). Concurrent duplicates converge on one run through the unique index.
+- At most 2 active runs per user locally (1 on the demo) → 429 `CONCURRENCY_LIMIT`.
+- One transaction creates the investigation, run (budget from `domain/budgets.py`), input artifacts and links (`input.query`, `input.param_sets`, `input.plan`, `input.schema`), the first event (`run.status_changed {from: null, to: queued}`) and the `run_start` job (dedupe key `run_start:<run_id>`).
+
+`GET /runs/{id}/plans` returns each plan artifact (`input.plan`, `context.plan`) parsed into `{sha256, kind, role, plan, metrics}`, so the UI can highlight cited plan nodes without re-uploading. `GET /settings/models` returns `{provider, model, fallback_model, configured}`; `configured` says whether a key exists, never the key.
 
 ### Replay
 | Method | Path | Purpose | Phase |

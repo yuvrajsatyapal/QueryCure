@@ -136,3 +136,13 @@ class RunFinalizedError(QueryCureError):
 
     code = "RUN_FINALIZED"
     status = 409
+
+
+class IdempotencyConflictError(QueryCureError):
+    code = "IDEMPOTENCY_CONFLICT"
+    status = 409
+
+
+class ConcurrencyLimitError(QueryCureError):
+    code = "CONCURRENCY_LIMIT"
+    status = 429

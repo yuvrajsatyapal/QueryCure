@@ -13,34 +13,13 @@ from typing import NoReturn
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine
 
-from querycure.core.config import Profile
 from querycure.core.errors import BudgetExhaustedError, RunCancelledError
+from querycure.domain.budgets import default_budget as default_budget
 from querycure.domain.investigation import RunBudget
 from querycure.events.emitter import emit
 from querycure.events.types import EventType
 
 WARNING_FRACTION = 0.8
-
-_DEFAULTS = {
-    Profile.LOCAL: RunBudget(
-        llm_calls=40,
-        total_tokens=400_000,
-        tool_calls=80,
-        tool_calls_per_agent=8,
-        wall_clock_seconds=20 * 60,
-    ),
-    Profile.DEMO: RunBudget(
-        llm_calls=20,
-        total_tokens=150_000,
-        tool_calls=40,
-        tool_calls_per_agent=6,
-        wall_clock_seconds=5 * 60,
-    ),
-}
-
-
-def default_budget(profile: Profile) -> RunBudget:
-    return _DEFAULTS[profile]
 
 
 def _exhausted(budget: str, limit: int) -> BudgetExhaustedError:
