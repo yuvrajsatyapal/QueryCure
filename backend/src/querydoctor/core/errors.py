@@ -89,6 +89,16 @@ class RoleTooPrivilegedError(QueryDoctorError):
     status = 422
 
 
+class TargetPermissionError(QueryDoctorError):
+    code = "TARGET_PERMISSION_DENIED"
+    status = 422
+
+
+class TargetQueryError(QueryDoctorError):
+    code = "TARGET_QUERY_ERROR"
+    status = 422
+
+
 class TargetUnreachableError(QueryDoctorError):
     code = "TARGET_UNREACHABLE"
     status = 502

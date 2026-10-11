@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | Phase | **1 — Foundation** (Phase 0 documentation complete) |
-| Status | In progress: T1.1–T1.6, T1.7 (logic), T1.8, T1.9, T1.15 done |
+| Status | In progress: T1.1–T1.11 done (T1.7 still needs real plan captures), T1.15 done |
 | Last updated | 2026-10-11 |
 | Application code | Scaffolding only: FastAPI app factory with `/api/v1/healthz`; Next.js shell page; local Compose file. |
 
@@ -91,7 +91,17 @@
   - Migration `0002`: a partial unique index allows one active local user, so concurrent first logins converge. It also grants `SELECT` on `alembic_version` to `qd_app` for readiness. The test first exposed the missing grant as a 503.
   - Tests: 10 unit tests (envelope, CSRF) plus 10 integration tests, with the app engine running as `qd_app` via `SET ROLE`.
   - Verified live: uvicorn as the `qd_app` login against the dev DB (readyz ok, 401 → 201 → 200, CSRF 403 envelope).
-- [ ] **Next:** T1.10–T1.14, T1.16–T1.19, and the real PG plan fixtures for T1.7. Doing Docker-free tasks first (T1.7, T1.9, the canonicalization part of T1.8, T1.15, T1.17–T1.18) while Docker is down.
+- [x] **T1.10 inspection gateway and T1.11 statistics redaction** (`connectors/inspection_gateway.py`, `models.py`, `catalog_queries/*.sql`).
+  - The connection goes through the SSRF guard and a pinned `hostaddr`, using explicit fields only (never a raw DSN).
+  - The session is hardened (read-only, statement/lock/idle-in-transaction timeouts, `search_path = pg_catalog, public`), and each setting is **verified via `current_setting`** rather than trusted. Every operation runs in `BEGIN READ ONLY`.
+  - Capabilities come from a template. SUPERUSER, CREATEROLE and BYPASSRLS roles are refused; table owners, REPLICATION, and missing `pg_read_all_stats` produce warnings.
+  - `explain()`: validator, then `pg_proc` resolution of unrecognized function names (user functions refused unless opted in), then plain `EXPLAIN (FORMAT JSON)`, or `GENERIC_PLAN` for `$n` queries on PG 16+.
+  - `schema_snapshot()`: tables, columns, and indexes with **numeric statistics only**. Value-bearing `pg_stats` columns are never selected.
+  - Driver errors map to envelope codes without leaking connection details.
+  - Validator fixes found while building it: unquoted identifiers fold to lower case like PostgreSQL, and `functions_to_resolve` lists unrecognized unqualified names.
+  - 15 integration tests on a seeded target DB with a throwaway restricted login role. They cover hardening verification; L3 holding with the validator bypassed (`EXPLAIN ANALYZE DELETE`, DDL, and a `SET … ; DELETE` all fail, with the row count unchanged); statement and lock timeouts; the `pg_proc` refusal and opt-in; redaction with planted secret emails; superuser refusal; SSRF block before connecting; a wrong password not leaking; and concurrent gateways.
+  - SQL templates verified present in the built wheel.
+- [ ] **Remaining:** T1.12–T1.14, T1.16–T1.19, and real PG 17 plan captures for T1.7.
 
 ## Blockers
 
@@ -115,7 +125,7 @@
 | Required files exist | See Phase 0 validation in the final summary |
 | Internal links | Checked by script during Phase 0 |
 | Mermaid syntax | Reviewed manually (no renderer installed; not executed) |
-| Backend (through T1.3) | `uv run pytest -q` → 358 passed (unit + security + 41 integration on PG 17.11) (3.12; CI also 3.13); `ruff check` and `ruff format --check` clean; `mypy` strict → no issues in 44 files; uvicorn smoke test: `/api/v1/healthz` 200, `/api/v1/openapi.json` 200 |
+| Backend (through T1.11) | `uv run pytest -q` → 376 passed: 320 unit/security + 56 integration on PG 17.11, Python 3.12; CI also runs 3.13 and a `postgres:17` integration job. `ruff check`/`format --check` clean; `mypy --strict` clean on 47 files. Live API check as `qd_app`: readyz ok, session flow 401 → 201 → 200, CSRF 403 envelope |
 | Frontend (through T1.15) | `pnpm lint` clean; `pnpm typecheck` clean; `pnpm test` → 13 passed; `pnpm build` → compiled, `/` and `/app` prerendered static |
 | Compose | Running: `metadata-db` and `sandbox-db` healthy; `alembic current` → `0002 (head)`; `qd_app` login verified (INSERT yes, UPDATE no on `artifacts`) |
 

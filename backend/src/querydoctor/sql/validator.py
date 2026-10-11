@@ -80,6 +80,9 @@ class QueryMetadata(BaseModel):
     limit: int | None
     parameter_count: int
     functions: list[str]
+    # Unqualified names SQLGlot does not recognize: may be user functions found via search_path,
+    # so the gateway resolves them against pg_proc before EXPLAIN (SECURITY.md §4.3).
+    functions_to_resolve: list[str]
 
 
 class ValidatedQuery(BaseModel):
@@ -106,8 +109,9 @@ def _qualifier(node: exp.Func) -> str | None:
     return None
 
 
-def _check_functions(tree: exp.Expression, policy: SqlPolicy) -> list[str]:
+def _check_functions(tree: exp.Expression, policy: SqlPolicy) -> tuple[list[str], list[str]]:
     names: list[str] = []
+    to_resolve: set[str] = set()
     for func in tree.find_all(exp.Func):
         name = _function_name(func)
         qualifier = _qualifier(func)
@@ -120,7 +124,9 @@ def _check_functions(tree: exp.Expression, policy: SqlPolicy) -> list[str]:
                 f"function {shown}",
             )
         names.append(shown)
-    return sorted(set(names))
+        if isinstance(func, exp.Anonymous) and qualifier is None:
+            to_resolve.add(name)
+    return sorted(set(names)), sorted(to_resolve)
 
 
 def _check_structure(tree: exp.Expression, policy: SqlPolicy) -> None:
@@ -142,11 +148,18 @@ def _check_structure(tree: exp.Expression, policy: SqlPolicy) -> None:
             raise _reject("Query is nested too deeply.", f"depth exceeds {policy.max_depth}")
 
 
-def _metadata(tree: exp.Expression, functions: list[str]) -> QueryMetadata:
+def _pg_name(node: exp.Expression | None) -> str | None:
+    """PostgreSQL folds unquoted identifiers to lower case; quoted ones keep their case."""
+    if not isinstance(node, exp.Identifier):
+        return None
+    return node.name if node.quoted else node.name.lower()
+
+
+def _metadata(tree: exp.Expression, functions: list[str], to_resolve: list[str]) -> QueryMetadata:
     cte_names = {cte.alias_or_name for cte in tree.find_all(exp.CTE)}
     tables = sorted(
         {
-            TableRef(schema_name=t.db or None, name=t.name)
+            TableRef(schema_name=_pg_name(t.args.get("db")), name=_pg_name(t.this) or t.name)
             for t in tree.find_all(exp.Table)
             if not (t.name in cte_names and not t.db)
         },
@@ -171,6 +184,7 @@ def _metadata(tree: exp.Expression, functions: list[str]) -> QueryMetadata:
         limit=limit,
         parameter_count=len(params),
         functions=functions,
+        functions_to_resolve=to_resolve,
     )
 
 
@@ -178,10 +192,10 @@ def validate_select(sql: str, policy: SqlPolicy | None = None) -> ValidatedQuery
     policy = policy or SqlPolicy()
     tree = parse_single(sql, max_bytes=policy.max_bytes)
     _check_structure(tree, policy)
-    functions = _check_functions(tree, policy)
+    functions, to_resolve = _check_functions(tree, policy)
     return ValidatedQuery(
         sql=sql,
         statement_type="select" if isinstance(tree, exp.Select) else "set_operation",
-        metadata=_metadata(tree, functions),
+        metadata=_metadata(tree, functions, to_resolve),
         fingerprint=fingerprint(tree),
     )

@@ -39,7 +39,7 @@ Status: Planned. Base path `/api/v1`. JSON is `snake_case`. Timestamps ISO 8601 
 | 404 | `NOT_FOUND`, `NOT_FINALIZED` (manifest requested for an unfinalized run) |
 | 409 | `INVALID_STATE` (e.g. approving a non-pending request), `IDEMPOTENCY_CONFLICT` |
 | 413 | `PAYLOAD_TOO_LARGE` |
-| 422 | `VALIDATION_ERROR`, `EXPERIMENT_NOT_REPLAYABLE`, `SQL_NOT_ALLOWED`, `SQL_PARSE_ERROR`, `CONNECTION_TARGET_BLOCKED`, `ROLE_TOO_PRIVILEGED` |
+| 422 | `VALIDATION_ERROR`, `EXPERIMENT_NOT_REPLAYABLE`, `SQL_NOT_ALLOWED`, `SQL_PARSE_ERROR`, `CONNECTION_TARGET_BLOCKED`, `ROLE_TOO_PRIVILEGED`, `TARGET_PERMISSION_DENIED` (role lacks e.g. SELECT on a table), `TARGET_QUERY_ERROR` (PostgreSQL rejected the EXPLAIN, e.g. unknown table) |
 | 429 | `RATE_LIMITED`, `CONCURRENCY_LIMIT` |
 | 502/504 | `TARGET_UNREACHABLE`, `TARGET_TIMEOUT` |
 | 503 | `SERVICE_UNAVAILABLE` (metadata DB not configured or unreachable) |
