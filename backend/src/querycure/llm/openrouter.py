@@ -2,8 +2,9 @@
 
 Called directly with the `openai` SDK rather than through LangChain because the raw response
 carries what the free-tier policy needs: the model that actually answered (the free router
-picks per request), the upstream provider, and `usage.cost`. With `free_only` every response
-must report a cost of exactly 0; anything else stops the run.
+picks per request), the upstream provider, and `usage.cost`. With `free_only` the model id is
+checked before any request is sent (at construction and again before every call), and every
+response must also report a cost of exactly 0; anything else stops the run.
 """
 
 from collections.abc import Sequence
@@ -21,6 +22,7 @@ from langchain_core.exceptions import (
 from openai.types.chat import ChatCompletionMessageParam
 from pydantic import SecretStr
 
+from querycure.core.config import is_free_model
 from querycure.llm.types import ChatMessage, RawCompletion
 
 _DAILY_MARKERS = ("per-day", "per day", "daily", "free-models-per-day")
@@ -31,7 +33,8 @@ class FreeQuotaExhaustedError(Exception):
 
 
 class PaidUsageError(Exception):
-    """A response reported a non-zero (or no) cost while free-only mode is on."""
+    """Free-only mode met a non-free model id (refused before dispatch) or a response that
+    reported a non-zero (or no) cost."""
 
 
 def _classify(exc: openai.APIError) -> Exception:
@@ -79,6 +82,7 @@ class OpenRouterClient:
     ) -> None:
         self.model = model
         self._free_only = free_only
+        self._refuse_paid_model()
         self._client = openai.AsyncOpenAI(
             api_key=api_key.get_secret_value(),
             base_url=base_url,
@@ -90,7 +94,13 @@ class OpenRouterClient:
     def __repr__(self) -> str:
         return f"OpenRouterClient(model={self.model!r}, free_only={self._free_only})"
 
+    def _refuse_paid_model(self) -> None:
+        # The reported cost only arrives after a paid request has already been billed.
+        if self._free_only and not is_free_model(self.model):
+            raise PaidUsageError("model is not a free OpenRouter model; refused before dispatch")
+
     async def complete_json(self, messages: Sequence[ChatMessage]) -> RawCompletion:
+        self._refuse_paid_model()
         try:
             response = await self._client.chat.completions.create(
                 model=self.model,

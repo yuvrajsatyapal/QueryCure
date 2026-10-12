@@ -48,13 +48,13 @@ def test_demo_profile_never_uses_env_keys() -> None:
 def test_built_clients_never_show_the_key(provider: str, key: str) -> None:
     client = build_client(
         provider,  # type: ignore[arg-type]
-        "some-model",
+        "vendor/some-model:free",  # free-only is on: a paid id is refused before dispatch
         SecretStr(key),
         settings=settings(),
     )
 
     assert client.provider == provider
-    assert client.model == "some-model"
+    assert client.model == "vendor/some-model:free"
     assert key not in repr(client)
     assert key not in str(vars(client))
 

@@ -262,3 +262,59 @@ def test_stub_provider_is_local_only() -> None:
             allow_private_targets=False,
             master_key=base64.b64encode(os.urandom(32)).decode(),
         )
+
+
+# --- Pre-dispatch enforcement: a paid model id never reaches the network -----------------
+
+
+def _paid_client(sent: list[httpx.Request], **kwargs: Any) -> OpenRouterClient:
+    return OpenRouterClient(
+        api_key=SecretStr(KEY),
+        base_url="https://openrouter.test/api/v1",
+        http_client=httpx.AsyncClient(
+            transport=httpx.MockTransport(lambda r: sent.append(r) or httpx.Response(500))
+        ),
+        **kwargs,
+    )
+
+
+@pytest.mark.parametrize("model", ["anthropic/claude-sonnet-5.5", "openrouter/auto"])
+def test_free_only_client_refuses_a_paid_model_at_construction(model: str) -> None:
+    sent: list[httpx.Request] = []
+
+    with pytest.raises(PaidUsageError, match="before dispatch"):
+        _paid_client(sent, model=model, free_only=True)
+
+    assert sent == []
+
+
+async def test_free_only_client_checks_the_model_again_before_every_request() -> None:
+    # Settings are not re-validated on assignment, so a model swapped after construction
+    # must still be refused before any byte is sent.
+    client, sent = client_returning((200, response()))
+    client.model = "openai/gpt-5.5"
+
+    with pytest.raises(PaidUsageError, match="before dispatch"):
+        await client.complete_json(MESSAGES)
+
+    assert sent == []
+
+
+async def test_pre_dispatch_refusal_stops_the_run_without_a_fallback_call() -> None:
+    primary, primary_sent = client_returning((200, response()))
+    primary.model = "openrouter/auto"
+    fallback, fallback_sent = client_returning((200, response()))
+
+    with pytest.raises(LLMPaidUsageBlockedError):
+        await call_structured(primary, MESSAGES, Verdict, fallback=fallback)
+
+    assert primary_sent == []
+    assert fallback_sent == []
+
+
+def test_paid_model_is_allowed_only_with_free_only_off() -> None:
+    sent: list[httpx.Request] = []
+
+    client = _paid_client(sent, model="anthropic/claude-sonnet-5.5", free_only=False)
+
+    assert client.model == "anthropic/claude-sonnet-5.5"
