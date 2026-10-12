@@ -53,9 +53,20 @@ class CaseResult:
     error: str | None
     tools: list[str] = field(default_factory=list)
 
+    model: str = ""
+
     @property
     def passed(self) -> bool:
         return self.error is None and self.score is not None and self.score.passed
+
+    @property
+    def expected_failure(self) -> str | None:
+        """The recorded reason when this model is known to fail this case (baseline)."""
+        return None if self.passed else self.case.known_failures.get(self.model)
+
+    @property
+    def acceptable(self) -> bool:
+        return self.passed or self.expected_failure is not None
 
 
 class RequestCap:
@@ -184,7 +195,9 @@ async def run_case(
         if mode == "replay":
             path = recording_path(case, model, recordings_dir)
             if not path.exists():
-                return CaseResult(case, None, f"no recording for {case.id} with {model}")
+                return CaseResult(
+                    case, None, f"no recording for {case.id} with {model}", model=model
+                )
             client = ReplayClient(Recording.load(path))
         else:
             if live_client is None:
@@ -195,6 +208,7 @@ async def run_case(
                     model=model,
                     base_url=settings.openrouter_base_url,
                     free_only=settings.llm_free_only,
+                    timeout_seconds=settings.llm_call_timeout_seconds,
                 )
             client = RecordingClient(live_client, recording)
             gate = _CappedGate(
@@ -226,10 +240,21 @@ async def run_case(
                 seen = await observe(conn, run_id)
         finally:
             await engine.dispose()
+        truncated = [
+            m
+            for e in seen.errors
+            if any(
+                marker in (m := str(e.get("message", "")))
+                for marker in ("eval request cap", "free model allowance", "free model requests")
+            )
+        ]
+        if error is None and truncated:
+            # Cut short by our cap or the free quota: not the model's behaviour, never recorded.
+            error = f"stopped early ({truncated[0][:80]}): not recorded, rerun later"
         if mode == "record" and error is None:
             recording.save(recording_path(case, model, recordings_dir))
         result = score(case, seen, other_tools=reference_tools)
-        return CaseResult(case, result, error, tools=[t for t, _ in seen.tools])
+        return CaseResult(case, result, error, tools=[t for t, _ in seen.tools], model=model)
     finally:
         with psycopg.connect(admin_url, autocommit=True) as admin:
             admin.execute(f'DROP DATABASE IF EXISTS "{name}" WITH (FORCE)')

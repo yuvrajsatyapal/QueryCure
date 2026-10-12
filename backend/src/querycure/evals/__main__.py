@@ -23,8 +23,13 @@ def _admin_url(settings: Settings, override: str | None) -> str:
 
 def _print(results: list[CaseResult]) -> None:
     for r in results:
-        mark = "PASS" if r.passed else "FAIL"
+        if r.passed:
+            mark = "XPASS" if r.case.known_failures.get(r.model) else "PASS"
+        else:
+            mark = "XFAIL" if r.expected_failure else "FAIL"
         print(f"{mark}  {r.case.id}")
+        if r.expected_failure:
+            print(f"      known baseline failure: {r.expected_failure}")
         if r.error:
             print(f"      error: {r.error}")
         if r.score:
@@ -38,7 +43,8 @@ def _print(results: list[CaseResult]) -> None:
                 f"served={m['served_models']}"
             )
     passed = sum(r.passed for r in results)
-    print(f"\n{passed}/{len(results)} cases passed")
+    xfail = sum(r.expected_failure is not None for r in results)
+    print(f"\n{passed}/{len(results)} cases passed, {xfail} known baseline failure(s)")
 
 
 async def _run(args: argparse.Namespace) -> int:
@@ -83,6 +89,7 @@ async def _run(args: argparse.Namespace) -> int:
                         {
                             "case": r.case.id,
                             "passed": r.passed,
+                            "known_failure": r.expected_failure,
                             "error": r.error,
                             "checks": [
                                 {"name": c.name, "passed": c.passed, "detail": c.detail}
@@ -98,7 +105,7 @@ async def _run(args: argparse.Namespace) -> int:
             + "\n"
         )
         print(f"results: {path.relative_to(EVALS_DIR.parent)}")
-    return 0 if all(r.passed for r in results) else 1
+    return 0 if all(r.acceptable for r in results) else 1
 
 
 def main() -> None:

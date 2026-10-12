@@ -23,7 +23,6 @@ from pydantic import SecretStr
 
 from querycure.llm.types import ChatMessage, RawCompletion
 
-PROVIDER_TIMEOUT_SECONDS = 60.0
 _DAILY_MARKERS = ("per-day", "per day", "daily", "free-models-per-day")
 
 
@@ -75,6 +74,7 @@ class OpenRouterClient:
         model: str,
         base_url: str,
         free_only: bool,
+        timeout_seconds: float = 120.0,
         http_client: Any = None,
     ) -> None:
         self.model = model
@@ -83,7 +83,7 @@ class OpenRouterClient:
             api_key=api_key.get_secret_value(),
             base_url=base_url,
             max_retries=0,  # llm.structured owns retries
-            timeout=PROVIDER_TIMEOUT_SECONDS,
+            timeout=timeout_seconds,
             http_client=http_client,
         )
 

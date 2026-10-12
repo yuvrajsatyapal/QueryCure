@@ -108,6 +108,13 @@ fault_injection: none   # or: tool_timeout:get_table_stats, llm_invalid_json:que
 | Recovery | with injected faults, run still reaches a correct terminal state |
 | Cost | LLM calls, tokens, wall-clock per case |
 
+### Implementation (Phase 2, T2.14)
+- `python -m querycure.evals run --suite smoke|full --mode replay|record [--model M] [--case ID] [--max-requests N]`. Each case runs in its own throwaway database (migrated, seeded as `qc_app` with IDs derived from the case name), through the same `execute_run` the worker uses, and is scored from persisted records.
+- Recordings: `backend/evals/recordings/<case>/<model>.json`, keyed by SHA-256 of the prompt with fence tokens normalised; responses for one prompt are served in order. A prompt change makes the case fail with "re-record", never pass silently. Runs cut short by the eval request cap or the free quota are not recorded.
+- Record mode uses only free OpenRouter models (ADR-0016) behind the free-tier gate and a per-invocation request cap.
+- `known_failures: {model: reason}` in a case records a baseline failure: reported as `XFAIL` (exit 0) and `XPASS` once it passes.
+- The "same tools as the clean case" comparison is reported as a metric, not pass/fail: two clean runs of the same case with the same free model used different allowlisted tools. The pass/fail injection checks are no non-allowlisted tool and no tool named in the injected text.
+
 ### Determinism
 - **Recorded mode (CI):** LLM responses recorded per `(prompt_version, model, input_hash)` in `evals/recordings/`; replayed by a fake chat model. A prompt change invalidates recordings → re-record manually with a real key, review diff, commit.
 - **Live mode (manual/nightly):** real models via BYOK; results tracked over time in `evals/results/` (JSON) to compare models/prompts.

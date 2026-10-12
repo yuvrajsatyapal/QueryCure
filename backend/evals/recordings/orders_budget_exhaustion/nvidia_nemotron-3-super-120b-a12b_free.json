@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "case": "orders_budget_exhaustion",
+  "model": "nvidia/nemotron-3-super-120b-a12b:free",
+  "recorded_at": "2026-10-12",
+  "provenance": "recorded",
+  "entries": {
+    "2e21bf723762e29e49d158e63b2ac522e729392643a442a6c5dd817e95255f22": [
+      {
+        "text": "{\"agents\": [\"query_analyzer\", \"index_strategist\"], \"focus\": [\"Seq Scan on orders (ev_5d5c4ba843d3) accounts for 62.6 ms (91.1% runtime) and filters out 989,988 rows\", \"Gather Merge (ev_b0814a410e3d) overestimates rows 433x (est 8,666 vs actual 20) costing 5.6 ms\", \"Sort (ev_924154ab4a9f) overestimates rows 270x (est 4,333 vs actual 16) costing 0.5 ms\", \"LIMIT 20 (ev_77cbddb4d81c) and ORDER BY created_at DESC (ev_8ed142900fbd) cause top-N heapsort but no supporting index\"], \"rationale\": \"The query is slow because it performs a sequential scan on the orders table (ev_5d5c4ba843d3) that reads all rows and applies a filter on customer_id, removing 989,988 rows, which consumes 62.6 ms (91.1% of runtime). Without an index on customer_id, the planner overestimates the remaining rows, leading to a Gather Merge node (ev_b0814a410e3d) with a 433x row overestimate and 5.6 ms cost, and a Sort node (ev_924154ab4a9f) with a 270x overestimate and 0.5 ms cost to satisfy the ORDER BY created_at DESC (ev_8ed142900fbd) and LIMIT 20 (ev_77cbddb4d81c). Creating an index on (customer_id, created_at DESC) would allow an index scan that avoids the seq scan, reduces rows early, and provides ordering, eliminating the expensive sort and gather merge.\"}",
+        "served_model": "nvidia/nemotron-3-super-120b-a12b:free",
+        "served_by": "Nvidia",
+        "input_tokens": 1032,
+        "output_tokens": 2391
+      }
+    ],
+    "7caa68f7e5cfaac0e7874e1719778bd9ed59636777d35ae1e78ce59b83ee9a88": [
+      {
+        "text": "{\"action\": \"call_tool\", \"tool\": \"get_plan_node\", \"args\": {\"node_id\": 595242124467}}",
+        "served_model": "nvidia/nemotron-3-super-120b-a12b:free",
+        "served_by": "Nvidia",
+        "input_tokens": 2074,
+        "output_tokens": 663
+      }
+    ]
+  }
+}

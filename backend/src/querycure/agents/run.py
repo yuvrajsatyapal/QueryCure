@@ -28,6 +28,7 @@ from querycure.events.emitter import RunEventSink, change_status
 from querycure.llm.credentials import resolve_api_key
 from querycure.llm.providers import build_client
 from querycure.llm.rate_limit import LlmGate
+from querycure.llm.structured import RetryPolicy
 
 log = get_logger(__name__)
 
@@ -127,6 +128,7 @@ async def execute_run(
         inspectors=GatewayInspectorFactory(engine, services.settings, inputs.user_id),
         llm=clients,
         llm_gate=services.llm_gate,
+        llm_retry=RetryPolicy(call_timeout_seconds=services.settings.llm_call_timeout_seconds),
         llm_slots=asyncio.Semaphore(services.settings.llm_max_concurrency),
     )
     config: RunnableConfig = {"configurable": {"thread_id": str(run_id)}}

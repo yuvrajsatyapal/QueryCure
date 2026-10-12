@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | Phase | **2 — Multi-agent intelligence** (Phase 1 complete: [PHASE_1_REPORT](reports/PHASE_1_REPORT.md)) |
-| Status | **Phase 2 in progress.** T2.1–T2.11 done (T2.9's eval smoke waits for T2.14 recordings) |
+| Status | **Phase 2 in progress.** T2.1–T2.11 and T2.14 done; 2 of 5 smoke recordings wait for the next free-quota day; T2.12–T2.13 next |
 | Last updated | 2026-10-12 |
 | Application code | Phase 1 foundation: API (session, connections, inspect, workloads, health), metadata DB migrations, SQL/plan parsing, inspection gateway, artifact store, demo workloads; web app with connections and plan workspace (tree + graph). No agents yet. |
 
@@ -244,6 +244,13 @@
   - One probe request: `openrouter/free` was served by `nvidia/nemotron-3-super-120b-a12b:free` (provider `Nvidia`), `usage.cost: 0`, 37 of 44 completion tokens were reasoning.
   - Implemented: config guard (refuses paid models at startup); direct OpenRouter client (`openai` SDK) that checks `usage.cost == 0` on every response; quota exhaustion and paid usage are non-retryable, never use the fallback, and stop the run gracefully (`inconclusive` partial report); per-process 16/min window; DB-counted daily quota (45); per-run LLM concurrency 1; `require_parameters`; served model and upstream provider recorded per call (migration `0007`). Defaults are now `openrouter` / `openrouter/free`.
   - Tests: 21 unit tests (free-ID rules incl. `openrouter/auto` refused; paid configs refused; served model/provider/cost captured and request body checked via an HTTP mock transport; non-zero or missing cost blocked; per-day 429 and 402 → quota exhaustion without retry or fallback; per-minute 429 retried; limiter window; no key in repr) + 1 integration test (daily quota stops a real run gracefully). Full suite 726 passed.
+- [x] **T2.14 eval runner + free-model benchmark** (`querycure/evals/`, `backend/evals/{cases,fixtures,recordings,results}`).
+  - Runner as described in TESTING_STRATEGY §5 (implementation note). 6 cases: orders missing index, injection in schema, plain EXPLAIN, already-optimal PK lookup, budget exhaustion (smoke) + rewrite trap (full). Two new real PG 17 plan captures (`no_benefit`, `rewrite_trap`).
+  - **Benchmark on `orders_missing_composite_index`** (results JSON in `evals/results/`): `openrouter/free` FAIL (routed 9 calls to 4 different models incl. a 2.6B model; synthesis output invalid); `nvidia/nemotron-3-super-120b-a12b:free` PASS 7/7 (8 calls, slow: 3 × 60 s timeouts); `google/gemma-4-31b-it:free` FAIL (upstream rate-limited on all 10 requests). **Pinned:** `nvidia/nemotron-3-super-120b-a12b:free` (config default, `.env.example`, local `.env`).
+  - Recordings with the pinned model: orders missing index **PASS** (acceptance #1, recorded mode), budget exhaustion **PASS** (acceptance #5), PK lookup **known baseline failure** (high-confidence `missing_index` on a 0.039 ms, 50-row query: overconfident). Injection and plain-EXPLAIN recordings wait for the next free-quota day (today's ~50 requests were spent on the benchmark).
+  - Fixes from live runs: call timeout configurable, default 120 s (`LLM_CALL_TIMEOUT_SECONDS`); runs truncated by the eval cap or free quota are never recorded; the injection check no longer compares tool sets (live variance) but checks for non-allowlisted / injected tools.
+  - Every live response reported `usage.cost = 0`; no request was blocked by the paid-usage guard.
+  - Tests: 7 unit (prompt hash ignores fence tokens, replay order and refusal, round trip, slugs, cases load) + 3 integration (offline record → replay gives identical metrics, missing recording fails, budget case). Full suite 736 passed.
 
 ## Blockers
 

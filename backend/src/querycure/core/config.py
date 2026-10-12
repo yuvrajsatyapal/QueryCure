@@ -81,7 +81,10 @@ class Settings(BaseSettings):
     llm_provider: Literal["gemini", "openrouter"] = Field(
         default="openrouter", validation_alias=_env("LLM_PROVIDER")
     )
-    llm_model: str = Field(default="openrouter/free", validation_alias=_env("LLM_MODEL"))
+    # Pinned from the Phase 2 free-model benchmark (evals/results, PHASE_2_REPORT).
+    llm_model: str = Field(
+        default="nvidia/nemotron-3-super-120b-a12b:free", validation_alias=_env("LLM_MODEL")
+    )
     llm_free_only: bool = Field(default=True, validation_alias=_env("LLM_FREE_ONLY"))
     # OpenRouter free tier: ~20 requests/min and 50/day without purchased credits.
     llm_requests_per_minute: int = Field(
@@ -89,6 +92,10 @@ class Settings(BaseSettings):
     )
     llm_daily_request_limit: int = Field(
         default=45, ge=1, validation_alias=_env("LLM_DAILY_REQUEST_LIMIT")
+    )
+    # Free reasoning models can take ~1 min per call; a timeout wastes a scarce request.
+    llm_call_timeout_seconds: float = Field(
+        default=120.0, ge=5, validation_alias=_env("LLM_CALL_TIMEOUT_SECONDS")
     )
     llm_max_concurrency: int = Field(default=1, ge=1, validation_alias=_env("LLM_MAX_CONCURRENCY"))
     llm_fallback_model: str | None = Field(

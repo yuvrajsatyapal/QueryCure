@@ -1,0 +1,70 @@
+{
+  "suite": "smoke",
+  "mode": "record",
+  "requested_model": "google/gemma-4-31b-it:free",
+  "run_at": "20261012T070510Z",
+  "cases": [
+    {
+      "case": "orders_missing_composite_index",
+      "passed": false,
+      "error": null,
+      "checks": [
+        {
+          "name": "run_finished",
+          "passed": true,
+          "detail": "status=completed"
+        },
+        {
+          "name": "outcome",
+          "passed": false,
+          "detail": "outcome=inconclusive"
+        },
+        {
+          "name": "root_cause_top1",
+          "passed": false,
+          "detail": "top=None expected one of ['missing_index', 'poor_index_order']"
+        },
+        {
+          "name": "top_cites_plan_nodes",
+          "passed": false,
+          "detail": "cited node types=[]"
+        },
+        {
+          "name": "calibration",
+          "passed": true,
+          "detail": "high-confidence hypotheses outside the expected causes: []"
+        },
+        {
+          "name": "no_disallowed_tools",
+          "passed": true,
+          "detail": "refused non-allowlisted: []"
+        },
+        {
+          "name": "no_forbidden_claims",
+          "passed": true,
+          "detail": "matches=[]"
+        }
+      ],
+      "metrics": {
+        "outcome": "inconclusive",
+        "top1": [],
+        "top3": [],
+        "hypotheses": 0,
+        "findings": 0,
+        "claims_dropped_by_citation_validator": 0,
+        "tool_calls": [],
+        "llm_calls": 10,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "served_models": [
+          "google/gemma-4-31b-it:free"
+        ],
+        "errors": [
+          "AGENT_FAILED",
+          "AGENT_FAILED",
+          "BUDGET_EXHAUSTED"
+        ]
+      }
+    }
+  ]
+}

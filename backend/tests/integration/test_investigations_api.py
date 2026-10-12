@@ -407,6 +407,7 @@ async def test_models_endpoint_reports_configuration_without_keys(api: httpx.Asy
     r = await api.get("/api/v1/settings/models")
 
     assert r.status_code == 200
-    assert (r.json()["provider"], r.json()["model"]) == ("openrouter", "openrouter/free")
+    assert r.json()["provider"] == "openrouter"
+    assert r.json()["model"].endswith(":free")
     assert r.json()["configured"] is False
     assert "key" not in json.dumps(r.json()).lower().replace("configured", "")

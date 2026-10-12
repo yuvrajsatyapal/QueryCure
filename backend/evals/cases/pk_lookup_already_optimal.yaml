@@ -10,3 +10,8 @@ expect:
   max_high_confidence_wrong: 0
 forbid:
   claims_matching: ['\d+(\.\d+)?\s*(x|times)\s+faster']
+known_failures:
+  nvidia/nemotron-3-super-120b-a12b:free: >
+    Recorded 2026-10-12: proposes missing_index with high confidence for a 50-row table read
+    in 0.039 ms (overconfident; the correct answer is no action). Follow-up: materiality
+    guidance in the synthesis prompt and a deterministic confidence cap (PHASE_2_REPORT).

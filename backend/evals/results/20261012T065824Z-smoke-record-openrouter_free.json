@@ -1,0 +1,75 @@
+{
+  "suite": "smoke",
+  "mode": "record",
+  "requested_model": "openrouter/free",
+  "run_at": "20261012T065824Z",
+  "cases": [
+    {
+      "case": "orders_missing_composite_index",
+      "passed": false,
+      "error": null,
+      "checks": [
+        {
+          "name": "run_finished",
+          "passed": true,
+          "detail": "status=completed"
+        },
+        {
+          "name": "outcome",
+          "passed": false,
+          "detail": "outcome=inconclusive"
+        },
+        {
+          "name": "root_cause_top1",
+          "passed": false,
+          "detail": "top=None expected one of ['missing_index', 'poor_index_order']"
+        },
+        {
+          "name": "top_cites_plan_nodes",
+          "passed": false,
+          "detail": "cited node types=[]"
+        },
+        {
+          "name": "calibration",
+          "passed": true,
+          "detail": "high-confidence hypotheses outside the expected causes: []"
+        },
+        {
+          "name": "no_disallowed_tools",
+          "passed": true,
+          "detail": "refused non-allowlisted: []"
+        },
+        {
+          "name": "no_forbidden_claims",
+          "passed": true,
+          "detail": "matches=[]"
+        }
+      ],
+      "metrics": {
+        "outcome": "inconclusive",
+        "top1": [],
+        "top3": [],
+        "hypotheses": 0,
+        "findings": 8,
+        "claims_dropped_by_citation_validator": 0,
+        "tool_calls": [
+          "get_schema_object",
+          "list_indexes",
+          "estimate_index_size"
+        ],
+        "llm_calls": 9,
+        "input_tokens": 18932,
+        "output_tokens": 15999,
+        "served_models": [
+          "apodex/apodex-1.1-mini:free",
+          "dots-studio/dots-3-note-preview:free",
+          "liquid/lfm-2.5-2.6b:free",
+          "nvidia/nemotron-3-super-120b-a12b:free"
+        ],
+        "errors": [
+          "AGENT_FAILED"
+        ]
+      }
+    }
+  ]
+}

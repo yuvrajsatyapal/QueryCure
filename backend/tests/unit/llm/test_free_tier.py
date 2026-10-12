@@ -39,10 +39,12 @@ def test_free_model_ids(model: str, free: bool) -> None:
     assert is_free_model(model) is free
 
 
-def test_defaults_are_the_free_router() -> None:
+def test_defaults_are_the_pinned_free_model() -> None:
     s = Settings(_env_file=None)
 
-    assert (s.llm_provider, s.llm_model, s.llm_free_only) == ("openrouter", "openrouter/free", True)
+    assert (s.llm_provider, s.llm_free_only) == ("openrouter", True)
+    assert is_free_model(s.llm_model)
+    assert s.llm_model == "nvidia/nemotron-3-super-120b-a12b:free"
     assert s.llm_daily_request_limit < 50
     assert s.llm_requests_per_minute < 20
 
@@ -220,3 +222,7 @@ def test_budget_error_shape_for_daily_quota() -> None:
     err = BudgetExhaustedError("x", details=[{"budget": "llm_daily_requests", "limit": 45}])
 
     assert err.details[0]["budget"] == "llm_daily_requests"
+
+
+def test_call_timeout_defaults_to_two_minutes_for_slow_free_models() -> None:
+    assert Settings(_env_file=None).llm_call_timeout_seconds == 120.0

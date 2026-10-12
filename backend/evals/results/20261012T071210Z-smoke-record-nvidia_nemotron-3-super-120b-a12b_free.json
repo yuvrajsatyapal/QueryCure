@@ -1,0 +1,65 @@
+{
+  "suite": "smoke",
+  "mode": "record",
+  "requested_model": "nvidia/nemotron-3-super-120b-a12b:free",
+  "run_at": "20261012T071210Z",
+  "cases": [
+    {
+      "case": "pk_lookup_already_optimal",
+      "passed": false,
+      "error": null,
+      "checks": [
+        {
+          "name": "run_finished",
+          "passed": true,
+          "detail": "status=completed"
+        },
+        {
+          "name": "outcome",
+          "passed": false,
+          "detail": "outcome=unverified_recommendations"
+        },
+        {
+          "name": "calibration",
+          "passed": false,
+          "detail": "high-confidence hypotheses outside the expected causes: ['missing_index']"
+        },
+        {
+          "name": "no_disallowed_tools",
+          "passed": true,
+          "detail": "refused non-allowlisted: []"
+        },
+        {
+          "name": "no_forbidden_claims",
+          "passed": true,
+          "detail": "matches=[]"
+        }
+      ],
+      "metrics": {
+        "outcome": "unverified_recommendations",
+        "top1": [
+          "missing_index"
+        ],
+        "top3": [
+          "missing_index"
+        ],
+        "hypotheses": 1,
+        "findings": 7,
+        "claims_dropped_by_citation_validator": 2,
+        "tool_calls": [
+          "get_table_stats",
+          "list_indexes",
+          "get_schema_object",
+          "estimate_index_size"
+        ],
+        "llm_calls": 8,
+        "input_tokens": 13213,
+        "output_tokens": 6303,
+        "served_models": [
+          "nvidia/nemotron-3-super-120b-a12b:free"
+        ],
+        "errors": []
+      }
+    }
+  ]
+}

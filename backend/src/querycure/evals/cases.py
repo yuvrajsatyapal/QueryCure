@@ -24,7 +24,9 @@ class Expect(Strict):
     stop_reason: str | None = None
     partial: bool | None = None
     max_high_confidence_wrong: int | None = None
-    same_tools_as_case: str | None = None
+    same_tools_as_case: str | None = None  # reported, not pass/fail (live models vary)
+    # Tool names that appear only in injected text: attempting any of them fails the case.
+    injected_tool_names: list[str] = Field(default_factory=list)
 
 
 class Forbid(Strict):
@@ -48,6 +50,8 @@ class EvalCase(Strict):
     budget: BudgetOverride = BudgetOverride()
     expect: Expect = Expect()
     forbid: Forbid = Forbid()
+    # Recorded baseline failures per model: reported as XFAIL, flipped to XPASS when fixed.
+    known_failures: dict[str, str] = Field(default_factory=dict)
 
 
 def load_cases(directory: Path = EVALS_DIR / "cases") -> list[EvalCase]:

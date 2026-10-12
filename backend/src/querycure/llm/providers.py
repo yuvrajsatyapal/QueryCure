@@ -62,6 +62,7 @@ def build_client(
             model=model,
             base_url=settings.openrouter_base_url,
             free_only=settings.llm_free_only,
+            timeout_seconds=settings.llm_call_timeout_seconds,
         )
     chat_model: BaseChatModel
     if provider == "gemini":

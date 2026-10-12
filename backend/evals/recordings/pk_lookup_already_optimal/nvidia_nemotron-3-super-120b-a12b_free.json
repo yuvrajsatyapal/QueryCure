@@ -1,0 +1,81 @@
+{
+  "schema_version": 1,
+  "case": "pk_lookup_already_optimal",
+  "model": "nvidia/nemotron-3-super-120b-a12b:free",
+  "recorded_at": "2026-10-12",
+  "provenance": "recorded",
+  "entries": {
+    "1462ce5bbf8608665cbad0b04b687fab01d9cb6279a63166ac960df9a352fce4": [
+      {
+        "text": "{\"action\": \"call_tool\", \"tool\": \"get_table_stats\", \"args\": {\"table\": \"app_settings\"}}",
+        "served_model": "nvidia/nemotron-3-super-120b-a12b:free",
+        "served_by": "Nvidia",
+        "input_tokens": 1714,
+        "output_tokens": 273
+      }
+    ],
+    "267859d084c2a5b884d0adbb402ca99a8ba0199deb4f66de7d54b83b713f9b5e": [
+      {
+        "text": "{\"action\": \"call_tool\", \"tool\": \"estimate_index_size\", \"args\": {\"table\": \"app_settings\", \"columns\": [\"key\"]}}",
+        "served_model": "nvidia/nemotron-3-super-120b-a12b:free",
+        "served_by": "Nvidia",
+        "input_tokens": 1769,
+        "output_tokens": 549
+      }
+    ],
+    "4db7ef78efb003ac93d054c4990a19fe7de9f5b10e1577933112a420eac35bc2": [
+      {
+        "text": "{\"action\": \"call_tool\", \"tool\": \"get_schema_object\", \"args\": {\"name\": \"app_settings\"}}",
+        "served_model": "nvidia/nemotron-3-super-120b-a12b:free",
+        "served_by": "Nvidia",
+        "input_tokens": 1814,
+        "output_tokens": 333
+      }
+    ],
+    "61a9293442c9a53ed3c4e90e262b25b781a87cb730c6a01990060e85e9706ceb": [
+      {
+        "text": "{\"hypotheses\": [{\"statement\": \"The query performs a sequential scan on app_settings because there is no index on the key column, causing it to read all rows and filter for the desired key.\", \"category\": \"missing_index\", \"supporting_evidence\": [\"ev_3471bc9278e7\", \"ev_8695ddb09525\", \"ev_0b347b0a0f5f\", \"ev_626f7235bdca\"], \"contradicting_evidence\": [], \"confidence\": \"high\", \"uncertainty_notes\": \"While the table currently appears small (as shown by the low row counts), the missing index will cause increasing latency as the table grows; it is unknown whether additional columns are frequently queried that might affect index design.\", \"verification_method\": \"explain_compare\"}], \"summary\": \"The query is slow due to a missing index on the key column, resulting in a sequential scan that reads the whole table and filters for the desired key. Creating an index on key (potentially including value for an index-only scan) would allow an index scan and eliminate the unnecessary sequential scan.\", \"no_action_evidence\": []}",
+        "served_model": "nvidia/nemotron-3-super-120b-a12b:free",
+        "served_by": "Nvidia",
+        "input_tokens": 1696,
+        "output_tokens": 1303
+      }
+    ],
+    "a110fec86cf426634d822e624a02e3c0b5b84b6ae27bbaa5d62e014946dd7add": [
+      {
+        "text": "{\"agents\": [\"query_analyzer\", \"index_strategist\"], \"focus\": [\"Seq Scan on app_settings (ev_8695ddb09525) with filter (key = 'feature_17'::text) removing 49 rows\", \"Plan summary shows Seq Scan as hottest node (ev_3471bc9278e7)\", \"Query references columns key and value (ev_0b347b0a0f5f) and uses one bind parameter (ev_626f7235bdca)\"], \"rationale\": \"The query performs a sequential scan on the app_settings table and applies a filter on the key column, which discards 49 rows to return a single matching row, indicating that the scan reads the whole table unnecessarily. The plan summary identifies this Seq Scan as the hottest node, confirming it dominates execution time. Since the query only needs rows where key equals a specific value, an index on key (or a composite index covering key and value) would allow an index scan and eliminate the need to scan the entire table.\"}",
+        "served_model": "nvidia/nemotron-3-super-120b-a12b:free",
+        "served_by": "Nvidia",
+        "input_tokens": 777,
+        "output_tokens": 1234
+      }
+    ],
+    "c1c946df1e41cd6b28730cbc0a63707ecb8bbd8aa93a165c9a3b3230579b5f8c": [
+      {
+        "text": "{\"action\": \"call_tool\", \"tool\": \"list_indexes\", \"args\": {\"table\": \"app_settings\"}}",
+        "served_model": "nvidia/nemotron-3-super-120b-a12b:free",
+        "served_by": "Nvidia",
+        "input_tokens": 1669,
+        "output_tokens": 240
+      }
+    ],
+    "e83d774f81880fc8854ce1830e02006459f4f72f960a4c76dace7d7d8eb283ee": [
+      {
+        "text": "{\"action\": \"final\", \"analysis\": {\"summary\": \"The query performs a sequential scan on app_settings because no index exists on the key column used in the equality filter. An index on key (possibly including value) would allow an index scan and remove the need to scan all rows.\", \"findings\": [{\"title\": \"No indexes exist on app_settings\", \"detail\": \"The table app_settings has no indexes recorded.\", \"severity\": \"medium\", \"evidence_ids\": [\"ev_028f43a1d4adea9d\"]}, {\"title\": \"Query uses sequential scan with filter on key\", \"detail\": \"Plan shows Seq Scan on app_settings with filter (key = 'feature_17'::text) removing 49 rows, returning 1 row.\", \"severity\": \"high\", \"evidence_ids\": [\"ev_8695ddb09525\", \"ev_3471bc9278e7\"]}, {\"title\": \"Query references columns key and value with one bind parameter\", \"detail\": \"The SELECT reads value from app_settings where key equals a single parameter.\", \"severity\": \"info\", \"evidence_ids\": [\"ev_0b347b0a0f5f\", \"ev_626f7235bdca\"]}, {\"title\": \"An index on key could satisfy the filter\", \"detail\": \"Since the query filters on key with equality, a btree index on (key) would allow an index scan instead of a sequential scan.\", \"severity\": \"medium\", \"evidence_ids\": [\"ev_8695ddb09525\"]}, {\"title\": \"Index size estimation unavailable due to unknown column width\", \"detail\": \"Attempt to estimate index size returned unknown width for column key, preventing a precise size estimate.\", \"severity\": \"low\", \"evidence_ids\": [\"ev_d8d36c349df9ba01\"]}, {\"title\": \"Including value in the index could enable index-only scan\", \"detail\": \"If the index also includes the value column, the query could be satisfied entirely from the index, avoiding heap access.\", \"severity\": \"info\", \"evidence_ids\": [\"ev_0b347b0a0f5f\"]}]}}",
+        "served_model": "nvidia/nemotron-3-super-120b-a12b:free",
+        "served_by": "Nvidia",
+        "input_tokens": 1866,
+        "output_tokens": 1021
+      }
+    ],
+    "e9f6ae8e3d3c666f849956a64801c7d04bd872da803634c3c67c5258dfbebfdc": [
+      {
+        "text": "{\"action\": \"final\", \"analysis\": {\"summary\": \"The query performs a sequential scan on app_settings because there is no index on the key column. The scan reads all rows and applies a filter that removes 49 rows, leaving one matching row. While the table appears tiny (about 50 rows) in the current evidence, the lack of an index will cause the scan to become progressively slower as the table grows. Creating an index on key would allow an index lookup and eliminate the need to scan the whole table.\", \"findings\": [{\"title\": \"Sequential scan due to missing index\", \"detail\": \"The plan shows a Seq Scan on app_settings as the hottest node (ev_3471bc9278e7) with a filter on key that removes 49 rows (ev_8695ddb09525). No index condition is present, indicating no index on the key column.\", \"severity\": \"medium\", \"evidence_ids\": [\"ev_3471bc9278e7\", \"ev_8695ddb09525\"]}, {\"title\": \"Filter removes majority of rows\", \"detail\": \"The Seq Scan applies filter (key = 'feature_17'::text) and removes 49 rows per loop while returning 1 row (ev_8695ddb09525). This indicates low selectivity and that most of the table is read unnecessarily.\", \"severity\": \"low\", \"evidence_ids\": [\"ev_8695ddb09525\"]}, {\"title\": \"Table size inferred from rows read\", \"detail\": \"Estimated rows 1 vs actual 1 rows/loop with 49 rows removed suggests the table contains roughly 50 rows (ev_8695ddb09525). If the table grows, the sequential scan will read proportionally more rows, increasing latency.\", \"severity\": \"info\", \"evidence_ids\": [\"ev_8695ddb09525\"]}]}}",
+        "served_model": "nvidia/nemotron-3-super-120b-a12b:free",
+        "served_by": "Nvidia",
+        "input_tokens": 1908,
+        "output_tokens": 1350
+      }
+    ]
+  }
+}
