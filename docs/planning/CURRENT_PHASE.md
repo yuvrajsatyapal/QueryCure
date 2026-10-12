@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | Phase | **2 — Multi-agent intelligence** (Phase 1 complete: [PHASE_1_REPORT](reports/PHASE_1_REPORT.md)) |
-| Status | **Phase 2 implemented; exit partially met** ([PHASE_2_REPORT](reports/PHASE_2_REPORT.md)). Acceptance #1, #2, #3, #5 met; #4 met by deterministic tests, its recorded-model case waits for the next free-quota day. Acceptance follow-up 2026-10-12 (PHASE_2_REPORT §11): calibration failure fixed by a deterministic materiality gate (ADR-0017); free-only now enforced before dispatch; two smoke recordings still pending (free quota spent). Phase 3 not started (awaiting go-ahead) |
+| Status | **Phase 2 implemented; exit partially met** ([PHASE_2_REPORT](reports/PHASE_2_REPORT.md)). Acceptance #1, #2, #3, #5 met; #4 met by deterministic tests, its recorded-model case waits for the next free-quota day. Acceptance follow-up 2026-10-12 (PHASE_2_REPORT §11): calibration failure fixed by a deterministic materiality gate (ADR-0017); free-only now enforced before dispatch; two smoke recordings still pending (free quota spent). Follow-up 2 (PHASE_2_REPORT §12): injection case now scored by a per-agent security evaluation (refused attempts count; tool choice/order not judged); no free capacity on 2026-10-12, no request sent; record `orders_injection_in_schema` + `orders_plain_explain` after 00:00 UTC. Phase 3 not started (awaiting go-ahead) |
 | Last updated | 2026-10-12 |
 | Application code | Phase 1 foundation: API (session, connections, inspect, workloads, health), metadata DB migrations, SQL/plan parsing, inspection gateway, artifact store, demo workloads; web app with connections and plan workspace (tree + graph). No agents yet. |
 
@@ -305,6 +305,7 @@
 | Frontend (Phase 2) | lint, typecheck, `pnpm test` → **59 passed**, build OK (Node 22); Playwright e2e **1 passed** (real API/worker/DB, stub LLM; CI job `e2e` green); browser-verified start → live timeline → findings → evidence chip → plan node, history delete/undo, 375 px |
 | Backend (acceptance follow-up, 2026-10-12) | `QC_REQUIRE_DB=1 uv run pytest -q` → **774 passed** (405 unit, 263 integration, 106 security); ruff, format, `mypy --strict` (135 files) clean. Frontend lint/typecheck/59 tests/build clean; Playwright e2e 1 passed |
 | Evals (replay) | `python -m querycure.evals run --suite smoke` → **3 PASS** (incl. `pk_lookup_already_optimal`, formerly XFAIL), 2 not yet recorded → exit 1 |
+| Backend (injection security evaluation, 2026-10-12) | `QC_REQUIRE_DB=1 uv run pytest -q` → **804 passed** (430 unit, 265 integration, 109 security); ruff, format, `mypy --strict` (135 files) clean. Eval replay under the stricter per-agent check: same 3 PASS, 2 unrecorded → exit 1. Frontend not re-run (unchanged) |
 | Compose (Phase 2) | `alembic current` → `0007 (head)` |
 | Backend (through T1.19) | `uv run pytest -q` → 448 passed: 359 unit/security + 89 integration on PG 17.11, Python 3.12; CI also runs 3.13 and a `postgres:17` integration job. `ruff check`/`format --check` clean; `mypy --strict` clean on 57 files. Live API check as `qc_app`: readyz ok, session flow 401 → 201 → 200, CSRF 403 envelope |
 | Frontend (through T1.18) | `pnpm lint` and `pnpm typecheck` clean; `pnpm test` → 41 passed; `pnpm build` compiles; browser-verified against the live API, including 375 px width |

@@ -24,7 +24,7 @@ from querycure.core.errors import BudgetExhaustedError, QueryCureError
 from querycure.core.logging import get_logger
 from querycure.db.repositories import agents as executions
 from querycure.events.types import EventType
-from querycure.evidence.sanitize import clean_text
+from querycure.evidence.sanitize import clean_args, clean_text
 from querycure.evidence.store import ensure_writable, list_evidence, record_evidence
 from querycure.llm.structured import (
     LLMError,
@@ -300,7 +300,7 @@ async def _execute_tool(
     started = time.monotonic()
     tool = tools.get(call.tool)
     status, evidence_ids, error, reply = "ok", [], None, ""
-    safe_args = {k: clean_text(str(v), 200) for k, v in list(call.args.items())[:10]}
+    safe_args = clean_args(call.args)
     await ctx.events.emit(
         EventType.TOOL_STARTED, {"tool": clean_text(call.tool, 64), "agent": agent}
     )

@@ -54,9 +54,6 @@ async def _run(args: argparse.Namespace) -> int:
     cases = [c for c in load_cases() if args.suite in c.suites]
     if args.case:
         cases = [c for c in cases if c.id in set(args.case)]
-    # Cases referenced by others (same_tools_as_case) run first.
-    referenced = {c.expect.same_tools_as_case for c in cases} - {None}
-    cases.sort(key=lambda c: c.id not in referenced)
     cap = None
     if args.mode == "record":
         today = dt.datetime.now(dt.UTC).date().isoformat()
@@ -71,7 +68,6 @@ async def _run(args: argparse.Namespace) -> int:
         allowed = min(args.max_requests, left)
         cap = RequestCap(allowed, ledger)
         print(f"recording with at most {allowed} free requests ({left} left today)")
-    tools: dict[str, list[str]] = {}
     results: list[CaseResult] = []
     for case in cases:
         result = await run_case(
@@ -81,9 +77,7 @@ async def _run(args: argparse.Namespace) -> int:
             settings=settings,
             admin_url=_admin_url(settings, args.admin_url),
             cap=cap,
-            reference_tools=tools,
         )
-        tools[case.id] = result.tools
         results.append(result)
     _print(results)
     if args.mode == "record" or args.save_results:

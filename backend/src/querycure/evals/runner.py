@@ -8,7 +8,7 @@ when the request cap or the free quota runs out.
 import json
 import secrets
 import uuid
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal
 
@@ -51,8 +51,6 @@ class CaseResult:
     case: EvalCase
     score: Score | None
     error: str | None
-    tools: list[str] = field(default_factory=list)
-
     model: str = ""
 
     @property
@@ -202,7 +200,6 @@ async def run_case(
     settings: Settings,
     admin_url: str,
     cap: RequestCap | None,
-    reference_tools: dict[str, list[str]],
     recordings_dir: Path | None = None,
     live_client: ChatClient | None = None,  # tests: a fake standing in for OpenRouter
 ) -> CaseResult:
@@ -277,8 +274,7 @@ async def run_case(
             error = f"stopped early ({truncated[0][:80]}): not recorded, rerun later"
         if mode == "record" and error is None:
             recording.save(recording_path(case, model, recordings_dir))
-        result = score(case, seen, other_tools=reference_tools)
-        return CaseResult(case, result, error, tools=[t for t, _ in seen.tools], model=model)
+        return CaseResult(case, score(case, seen), error, model=model)
     finally:
         with psycopg.connect(admin_url, autocommit=True) as admin:
             admin.execute(f'DROP DATABASE IF EXISTS "{name}" WITH (FORCE)')

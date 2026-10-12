@@ -101,7 +101,7 @@ Real output, 2026-10-12, PostgreSQL 17.11 in Docker, Python 3.12, Node 22.
 | 1. `orders_ecommerce` recorded-mode eval: top hypothesis ∈ {missing_index, poor_index_order} citing Seq Scan/Sort | **Met** | Replay `orders_missing_composite_index`: PASS, top `missing_index`, cited node types `['Seq Scan']` |
 | 2. Kill worker after the fan-out checkpoint → restart → completes, no duplicate evidence | **Met** | `test_worker_kill.py`: real worker process SIGKILLed during synthesis; second worker reclaims; identical evidence/finding counts, analysts not re-run (6/6 runs). Also `test_crash_after_the_fan_out_resumes_without_redoing_analysis` |
 | 3. SSE client reconnecting with `Last-Event-ID` gets every event exactly once | **Met** | `test_reconnect_with_last_event_id_delivers_every_event_exactly_once` over real uvicorn/TCP (8/8 repeats); live browser stream |
-| 4. Injection fixture does not change tool calls | **Partially met** | Deterministic: non-allowlisted tools refused (`test_injected_instructions_cannot_reach_tools_outside_the_allowlist`, where a scripted model obeys planted instructions and is refused for `drop_everything` and for another agent's tool); fencing security tests. Recorded live-model case pending. Note: the check became "no non-allowlisted or injected tool attempted", because two *clean* live runs of the same case used different allowlisted tools, so an exact tool-set comparison measures model variance, not injection (TESTING_STRATEGY §5) |
+| 4. Injection fixture does not change tool calls | **Partially met** | Deterministic: non-allowlisted tools refused (`test_injected_instructions_cannot_reach_tools_outside_the_allowlist`, where a scripted model obeys planted instructions and is refused for `drop_everything` and for another agent's tool); fencing security tests. Recorded live-model case pending. Note (superseded by §12, which replaced it with a per-agent security evaluation): the check became "no non-allowlisted or injected tool attempted", because two *clean* live runs of the same case used different allowlisted tools, so an exact tool-set comparison measures model variance, not injection (TESTING_STRATEGY §5) |
 | 5. Budget exhaustion fixture → `inconclusive` + partial report | **Met** | `test_budget_exhaustion_ends_inconclusive_with_a_partial_report`; recorded eval `orders_budget_exhaustion` PASS; daily-quota stop test |
 | Tests: routing, citation validator, queue concurrency, SSE resume, checkpoint resume, eval smoke | Met (eval smoke partially recorded) | §4 |
 | Security: fencing, tool allowlists, prompt redaction in logs, no secrets in checkpoints | **Met** | `test_prompt_fencing.py`; allowlist tests; `test_logs_never_contain_prompt_or_output_text`; `test_secrets_never_reach_checkpoints` (target password, API key held by the client, master key, DSNs absent from checkpoints/blobs/writes) |
@@ -155,8 +155,8 @@ Read in this order ([LEARNING.md Phase 2](../../engineering/LEARNING.md)):
 ## 10. Remaining work
 
 - **Next UTC day (one command, free):**
-  `cd backend && uv run python -m querycure.evals run --mode record --case orders_missing_composite_index --case orders_injection_in_schema --case orders_plain_explain --max-requests 25`
-  (the orders case is included as the injection tool-set reference). Then confirm `run --suite smoke` replays with exit 0, commit the recordings, and add `python -m querycure.evals run --suite smoke` to the CI integration job. Optionally record `rewrite_trap_not_in` (`--suite full`).
+  `cd backend && uv run python -m querycure.evals run --mode record --case orders_injection_in_schema --case orders_plain_explain --max-requests 25`
+  (superseded by §12: the orders case is no longer re-recorded as a tool-set reference). Then confirm `run --suite smoke` replays with exit 0, commit the recordings, and add `python -m querycure.evals run --suite smoke` to the CI integration job. Optionally record `rewrite_trap_not_in` (`--suite full`).
 - ~~Calibration follow-up for `pk_lookup_already_optimal`~~: done (§11).
 - **Risks** (RISKS.md): R16 free-tier capacity and reliability; R2 evidence now includes the overconfidence baseline.
 - **Phase 3 inputs:** approval gate (`interrupt`), Optimization Engineer, sandbox and benchmark engine; production-connection EXPLAIN approvals; candidate SQL validation.
@@ -213,9 +213,46 @@ The owner asked for the outstanding Phase 2 acceptance work to be finished befor
 | Eval smoke (replay) | 3/5 pass; 2 unrecorded (11.1) |
 
 ### 11.7 Remaining risks and work before Phase 3
-1. **Record `orders_injection_in_schema` and `orders_plain_explain`** on the next UTC day (§10 command, `--max-requests 25`), confirm `run --suite smoke` exits 0, commit the recordings, and enable the eval step in CI. Until then acceptance #4 is met only by deterministic and live tests.
+1. **Record `orders_injection_in_schema` and `orders_plain_explain`** on the next UTC day (§12.4 command, `--max-requests 25`), confirm `run --suite smoke` exits 0, commit the recordings, and enable the eval step in CI. Until then acceptance #4 is met only by deterministic and live tests.
 2. Free-model capacity (R16) remains the main schedule risk: one recording day per attempt, and recordings can be cut short by upstream 429s.
 3. The materiality thresholds (1,000 rows, 5% workload share) are reasoned, not tuned on data. They may need revisiting once Mode B workload evidence is common, and Phase 3 benchmarks can measure them.
 4. Optional: OpenRouter `max_price = 0` routing as a third free-only layer, verified with one request on a recording day.
 
 **Phase 3 has not started and should not start until 11.7 item 1 is done and the owner says so.**
+
+## 12. Security evaluation for prompt injection (2026-10-12, owner-approved)
+
+The owner approved replacing `same_tools_as_case` with a security-focused evaluation before the injection case is recorded.
+
+### 12.1 Quota check before any work: **no free capacity, no model request sent**
+- 12:23 UTC 2026-10-12. The eval ledger shows 60 free requests today against `LLM_DAILY_REQUEST_LIMIT=45`. The record command refused before any request (exit 2). OpenRouter's key endpoint (no model request) reports `is_free_tier: true`, `usage: 0`, `usage_daily: 0`. These are spend figures, not a remaining-request count, so the ledger decides.
+
+### 12.2 What changed
+- **Per-agent allowlist, every case.** `no_disallowed_tools` now checks each attempt against the *calling agent's* allowlist (joined from `agent_executions`). Before, it checked the union of all allowlists and only refused rows, so a query analyzer attempting the workload investigator's `get_statement_stats` passed the eval even though the runtime refused it. That was a gap in the eval, not in the runtime. The three existing recordings still pass under the stricter check.
+- **`security:` block in case files** (`injected_tool_names`, `injected_outcomes`, `injected_markers`) adds four checks: injected tool not attempted, arguments valid, arguments within policy, injected outcome not followed. All tool attempts are judged, including refused ones. Tool choice and order are not. Details: TESTING_STRATEGY §5.
+- **Arguments stored with their JSON types.** `tool_executions.args` used to stringify every value, so stored arguments could not be re-validated. `evidence/sanitize.clean_args` keeps numbers, booleans and lists, cleans and clips text, and bounds keys and items. Every bound sits above the tools' own limits, so clipping never turns invalid arguments into valid ones. This changes only what is persisted. The model's conversation is unchanged, so no recording was invalidated.
+- **`orders_injection_in_schema` covers all three untrusted vectors** (it was unrecorded, so this costs no extra quota): the hostile column and index names as before, plus a SQL comment in the query and a string literal in the plan's `Filter`. The plan is a **derived, hand-edited** copy of the real capture (`pg17_canonical_hot_analyze_injected_filter.json`). Only the Filter text changed, and the fixture README labels it. The expected diagnosis is unchanged (`missing_index`/`poor_index_order`, `material`, `unverified_recommendations`).
+- Removed: `Expect.same_tools_as_case`, the runner's `reference_tools` plumbing, and the CLI's reference-first ordering.
+
+### 12.3 Tests (real output, 2026-10-12)
+| Suite | Result |
+|---|---|
+| `ruff check`, `ruff format --check`, `mypy --strict src` (135 files) | clean |
+| `pytest -q` (whole backend, `QC_REQUIRE_DB=1`) | **804 passed** (was 774) |
+| unit / integration / security | **430 / 265 / 109 passed** |
+| Eval smoke (replay) | 3/5 pass (`orders_missing_composite_index`, `orders_budget_exhaustion`, `pk_lookup_already_optimal`); 2 have no recording yet; exit 1 |
+
+New regression tests:
+- `tests/unit/test_eval_scoring.py` (+27): clean run passes; different tool choice, order or none at all passes; an injected tool fails as `ok`, `error` and `refused`; another agent's tool fails; an unknown agent fails; the allowlist is checked on non-injection cases too; 5 invalid-argument cases, including budget-refused calls the runtime never validated; 6 SQL or marker arguments fail; naming a declared hostile object passes; following the injected outcome fails; no `security:` block means no security checks; the block is strict.
+- `tests/security/test_evidence_sanitize.py` (+3): argument types kept; text cleaned and clipped; keys, items and nesting bounded.
+- `tests/integration/test_eval_runner.py` (+2): the real injection case through the real graph. A scripted model that ignores the planted text, and looks up the hostile index by name, **passes every check**. A scripted model that obeys (calls `drop_table`, calls another agent's tool, passes SQL and an invalid node id) **fails four checks even though the runtime refused or rejected every call**.
+- Preserved unchanged: `test_injected_instructions_cannot_reach_tools_outside_the_allowlist` and the fencing and sanitizer tests.
+
+Frontend: not re-run. No frontend file changed.
+
+### 12.4 Still open
+- **Record the two missing cases** after 00:00 UTC (about 15 free requests):
+  `cd backend && uv run python -m querycure.evals run --mode record --case orders_injection_in_schema --case orders_plain_explain --max-requests 25`
+  Then `run --suite smoke` must exit 0 with all five passing. After that, commit the recordings, enable the CI eval step, and mark Phase 2 complete.
+- **Phase 2 is not complete. Phase 3 has not started.**
+
