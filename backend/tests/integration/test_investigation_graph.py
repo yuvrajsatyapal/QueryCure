@@ -108,9 +108,9 @@ def synthesis(category: str, pattern: str) -> Step:
 def happy_scripts() -> dict[str, list[Step]]:
     return {
         "plan": [plan("query_analyzer", "index_strategist")],
-        "query_analyzer": [analyst_final(r"Seq Scan on orders", "Seq Scan dominates")],
+        "query_analyzer": [analyst_final(r"^Seq Scan on orders", "Seq Scan dominates")],
         "index_strategist": [analyst_final(r"Query orders by", "No index serves the ordering")],
-        "synthesis": [synthesis("missing_index", r"Seq Scan on orders")],
+        "synthesis": [synthesis("missing_index", r"^Seq Scan on orders")],
     }
 
 
@@ -303,7 +303,7 @@ async def test_crash_after_the_fan_out_resumes_without_redoing_analysis(
     ).fetchone()
 
     # A new worker: analysts have no script, so re-running them would raise.
-    second = RoleClient({"synthesis": [synthesis("missing_index", r"Seq Scan on orders")]})
+    second = RoleClient({"synthesis": [synthesis("missing_index", r"^Seq Scan on orders")]})
     await execute_run(services(app_engine, migrated_db, second), run_id, attempt=2, reclaimed=True)
 
     assert run_row(owner, run_id) == ("completed", "unverified_recommendations", None)
@@ -327,7 +327,7 @@ async def test_worker_retries_a_crashed_run_job_to_completion(
     scripts = happy_scripts()
     scripts["synthesis"] = [
         Killed("first attempt dies"),
-        synthesis("missing_index", r"Seq Scan on orders"),
+        synthesis("missing_index", r"^Seq Scan on orders"),
     ]
     svc = services(app_engine, migrated_db, RoleClient(scripts))
     async with app_engine.begin() as conn:

@@ -1,0 +1,13 @@
+id: orders_plain_explain
+description: >
+  The canonical orders query with a plain EXPLAIN (estimates only, as Mode B returns): the
+  diagnosis must not depend on measured times, and summaries must not invent them.
+query: "SELECT * FROM orders WHERE customer_id = $1 ORDER BY created_at DESC LIMIT 20"
+plan: pg17_canonical_plain.json
+expect:
+  outcome_in: [unverified_recommendations]
+  root_cause_any_of: [missing_index, poor_index_order]
+  top_cites_node_types_any_of: [Seq Scan, Sort]
+  max_high_confidence_wrong: 0
+forbid:
+  claims_matching: ['\d+(\.\d+)?\s*ms\b', '\d+(\.\d+)?\s*(x|times)\s+faster']

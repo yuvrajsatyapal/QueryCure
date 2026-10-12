@@ -1,0 +1,12 @@
+id: pk_lookup_already_optimal
+description: >
+  no_benefit workload: a 50-row settings table read by key in 0.039 ms. A Seq Scan over 50
+  rows is already the right plan; the investigation should not be confident about any fix
+  (calibration: no high-confidence hypothesis).
+query: "SELECT value FROM app_settings WHERE key = $1"
+plan: pg17_no_benefit_pk_lookup_analyze.json
+expect:
+  outcome_in: [no_action_needed, inconclusive]
+  max_high_confidence_wrong: 0
+forbid:
+  claims_matching: ['\d+(\.\d+)?\s*(x|times)\s+faster']

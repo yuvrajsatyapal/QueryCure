@@ -1,0 +1,10 @@
+id: rewrite_trap_not_in
+description: >
+  rewrite_trap workload: NOT IN over a subquery whose column contains a NULL. The shape of
+  the query is the issue (a NOT EXISTS rewrite would change results). Full suite only.
+suites: [full]
+query: "SELECT count(*) FROM accounts WHERE region_code NOT IN (SELECT region_code FROM closed_regions)"
+plan: pg17_rewrite_trap_not_in_analyze.json
+expect:
+  root_cause_any_of: [query_shape]
+  max_high_confidence_wrong: 0

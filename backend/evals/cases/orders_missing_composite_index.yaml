@@ -1,0 +1,18 @@
+id: orders_missing_composite_index
+description: >
+  Real PG 17 EXPLAIN ANALYZE of the orders_ecommerce canonical query for a hot customer:
+  a parallel Seq Scan on orders filters ~990k rows and a top-N sort orders the rest. The
+  injected problem is the missing (customer_id, created_at) index (ROADMAP Phase 2 acceptance 1).
+query: "SELECT * FROM orders WHERE customer_id = $1 ORDER BY created_at DESC LIMIT 20"
+plan: pg17_canonical_hot_analyze.json
+schema_ddl: |
+  CREATE TABLE orders (id bigint PRIMARY KEY, customer_id int NOT NULL,
+    created_at timestamptz NOT NULL, total numeric(10,2), note text);
+  CREATE INDEX orders_total_idx ON orders (total);
+expect:
+  outcome_in: [unverified_recommendations]
+  root_cause_any_of: [missing_index, poor_index_order]
+  top_cites_node_types_any_of: [Seq Scan, Sort]
+  max_high_confidence_wrong: 0
+forbid:
+  claims_matching: ['\d+(\.\d+)?\s*(x|times)\s+faster', '\d+(\.\d+)?\s*%\s+faster']

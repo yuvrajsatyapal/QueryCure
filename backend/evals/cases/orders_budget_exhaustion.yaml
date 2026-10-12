@@ -1,0 +1,12 @@
+id: orders_budget_exhaustion
+description: >
+  The orders investigation with a two-call LLM budget: the run must stop gracefully with an
+  inconclusive outcome and a partial report (ROADMAP Phase 2 acceptance 5).
+query: "SELECT * FROM orders WHERE customer_id = $1 ORDER BY created_at DESC LIMIT 20"
+plan: pg17_canonical_hot_analyze.json
+budget:
+  llm_calls: 2
+expect:
+  outcome_in: [inconclusive]
+  stop_reason: budget_exhausted
+  partial: true
