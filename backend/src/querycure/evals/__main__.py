@@ -9,7 +9,7 @@ import sys
 from querycure.core.config import Settings
 from querycure.evals.cases import EVALS_DIR, load_cases
 from querycure.evals.recording import model_slug
-from querycure.evals.runner import CaseResult, RequestCap, check_model, run_case
+from querycure.evals.runner import CaseResult, QuotaLedger, RequestCap, check_model, run_case
 
 
 def _admin_url(settings: Settings, override: str | None) -> str:
@@ -57,7 +57,20 @@ async def _run(args: argparse.Namespace) -> int:
     # Cases referenced by others (same_tools_as_case) run first.
     referenced = {c.expect.same_tools_as_case for c in cases} - {None}
     cases.sort(key=lambda c: c.id not in referenced)
-    cap = RequestCap(args.max_requests) if args.mode == "record" else None
+    cap = None
+    if args.mode == "record":
+        today = dt.datetime.now(dt.UTC).date().isoformat()
+        ledger = QuotaLedger(EVALS_DIR / ".quota", today)
+        left = settings.llm_daily_request_limit - ledger.used() - args.used_elsewhere
+        if left <= 0:
+            print(
+                f"Today's free request limit ({settings.llm_daily_request_limit}, "
+                "LLM_DAILY_REQUEST_LIMIT) is used up; record again after 00:00 UTC."
+            )
+            return 2
+        allowed = min(args.max_requests, left)
+        cap = RequestCap(allowed, ledger)
+        print(f"recording with at most {allowed} free requests ({left} left today)")
     tools: dict[str, list[str]] = {}
     results: list[CaseResult] = []
     for case in cases:
@@ -118,6 +131,12 @@ def main() -> None:
     run.add_argument("--case", action="append", help="run only these case ids")
     run.add_argument("--max-requests", type=int, default=40, help="record mode request cap")
     run.add_argument("--admin-url", help="owner URL for creating throwaway databases")
+    run.add_argument(
+        "--used-elsewhere",
+        type=int,
+        default=0,
+        help="free requests already spent today outside eval recording (e.g. live runs)",
+    )
     run.add_argument("--save-results", action="store_true", help="also save replay results")
     args = parser.parse_args()
     sys.exit(asyncio.run(_run(args)))

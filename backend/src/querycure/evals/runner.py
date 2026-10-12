@@ -70,10 +70,15 @@ class CaseResult:
 
 
 class RequestCap:
-    """Hard cap on provider requests for one record invocation (free quota is scarce)."""
+    """Hard cap on provider requests for one record invocation (free quota is scarce).
 
-    def __init__(self, remaining: int) -> None:
+    With a ledger, every request is also counted per UTC day across invocations: eval runs
+    use throwaway databases, so the worker's database-backed daily count never sees them.
+    """
+
+    def __init__(self, remaining: int, ledger: "QuotaLedger | None" = None) -> None:
         self.remaining = remaining
+        self._ledger = ledger
 
     async def check(self) -> None:
         if self.remaining <= 0:
@@ -82,6 +87,25 @@ class RequestCap:
                 details=[{"budget": "eval_request_cap", "limit": 0}],
             )
         self.remaining -= 1
+        if self._ledger is not None:
+            self._ledger.add(1)
+
+
+class QuotaLedger:
+    """Free requests made by eval recording today (UTC), kept in a small local file."""
+
+    def __init__(self, directory: Path, today: str) -> None:
+        self._path = directory / f"{today}.json"
+
+    def used(self) -> int:
+        try:
+            return int(json.loads(self._path.read_text())["requests"])
+        except (FileNotFoundError, KeyError, ValueError):
+            return 0
+
+    def add(self, n: int) -> None:
+        self._path.parent.mkdir(parents=True, exist_ok=True)
+        self._path.write_text(json.dumps({"requests": self.used() + n}) + "\n")
 
 
 class _CappedGate(LlmGate):

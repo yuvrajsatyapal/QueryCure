@@ -28,3 +28,6 @@ test-results/
 
 # Local agent/preview tooling
 .claude/launch.json
+
+# Per-day free-request ledger for eval recording (local only)
+backend/evals/.quota/

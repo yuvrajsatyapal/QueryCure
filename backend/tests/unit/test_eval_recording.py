@@ -84,3 +84,21 @@ def test_shipped_cases_load() -> None:
         "pk_lookup_already_optimal",
         "orders_budget_exhaustion",
     } <= ids
+
+
+async def test_ledger_counts_requests_across_invocations(tmp_path: Path) -> None:
+    from querycure.core.errors import BudgetExhaustedError
+    from querycure.evals.runner import QuotaLedger, RequestCap
+
+    ledger = QuotaLedger(tmp_path, "2026-10-12")
+    first = RequestCap(2, ledger)
+    await first.check()
+    await first.check()
+    with pytest.raises(BudgetExhaustedError):
+        await first.check()
+
+    second = RequestCap(5, QuotaLedger(tmp_path, "2026-10-12"))
+    await second.check()
+
+    assert QuotaLedger(tmp_path, "2026-10-12").used() == 3
+    assert QuotaLedger(tmp_path, "2026-10-13").used() == 0
