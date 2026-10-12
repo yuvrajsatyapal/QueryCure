@@ -1,6 +1,7 @@
 """Event emitter (T2.3): gap-free seq in the caller's transaction, NOTIFY, sealing."""
 
 import asyncio
+import contextlib
 import uuid
 
 import psycopg
@@ -176,3 +177,42 @@ async def test_run_event_sink_commits_each_event(
     await sink.emit(EventType.NODE_COMPLETED, {"node": "intake"})
 
     assert seqs(owner, run_id) == [1, 2]
+
+
+async def test_concurrent_content_writers_do_not_deadlock(app_engine: AsyncEngine) -> None:
+    """Regression: parallel analysts each check writability then emit in one transaction.
+    With a FOR SHARE check both held the share lock and deadlocked upgrading to the UPDATE
+    that assigns `seq` (seen as DeadlockDetected in a worker run, 2026-10-12)."""
+    from querycure.evidence.store import ensure_writable
+
+    run_id = await new_run(app_engine)
+    both_checked = asyncio.Event()
+    checked = 0
+
+    async def writer() -> None:
+        nonlocal checked
+        async with app_engine.begin() as conn:
+            await ensure_writable(conn, run_id)
+            checked += 1
+            if checked == 2:
+                both_checked.set()
+            # With FOR SHARE both writers get here together; give the second one the chance.
+            with contextlib.suppress(TimeoutError):
+                await asyncio.wait_for(both_checked.wait(), 0.5)
+            await emit(conn, run_id, EventType.EVIDENCE_CREATED, {"evidence_ids": []})
+
+    async with asyncio.timeout(15):
+        await asyncio.gather(writer(), writer())
+
+    async with app_engine.connect() as conn:
+        seqs = (
+            (
+                await conn.execute(
+                    text("SELECT seq FROM investigation_events WHERE run_id = :id ORDER BY seq"),
+                    {"id": run_id},
+                )
+            )
+            .scalars()
+            .all()
+        )
+    assert list(seqs) == [1, 2]

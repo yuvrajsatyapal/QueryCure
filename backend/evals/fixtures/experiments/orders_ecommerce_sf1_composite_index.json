@@ -1,0 +1,357 @@
+{
+ "schema_version": 1,
+ "provenance": "prerecorded",
+ "recorded_on": "2026-10-12",
+ "source_note": "Full Mode C run (API + containerized worker on sandbox_net, stub LLM proposed the index); orders_ecommerce sf=1. Inconclusive by the sample-quality gate despite a 144-211x CI.",
+ "label": "Prerecorded on aarch64 (8 CPUs), Linux, 2026-10-12 — not your database",
+ "config": {
+  "schema_version": 1,
+  "experiment_id": "c66674c2-e449-58d9-a20e-6f7b3cd659cb",
+  "workload_id": "orders_ecommerce@v1:sf=1:seed=42",
+  "baseline_query": "SELECT * FROM orders WHERE customer_id = $1 ORDER BY created_at DESC LIMIT 20",
+  "candidates": [
+   {
+    "arm": "oc_7f7a7b68a52c",
+    "candidate_id": "c9bf7620-72b6-463d-9a6f-84fef4043f2d",
+    "kind": "create_index",
+    "ddl": [
+     "CREATE INDEX ON orders (customer_id, created_at)"
+    ],
+    "query": null,
+    "write_overhead": "unknown"
+   }
+  ],
+  "param_sets": [
+   {
+    "name": "hot_customer",
+    "values": [
+     1024
+    ],
+    "edge_case": false
+   },
+   {
+    "name": "regular_customer",
+    "values": [
+     7
+    ],
+    "edge_case": false
+   }
+  ],
+  "warmup_runs": 5,
+  "measured_runs": 30,
+  "block_size": 5,
+  "query_timeout_ms": 10000,
+  "max_index_bytes": null,
+  "max_build_ms": 120000,
+  "min_effect": 1.1,
+  "max_regression": 0.95,
+  "max_cv": 0.25,
+  "max_error_rate": 0.1,
+  "row_hash_cap": 100000,
+  "seed": 2995988933220103,
+  "cache_mode": "warm"
+ },
+ "environment": {
+  "pg_version": "170011",
+  "pg_settings": {
+   "jit": "off",
+   "work_mem": "16MB",
+   "autovacuum": "on",
+   "seq_page_cost": "1",
+   "shared_buffers": "256MB",
+   "random_page_cost": "1.1",
+   "effective_cache_size": "1GB",
+   "default_statistics_target": "100",
+   "max_parallel_workers_per_gather": "0"
+  },
+  "sandbox_image_digest": "postgres:17",
+  "workload_id": "orders_ecommerce@v1:sf=1:seed=42",
+  "workload_data_digest": "d6a3be13b5b9d3a1c904fcfa0a24e7c304aea6d2b9c4dc16abfb06eac200ee9a",
+  "row_profile": "qc-row-v1",
+  "cpu_arch": "aarch64",
+  "cpu_model": "unknown",
+  "cpu_count": 8,
+  "memory_bytes": 4108828672,
+  "os": "Linux 6.12.76-linuxkit",
+  "container_runtime": "docker",
+  "autovacuum_disabled_on_clones": true
+ },
+ "result": {
+  "schema_version": 1,
+  "experiment_id": "c66674c2-e449-58d9-a20e-6f7b3cd659cb",
+  "engine_version": "bench@1",
+  "environment_digest": "9254098f08e3a6c417c29d056f76ce43471f9e3c03b6da1a97be64e5f076f391",
+  "builds": [
+   {
+    "arm": "oc_7f7a7b68a52c",
+    "ok": true,
+    "reason": null,
+    "detail": "",
+    "index_size_bytes": 31539200,
+    "build_ns": 3320498084
+   }
+  ],
+  "measurements": [
+   {
+    "arm": "baseline",
+    "param_set": "hot_customer",
+    "latencies_ns": [
+     42290041,
+     57238125,
+     50962209,
+     47706084,
+     61670875,
+     68645666,
+     50805041,
+     55790291,
+     51365667,
+     47868292,
+     53283000,
+     57069459,
+     61379625,
+     59710209,
+     50004750,
+     56353917,
+     69038333,
+     33501750,
+     59722292,
+     43093667,
+     50657750,
+     50723209,
+     71958792,
+     49837791,
+     41896208,
+     42289500,
+     44074833,
+     40676208,
+     41624042,
+     41877125
+    ],
+    "failures": [],
+    "fingerprint": {
+     "rows": 20,
+     "multiset": "36aec76c20f8bc2609ef2f864f6a076384f603baa478cc263d412975abe057dc",
+     "ordered": "0f25c9adc935318a9f622a708bed8952bf28ffb2004242ac3e8ca7463219d0d9",
+     "truncated": false
+    },
+    "consistent": true,
+    "plan_sha256": null
+   },
+   {
+    "arm": "baseline",
+    "param_set": "regular_customer",
+    "latencies_ns": [
+     50409667,
+     55625625,
+     56923750,
+     68489084,
+     63383500,
+     51020375,
+     49668084,
+     55297250,
+     49139917,
+     49411917,
+     49674291,
+     45475750,
+     42176125,
+     87368792,
+     42110708,
+     49805334,
+     43132000,
+     48963625,
+     51673833,
+     52525750,
+     52098584,
+     53832083,
+     78446667,
+     41899375,
+     45169416,
+     40221875,
+     37417584,
+     38993375,
+     39238541,
+     37904417
+    ],
+    "failures": [],
+    "fingerprint": {
+     "rows": 9,
+     "multiset": "5687a17063e80b405e206bef8c2f1cee176ab4ce2a2178474c9cd50771bbda9c",
+     "ordered": "61b600e801aaac5d691807985a0278824286e8f60db0dc6077b6a705df6fc397",
+     "truncated": false
+    },
+    "consistent": true,
+    "plan_sha256": null
+   },
+   {
+    "arm": "oc_7f7a7b68a52c",
+    "param_set": "hot_customer",
+    "latencies_ns": [
+     416041,
+     357250,
+     304334,
+     287291,
+     227542,
+     529583,
+     435209,
+     875750,
+     353083,
+     453375,
+     517625,
+     286542,
+     260333,
+     248209,
+     239292,
+     426417,
+     217125,
+     196417,
+     205000,
+     291458,
+     348917,
+     248750,
+     207333,
+     196459,
+     257500,
+     295417,
+     273708,
+     209792,
+     213208,
+     669542
+    ],
+    "failures": [],
+    "fingerprint": {
+     "rows": 20,
+     "multiset": "36aec76c20f8bc2609ef2f864f6a076384f603baa478cc263d412975abe057dc",
+     "ordered": "0f25c9adc935318a9f622a708bed8952bf28ffb2004242ac3e8ca7463219d0d9",
+     "truncated": false
+    },
+    "consistent": true,
+    "plan_sha256": null
+   },
+   {
+    "arm": "oc_7f7a7b68a52c",
+    "param_set": "regular_customer",
+    "latencies_ns": [
+     197375,
+     137833,
+     133750,
+     122916,
+     136333,
+     385584,
+     282208,
+     169291,
+     149084,
+     139583,
+     377334,
+     192709,
+     206584,
+     169833,
+     137250,
+     321542,
+     184125,
+     192625,
+     183459,
+     184792,
+     476167,
+     265708,
+     214000,
+     156792,
+     170167,
+     377541,
+     215000,
+     154166,
+     150209,
+     149000
+    ],
+    "failures": [],
+    "fingerprint": {
+     "rows": 9,
+     "multiset": "5687a17063e80b405e206bef8c2f1cee176ab4ce2a2178474c9cd50771bbda9c",
+     "ordered": "61b600e801aaac5d691807985a0278824286e8f60db0dc6077b6a705df6fc397",
+     "truncated": false
+    },
+    "consistent": true,
+    "plan_sha256": null
+   }
+  ],
+  "stats": [
+   {
+    "arm": "oc_7f7a7b68a52c",
+    "param_set": "hot_customer",
+    "baseline": {
+     "n": 30,
+     "median_ns": 50764125.0,
+     "p95_ns": 69038333,
+     "min_ns": 33501750,
+     "max_ns": 71958792,
+     "iqr_ns": 13857000.0,
+     "cv": 0.179942506549649,
+     "robust_cv": 0.2023486738492743
+    },
+    "candidate": {
+     "n": 30,
+     "median_ns": 286916.5,
+     "p95_ns": 669542,
+     "min_ns": 196417,
+     "max_ns": 875750,
+     "iqr_ns": 170863.75,
+     "cv": 0.46104553337191095,
+     "robust_cv": 0.4414509539848418
+    },
+    "speedup": 176.92996045887915,
+    "ci_low": 143.88959268841506,
+    "ci_high": 210.50074074074075
+   },
+   {
+    "arm": "oc_7f7a7b68a52c",
+    "param_set": "regular_customer",
+    "baseline": {
+     "n": 30,
+     "median_ns": 49671187.5,
+     "p95_ns": 78446667,
+     "min_ns": 37417584,
+     "max_ns": 87368792,
+     "iqr_ns": 11090406.0,
+     "cv": 0.22357860207448804,
+     "robust_cv": 0.1655125587099539
+    },
+    "candidate": {
+     "n": 30,
+     "median_ns": 183792.0,
+     "p95_ns": 385584,
+     "min_ns": 122916,
+     "max_ns": 476167,
+     "iqr_ns": 65384.75,
+     "cv": 0.42859155172654606,
+     "robust_cv": 0.26371687096826446
+    },
+    "speedup": 270.2576145860538,
+    "ci_low": 236.33474663405343,
+    "ci_high": 319.6289519089812
+   }
+  ],
+  "verdicts": [
+   {
+    "arm": "oc_7f7a7b68a52c",
+    "verdict": "inconclusive",
+    "reasons": [
+     {
+      "code": "insufficient_evidence",
+      "detail": "hot_customer: candidate robust CV 0.44 > 0.25"
+     }
+    ],
+    "gate": 4
+   }
+  ],
+  "tournament": [
+   {
+    "arm": "oc_7f7a7b68a52c",
+    "rank": 1,
+    "verdict": "inconclusive",
+    "primary_ci_low": 143.88959268841506
+   }
+  ],
+  "winner": null,
+  "order_is_total": false,
+  "provenance": "prerecorded"
+ }
+}

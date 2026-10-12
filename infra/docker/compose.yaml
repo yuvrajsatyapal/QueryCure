@@ -83,6 +83,34 @@ services:
     mem_limit: 64m
     pids_limit: 64
 
+  # Opt-in worker container (`docker compose --profile bench up -d worker`): it reaches the
+  # sandbox on sandbox_net directly, without the relay's host<->VM hop. Measured on Docker
+  # Desktop (2026-10-12): SELECT 1 round trip 40 us median / 24 us IQR in-network vs
+  # 355-451 us / 125-171 us through the published port (ADR-0018). Stop any host worker first,
+  # or both will claim jobs.
+  worker:
+    profiles: ["bench"]
+    build: ../../backend
+    environment:
+      QC_PROFILE: local
+      DATABASE_URL: postgresql://qc_app:${QC_APP_PASSWORD:-qc_local_dev_only}@metadata-db:5432/querycure
+      DATABASE_URL_DIRECT: postgresql://qc_app:${QC_APP_PASSWORD:-qc_local_dev_only}@metadata-db:5432/querycure
+      SANDBOX_ADMIN_URL: postgresql://qc_sandbox_admin:${QC_SANDBOX_PASSWORD:-qc_local_dev_only}@sandbox-db:5432/sandbox_admin
+      SANDBOX_BENCH_PASSWORD: ${SANDBOX_BENCH_PASSWORD:-qc_local_dev_only}
+      SANDBOX_IMAGE_DIGEST: postgres:17
+      LLM_PROVIDER: ${LLM_PROVIDER:-openrouter}
+      LLM_MODEL: ${LLM_MODEL:-nvidia/nemotron-3-super-120b-a12b:free}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      TZ: UTC
+    networks:
+      - default
+      - sandbox_net
+    depends_on:
+      metadata-db:
+        condition: service_healthy
+      sandbox-db:
+        condition: service_healthy
+
 networks:
   default:
   sandbox_net:

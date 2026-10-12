@@ -1,0 +1,357 @@
+{
+ "schema_version": 1,
+ "provenance": "prerecorded",
+ "recorded_on": "2026-10-12",
+ "source_note": "Benchmark-engine eval case (index_regression, hand-written candidate, host worker via relay).",
+ "label": "Prerecorded on arm64 (8 CPUs), Darwin, 2026-10-12 — not your database",
+ "config": {
+  "schema_version": 1,
+  "experiment_id": "4b9eebac-1ffb-46b1-9abc-d5b4927f84f2",
+  "workload_id": "index_regression@v1:sf=0.1:seed=42",
+  "baseline_query": "SELECT * FROM tickets WHERE status = $1 ORDER BY opened_at, id LIMIT 10",
+  "candidates": [
+   {
+    "arm": "oc_0000000000a5",
+    "candidate_id": null,
+    "kind": "create_index",
+    "ddl": [
+     "CREATE INDEX ON tickets (opened_at, id)"
+    ],
+    "query": null,
+    "write_overhead": "unknown"
+   }
+  ],
+  "param_sets": [
+   {
+    "name": "open",
+    "values": [
+     "open"
+    ],
+    "edge_case": false
+   },
+   {
+    "name": "escalated",
+    "values": [
+     "escalated"
+    ],
+    "edge_case": false
+   }
+  ],
+  "warmup_runs": 5,
+  "measured_runs": 30,
+  "block_size": 5,
+  "query_timeout_ms": 10000,
+  "max_index_bytes": null,
+  "max_build_ms": 120000,
+  "min_effect": 1.1,
+  "max_regression": 0.95,
+  "max_cv": 0.25,
+  "max_error_rate": 0.1,
+  "row_hash_cap": 100000,
+  "seed": 42,
+  "cache_mode": "warm"
+ },
+ "environment": {
+  "pg_version": "170011",
+  "pg_settings": {
+   "shared_buffers": "256MB",
+   "work_mem": "16MB",
+   "effective_cache_size": "1GB",
+   "random_page_cost": "1.1",
+   "seq_page_cost": "1",
+   "jit": "off",
+   "max_parallel_workers_per_gather": "0",
+   "default_statistics_target": "100",
+   "autovacuum": "on"
+  },
+  "sandbox_image_digest": "unrecorded",
+  "workload_id": "index_regression@v1:sf=0.1:seed=42",
+  "workload_data_digest": "2fe42b873d12af57077d16bd1598287eea5360206030dfe9d493f1fa712e2f64",
+  "row_profile": "qc-row-v1",
+  "cpu_arch": "arm64",
+  "cpu_model": "arm",
+  "cpu_count": 8,
+  "memory_bytes": 8589934592,
+  "os": "Darwin 25.6.0",
+  "container_runtime": "docker",
+  "autovacuum_disabled_on_clones": true
+ },
+ "result": {
+  "schema_version": 1,
+  "experiment_id": "4b9eebac-1ffb-46b1-9abc-d5b4927f84f2",
+  "engine_version": "bench@1",
+  "environment_digest": "36b5942beaec95c035b22c51de8d5fedf37f3d42b8e717615194c4bfd6a67b70",
+  "builds": [
+   {
+    "arm": "oc_0000000000a5",
+    "ok": true,
+    "reason": null,
+    "detail": "",
+    "index_size_bytes": 958464,
+    "build_ns": 30336375
+   }
+  ],
+  "measurements": [
+   {
+    "arm": "baseline",
+    "param_set": "open",
+    "latencies_ns": [
+     2666625,
+     2939792,
+     4021375,
+     2837375,
+     2770458,
+     4225959,
+     3078875,
+     4075500,
+     2713208,
+     2788209,
+     2302333,
+     2248916,
+     2304000,
+     3368708,
+     3023291,
+     2538417,
+     3150333,
+     2908625,
+     2863750,
+     2521875,
+     3079708,
+     3101833,
+     3154958,
+     2568917,
+     2798708,
+     2563334,
+     2505041,
+     2344375,
+     5374625,
+     2757125
+    ],
+    "failures": [],
+    "fingerprint": {
+     "rows": 10,
+     "multiset": "a4f8b8ad5f65e358e578260f7911e6b4396df89ba228d1f4beb78df3bf04953f",
+     "ordered": "2835db3fb0ffbee63a55835f2ff984bd5d4a09c5d6032066342b918a5ffae5cc",
+     "truncated": false
+    },
+    "consistent": true,
+    "plan_sha256": null
+   },
+   {
+    "arm": "baseline",
+    "param_set": "escalated",
+    "latencies_ns": [
+     2746208,
+     1866125,
+     2199541,
+     3651584,
+     3083209,
+     3554750,
+     2428709,
+     2067125,
+     2193708,
+     2331625,
+     5329541,
+     2666375,
+     2205542,
+     1981333,
+     2129583,
+     1920958,
+     2193708,
+     2005959,
+     1956416,
+     1914167,
+     1949334,
+     2031000,
+     2162417,
+     1810875,
+     1847125,
+     2863584,
+     2001875,
+     1923792,
+     1881792,
+     1914417
+    ],
+    "failures": [],
+    "fingerprint": {
+     "rows": 10,
+     "multiset": "b7a0a49c879897c7e1767a4c341bd6c6467e9b04084255f31c43f2e1f2d228ef",
+     "ordered": "3cec0c5d850959eafef6e29b5b83add29f8b8123e76cd9aad267c2bbaaa9aaf5",
+     "truncated": false
+    },
+    "consistent": true,
+    "plan_sha256": null
+   },
+   {
+    "arm": "oc_0000000000a5",
+    "param_set": "open",
+    "latencies_ns": [
+     777583,
+     699959,
+     645000,
+     949750,
+     709125,
+     1407500,
+     1296458,
+     9610167,
+     11577292,
+     8048333,
+     946000,
+     919167,
+     601917,
+     550250,
+     718125,
+     720125,
+     661167,
+     574125,
+     577875,
+     602959,
+     1507792,
+     912125,
+     1166500,
+     744458,
+     622333,
+     903583,
+     1355875,
+     814583,
+     771375,
+     625417
+    ],
+    "failures": [],
+    "fingerprint": {
+     "rows": 10,
+     "multiset": "a4f8b8ad5f65e358e578260f7911e6b4396df89ba228d1f4beb78df3bf04953f",
+     "ordered": "2835db3fb0ffbee63a55835f2ff984bd5d4a09c5d6032066342b918a5ffae5cc",
+     "truncated": false
+    },
+    "consistent": true,
+    "plan_sha256": null
+   },
+   {
+    "arm": "oc_0000000000a5",
+    "param_set": "escalated",
+    "latencies_ns": [
+     10511541,
+     8547542,
+     8875000,
+     9825625,
+     8464833,
+     13612041,
+     7542000,
+     7543958,
+     7404416,
+     7001625,
+     8303708,
+     7512166,
+     8154208,
+     7165833,
+     7381584,
+     9344417,
+     8651834,
+     8019958,
+     7427334,
+     16883375,
+     9425292,
+     7544500,
+     7886625,
+     7356084,
+     7522750,
+     7864250,
+     6662542,
+     8515958,
+     7090166,
+     6913000
+    ],
+    "failures": [],
+    "fingerprint": {
+     "rows": 10,
+     "multiset": "b7a0a49c879897c7e1767a4c341bd6c6467e9b04084255f31c43f2e1f2d228ef",
+     "ordered": "3cec0c5d850959eafef6e29b5b83add29f8b8123e76cd9aad267c2bbaaa9aaf5",
+     "truncated": false
+    },
+    "consistent": true,
+    "plan_sha256": null
+   }
+  ],
+  "stats": [
+   {
+    "arm": "oc_0000000000a5",
+    "param_set": "open",
+    "baseline": {
+     "n": 30,
+     "median_ns": 2818041.5,
+     "p95_ns": 4225959,
+     "min_ns": 2248916,
+     "max_ns": 5374625,
+     "iqr_ns": 531572.0,
+     "cv": 0.22433928582098447,
+     "robust_cv": 0.1398307743621681
+    },
+    "candidate": {
+     "n": 30,
+     "median_ns": 774479.0,
+     "p95_ns": 9610167,
+     "min_ns": 550250,
+     "max_ns": 11577292,
+     "iqr_ns": 463270.75,
+     "cv": 1.5963057848659254,
+     "robust_cv": 0.4434179650445533
+    },
+    "speedup": 3.6386286781178057,
+    "ci_low": 2.9707345240399383,
+    "ci_high": 4.177685407288141
+   },
+   {
+    "arm": "oc_0000000000a5",
+    "param_set": "escalated",
+    "baseline": {
+     "n": 30,
+     "median_ns": 2098354.0,
+     "p95_ns": 3651584,
+     "min_ns": 1810875,
+     "max_ns": 5329541,
+     "iqr_ns": 474260.5,
+     "cv": 0.31346162425226176,
+     "robust_cv": 0.16754298474730986
+    },
+    "candidate": {
+     "n": 30,
+     "median_ns": 7875437.5,
+     "p95_ns": 13612041,
+     "min_ns": 6662542,
+     "max_ns": 16883375,
+     "iqr_ns": 1215615.5,
+     "cv": 0.24586988574608962,
+     "robust_cv": 0.11442201461938854
+    },
+    "speedup": 0.2664428484131834,
+    "ci_low": 0.23921147136196425,
+    "ci_high": 0.29155278823057995
+   }
+  ],
+  "verdicts": [
+   {
+    "arm": "oc_0000000000a5",
+    "verdict": "rejected",
+    "reasons": [
+     {
+      "code": "regression",
+      "detail": "escalated: speedup CI upper 0.292 < 0.95"
+     }
+    ],
+    "gate": 5
+   }
+  ],
+  "tournament": [
+   {
+    "arm": "oc_0000000000a5",
+    "rank": 1,
+    "verdict": "rejected",
+    "primary_ci_low": 2.9707345240399383
+   }
+  ],
+  "winner": null,
+  "order_is_total": true,
+  "provenance": "prerecorded"
+ }
+}

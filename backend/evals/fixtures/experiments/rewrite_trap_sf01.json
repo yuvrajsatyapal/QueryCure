@@ -1,0 +1,229 @@
+{
+ "schema_version": 1,
+ "provenance": "prerecorded",
+ "recorded_on": "2026-10-12",
+ "source_note": "Benchmark-engine eval case (rewrite_trap, hand-written candidate, host worker via relay).",
+ "label": "Prerecorded on arm64 (8 CPUs), Darwin, 2026-10-12 — not your database",
+ "config": {
+  "schema_version": 1,
+  "experiment_id": "e38756e6-00aa-4566-bb7a-37d8fabc9f78",
+  "workload_id": "rewrite_trap@v1:sf=0.1:seed=42",
+  "baseline_query": "SELECT count(*) FROM accounts WHERE region_code NOT IN (SELECT region_code FROM closed_regions)",
+  "candidates": [
+   {
+    "arm": "oc_0000000000a6",
+    "candidate_id": null,
+    "kind": "query_rewrite",
+    "ddl": [],
+    "query": "SELECT count(*) FROM accounts a WHERE NOT EXISTS (SELECT 1 FROM closed_regions c WHERE c.region_code = a.region_code)",
+    "write_overhead": "unknown"
+   }
+  ],
+  "param_sets": [
+   {
+    "name": "default",
+    "values": [],
+    "edge_case": false
+   }
+  ],
+  "warmup_runs": 5,
+  "measured_runs": 30,
+  "block_size": 5,
+  "query_timeout_ms": 10000,
+  "max_index_bytes": null,
+  "max_build_ms": 120000,
+  "min_effect": 1.1,
+  "max_regression": 0.95,
+  "max_cv": 0.25,
+  "max_error_rate": 0.1,
+  "row_hash_cap": 100000,
+  "seed": 42,
+  "cache_mode": "warm"
+ },
+ "environment": {
+  "pg_version": "170011",
+  "pg_settings": {
+   "shared_buffers": "256MB",
+   "work_mem": "16MB",
+   "effective_cache_size": "1GB",
+   "random_page_cost": "1.1",
+   "seq_page_cost": "1",
+   "jit": "off",
+   "max_parallel_workers_per_gather": "0",
+   "default_statistics_target": "100",
+   "autovacuum": "on"
+  },
+  "sandbox_image_digest": "unrecorded",
+  "workload_id": "rewrite_trap@v1:sf=0.1:seed=42",
+  "workload_data_digest": "66bd22dff5f8bf861451c6a6faf73def04e84cfe771ef96c029402707d437671",
+  "row_profile": "qc-row-v1",
+  "cpu_arch": "arm64",
+  "cpu_model": "arm",
+  "cpu_count": 8,
+  "memory_bytes": 8589934592,
+  "os": "Darwin 25.6.0",
+  "container_runtime": "docker",
+  "autovacuum_disabled_on_clones": true
+ },
+ "result": {
+  "schema_version": 1,
+  "experiment_id": "e38756e6-00aa-4566-bb7a-37d8fabc9f78",
+  "engine_version": "bench@1",
+  "environment_digest": "f5e922169f8886db72f5548e150e2c1a43fcef613bc2a69460a7d3f07b4b1cda",
+  "builds": [
+   {
+    "arm": "oc_0000000000a6",
+    "ok": true,
+    "reason": null,
+    "detail": "",
+    "index_size_bytes": 0,
+    "build_ns": 0
+   }
+  ],
+  "measurements": [
+   {
+    "arm": "baseline",
+    "param_set": "default",
+    "latencies_ns": [
+     1583667,
+     1458625,
+     1532666,
+     2876250,
+     4274375,
+     1782125,
+     1967250,
+     1622708,
+     1503958,
+     1435166,
+     1715500,
+     1706041,
+     1651292,
+     1597167,
+     1707083,
+     1492750,
+     1497875,
+     1612042,
+     1667750,
+     1878917,
+     1579583,
+     2709625,
+     1656125,
+     2095250,
+     1592708,
+     1753416,
+     1635125,
+     1615250,
+     2958583,
+     1563042
+    ],
+    "failures": [],
+    "fingerprint": {
+     "rows": 1,
+     "multiset": "00e8a857ea5876b44e0ccc4da42d08fd9f0f3c4bd1c9c89a3fa81ecf7df8eabe",
+     "ordered": "00e8a857ea5876b44e0ccc4da42d08fd9f0f3c4bd1c9c89a3fa81ecf7df8eabe",
+     "truncated": false
+    },
+    "consistent": true,
+    "plan_sha256": null
+   },
+   {
+    "arm": "oc_0000000000a6",
+    "param_set": "default",
+    "latencies_ns": [
+     1375416,
+     1253875,
+     1235041,
+     1147459,
+     1200750,
+     4254959,
+     1401584,
+     1309417,
+     1407458,
+     1301500,
+     1402916,
+     1253792,
+     2996833,
+     1295834,
+     1226959,
+     1261625,
+     1203666,
+     1178833,
+     1175792,
+     1182292,
+     1326292,
+     1267792,
+     1233667,
+     1696166,
+     1276334,
+     1272167,
+     1163459,
+     1131917,
+     1403917,
+     1429959
+    ],
+    "failures": [],
+    "fingerprint": {
+     "rows": 1,
+     "multiset": "fe3231d5cb3dbd1e55823c25a1c20318d760d39d0f0e0980ffea93879edcd410",
+     "ordered": "fe3231d5cb3dbd1e55823c25a1c20318d760d39d0f0e0980ffea93879edcd410",
+     "truncated": false
+    },
+    "consistent": true,
+    "plan_sha256": null
+   }
+  ],
+  "stats": [
+   {
+    "arm": "oc_0000000000a6",
+    "param_set": "default",
+    "baseline": {
+     "n": 30,
+     "median_ns": 1643208.5,
+     "p95_ns": 2958583,
+     "min_ns": 1435166,
+     "max_ns": 4274375,
+     "iqr_ns": 194343.75,
+     "cv": 0.32424744352770146,
+     "robust_cv": 0.08767301786951558
+    },
+    "candidate": {
+     "n": 30,
+     "median_ns": 1269979.5,
+     "p95_ns": 2996833,
+     "min_ns": 1131917,
+     "max_ns": 4254959,
+     "iqr_ns": 185552.75,
+     "cv": 0.4343939801155885,
+     "robust_cv": 0.10830755076152211
+    },
+    "speedup": 1.2938858461888558,
+    "ci_low": 1.2291501415020087,
+    "ci_high": 1.367044219081398
+   }
+  ],
+  "verdicts": [
+   {
+    "arm": "oc_0000000000a6",
+    "verdict": "rejected",
+    "reasons": [
+     {
+      "code": "result_mismatch",
+      "detail": "default: same row count, different rows"
+     }
+    ],
+    "gate": 3
+   }
+  ],
+  "tournament": [
+   {
+    "arm": "oc_0000000000a6",
+    "rank": 1,
+    "verdict": "rejected",
+    "primary_ci_low": 1.2291501415020087
+   }
+  ],
+  "winner": null,
+  "order_is_total": false,
+  "provenance": "prerecorded"
+ }
+}

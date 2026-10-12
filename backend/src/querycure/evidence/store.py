@@ -12,7 +12,11 @@ from querycure.domain.investigation import Evidence
 from querycure.events.emitter import emit
 from querycure.events.types import EventType
 
-_LOCK_RUN = text("SELECT finalized_at FROM investigation_runs WHERE id = :id FOR SHARE")
+# FOR NO KEY UPDATE, not FOR SHARE: content writers emit an event in the same transaction,
+# and that UPDATE of the run row needs this lock anyway. Two writers holding FOR SHARE and
+# both upgrading deadlocked (parallel analysts, 2026-10-12). It still waits for an in-flight
+# finalize_run (FOR UPDATE).
+_LOCK_RUN = text("SELECT finalized_at FROM investigation_runs WHERE id = :id FOR NO KEY UPDATE")
 _INSERT = text(
     "INSERT INTO evidence (id, run_id, kind, artifact_id, locator, summary, data, provenance) "
     "SELECT x.id, :run_id, x.kind, a.id, x.locator, x.summary, x.data, x.provenance "
@@ -32,7 +36,8 @@ _SELECT = (
 async def ensure_writable(conn: AsyncConnection, run_id: uuid.UUID) -> None:
     """Content writes check finalization in their own transaction (REPLAY_ENGINE §5).
 
-    FOR SHARE waits for an in-flight finalize_run (FOR UPDATE) instead of racing it."""
+    The row lock waits for an in-flight finalize_run (FOR UPDATE) instead of racing it, and
+    serializes content writers of one run, which the event `seq` update does anyway."""
     row = (await conn.execute(_LOCK_RUN, {"id": run_id})).first()
     if row is None:
         raise InvalidStateError("Run not found.")
