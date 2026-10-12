@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | Phase | **2 — Multi-agent intelligence** (Phase 1 complete: [PHASE_1_REPORT](reports/PHASE_1_REPORT.md)) |
-| Status | **Phase 2 in progress.** T2.1–T2.11 and T2.14 done; 2 of 5 smoke recordings wait for the next free-quota day; T2.12–T2.13 next |
+| Status | **Phase 2 in progress.** T2.1–T2.12 and T2.14 done; 2 of 5 smoke recordings wait for the next free-quota day; T2.13 next |
 | Last updated | 2026-10-12 |
 | Application code | Phase 1 foundation: API (session, connections, inspect, workloads, health), metadata DB migrations, SQL/plan parsing, inspection gateway, artifact store, demo workloads; web app with connections and plan workspace (tree + graph). No agents yet. |
 
@@ -251,6 +251,15 @@
   - Fixes from live runs: call timeout configurable, default 120 s (`LLM_CALL_TIMEOUT_SECONDS`); runs truncated by the eval cap or free quota are never recorded; the injection check no longer compares tool sets (live variance) but checks for non-allowlisted / injected tools.
   - Every live response reported `usage.cost = 0`; no request was blocked by the paid-usage guard.
   - Tests: 7 unit (prompt hash ignores fence tokens, replay order and refusal, round trip, slugs, cases load) + 3 integration (offline record → replay gives identical metrics, missing recording fails, budget case). Full suite 736 passed.
+- [x] **T2.12 frontend run view** (`components/investigation/*`, `app/app/investigations/[id]`, `lib/api/investigations.ts`, `lib/events/*`, Playwright `e2e/`).
+  - Start: the workspace's "New investigation" form (title, objective, param-sets editor deferred from T1.17, mode from the plan source) sends the uploaded plan digest or the live connection, with one `Idempotency-Key` per form; shows the configured model and warns when no key is set.
+  - Run view: Findings (hypotheses ranked, ClaimBadge "Hypothesis · confidence · unverified" with a dashed border, supporting/contradicting EvidenceChips; findings grouped by agent) and Plan (tree/graph from `/runs/{id}/plans`). An EvidenceChip on a plan node switches to Plan with the cited node selected and shows the evidence summary. Right panel: status/outcome, Cancel, budget meters (`role=meter`), live timeline in words with a throttled `aria-live` region.
+  - SSE: `useRunEvents` registers a listener per named event type, merges by `seq`, invalidates findings/run queries on the relevant events, and closes the stream on a terminal status.
+  - **Bug found in the browser:** the API's CORS `allow_headers` lacked `Idempotency-Key` (and `Last-Event-ID` for SSE reconnects), so starting an investigation failed with a preflight 400. Fixed with a regression test.
+  - Stub LLM (`LLM_PROVIDER=stub`, local profile only): deterministic canned JSON that cites real evidence IDs from the prompt, labelled `stub/canned`, for end-to-end tests without model calls.
+  - Environment: this shell defaulted to Node 20; the test stack needs Node 22 (CI's version). Added `.nvmrc` (22).
+  - Tests: Vitest 55 (start flow with idempotency key and param sets, invalid param set, event merge/parse/terminal, param-set parsing, run view: unverified claims, **chip → plan node selected**, timeline in words, budget + cancel). **Playwright e2e** against the real API, worker and metadata DB with the stub LLM: upload plan → start → live timeline to "Run completed" → stub hypothesis → chip → Seq Scan row selected (3/3 runs, ~5 s each). New CI job `e2e`. Backend 740 passed.
+  - **Live browser check with the real free model:** started from the UI, the timeline streamed live; the run completed `unverified_recommendations` in 7 calls (all `nvidia/nemotron-3-super-120b-a12b:free` via Nvidia, cost 0) with ranked hypotheses `missing_index` (high) / `cardinality_misestimate` / `inefficient_sort`; the chip highlighted the Seq Scan (62.6 ms, 91.1%). No page-level horizontal scroll at 375 px.
 
 ## Blockers
 

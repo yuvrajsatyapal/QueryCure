@@ -102,3 +102,54 @@ jobs:
         run: pnpm test
       - name: Build
         run: pnpm build
+
+  e2e:
+    name: End-to-end (stub LLM, no model calls)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: qc_owner
+          POSTGRES_PASSWORD: qc_ci_only
+          POSTGRES_DB: querycure
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U qc_owner"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    env:
+      # The UI flow is under test here; role grants are covered by the integration job.
+      DATABASE_URL: postgresql://qc_owner:qc_ci_only@127.0.0.1:5432/querycure
+      DATABASE_URL_DIRECT: postgresql://qc_owner:qc_ci_only@127.0.0.1:5432/querycure
+      DATABASE_MIGRATION_URL: postgresql://qc_owner:qc_ci_only@127.0.0.1:5432/querycure
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.3.0  # exact pin: no floating major tag is published
+        with:
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+      - uses: pnpm/action-setup@v6
+        with:
+          package_json_file: frontend/package.json
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+      - name: Backend install and migrate
+        working-directory: backend
+        run: uv sync --locked && uv run alembic upgrade head
+      - name: Frontend install
+        working-directory: frontend
+        run: pnpm install --frozen-lockfile && pnpm exec playwright install --with-deps chromium
+      - name: Playwright
+        working-directory: frontend
+        run: pnpm exec playwright test
+      - uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: playwright-traces
+          path: frontend/test-results/

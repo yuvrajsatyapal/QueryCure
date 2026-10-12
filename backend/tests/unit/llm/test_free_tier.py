@@ -226,3 +226,39 @@ def test_budget_error_shape_for_daily_quota() -> None:
 
 def test_call_timeout_defaults_to_two_minutes_for_slow_free_models() -> None:
     assert Settings(_env_file=None).llm_call_timeout_seconds == 120.0
+
+
+async def test_stub_cites_a_real_plan_node_from_the_prompt() -> None:
+    from querycure.llm.stub import StubClient
+
+    prompt = [
+        ChatMessage(role="system", content="Combine the analysts' findings into hypotheses"),
+        ChatMessage(
+            role="user",
+            content="[ev_aaaaaaaaaaaa] (plan_summary) Plan with 4 nodes\n"
+            "[ev_bbbbbbbbbbbb] (plan_node) Seq Scan on orders; 62.6 ms self",
+        ),
+    ]
+
+    out = await StubClient().complete_json(prompt)
+
+    body = json.loads(out.text)
+    assert body["hypotheses"][0]["supporting_evidence"] == ["ev_bbbbbbbbbbbb"]
+    assert body["hypotheses"][0]["confidence"] == "low"
+    assert (out.model, out.served_by) == ("stub/canned", "stub")
+
+
+def test_stub_provider_is_local_only() -> None:
+    import base64
+    import os
+
+    from querycure.core.config import Profile
+
+    with pytest.raises(ValidationError, match="local profile"):
+        Settings(
+            _env_file=None,
+            llm_provider="stub",
+            profile=Profile.DEMO,
+            allow_private_targets=False,
+            master_key=base64.b64encode(os.urandom(32)).decode(),
+        )

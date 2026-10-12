@@ -15,8 +15,8 @@ async def models(settings: SettingsDep, _user: CurrentUser) -> ModelsResponse:
         if settings.llm_provider == "gemini"
         else settings.openrouter_api_key
     )
-    configured = (
-        settings.profile is Profile.LOCAL and key is not None and bool(key.get_secret_value())
+    configured = settings.profile is Profile.LOCAL and (
+        settings.llm_provider == "stub" or (key is not None and bool(key.get_secret_value()))
     )
     return ModelsResponse(
         provider=settings.llm_provider,

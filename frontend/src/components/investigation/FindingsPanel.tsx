@@ -1,0 +1,84 @@
+import type { Finding, FindingsResponse } from "@/lib/api/types";
+import { ClaimBadge } from "./ClaimBadge";
+import { EvidenceChip } from "./EvidenceChip";
+
+const AGENT_LABEL: Record<string, string> = {
+  query_analyzer: "Query Analyzer",
+  index_strategist: "Index Strategist",
+  workload_investigator: "Workload Investigator",
+  supervisor: "Supervisor",
+};
+
+export function FindingsPanel({
+  data,
+  onEvidence,
+  activeEvidence,
+}: {
+  data: FindingsResponse | undefined;
+  onEvidence: (id: string) => void;
+  activeEvidence: string | null;
+}) {
+  if (!data || (data.hypotheses.length === 0 && data.findings.length === 0)) {
+    return <p className="rounded-lg border border-border bg-surface p-6 text-muted">No findings yet.</p>;
+  }
+  const byAgent = data.findings.reduce<Record<string, Finding[]>>((acc, f) => {
+    (acc[f.agent] ??= []).push(f);
+    return acc;
+  }, {});
+  const chips = (ids: string[]) =>
+    ids.map((id) => <EvidenceChip key={id} id={id} onOpen={onEvidence} active={id === activeEvidence} />);
+  return (
+    <div className="flex flex-col gap-6">
+      <section aria-labelledby="hypotheses-heading">
+        <h2 id="hypotheses-heading" className="mb-2 text-lg font-semibold">
+          Hypotheses
+        </h2>
+        {data.hypotheses.length === 0 ? (
+          <p className="text-sm text-muted">No hypotheses were produced.</p>
+        ) : (
+          <ol className="flex flex-col gap-3">
+            {data.hypotheses.map((h) => (
+              <li key={h.key} className="rounded-lg border border-border bg-surface p-4">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="font-mono text-xs text-muted">#{h.rank}</span>
+                  <span className="font-mono text-xs">{h.category}</span>
+                  <ClaimBadge confidence={h.confidence} />
+                </div>
+                <p className="mt-2">{h.statement}</p>
+                <div className="mt-2 flex flex-wrap items-center gap-1 text-xs text-muted">
+                  Supporting: {chips(h.supportingEvidence)}
+                  {(h.contradictingEvidence ?? []).length > 0 ? (
+                    <> · Contradicting: {chips(h.contradictingEvidence ?? [])}</>
+                  ) : null}
+                </div>
+                {h.uncertaintyNotes ? <p className="mt-2 text-sm text-muted">Uncertain: {h.uncertaintyNotes}</p> : null}
+                <p className="mt-1 text-xs text-muted">Verify by: {h.verificationMethod.replace("_", " ")}</p>
+              </li>
+            ))}
+          </ol>
+        )}
+      </section>
+      <section aria-labelledby="findings-heading">
+        <h2 id="findings-heading" className="mb-2 text-lg font-semibold">
+          Findings by agent
+        </h2>
+        {Object.entries(byAgent).map(([agent, findings]) => (
+          <div key={agent} className="mb-4">
+            <h3 className="mb-1 font-mono text-xs uppercase tracking-wider text-muted">{AGENT_LABEL[agent] ?? agent}</h3>
+            <ul className="flex flex-col gap-2">
+              {findings.map((f) => (
+                <li key={f.key} className="rounded-md border border-border bg-surface p-3">
+                  <p className="font-medium">
+                    {f.title} <span className="font-mono text-[11px] text-muted">({f.severity})</span>
+                  </p>
+                  <p className="text-sm">{f.detail}</p>
+                  <div className="mt-1 flex flex-wrap gap-1">{chips(f.evidenceIds)}</div>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
+      </section>
+    </div>
+  );
+}

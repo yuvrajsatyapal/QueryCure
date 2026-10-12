@@ -59,12 +59,13 @@ export interface ApiRequest {
   body?: unknown;
   /** Sent verbatim (no case conversion), e.g. PostgreSQL plan JSON whose keys contain spaces. */
   rawJsonBody?: string;
+  headers?: Record<string, string>;
   signal?: AbortSignal;
 }
 
 export async function apiFetch<T>(path: string, request: ApiRequest = {}): Promise<T> {
   const method = request.method ?? "GET";
-  const headers = new Headers({ Accept: "application/json" });
+  const headers = new Headers({ Accept: "application/json", ...request.headers });
   const hasBody = request.body !== undefined || request.rawJsonBody !== undefined;
   if (hasBody) headers.set("Content-Type", "application/json");
   if (method !== "GET") {

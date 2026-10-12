@@ -29,6 +29,7 @@ from querycure.llm.credentials import resolve_api_key
 from querycure.llm.providers import build_client
 from querycure.llm.rate_limit import LlmGate
 from querycure.llm.structured import RetryPolicy
+from querycure.llm.stub import StubClient
 
 log = get_logger(__name__)
 
@@ -39,6 +40,8 @@ def env_clients(settings: Settings) -> ClientsFactory:
     """Local profile: the configured provider with the env key (resolved per run)."""
 
     def make(inputs: RunInputs) -> LlmClients:
+        if settings.llm_provider == "stub":
+            return LlmClients(primary=StubClient())
         key = resolve_api_key(settings, settings.llm_provider)
         primary = build_client(settings.llm_provider, settings.llm_model, key, settings=settings)
         fallback = (

@@ -4,6 +4,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { useState, type ChangeEvent } from "react";
 import { ErrorNotice } from "@/components/common/ErrorNotice";
 import { SqlEditor } from "@/components/editor/SqlEditor";
+import { StartInvestigation } from "@/components/investigation/StartInvestigation";
 import { NodeDetails } from "@/components/plan/NodeDetails";
 import { PlanGraph } from "@/components/plan/PlanGraph";
 import { PlanTreeTable } from "@/components/plan/PlanTreeTable";
@@ -17,6 +18,7 @@ interface PlanResult {
   plan: PlanTree;
   metrics: NodeMetrics[];
   origin: string;
+  artifactSha256?: string;
 }
 
 const MAX_PLAN_CHARS = 5 * 1024 * 1024;
@@ -33,6 +35,7 @@ export function Workspace() {
   const [result, setResult] = useState<PlanResult | null>(null);
   const [selected, setSelected] = useState<number | null>(null);
   const [view, setView] = useState<View>("tree");
+  const [starting, setStarting] = useState(false);
 
   const connections = useQuery({
     queryKey: connectionKeys.all,
@@ -40,13 +43,14 @@ export function Workspace() {
     enabled: source === "live",
   });
 
-  const show = (plan: PlanTree, metrics: NodeMetrics[], origin: string) => {
-    setResult({ plan, metrics, origin });
+  const show = (plan: PlanTree, metrics: NodeMetrics[], origin: string, artifactSha256?: string) => {
+    setResult({ plan, metrics, origin, artifactSha256 });
     setSelected(null);
   };
   const analyze = useMutation({
     mutationFn: () => inspectPlan(planText),
-    onSuccess: (r) => show(r.plan, r.metrics, `uploaded plan · artifact ${r.artifactSha256.slice(0, 12)}`),
+    onSuccess: (r) =>
+      show(r.plan, r.metrics, `uploaded plan · artifact ${r.artifactSha256.slice(0, 12)}`, r.artifactSha256),
   });
   const explain = useMutation({
     mutationFn: () => explainOnConnection(connectionId, query),
@@ -68,17 +72,24 @@ export function Workspace() {
           <h1 className="text-2xl font-semibold">Workspace</h1>
           <button
             type="button"
-            disabled
-            title="Investigations arrive in Phase 2"
-            className="rounded-md bg-accent px-4 py-2 text-sm font-medium text-accent-fg opacity-50"
+            onClick={() => setStarting((v) => !v)}
+            aria-expanded={starting}
+            className="rounded-md bg-accent px-4 py-2 text-sm font-medium text-accent-fg"
           >
-            Start investigation
+            {starting ? "Close" : "New investigation"}
           </button>
         </div>
         <p className="text-sm text-muted">
-          Multi-agent investigations arrive in Phase 2. Today you can inspect a plan from an upload or a
-          live, read-only EXPLAIN.
+          Inspect a plan from an upload or a live, read-only EXPLAIN, then start a multi-agent
+          investigation. Agents cite evidence; nothing is benchmarked until Phase 3.
         </p>
+        {starting ? (
+          <StartInvestigation
+            query={query}
+            planArtifactSha256={source === "upload" ? result?.artifactSha256 : undefined}
+            connectionId={source === "live" && connectionId !== "" ? connectionId : undefined}
+          />
+        ) : null}
         <SqlEditor value={query} onChange={setQuery} />
         <div role="tablist" aria-label="Plan source" className="flex gap-2">
           <button role="tab" aria-selected={source === "upload"} className={tabClass(source === "upload")} onClick={() => setSource("upload")}>

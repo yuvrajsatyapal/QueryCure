@@ -78,7 +78,7 @@ class Settings(BaseSettings):
     )
     # ADR-0016: free OpenRouter models only, by default and for every run unless an operator
     # explicitly turns LLM_FREE_ONLY off. Nothing ever falls back to a paid model.
-    llm_provider: Literal["gemini", "openrouter"] = Field(
+    llm_provider: Literal["gemini", "openrouter", "stub"] = Field(
         default="openrouter", validation_alias=_env("LLM_PROVIDER")
     )
     # Pinned from the Phase 2 free-model benchmark (evals/results, PHASE_2_REPORT).
@@ -129,6 +129,11 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def _free_models_only(self) -> Self:
+        if self.llm_provider == "stub":
+            # Offline canned responses for UI tests: free by construction, local only.
+            if self.profile is not Profile.LOCAL:
+                raise ValueError("LLM_PROVIDER=stub is only allowed in the local profile")
+            return self
         if not self.llm_free_only:
             return self
         if self.llm_provider != "openrouter":
