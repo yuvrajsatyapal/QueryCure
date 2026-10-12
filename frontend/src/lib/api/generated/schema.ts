@@ -4,6 +4,23 @@
  */
 
 export interface paths {
+    "/api/v1/approvals/{approval_id}/decision": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Decide */
+        post: operations["decide_api_v1_approvals__approval_id__decision_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/artifacts/{sha256}": {
         parameters: {
             query?: never;
@@ -104,6 +121,23 @@ export interface paths {
         put?: never;
         /** Test Connection */
         post: operations["test_connection_api_v1_connections__connection_id__test_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/experiments/{experiment_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Experiment Detail */
+        get: operations["experiment_detail_api_v1_experiments__experiment_id__get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -288,6 +322,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/runs/{run_id}/approvals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Run Approvals */
+        get: operations["run_approvals_api_v1_runs__run_id__approvals_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/runs/{run_id}/cancel": {
         parameters: {
             query?: never;
@@ -303,6 +354,23 @@ export interface paths {
          *     to cancelling and the worker stops at its next safe point.
          */
         post: operations["cancel_run_api_v1_runs__run_id__cancel_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/runs/{run_id}/candidates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Run Candidates */
+        get: operations["run_candidates_api_v1_runs__run_id__candidates_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -352,6 +420,23 @@ export interface paths {
         };
         /** Run Evidence */
         get: operations["run_evidence_api_v1_runs__run_id__evidence__evidence_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/runs/{run_id}/experiments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Run Experiments */
+        get: operations["run_experiments_api_v1_runs__run_id__experiments_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -452,12 +537,197 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /**
+         * ApprovalCandidate
+         * @description Exactly what the human sees and approves (SECURITY §6.6).
+         */
+        ApprovalCandidate: {
+            /**
+             * Candidate Id
+             * Format: uuid
+             */
+            candidate_id: string;
+            /** Ddl */
+            ddl: string[];
+            /** Expected Benefit */
+            expected_benefit: string;
+            /** Key */
+            key: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "create_index" | "query_rewrite" | "analyze_statistics" | "extended_statistics";
+            /** Query Sql */
+            query_sql: string | null;
+            /** Risks */
+            risks: string[];
+            /** Sql Sha256 */
+            sql_sha256: string;
+        };
+        /** ApprovalList */
+        ApprovalList: {
+            /** Items */
+            items: components["schemas"]["ApprovalOut"][];
+        };
+        /** ApprovalOut */
+        ApprovalOut: {
+            /** Approved Candidate Ids */
+            approved_candidate_ids: string[];
+            /** Comment */
+            comment: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Decided At */
+            decided_at: string | null;
+            /** Decided By */
+            decided_by: string | null;
+            /**
+             * Expires At
+             * Format: date-time
+             */
+            expires_at: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Kind */
+            kind: string;
+            payload: components["schemas"]["ApprovalPayload"];
+            /** Round */
+            round: number;
+            /**
+             * Run Id
+             * Format: uuid
+             */
+            run_id: string;
+            /** Status */
+            status: string;
+        };
+        /** ApprovalPayload */
+        ApprovalPayload: {
+            /** Baseline Query */
+            baseline_query: string;
+            /** Candidates */
+            candidates: components["schemas"]["ApprovalCandidate"][];
+            /** Param Sets */
+            param_sets: {
+                [key: string]: unknown;
+            }[];
+            /** Sandbox */
+            sandbox: string;
+            /**
+             * Schema Version
+             * @default 1
+             * @constant
+             */
+            schema_version: 1;
+            /** Workload Id */
+            workload_id: string;
+        };
+        /** ArmFingerprint */
+        ArmFingerprint: {
+            /** Multiset */
+            multiset: string;
+            /** Ordered */
+            ordered: string;
+            /** Rows */
+            rows: number;
+            /** Truncated */
+            truncated: boolean;
+        };
+        /**
+         * ArmMeasurement
+         * @description All measured samples of one arm under one param set (collected across blocks).
+         */
+        ArmMeasurement: {
+            /** Arm */
+            arm: string;
+            /** Consistent */
+            consistent: boolean;
+            /** Failures */
+            failures: ("timeout" | "error")[];
+            fingerprint: components["schemas"]["ArmFingerprint"] | null;
+            /** Latencies Ns */
+            latencies_ns: number[];
+            /** Param Set */
+            param_set: string;
+            /** Plan Sha256 */
+            plan_sha256?: string | null;
+        };
         /** ArtifactRefOut */
         ArtifactRefOut: {
             /** Kind */
             kind: string;
             /** Sha256 */
             sha256: string;
+        };
+        /** BlockOut */
+        BlockOut: {
+            /** Arm */
+            arm: string;
+            /** Block */
+            block: number;
+            /** Index Build Ns */
+            index_build_ns: number | null;
+            /** Index Size Bytes */
+            index_size_bytes: number | null;
+            /** Latencies Ns */
+            latencies_ns: number[];
+            /** Param Set */
+            param_set: string;
+            /** Phase */
+            phase: string;
+            /** Plan Sha256 */
+            plan_sha256: string | null;
+            /** Rows Returned */
+            rows_returned: number | null;
+            /** Sample Errors */
+            sample_errors: string[];
+        };
+        /** BuildResult */
+        BuildResult: {
+            /** Arm */
+            arm: string;
+            /**
+             * Build Ns
+             * @default 0
+             */
+            build_ns: number;
+            /**
+             * Detail
+             * @default
+             */
+            detail: string;
+            /**
+             * Index Size Bytes
+             * @default 0
+             */
+            index_size_bytes: number;
+            /** Ok */
+            ok: boolean;
+            /** Reason */
+            reason?: ("ddl_failed" | "constraint_violation") | null;
+        };
+        /** CandidateCost */
+        CandidateCost: {
+            /** Index Size Estimate Bytes */
+            index_size_estimate_bytes?: number | null;
+            /**
+             * Write Overhead
+             * @default unknown
+             * @enum {string}
+             */
+            write_overhead: "low" | "medium" | "high" | "unknown";
+        };
+        /** CandidateList */
+        CandidateList: {
+            /** Items */
+            items: components["schemas"]["OptimizationCandidate"][];
         };
         /** ColumnRef */
         ColumnRef: {
@@ -625,6 +895,21 @@ export interface components {
             investigation: components["schemas"]["InvestigationDetail"];
             run: components["schemas"]["RunDetail"];
         };
+        /** DecisionRequest */
+        DecisionRequest: {
+            /** Candidate Ids */
+            candidate_ids?: string[];
+            /**
+             * Comment
+             * @default
+             */
+            comment: string;
+            /**
+             * Decision
+             * @enum {string}
+             */
+            decision: "approve" | "decline" | "partial";
+        };
         /** DeclaredColumn */
         DeclaredColumn: {
             /** Data Type */
@@ -712,6 +997,135 @@ export interface components {
             /** Sql */
             sql: string;
         };
+        /** ExperimentDetail */
+        ExperimentDetail: {
+            /** Blocks */
+            blocks: components["schemas"]["BlockOut"][];
+            /** Config */
+            config: {
+                [key: string]: unknown;
+            } | null;
+            /** Engine Version */
+            engine_version: string;
+            /** Environment */
+            environment: {
+                [key: string]: unknown;
+            } | null;
+            /** Environment Digest */
+            environment_digest: string | null;
+            /** Error Code */
+            error_code: string | null;
+            /** Finished At */
+            finished_at: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Kind */
+            kind: string;
+            /**
+             * Provenance
+             * @default measured
+             * @enum {string}
+             */
+            provenance: "measured" | "prerecorded";
+            result: components["schemas"]["ExperimentResult"] | null;
+            /** Round */
+            round: number;
+            /** Row Profile */
+            row_profile: string;
+            /**
+             * Run Id
+             * Format: uuid
+             */
+            run_id: string;
+            /** Started At */
+            started_at: string | null;
+            /** Status */
+            status: string;
+            /** Winner */
+            winner: string | null;
+        };
+        /** ExperimentList */
+        ExperimentList: {
+            /** Items */
+            items: components["schemas"]["ExperimentSummary"][];
+        };
+        /** ExperimentResult */
+        ExperimentResult: {
+            /** Builds */
+            builds: components["schemas"]["BuildResult"][];
+            /**
+             * Engine Version
+             * @default bench@1
+             */
+            engine_version: string;
+            /** Environment Digest */
+            environment_digest: string;
+            /**
+             * Experiment Id
+             * Format: uuid
+             */
+            experiment_id: string;
+            /** Measurements */
+            measurements: components["schemas"]["ArmMeasurement"][];
+            /** Order Is Total */
+            order_is_total: boolean;
+            /**
+             * Provenance
+             * @default measured
+             * @enum {string}
+             */
+            provenance: "measured" | "prerecorded";
+            /**
+             * Schema Version
+             * @default 1
+             * @constant
+             */
+            schema_version: 1;
+            /** Stats */
+            stats: components["schemas"]["SpeedupStats"][];
+            /** Tournament */
+            tournament: components["schemas"]["TournamentEntry"][];
+            /** Verdicts */
+            verdicts: components["schemas"]["RuleVerdict"][];
+            /** Winner */
+            winner: string | null;
+        };
+        /** ExperimentSummary */
+        ExperimentSummary: {
+            /** Engine Version */
+            engine_version: string;
+            /** Environment Digest */
+            environment_digest: string | null;
+            /** Error Code */
+            error_code: string | null;
+            /** Finished At */
+            finished_at: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Kind */
+            kind: string;
+            /** Round */
+            round: number;
+            /** Row Profile */
+            row_profile: string;
+            /**
+             * Run Id
+             * Format: uuid
+             */
+            run_id: string;
+            /** Started At */
+            started_at: string | null;
+            /** Status */
+            status: string;
+            /** Winner */
+            winner: string | null;
+        };
         /** ExplainRequest */
         ExplainRequest: {
             /**
@@ -744,7 +1158,7 @@ export interface components {
              * Agent
              * @enum {string}
              */
-            agent: "supervisor" | "query_analyzer" | "index_strategist" | "workload_investigator";
+            agent: "supervisor" | "query_analyzer" | "index_strategist" | "workload_investigator" | "optimization_engineer";
             /** Detail */
             detail: string;
             /** Evidence Ids */
@@ -796,7 +1210,7 @@ export interface components {
             /** Key */
             key: string;
             /** Proposed By */
-            proposed_by: ("supervisor" | "query_analyzer" | "index_strategist" | "workload_investigator")[];
+            proposed_by: ("supervisor" | "query_analyzer" | "index_strategist" | "workload_investigator" | "optimization_engineer")[];
             /** Rank */
             rank: number;
             /** Statement */
@@ -900,6 +1314,25 @@ export interface components {
             /** Title */
             title: string;
         };
+        /** LatencySummary */
+        LatencySummary: {
+            /** Cv */
+            cv: number | null;
+            /** Iqr Ns */
+            iqr_ns: number;
+            /** Max Ns */
+            max_ns: number;
+            /** Median Ns */
+            median_ns: number;
+            /** Min Ns */
+            min_ns: number;
+            /** N */
+            n: number;
+            /** P95 Ns */
+            p95_ns: number | null;
+            /** Robust Cv */
+            robust_cv: number | null;
+        };
         /** LlmChoice */
         LlmChoice: {
             /** Credential Id */
@@ -956,8 +1389,57 @@ export interface components {
             /** Total Actual Rows */
             total_actual_rows: number | null;
         };
+        /** OptimizationCandidate */
+        OptimizationCandidate: {
+            /** Addresses Hypotheses */
+            addresses_hypotheses: string[];
+            /** Ddl */
+            ddl: string[];
+            estimated_cost: components["schemas"]["CandidateCost"];
+            /** Expected Benefit */
+            expected_benefit: string;
+            /** Id */
+            id?: string | null;
+            /** Key */
+            key: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "create_index" | "query_rewrite" | "analyze_statistics" | "extended_statistics";
+            /**
+             * Proposed By
+             * @default optimization_engineer
+             */
+            proposed_by: string;
+            /** Query Sql */
+            query_sql: string | null;
+            /** Risks */
+            risks: string[];
+            /** Rollback Sql */
+            rollback_sql: string | null;
+            /** Round */
+            round: number;
+            /** Sql Sha256 */
+            sql_sha256: string;
+            /**
+             * Status
+             * @default proposed
+             * @enum {string}
+             */
+            status: "proposed" | "approved" | "declined" | "expired" | "benchmarked" | "verified" | "rejected" | "inconclusive";
+            /** Verdict Reasons */
+            verdict_reasons?: {
+                [key: string]: string;
+            }[] | null;
+        };
         /** ParamSet */
         "ParamSet-Input": {
+            /**
+             * Edge Case
+             * @default false
+             */
+            edge_case: boolean;
             /** Name */
             name: string;
             /** Values */
@@ -965,6 +1447,11 @@ export interface components {
         };
         /** ParamSet */
         "ParamSet-Output": {
+            /**
+             * Edge Case
+             * @default false
+             */
+            edge_case: boolean;
             /** Name */
             name: string;
             /** Values */
@@ -1124,10 +1611,52 @@ export interface components {
             /** Status */
             status: string;
         };
+        /** Reason */
+        Reason: {
+            /**
+             * Code
+             * @enum {string}
+             */
+            code: "ddl_failed" | "constraint_violation" | "unstable_execution" | "result_mismatch" | "nondeterministic_order" | "result_too_large" | "insufficient_evidence" | "regression" | "effect_not_significant" | "no_improvement" | "not_measured";
+            /**
+             * Detail
+             * @default
+             */
+            detail: string;
+        };
+        /** RuleVerdict */
+        RuleVerdict: {
+            /** Arm */
+            arm: string;
+            /** Gate */
+            gate: number | null;
+            /** Reasons */
+            reasons: components["schemas"]["Reason"][];
+            /**
+             * Verdict
+             * @enum {string}
+             */
+            verdict: "verified" | "rejected" | "inconclusive";
+        };
         /** RunBudget */
         RunBudget: {
+            /**
+             * Benchmark Seconds
+             * @default 480
+             */
+            benchmark_seconds: number;
+            /**
+             * Candidates Per Round
+             * @default 4
+             */
+            candidates_per_round: number;
             /** Llm Calls */
             llm_calls: number;
+            /**
+             * Max Optimization Rounds
+             * @default 2
+             */
+            max_optimization_rounds: number;
             /** Tool Calls */
             tool_calls: number;
             /** Tool Calls Per Agent */
@@ -1278,6 +1807,21 @@ export interface components {
         SessionResponse: {
             user: components["schemas"]["UserOut"];
         };
+        /** SpeedupStats */
+        SpeedupStats: {
+            /** Arm */
+            arm: string;
+            baseline: components["schemas"]["LatencySummary"];
+            candidate: components["schemas"]["LatencySummary"];
+            /** Ci High */
+            ci_high: number;
+            /** Ci Low */
+            ci_low: number;
+            /** Param Set */
+            param_set: string;
+            /** Speedup */
+            speedup: number;
+        };
         /** SqlAnalysis */
         SqlAnalysis: {
             fingerprint: components["schemas"]["QueryFingerprint"];
@@ -1348,6 +1892,20 @@ export interface components {
             /** Warnings */
             warnings?: string[];
         };
+        /** TournamentEntry */
+        TournamentEntry: {
+            /** Arm */
+            arm: string;
+            /** Primary Ci Low */
+            primary_ci_low: number | null;
+            /** Rank */
+            rank: number;
+            /**
+             * Verdict
+             * @enum {string}
+             */
+            verdict: "verified" | "rejected" | "inconclusive";
+        };
         /**
          * UserKind
          * @enum {string}
@@ -1417,6 +1975,41 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    decide_api_v1_approvals__approval_id__decision_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                approval_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DecisionRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApprovalOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_artifact_content_api_v1_artifacts__sha256__get: {
         parameters: {
             query?: never;
@@ -1614,6 +2207,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ConnectionTestResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    experiment_detail_api_v1_experiments__experiment_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                experiment_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExperimentDetail"];
                 };
             };
             /** @description Validation Error */
@@ -1969,6 +2593,37 @@ export interface operations {
             };
         };
     };
+    run_approvals_api_v1_runs__run_id__approvals_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApprovalList"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     cancel_run_api_v1_runs__run_id__cancel_post: {
         parameters: {
             query?: never;
@@ -1987,6 +2642,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RunDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    run_candidates_api_v1_runs__run_id__candidates_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CandidateList"];
                 };
             };
             /** @description Validation Error */
@@ -2088,6 +2774,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["EvidenceDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    run_experiments_api_v1_runs__run_id__experiments_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExperimentList"];
                 };
             };
             /** @description Validation Error */

@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { API_BASE_URL } from "@/lib/api/client";
 import { investigationKeys } from "@/lib/api/investigations";
+import { optimizationKeys } from "@/lib/api/optimization";
 import type { RunEvent } from "@/lib/api/types";
 import { EVENT_TYPES, isTerminal, mergeEvents, parseEvent } from "./runEvents";
 
@@ -46,6 +47,18 @@ export function useRunEvents(runId: string | null): { events: RunEvent[]; live: 
       if (REFRESH_ON.has(event.type)) {
         void client.invalidateQueries({ queryKey: investigationKeys.run(runId), exact: true });
       }
+      if (event.type === "candidate.created") {
+        void client.invalidateQueries({ queryKey: optimizationKeys.candidates(runId) });
+      }
+      if (event.type === "approval.requested" || event.type === "approval.decided") {
+        void client.invalidateQueries({ queryKey: optimizationKeys.approvals(runId) });
+        void client.invalidateQueries({ queryKey: optimizationKeys.candidates(runId) });
+      }
+      if (event.type === "verification.completed" || (event.type === "benchmark.progress" && (event.payload as { state?: string }).state === "provisioning")) {
+        void client.invalidateQueries({ queryKey: optimizationKeys.experiments(runId) });
+        void client.invalidateQueries({ queryKey: optimizationKeys.candidates(runId) });
+        void client.invalidateQueries({ queryKey: ["experiments"] });
+      }
       if (event.type === "evidence.created") {
         void client.invalidateQueries({ queryKey: investigationKeys.plans(runId) });
       }
@@ -54,6 +67,8 @@ export function useRunEvents(runId: string | null): { events: RunEvent[]; live: 
         setLive(false);
         void client.invalidateQueries({ queryKey: ["investigations"] });
         void client.invalidateQueries({ queryKey: investigationKeys.findings(runId) });
+        void client.invalidateQueries({ queryKey: optimizationKeys.experiments(runId) });
+        void client.invalidateQueries({ queryKey: ["experiments"] });
       }
     };
     source.onopen = () => setLive(true);

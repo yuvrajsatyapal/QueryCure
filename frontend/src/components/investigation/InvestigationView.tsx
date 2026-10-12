@@ -15,13 +15,16 @@ import {
   getRunPlans,
   investigationKeys,
 } from "@/lib/api/investigations";
+import { getApprovals, getCandidates, getExperiments, optimizationKeys } from "@/lib/api/optimization";
 import type { EvidenceDetail } from "@/lib/api/types";
+import { ApprovalCard } from "@/components/tournament/ApprovalCard";
+import { TournamentPanel } from "@/components/tournament/TournamentPanel";
 import { useRunEvents } from "@/lib/events/useRunEvents";
 import { BudgetMeter } from "./BudgetMeter";
 import { FindingsPanel } from "./FindingsPanel";
 import { Timeline } from "./Timeline";
 
-type Tab = "plan" | "findings";
+type Tab = "plan" | "findings" | "tournament";
 const ACTIVE = new Set(["queued", "running", "awaiting_approval", "cancelling"]);
 const tabClass = (active: boolean) =>
   `rounded-md px-3 py-1.5 text-sm ${active ? "bg-accent-tint font-medium text-ink" : "text-muted hover:text-ink"}`;
@@ -39,6 +42,11 @@ export function InvestigationView({ id }: { id: string }) {
   const run = useQuery({ queryKey: investigationKeys.run(runId ?? ""), queryFn: ({ signal }) => getRun(runId ?? "", signal), enabled: runId !== null });
   const findings = useQuery({ queryKey: investigationKeys.findings(runId ?? ""), queryFn: ({ signal }) => getFindings(runId ?? "", signal), enabled: runId !== null });
   const plans = useQuery({ queryKey: investigationKeys.plans(runId ?? ""), queryFn: ({ signal }) => getRunPlans(runId ?? "", signal), enabled: runId !== null });
+  const sandbox = investigation.data?.modes.includes("sandbox_benchmark") ?? false;
+  const candidates = useQuery({ queryKey: optimizationKeys.candidates(runId ?? ""), queryFn: ({ signal }) => getCandidates(runId ?? "", signal), enabled: runId !== null && sandbox });
+  const approvals = useQuery({ queryKey: optimizationKeys.approvals(runId ?? ""), queryFn: ({ signal }) => getApprovals(runId ?? "", signal), enabled: runId !== null && sandbox });
+  const experiments = useQuery({ queryKey: optimizationKeys.experiments(runId ?? ""), queryFn: ({ signal }) => getExperiments(runId ?? "", signal), enabled: runId !== null && sandbox });
+  const pending = approvals.data?.items.find((a) => a.status === "pending") ?? null;
   const { events, live } = useRunEvents(runId);
   const cancel = useMutation({
     mutationFn: () => cancelRun(runId ?? ""),
@@ -85,7 +93,13 @@ export function InvestigationView({ id }: { id: string }) {
           <button role="tab" aria-selected={tab === "plan"} className={tabClass(tab === "plan")} onClick={() => setTab("plan")}>
             Plan
           </button>
+          {sandbox ? (
+            <button role="tab" aria-selected={tab === "tournament"} className={tabClass(tab === "tournament")} onClick={() => setTab("tournament")}>
+              Tournament
+            </button>
+          ) : null}
         </div>
+        {pending && runId && r?.status === "awaiting_approval" ? <ApprovalCard key={pending.id} approval={pending} runId={runId} /> : null}
         {evidence ? (
           <aside aria-label="Selected evidence" className="rounded-md border border-border bg-surface-2 p-3 text-sm">
             <p className="font-mono text-xs text-muted">
@@ -94,7 +108,9 @@ export function InvestigationView({ id }: { id: string }) {
             <p>{evidence.evidence.summary}</p>
           </aside>
         ) : null}
-        {tab === "findings" ? (
+        {tab === "tournament" ? (
+          <TournamentPanel experiments={experiments.data?.items ?? []} candidates={candidates.data?.items ?? []} />
+        ) : tab === "findings" ? (
           <FindingsPanel data={findings.data} onEvidence={(e) => void openEvidence(e)} activeEvidence={evidence?.evidence.id ?? null} />
         ) : currentPlan ? (
           <div className="flex flex-col gap-3">

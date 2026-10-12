@@ -12,15 +12,21 @@ export function StartInvestigation({
   query,
   planArtifactSha256,
   connectionId,
+  workloadId,
+  initialRows,
 }: {
   query: string;
   planArtifactSha256?: string;
   connectionId?: string;
+  /** Mode C: a demo workload benchmarked in the sandbox after approval. */
+  workloadId?: string;
+  initialRows?: ParamSetRow[];
 }) {
   const router = useRouter();
   const [title, setTitle] = useState("");
   const [objective, setObjective] = useState("Why is this query slow, and what should change?");
-  const [rows, setRows] = useState<ParamSetRow[]>([{ name: "", values: "" }]);
+  const [rows, setRows] = useState<ParamSetRow[]>(initialRows ?? [{ name: "", values: "" }]);
+  const [preAuthorize, setPreAuthorize] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   // One key per form instance: retries and double submits reuse it (API idempotency).
   const [idempotencyKey] = useState(() => crypto.randomUUID());
@@ -40,10 +46,11 @@ export function StartInvestigation({
     start.mutate({
       title: title.trim(),
       objective: objective.trim(),
-      modes: [connectionId ? "live_inspection" : "offline"],
+      modes: [workloadId ? "sandbox_benchmark" : connectionId ? "live_inspection" : "offline"],
       query,
       paramSets: sets,
-      ...(connectionId ? { connectionId } : {}),
+      ...(connectionId && !workloadId ? { connectionId } : {}),
+      ...(workloadId ? { workloadId, preAuthorizeDemoSandbox: preAuthorize } : {}),
       ...(planArtifactSha256 ? { planArtifactSha256 } : {}),
     });
   }
@@ -59,10 +66,23 @@ export function StartInvestigation({
         <textarea value={objective} onChange={(e) => setObjective(e.target.value)} maxLength={2000} rows={2} className="rounded-md border border-border-strong bg-surface px-3 py-2" />
       </label>
       <ParamSetsEditor rows={rows} onChange={setRows} />
-      <p className="text-xs text-muted">
-        Mode: {connectionId ? "live inspection (plain EXPLAIN on your connection)" : "offline"}
-        {planArtifactSha256 ? " · with the uploaded plan" : ""}. Nothing is executed or benchmarked yet.
-      </p>
+      {workloadId ? (
+        <>
+          <p className="text-xs text-muted">
+            Mode: sandbox benchmark on <span className="font-mono">{workloadId}</span>. Candidates are benchmarked in a
+            disposable sandbox copy only after you approve their exact SQL.
+          </p>
+          <label className="flex items-center gap-2 text-xs">
+            <input type="checkbox" checked={preAuthorize} onChange={(e) => setPreAuthorize(e.target.checked)} />
+            Pre-authorize sandbox experiments for this demo workload (an approval record is still kept)
+          </label>
+        </>
+      ) : (
+        <p className="text-xs text-muted">
+          Mode: {connectionId ? "live inspection (plain EXPLAIN on your connection)" : "offline"}
+          {planArtifactSha256 ? " · with the uploaded plan" : ""}. Nothing is executed or benchmarked.
+        </p>
+      )}
       {models.data ? (
         <p className={`text-xs ${models.data.configured ? "text-muted" : "text-inconclusive"}`}>
           {models.data.configured

@@ -32,11 +32,27 @@ export type RunPlan = Camel<"RunPlan">;
 export type RunPlanList = Camel<"RunPlanList">;
 export type ModelsInfo = Camel<"ModelsResponse">;
 export type RunEvent = Camel<"RunEvent">;
+export type OptimizationCandidate = Camel<"OptimizationCandidate">;
+export type CandidateList = Camel<"CandidateList">;
+export type Approval = Camel<"ApprovalOut">;
+export type ApprovalList = Camel<"ApprovalList">;
+export type ExperimentSummary = Camel<"ExperimentSummary">;
+export type ExperimentList = Camel<"ExperimentList">;
+export type ExperimentDetail = Camel<"ExperimentDetail">;
+export type SpeedupStats = Camel<"SpeedupStats">;
+export type RuleVerdict = Camel<"RuleVerdict">;
+export type WorkloadInfo = Camel<"WorkloadInfo">;
+export interface DecisionInput {
+  decision: "approve" | "decline" | "partial";
+  candidateIds: string[];
+  comment?: string;
+}
 
-export type InvestigationMode = "offline" | "live_inspection";
+export type InvestigationMode = "offline" | "live_inspection" | "sandbox_benchmark";
 export interface ParamSetInput {
   name: string;
   values: (string | number | boolean | null)[];
+  edgeCase?: boolean;
 }
 export interface CreateInvestigationInput {
   title: string;
@@ -46,6 +62,8 @@ export interface CreateInvestigationInput {
   paramSets: ParamSetInput[];
   connectionId?: string;
   planArtifactSha256?: string;
+  workloadId?: string;
+  preAuthorizeDemoSandbox?: boolean;
 }
 
 export type CreateConnectionInput = {

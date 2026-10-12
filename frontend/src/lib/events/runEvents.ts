@@ -16,6 +16,11 @@ export const EVENT_TYPES = [
   "hypothesis.updated",
   "budget.warning",
   "error",
+  "candidate.created",
+  "approval.requested",
+  "approval.decided",
+  "benchmark.progress",
+  "verification.completed",
 ] as const;
 
 export const TERMINAL = new Set(["completed", "failed", "cancelled"]);

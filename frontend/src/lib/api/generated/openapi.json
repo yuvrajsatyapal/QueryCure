@@ -1,6 +1,327 @@
 {
   "components": {
     "schemas": {
+      "ApprovalCandidate": {
+        "additionalProperties": false,
+        "description": "Exactly what the human sees and approves (SECURITY \u00a76.6).",
+        "properties": {
+          "candidate_id": {
+            "format": "uuid",
+            "title": "Candidate Id",
+            "type": "string"
+          },
+          "ddl": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Ddl",
+            "type": "array"
+          },
+          "expected_benefit": {
+            "title": "Expected Benefit",
+            "type": "string"
+          },
+          "key": {
+            "pattern": "^oc_[0-9a-f]{12}$",
+            "title": "Key",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "create_index",
+              "query_rewrite",
+              "analyze_statistics",
+              "extended_statistics"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "query_sql": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Query Sql"
+          },
+          "risks": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Risks",
+            "type": "array"
+          },
+          "sql_sha256": {
+            "title": "Sql Sha256",
+            "type": "string"
+          }
+        },
+        "required": [
+          "candidate_id",
+          "key",
+          "kind",
+          "ddl",
+          "query_sql",
+          "sql_sha256",
+          "expected_benefit",
+          "risks"
+        ],
+        "title": "ApprovalCandidate",
+        "type": "object"
+      },
+      "ApprovalList": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ApprovalOut"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "ApprovalList",
+        "type": "object"
+      },
+      "ApprovalOut": {
+        "properties": {
+          "approved_candidate_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "Approved Candidate Ids",
+            "type": "array"
+          },
+          "comment": {
+            "title": "Comment",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "decided_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decided At"
+          },
+          "decided_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decided By"
+          },
+          "expires_at": {
+            "format": "date-time",
+            "title": "Expires At",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/ApprovalPayload"
+          },
+          "round": {
+            "title": "Round",
+            "type": "integer"
+          },
+          "run_id": {
+            "format": "uuid",
+            "title": "Run Id",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "run_id",
+          "round",
+          "kind",
+          "status",
+          "payload",
+          "decided_by",
+          "decided_at",
+          "expires_at",
+          "approved_candidate_ids",
+          "comment",
+          "created_at"
+        ],
+        "title": "ApprovalOut",
+        "type": "object"
+      },
+      "ApprovalPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "baseline_query": {
+            "title": "Baseline Query",
+            "type": "string"
+          },
+          "candidates": {
+            "items": {
+              "$ref": "#/components/schemas/ApprovalCandidate"
+            },
+            "minItems": 1,
+            "title": "Candidates",
+            "type": "array"
+          },
+          "param_sets": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Param Sets",
+            "type": "array"
+          },
+          "sandbox": {
+            "title": "Sandbox",
+            "type": "string"
+          },
+          "schema_version": {
+            "const": 1,
+            "default": 1,
+            "title": "Schema Version",
+            "type": "integer"
+          },
+          "workload_id": {
+            "title": "Workload Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "workload_id",
+          "sandbox",
+          "baseline_query",
+          "param_sets",
+          "candidates"
+        ],
+        "title": "ApprovalPayload",
+        "type": "object"
+      },
+      "ArmFingerprint": {
+        "additionalProperties": false,
+        "properties": {
+          "multiset": {
+            "title": "Multiset",
+            "type": "string"
+          },
+          "ordered": {
+            "title": "Ordered",
+            "type": "string"
+          },
+          "rows": {
+            "title": "Rows",
+            "type": "integer"
+          },
+          "truncated": {
+            "title": "Truncated",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "rows",
+          "multiset",
+          "ordered",
+          "truncated"
+        ],
+        "title": "ArmFingerprint",
+        "type": "object"
+      },
+      "ArmMeasurement": {
+        "additionalProperties": false,
+        "description": "All measured samples of one arm under one param set (collected across blocks).",
+        "properties": {
+          "arm": {
+            "title": "Arm",
+            "type": "string"
+          },
+          "consistent": {
+            "title": "Consistent",
+            "type": "boolean"
+          },
+          "failures": {
+            "items": {
+              "enum": [
+                "timeout",
+                "error"
+              ],
+              "type": "string"
+            },
+            "title": "Failures",
+            "type": "array"
+          },
+          "fingerprint": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ArmFingerprint"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "latencies_ns": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Latencies Ns",
+            "type": "array"
+          },
+          "param_set": {
+            "title": "Param Set",
+            "type": "string"
+          },
+          "plan_sha256": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Plan Sha256"
+          }
+        },
+        "required": [
+          "arm",
+          "param_set",
+          "latencies_ns",
+          "failures",
+          "fingerprint",
+          "consistent"
+        ],
+        "title": "ArmMeasurement",
+        "type": "object"
+      },
       "ArtifactRefOut": {
         "properties": {
           "kind": {
@@ -17,6 +338,192 @@
           "kind"
         ],
         "title": "ArtifactRefOut",
+        "type": "object"
+      },
+      "BlockOut": {
+        "properties": {
+          "arm": {
+            "title": "Arm",
+            "type": "string"
+          },
+          "block": {
+            "title": "Block",
+            "type": "integer"
+          },
+          "index_build_ns": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Index Build Ns"
+          },
+          "index_size_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Index Size Bytes"
+          },
+          "latencies_ns": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Latencies Ns",
+            "type": "array"
+          },
+          "param_set": {
+            "title": "Param Set",
+            "type": "string"
+          },
+          "phase": {
+            "title": "Phase",
+            "type": "string"
+          },
+          "plan_sha256": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Plan Sha256"
+          },
+          "rows_returned": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rows Returned"
+          },
+          "sample_errors": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Sample Errors",
+            "type": "array"
+          }
+        },
+        "required": [
+          "arm",
+          "param_set",
+          "phase",
+          "block",
+          "latencies_ns",
+          "sample_errors",
+          "rows_returned",
+          "index_size_bytes",
+          "index_build_ns",
+          "plan_sha256"
+        ],
+        "title": "BlockOut",
+        "type": "object"
+      },
+      "BuildResult": {
+        "additionalProperties": false,
+        "properties": {
+          "arm": {
+            "title": "Arm",
+            "type": "string"
+          },
+          "build_ns": {
+            "default": 0,
+            "title": "Build Ns",
+            "type": "integer"
+          },
+          "detail": {
+            "default": "",
+            "title": "Detail",
+            "type": "string"
+          },
+          "index_size_bytes": {
+            "default": 0,
+            "title": "Index Size Bytes",
+            "type": "integer"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "enum": [
+                  "ddl_failed",
+                  "constraint_violation"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "required": [
+          "arm",
+          "ok"
+        ],
+        "title": "BuildResult",
+        "type": "object"
+      },
+      "CandidateCost": {
+        "additionalProperties": false,
+        "properties": {
+          "index_size_estimate_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Index Size Estimate Bytes"
+          },
+          "write_overhead": {
+            "default": "unknown",
+            "enum": [
+              "low",
+              "medium",
+              "high",
+              "unknown"
+            ],
+            "title": "Write Overhead",
+            "type": "string"
+          }
+        },
+        "title": "CandidateCost",
+        "type": "object"
+      },
+      "CandidateList": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/OptimizationCandidate"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "CandidateList",
         "type": "object"
       },
       "ColumnRef": {
@@ -513,6 +1020,40 @@
         "title": "CreateInvestigationResponse",
         "type": "object"
       },
+      "DecisionRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "candidate_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "maxItems": 10,
+            "title": "Candidate Ids",
+            "type": "array"
+          },
+          "comment": {
+            "default": "",
+            "maxLength": 1000,
+            "title": "Comment",
+            "type": "string"
+          },
+          "decision": {
+            "enum": [
+              "approve",
+              "decline",
+              "partial"
+            ],
+            "title": "Decision",
+            "type": "string"
+          }
+        },
+        "required": [
+          "decision"
+        ],
+        "title": "DecisionRequest",
+        "type": "object"
+      },
       "DeclaredColumn": {
         "properties": {
           "data_type": {
@@ -828,6 +1369,387 @@
         "title": "ExampleQuery",
         "type": "object"
       },
+      "ExperimentDetail": {
+        "properties": {
+          "blocks": {
+            "items": {
+              "$ref": "#/components/schemas/BlockOut"
+            },
+            "title": "Blocks",
+            "type": "array"
+          },
+          "config": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Config"
+          },
+          "engine_version": {
+            "title": "Engine Version",
+            "type": "string"
+          },
+          "environment": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Environment"
+          },
+          "environment_digest": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Environment Digest"
+          },
+          "error_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Code"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "provenance": {
+            "default": "measured",
+            "enum": [
+              "measured",
+              "prerecorded"
+            ],
+            "title": "Provenance",
+            "type": "string"
+          },
+          "result": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ExperimentResult"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "round": {
+            "title": "Round",
+            "type": "integer"
+          },
+          "row_profile": {
+            "title": "Row Profile",
+            "type": "string"
+          },
+          "run_id": {
+            "format": "uuid",
+            "title": "Run Id",
+            "type": "string"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "winner": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Winner"
+          }
+        },
+        "required": [
+          "id",
+          "run_id",
+          "round",
+          "kind",
+          "status",
+          "engine_version",
+          "row_profile",
+          "environment_digest",
+          "started_at",
+          "finished_at",
+          "winner",
+          "error_code",
+          "environment",
+          "config",
+          "result",
+          "blocks"
+        ],
+        "title": "ExperimentDetail",
+        "type": "object"
+      },
+      "ExperimentList": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ExperimentSummary"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "ExperimentList",
+        "type": "object"
+      },
+      "ExperimentResult": {
+        "additionalProperties": false,
+        "properties": {
+          "builds": {
+            "items": {
+              "$ref": "#/components/schemas/BuildResult"
+            },
+            "title": "Builds",
+            "type": "array"
+          },
+          "engine_version": {
+            "default": "bench@1",
+            "title": "Engine Version",
+            "type": "string"
+          },
+          "environment_digest": {
+            "title": "Environment Digest",
+            "type": "string"
+          },
+          "experiment_id": {
+            "format": "uuid",
+            "title": "Experiment Id",
+            "type": "string"
+          },
+          "measurements": {
+            "items": {
+              "$ref": "#/components/schemas/ArmMeasurement"
+            },
+            "title": "Measurements",
+            "type": "array"
+          },
+          "order_is_total": {
+            "title": "Order Is Total",
+            "type": "boolean"
+          },
+          "provenance": {
+            "default": "measured",
+            "enum": [
+              "measured",
+              "prerecorded"
+            ],
+            "title": "Provenance",
+            "type": "string"
+          },
+          "schema_version": {
+            "const": 1,
+            "default": 1,
+            "title": "Schema Version",
+            "type": "integer"
+          },
+          "stats": {
+            "items": {
+              "$ref": "#/components/schemas/SpeedupStats"
+            },
+            "title": "Stats",
+            "type": "array"
+          },
+          "tournament": {
+            "items": {
+              "$ref": "#/components/schemas/TournamentEntry"
+            },
+            "title": "Tournament",
+            "type": "array"
+          },
+          "verdicts": {
+            "items": {
+              "$ref": "#/components/schemas/RuleVerdict"
+            },
+            "title": "Verdicts",
+            "type": "array"
+          },
+          "winner": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Winner"
+          }
+        },
+        "required": [
+          "experiment_id",
+          "environment_digest",
+          "builds",
+          "measurements",
+          "stats",
+          "verdicts",
+          "tournament",
+          "winner",
+          "order_is_total"
+        ],
+        "title": "ExperimentResult",
+        "type": "object"
+      },
+      "ExperimentSummary": {
+        "properties": {
+          "engine_version": {
+            "title": "Engine Version",
+            "type": "string"
+          },
+          "environment_digest": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Environment Digest"
+          },
+          "error_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Code"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "round": {
+            "title": "Round",
+            "type": "integer"
+          },
+          "row_profile": {
+            "title": "Row Profile",
+            "type": "string"
+          },
+          "run_id": {
+            "format": "uuid",
+            "title": "Run Id",
+            "type": "string"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "winner": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Winner"
+          }
+        },
+        "required": [
+          "id",
+          "run_id",
+          "round",
+          "kind",
+          "status",
+          "engine_version",
+          "row_profile",
+          "environment_digest",
+          "started_at",
+          "finished_at",
+          "winner",
+          "error_code"
+        ],
+        "title": "ExperimentSummary",
+        "type": "object"
+      },
       "ExplainRequest": {
         "additionalProperties": false,
         "properties": {
@@ -904,7 +1826,8 @@
               "supervisor",
               "query_analyzer",
               "index_strategist",
-              "workload_investigator"
+              "workload_investigator",
+              "optimization_engineer"
             ],
             "title": "Agent",
             "type": "string"
@@ -1055,7 +1978,8 @@
                 "supervisor",
                 "query_analyzer",
                 "index_strategist",
-                "workload_investigator"
+                "workload_investigator",
+                "optimization_engineer"
               ],
               "type": "string"
             },
@@ -1370,6 +2294,76 @@
         "title": "InvestigationSummary",
         "type": "object"
       },
+      "LatencySummary": {
+        "additionalProperties": false,
+        "properties": {
+          "cv": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cv"
+          },
+          "iqr_ns": {
+            "title": "Iqr Ns",
+            "type": "number"
+          },
+          "max_ns": {
+            "title": "Max Ns",
+            "type": "integer"
+          },
+          "median_ns": {
+            "title": "Median Ns",
+            "type": "number"
+          },
+          "min_ns": {
+            "title": "Min Ns",
+            "type": "integer"
+          },
+          "n": {
+            "title": "N",
+            "type": "integer"
+          },
+          "p95_ns": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "P95 Ns"
+          },
+          "robust_cv": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Robust Cv"
+          }
+        },
+        "required": [
+          "n",
+          "median_ns",
+          "p95_ns",
+          "min_ns",
+          "max_ns",
+          "iqr_ns",
+          "cv",
+          "robust_cv"
+        ],
+        "title": "LatencySummary",
+        "type": "object"
+      },
       "LlmChoice": {
         "additionalProperties": false,
         "properties": {
@@ -1612,9 +2606,162 @@
         "title": "NodeMetrics",
         "type": "object"
       },
+      "OptimizationCandidate": {
+        "additionalProperties": false,
+        "properties": {
+          "addresses_hypotheses": {
+            "items": {
+              "pattern": "^hy_[0-9a-f]{12}$",
+              "type": "string"
+            },
+            "minItems": 1,
+            "title": "Addresses Hypotheses",
+            "type": "array"
+          },
+          "ddl": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 4,
+            "title": "Ddl",
+            "type": "array"
+          },
+          "estimated_cost": {
+            "$ref": "#/components/schemas/CandidateCost"
+          },
+          "expected_benefit": {
+            "maxLength": 500,
+            "title": "Expected Benefit",
+            "type": "string"
+          },
+          "id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id"
+          },
+          "key": {
+            "pattern": "^oc_[0-9a-f]{12}$",
+            "title": "Key",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "create_index",
+              "query_rewrite",
+              "analyze_statistics",
+              "extended_statistics"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "proposed_by": {
+            "default": "optimization_engineer",
+            "title": "Proposed By",
+            "type": "string"
+          },
+          "query_sql": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Query Sql"
+          },
+          "risks": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 5,
+            "title": "Risks",
+            "type": "array"
+          },
+          "rollback_sql": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rollback Sql"
+          },
+          "round": {
+            "minimum": 0.0,
+            "title": "Round",
+            "type": "integer"
+          },
+          "sql_sha256": {
+            "title": "Sql Sha256",
+            "type": "string"
+          },
+          "status": {
+            "default": "proposed",
+            "enum": [
+              "proposed",
+              "approved",
+              "declined",
+              "expired",
+              "benchmarked",
+              "verified",
+              "rejected",
+              "inconclusive"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "verdict_reasons": {
+            "anyOf": [
+              {
+                "items": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Verdict Reasons"
+          }
+        },
+        "required": [
+          "key",
+          "round",
+          "kind",
+          "addresses_hypotheses",
+          "ddl",
+          "query_sql",
+          "sql_sha256",
+          "rollback_sql",
+          "expected_benefit",
+          "risks",
+          "estimated_cost"
+        ],
+        "title": "OptimizationCandidate",
+        "type": "object"
+      },
       "ParamSet-Input": {
         "additionalProperties": false,
         "properties": {
+          "edge_case": {
+            "default": false,
+            "title": "Edge Case",
+            "type": "boolean"
+          },
           "name": {
             "maxLength": 64,
             "minLength": 1,
@@ -1656,6 +2803,11 @@
       },
       "ParamSet-Output": {
         "properties": {
+          "edge_case": {
+            "default": false,
+            "title": "Edge Case",
+            "type": "boolean"
+          },
           "name": {
             "title": "Name",
             "type": "string"
@@ -2283,12 +3435,108 @@
         "title": "ReadinessResponse",
         "type": "object"
       },
+      "Reason": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "enum": [
+              "ddl_failed",
+              "constraint_violation",
+              "unstable_execution",
+              "result_mismatch",
+              "nondeterministic_order",
+              "result_too_large",
+              "insufficient_evidence",
+              "regression",
+              "effect_not_significant",
+              "no_improvement",
+              "not_measured"
+            ],
+            "title": "Code",
+            "type": "string"
+          },
+          "detail": {
+            "default": "",
+            "title": "Detail",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code"
+        ],
+        "title": "Reason",
+        "type": "object"
+      },
+      "RuleVerdict": {
+        "additionalProperties": false,
+        "properties": {
+          "arm": {
+            "title": "Arm",
+            "type": "string"
+          },
+          "gate": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gate"
+          },
+          "reasons": {
+            "items": {
+              "$ref": "#/components/schemas/Reason"
+            },
+            "title": "Reasons",
+            "type": "array"
+          },
+          "verdict": {
+            "enum": [
+              "verified",
+              "rejected",
+              "inconclusive"
+            ],
+            "title": "Verdict",
+            "type": "string"
+          }
+        },
+        "required": [
+          "arm",
+          "verdict",
+          "reasons",
+          "gate"
+        ],
+        "title": "RuleVerdict",
+        "type": "object"
+      },
       "RunBudget": {
         "additionalProperties": false,
         "properties": {
+          "benchmark_seconds": {
+            "default": 480,
+            "minimum": 30.0,
+            "title": "Benchmark Seconds",
+            "type": "integer"
+          },
+          "candidates_per_round": {
+            "default": 4,
+            "maximum": 4.0,
+            "minimum": 1.0,
+            "title": "Candidates Per Round",
+            "type": "integer"
+          },
           "llm_calls": {
             "minimum": 1.0,
             "title": "Llm Calls",
+            "type": "integer"
+          },
+          "max_optimization_rounds": {
+            "default": 2,
+            "maximum": 5.0,
+            "minimum": 0.0,
+            "title": "Max Optimization Rounds",
             "type": "integer"
           },
           "tool_calls": {
@@ -2730,6 +3978,48 @@
         "title": "SessionResponse",
         "type": "object"
       },
+      "SpeedupStats": {
+        "additionalProperties": false,
+        "properties": {
+          "arm": {
+            "title": "Arm",
+            "type": "string"
+          },
+          "baseline": {
+            "$ref": "#/components/schemas/LatencySummary"
+          },
+          "candidate": {
+            "$ref": "#/components/schemas/LatencySummary"
+          },
+          "ci_high": {
+            "title": "Ci High",
+            "type": "number"
+          },
+          "ci_low": {
+            "title": "Ci Low",
+            "type": "number"
+          },
+          "param_set": {
+            "title": "Param Set",
+            "type": "string"
+          },
+          "speedup": {
+            "title": "Speedup",
+            "type": "number"
+          }
+        },
+        "required": [
+          "arm",
+          "param_set",
+          "baseline",
+          "candidate",
+          "speedup",
+          "ci_low",
+          "ci_high"
+        ],
+        "title": "SpeedupStats",
+        "type": "object"
+      },
       "SqlAnalysis": {
         "properties": {
           "fingerprint": {
@@ -2980,6 +4270,47 @@
         "title": "TargetCapabilities",
         "type": "object"
       },
+      "TournamentEntry": {
+        "additionalProperties": false,
+        "properties": {
+          "arm": {
+            "title": "Arm",
+            "type": "string"
+          },
+          "primary_ci_low": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Primary Ci Low"
+          },
+          "rank": {
+            "title": "Rank",
+            "type": "integer"
+          },
+          "verdict": {
+            "enum": [
+              "verified",
+              "rejected",
+              "inconclusive"
+            ],
+            "title": "Verdict",
+            "type": "string"
+          }
+        },
+        "required": [
+          "arm",
+          "rank",
+          "verdict",
+          "primary_ci_low"
+        ],
+        "title": "TournamentEntry",
+        "type": "object"
+      },
       "UserKind": {
         "enum": [
           "local",
@@ -3154,6 +4485,59 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/api/v1/approvals/{approval_id}/decision": {
+      "post": {
+        "operationId": "decide_api_v1_approvals__approval_id__decision_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "approval_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Approval Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DecisionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApprovalOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Decide",
+        "tags": [
+          "optimization"
+        ]
+      }
+    },
     "/api/v1/artifacts/{sha256}": {
       "get": {
         "description": "Exact stored bytes, re-verified against the digest on read.",
@@ -3433,6 +4817,49 @@
         "summary": "Test Connection",
         "tags": [
           "connections"
+        ]
+      }
+    },
+    "/api/v1/experiments/{experiment_id}": {
+      "get": {
+        "operationId": "experiment_detail_api_v1_experiments__experiment_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "experiment_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Experiment Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExperimentDetail"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Experiment Detail",
+        "tags": [
+          "optimization"
         ]
       }
     },
@@ -3944,6 +5371,49 @@
         ]
       }
     },
+    "/api/v1/runs/{run_id}/approvals": {
+      "get": {
+        "operationId": "run_approvals_api_v1_runs__run_id__approvals_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Run Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApprovalList"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Run Approvals",
+        "tags": [
+          "optimization"
+        ]
+      }
+    },
     "/api/v1/runs/{run_id}/cancel": {
       "post": {
         "description": "Idempotent (API_DESIGN \u00a74): queued/awaiting_approval stop at once; a running run moves\nto cancelling and the worker stops at its next safe point.",
@@ -3985,6 +5455,49 @@
         "summary": "Cancel Run",
         "tags": [
           "runs"
+        ]
+      }
+    },
+    "/api/v1/runs/{run_id}/candidates": {
+      "get": {
+        "operationId": "run_candidates_api_v1_runs__run_id__candidates_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Run Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CandidateList"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Run Candidates",
+        "tags": [
+          "optimization"
         ]
       }
     },
@@ -4181,6 +5694,49 @@
         "summary": "Run Evidence",
         "tags": [
           "runs"
+        ]
+      }
+    },
+    "/api/v1/runs/{run_id}/experiments": {
+      "get": {
+        "operationId": "run_experiments_api_v1_runs__run_id__experiments_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Run Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExperimentList"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Run Experiments",
+        "tags": [
+          "optimization"
         ]
       }
     },

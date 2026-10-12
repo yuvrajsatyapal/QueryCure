@@ -9,10 +9,12 @@ import { NodeDetails } from "@/components/plan/NodeDetails";
 import { PlanGraph } from "@/components/plan/PlanGraph";
 import { PlanTreeTable } from "@/components/plan/PlanTreeTable";
 import { connectionKeys, explainOnConnection, listConnections } from "@/lib/api/connections";
+import { listWorkloads, optimizationKeys } from "@/lib/api/optimization";
+import type { ParamSetRow } from "@/components/investigation/ParamSetsEditor";
 import { inspectPlan } from "@/lib/api/inspect";
 import type { NodeMetrics, PlanTree } from "@/lib/api/types";
 
-type Source = "upload" | "live";
+type Source = "upload" | "live" | "workload";
 type View = "tree" | "graph";
 interface PlanResult {
   plan: PlanTree;
@@ -36,6 +38,27 @@ export function Workspace() {
   const [selected, setSelected] = useState<number | null>(null);
   const [view, setView] = useState<View>("tree");
   const [starting, setStarting] = useState(false);
+  const [workload, setWorkload] = useState({ name: "", scale: "0.1", example: 0 });
+
+  const workloads = useQuery({
+    queryKey: optimizationKeys.workloads,
+    queryFn: ({ signal }) => listWorkloads(signal),
+    enabled: source === "workload",
+  });
+  const spec = workloads.data?.items.find((w) => w.name === workload.name);
+  const example = spec?.exampleQueries[workload.example];
+  const workloadId = spec ? `${spec.id}:sf=${workload.scale}:seed=${spec.defaultSeed}` : undefined;
+  const exampleRows: ParamSetRow[] | undefined = example?.paramSets.map((p) => ({
+    name: p.name,
+    values: JSON.stringify(p.values),
+    edgeCase: p.edgeCase,
+  }));
+  function pickWorkload(name: string, index = 0) {
+    const chosen = workloads.data?.items.find((w) => w.name === name);
+    setWorkload((w) => ({ ...w, name, example: index }));
+    const sql = chosen?.exampleQueries[index]?.sql;
+    if (sql) setQuery(sql);
+  }
 
   const connections = useQuery({
     queryKey: connectionKeys.all,
@@ -81,13 +104,16 @@ export function Workspace() {
         </div>
         <p className="text-sm text-muted">
           Inspect a plan from an upload or a live, read-only EXPLAIN, then start a multi-agent
-          investigation. Agents cite evidence; nothing is benchmarked until Phase 3.
+          investigation. Agents cite evidence; demo workloads can be benchmarked in the sandbox.
         </p>
         {starting ? (
           <StartInvestigation
+            key={source === "workload" ? `${workloadId}:${workload.example}` : source}
             query={query}
             planArtifactSha256={source === "upload" ? result?.artifactSha256 : undefined}
             connectionId={source === "live" && connectionId !== "" ? connectionId : undefined}
+            workloadId={source === "workload" ? workloadId : undefined}
+            initialRows={source === "workload" ? exampleRows : undefined}
           />
         ) : null}
         <SqlEditor value={query} onChange={setQuery} />
@@ -98,8 +124,74 @@ export function Workspace() {
           <button role="tab" aria-selected={source === "live"} className={tabClass(source === "live")} onClick={() => setSource("live")}>
             Live EXPLAIN
           </button>
+          <button role="tab" aria-selected={source === "workload"} className={tabClass(source === "workload")} onClick={() => setSource("workload")}>
+            Demo workload
+          </button>
         </div>
-        {source === "upload" ? (
+        {source === "workload" ? (
+          <div className="flex flex-col gap-2">
+            <label className="text-sm text-muted" htmlFor="workload">
+              Workload
+            </label>
+            <select
+              id="workload"
+              value={workload.name}
+              onChange={(e) => pickWorkload(e.target.value)}
+              className="rounded-md border border-border-strong bg-surface px-3 py-2 text-sm"
+            >
+              <option value="">Choose a demo workload…</option>
+              {(workloads.data?.items ?? []).map((w) => (
+                <option key={w.id} value={w.name}>
+                  {w.name} — {w.description}
+                </option>
+              ))}
+            </select>
+            {spec ? (
+              <>
+                <p className="text-xs text-muted">Injected problem: {spec.injectedProblem}</p>
+                <div className="flex flex-wrap gap-3">
+                  <label className="flex items-center gap-2 text-sm">
+                    Scale
+                    <select
+                      aria-label="Scale factor"
+                      value={workload.scale}
+                      onChange={(e) => setWorkload((w) => ({ ...w, scale: e.target.value }))}
+                      className="rounded-md border border-border-strong bg-surface px-2 py-1 text-sm"
+                    >
+                      {spec.scaleFactors.map((sf) => (
+                        <option key={sf} value={String(sf)}>
+                          sf={sf}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  {spec.exampleQueries.length > 1 ? (
+                    <label className="flex items-center gap-2 text-sm">
+                      Query
+                      <select
+                        aria-label="Example query"
+                        value={workload.example}
+                        onChange={(e) => pickWorkload(spec.name, Number(e.target.value))}
+                        className="rounded-md border border-border-strong bg-surface px-2 py-1 text-sm"
+                      >
+                        {spec.exampleQueries.map((q, i) => (
+                          <option key={q.name} value={i}>
+                            {q.name}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  ) : null}
+                </div>
+                <p className="text-xs text-muted">
+                  {spec.availability === "live"
+                    ? "Benchmarks run live in the local sandbox after you approve the SQL."
+                    : "This deployment has no live sandbox: benchmark results are prerecorded."}
+                </p>
+              </>
+            ) : null}
+          </div>
+        ) : source === "upload" ? (
           <div className="flex flex-col gap-2">
             <label className="text-sm text-muted" htmlFor="plan-json">
               Plan JSON

@@ -39,6 +39,23 @@ export function describe(event: RunEvent): { text: string; tone: "normal" | "mut
       return { text: `Hypothesis: ${str(p.category)} (${str(p.confidence)})`, tone: "normal" };
     case "budget.warning":
       return { text: `Budget: ${str(p.budget)} at ${Number(p.used)}/${Number(p.limit)}`, tone: "error" };
+    case "candidate.created":
+      return { text: `Candidate ${str(p.key)}: ${str(p.kind).replaceAll("_", " ")}`, tone: "normal" };
+    case "approval.requested":
+      return {
+        text: p.status === "pending" ? `Approval needed for round ${Number(p.round ?? 0) + 1}` : `Approval recorded (${str(p.decidedBy)})`,
+        tone: "normal",
+      };
+    case "approval.decided":
+      return { text: `Approval ${str(p.status).replaceAll("_", " ")}`, tone: "normal" };
+    case "benchmark.progress": {
+      const block = typeof p.block === "number" && typeof p.blocksTotal === "number" ? ` · block ${p.block}/${p.blocksTotal}` : "";
+      return { text: `Benchmark ${str(p.state).replaceAll("_", " ")}${block}`, tone: "muted" };
+    }
+    case "verification.completed": {
+      const reasons = Array.isArray(p.reasons) && p.reasons.length ? ` (${str((p.reasons[0] as Payload).code)})` : "";
+      return { text: `${str(p.candidateKey)}: ${str(p.verdict)}${reasons}`, tone: p.verdict === "rejected" ? "error" : "normal" };
+    }
     case "error":
       return { text: `Error in ${str(p.node)}: ${str(p.code)} — ${str(p.message)}`, tone: "error" };
     default:

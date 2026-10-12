@@ -5,6 +5,7 @@ import type { ParamSetInput } from "@/lib/api/types";
 export interface ParamSetRow {
   name: string;
   values: string; // JSON array text, e.g. [1024]
+  edgeCase?: boolean; // NULL-bearing or empty-result set (needed to verify rewrites)
 }
 
 const NAME = /^[A-Za-z0-9_-]{1,64}$/;
@@ -31,7 +32,11 @@ export function parseParamSets(rows: ParamSetRow[]): { sets: ParamSetInput[]; er
     if (!values.every(scalar)) {
       return { sets: [], error: `Row ${i + 1}: values must be an array of numbers, strings, booleans or null.` };
     }
-    sets.push({ name: row.name, values: values as ParamSetInput["values"] });
+    sets.push({
+      name: row.name,
+      values: values as ParamSetInput["values"],
+      ...(row.edgeCase ? { edgeCase: true } : {}),
+    });
   }
   return { sets, error: null };
 }

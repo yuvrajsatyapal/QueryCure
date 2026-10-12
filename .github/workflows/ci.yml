@@ -143,7 +143,22 @@ jobs:
           --health-interval 5s
           --health-timeout 3s
           --health-retries 10
+      sandbox:
+        image: postgres:17
+        env:
+          POSTGRES_USER: qc_sandbox_admin
+          POSTGRES_PASSWORD: qc_ci_only
+          POSTGRES_DB: sandbox_admin
+        ports:
+          - 55432:5432
+        options: >-
+          --health-cmd "pg_isready -U qc_sandbox_admin -d sandbox_admin"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
     env:
+      SANDBOX_ADMIN_URL: postgresql://qc_sandbox_admin:qc_ci_only@127.0.0.1:55432/sandbox_admin
+      SANDBOX_BENCH_PASSWORD: qc_ci_only
       # The UI flow is under test here; role grants are covered by the integration job.
       DATABASE_URL: postgresql://qc_owner:qc_ci_only@127.0.0.1:5432/querycure
       DATABASE_URL_DIRECT: postgresql://qc_owner:qc_ci_only@127.0.0.1:5432/querycure
