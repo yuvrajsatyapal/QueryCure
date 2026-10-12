@@ -13,6 +13,7 @@ from collections.abc import Awaitable, Callable
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine
 
+from querycure.core.config import FREE_ROUTER
 from querycure.core.errors import BudgetExhaustedError
 
 WINDOW_SECONDS = 60.0
@@ -56,8 +57,11 @@ class DailyQuota:
                     text(
                         "SELECT count(*) FROM agent_executions "
                         "WHERE created_at >= date_trunc('day', now() AT TIME ZONE 'UTC') "
-                        "AT TIME ZONE 'UTC'"
-                    )
+                        "AT TIME ZONE 'UTC' "
+                        # Only requests that went to OpenRouter free models use the allowance.
+                        "AND (requested_model LIKE :free_suffix OR requested_model = :free_router)"
+                    ),
+                    {"free_suffix": "%:free", "free_router": FREE_ROUTER},
                 )
             ).scalar_one()
         return int(count)

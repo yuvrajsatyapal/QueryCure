@@ -34,10 +34,13 @@ def build_services(engine: AsyncEngine, settings: Settings) -> RunServices:
         settings=settings,
         checkpoint_url=settings.database_url.get_secret_value(),
         clients=env_clients(settings),
+        # Free-tier limits apply to OpenRouter only; the offline stub makes no requests.
         llm_gate=LlmGate(
             MinuteRateLimiter(settings.llm_requests_per_minute),
             DailyQuota(engine, settings.llm_daily_request_limit),
-        ),
+        )
+        if settings.llm_provider == "openrouter"
+        else None,
     )
 
 

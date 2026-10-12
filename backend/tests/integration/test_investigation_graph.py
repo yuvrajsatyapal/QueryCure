@@ -495,7 +495,8 @@ async def test_daily_free_quota_stops_the_run_gracefully(
     run_id = await create_run(app_engine)
     quota = DailyQuota(app_engine, limit=1)
     quota.limit = await quota.used_today() + 1  # exactly one free request left today
-    svc = services(app_engine, migrated_db, RoleClient(happy_scripts()))
+    # Only requests to free OpenRouter models count toward the allowance.
+    svc = services(app_engine, migrated_db, RoleClient(happy_scripts(), model="test/fake:free"))
     svc.llm_gate = LlmGate(MinuteRateLimiter(100), quota)
 
     await execute_run(svc, run_id, attempt=1, reclaimed=False)
@@ -505,3 +506,22 @@ async def test_daily_free_quota_stops_the_run_gracefully(
     assert body["stop_reason"] == "budget_exhausted"
     assert body["partial"] is True
     assert any("free model requests are used up" in e["message"] for e in body["errors"])
+
+
+async def test_daily_quota_counts_only_free_openrouter_requests(
+    app_engine: AsyncEngine, owner: psycopg.Connection
+) -> None:
+    from querycure.llm.rate_limit import DailyQuota
+
+    run_id = await create_run(app_engine)
+    quota = DailyQuota(app_engine, limit=1000)
+    before = await quota.used_today()
+    for requested in ("nvidia/nemotron-3-super-120b-a12b:free", "stub/canned", None):
+        owner.execute(
+            "INSERT INTO agent_executions (run_id, agent, node, invocation_key, attempt, "
+            "prompt_version, model, requested_model, status) VALUES (%s, 'qa', 'qa', %s, 1, "
+            "'p@1', 'm', %s, 'failed')",
+            (run_id, str(uuid.uuid4()), requested),
+        )
+
+    assert await quota.used_today() == before + 1
