@@ -1,6 +1,7 @@
 # ADR-0008: Median-based speedup with seeded percentile-bootstrap confidence intervals
 
 - Status: Accepted (2026-10-11)
+- Amended by: [ADR-0018](ADR-0018-robust-sample-quality-gate.md) (robust CV, gate order), [ADR-0019](ADR-0019-noise-warning-verification-and-corroborated-regression.md) (corroborated regression, replication rule, `bench@2`)
 - Area: Benchmarking
 
 ## Context

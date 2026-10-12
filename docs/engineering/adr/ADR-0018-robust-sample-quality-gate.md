@@ -1,6 +1,7 @@
 # ADR-0018: Robust dispersion for the sample-quality gate, checked after decisive regressions
 
-- Status: Accepted (2026-10-12), pending owner review (it changes a verdict rule)
+- Status: Accepted (2026-10-12). Owner review (2026-10-12): approved in principle, on condition that the statistical assumptions are documented and decisive regressions cannot rest on insufficient or biased evidence. Both conditions are met by [ADR-0019](ADR-0019-noise-warning-verification-and-corroborated-regression.md) (`bench@2`); this record is kept as written for `bench@1`.
+- Amended by: [ADR-0019](ADR-0019-noise-warning-verification-and-corroborated-regression.md) (gate 5 corroboration, D11 resolution)
 - Area: Benchmarking / Verification
 - Amends: [ADR-0008](ADR-0008-benchmark-statistics.md), BENCHMARK_ENGINE §6–§7
 
@@ -28,3 +29,9 @@ ADR-0008 makes speedups robust: the verdict uses the ratio of **medians** with a
 - Residual risk: a long, smooth drift (for example thermal throttling across the whole run) can widen the IQR without spikes. Block interleaving spreads drift across arms, and the gate still catches the widened distribution.
 - **Measured after this ADR (same day):** with the worker in a container on `sandbox_net`, the sf=1 `orders_ecommerce` candidate median fell from 0.88 ms to 0.29 ms (177×, 95% CI 144–211×), but its robust CV was still 0.44 (≈ 0.1 ms absolute jitter on a shared 8-core VM). On hardware like this, gate 4b still blocks very fast winners. The policy question is open decision D11 (CURRENT_PHASE); this ADR does not decide it.
 - Reducing the noise itself is out of scope here. Running the worker container on `sandbox_net` would remove the published-port hop (DEPLOYMENT §2) and is a Phase 5 deployment item.
+
+## Amendment note (2026-10-12)
+The decision text above remains the `bench@1` rule. [ADR-0019](ADR-0019-noise-warning-verification-and-corroborated-regression.md) adds, for `bench@2`:
+- the explicit assumptions behind "noise only widens a bootstrap CI" (it holds for disturbances that are independent of the arm);
+- corroboration requirements before gate 5 may reject: n ≥ 20, no baseline censoring, and every block slower;
+- the D11 resolution, `verified_with_noise_warning` by independent replication, instead of a waiver.
