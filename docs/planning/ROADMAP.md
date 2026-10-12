@@ -98,6 +98,7 @@ Replay features ship in Phase 4, but their contracts bind from Phase 1 so no dat
   5. No sandbox DDL executes without an approved `approval_requests` row (integration test).
 - **Security:** DDL allowlist, sandbox internal network, non-superuser benchmark role, resource limits.
 - **Exit:** acceptance met; sample experiment artifacts committed as prerecorded demo fixtures (labeled).
+- **Status (2026-10-12):** implemented; #1, #3, #4, #5 met; #2 documented `inconclusive` on noisy hardware; fixtures committed. See [PHASE_3_REPORT](reports/PHASE_3_REPORT.md).
 
 ---
 

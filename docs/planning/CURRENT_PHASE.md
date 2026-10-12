@@ -2,10 +2,10 @@
 
 | Field | Value |
 |---|---|
-| Phase | **2 — Multi-agent intelligence** (Phase 1 complete: [PHASE_1_REPORT](reports/PHASE_1_REPORT.md)) |
-| Status | **Phase 2 implemented; exit partially met** ([PHASE_2_REPORT](reports/PHASE_2_REPORT.md)). Acceptance #1, #2, #3, #5 met; #4 met by deterministic tests, its recorded-model case waits for the next free-quota day. Acceptance follow-up 2026-10-12 (PHASE_2_REPORT §11): calibration failure fixed by a deterministic materiality gate (ADR-0017); free-only now enforced before dispatch; two smoke recordings still pending (free quota spent). Follow-up 2 (PHASE_2_REPORT §12): injection case now scored by a per-agent security evaluation (refused attempts count; tool choice/order not judged); no free capacity on 2026-10-12, no request sent; record `orders_injection_in_schema` + `orders_plain_explain` after 00:00 UTC. Phase 3 not started (awaiting go-ahead) |
+| Phase | **3 — Optimization & benchmarking** (Phase 1 complete: [PHASE_1_REPORT](reports/PHASE_1_REPORT.md); Phase 2 implemented, acceptance partially met: [PHASE_2_REPORT](reports/PHASE_2_REPORT.md)) |
+| Status | **Phase 3 implemented; exit partially met** ([PHASE_3_REPORT](reports/PHASE_3_REPORT.md)). Acceptance #1, #3, #4, #5 met against real PostgreSQL 17; #2 ends as the documented noisy-hardware `inconclusive` (177×/270× measured, stopped by the sample-quality gate; decision D11 open). Prerecorded demo fixtures committed. **Pending, tracked separately:** Phase 2 smoke recordings `orders_injection_in_schema`, `orders_plain_explain` (Phase 2 acceptance stays partial until recorded) and Phase 3 Mode C recordings `orders_sandbox_composite_index`, `rewrite_trap_sandbox`; no OpenRouter request was sent in Phase 3. Phase 4 not started (awaiting go-ahead) |
 | Last updated | 2026-10-12 |
-| Application code | Phase 1 foundation: API (session, connections, inspect, workloads, health), metadata DB migrations, SQL/plan parsing, inspection gateway, artifact store, demo workloads; web app with connections and plan workspace (tree + graph). No agents yet. |
+| Application code | Phases 1–3: API, metadata DB (migrations 0001–0009), parsing, inspection gateway, artifact store, six demo workloads; multi-agent graph with Optimization Engineer, approval gate (interrupt/resume, expiry), sandbox benchmark engine (`bench@1`) and tournament; web app with workspace (upload / live EXPLAIN / demo workload), live timeline, findings, approval card and tournament tab. |
 
 ## Completed
 
@@ -271,9 +271,27 @@
   - Tests: backend 774 passed (405 unit, 263 integration, 106 security); frontend 59 + build; e2e 1 passed; eval smoke replay 3/5 (two unrecorded).
 - [x] **Acceptance #2, literal process kill** (`tests/integration/test_worker_kill.py`): a real `python -m querycure.worker` (stub LLM with a 1.5 s per-call delay, lease 5 s) is SIGKILLed once `synthesize_hypotheses` has started; a second worker reclaims the expired lease and the run completes with identical evidence/finding counts, both analysts' single successful executions untouched, statuses `running → queued → running → completed`, job `done` after 2 attempts. 6/6 repeated passes after fixing a test-side race (stopping the worker before the job was marked done).
 
+## Phase 3 progress
+
+Started 2026-10-12 on the owner's instruction; `main` clean at `ffe9321`. Details and evidence: [PHASE_3_REPORT](reports/PHASE_3_REPORT.md).
+
+- [x] **Sandbox access** (`fc72846`). `sandbox-relay` (`alpine/socat:1.8.0.3`) publishes `127.0.0.1:55432` → `sandbox-db:5432` only; `sandbox-db` stays on `internal` `sandbox_net` (egress re-verified blocked: TCP, DNS, metadata-db). Planner settings pinned with `-c` in compose (`jit=off`, `max_parallel_workers_per_gather=0`, …).
+- [x] **T3.1 migrations** `0008` (candidates, approvals, experiments, append-only `benchmark_runs` with `phase` in the resume key, `experiment_result` artifact kind) and `0009` (`waiting_seconds`, `pre_authorize_sandbox`). Grant tests as `qc_app`/`qc_retention`.
+- [x] **T3.2 provisioner**: `qc_bench` least-privilege role, digest-stable templates, `FILE_COPY` clones, advisory-lock leases (cancellable), orphan cleanup, clone cap. 9 integration + 14 security tests.
+- [x] **T3.3 workloads** `join_fanout`, `stale_stats`, `index_regression` (plans checked in the sandbox).
+- [x] **T3.4–T3.7 engine** `bench@1`: seeded interleaved schedule (golden order), streamed timing in READ ONLY transactions, `qc-row-v1` (frozen, golden vectors), correctness incl. ties/error parity/arm stability, bootstrap CI, gates 1–6 (ADR-0018 order), tournament, block resume, in-flight cancellation. Eval table 9/9.
+- [x] **T3.8 DDL allowlist** (strict fail-closed grammar; 39 unit cases) + re-validation and approval-digest check inside the engine.
+- [x] **T3.9 Optimization Engineer** (`optimization_engineer@1`): one structured call per round, deterministic judging with one retry. Tested with scripted and stub models; eval cases added, **not recorded** (free-quota policy).
+- [x] **T3.10 approval gate**: interrupt/resume, decision API (approve/decline/partial, idempotent, user-scoped), 24 h expiry sweep → `inconclusive`, demo pre-authorization (approval row still written), wait time excluded from the budget.
+- [x] **T3.11 run_experiment + loop**: DB-bridged engine, evidence (`benchmark_metric`, `correctness_check`), verdict events, bounded rounds with rejection reasons fed back; `interim-report@3`.
+- [x] **T3.12 UI**: demo-workload start, approval card, tournament tab with benchmark comparison; Playwright approval flow through the real stack (stub LLM).
+- [x] **T3.13 fixtures**: 4 prerecorded experiments in `backend/evals/fixtures/experiments/`, provenance enforced on import.
+- [x] **Bug fixed**: lock-upgrade deadlock between parallel content writers (`ensure_writable` `FOR SHARE` → `FOR NO KEY UPDATE`), regression test.
+- [x] **Opt-in worker container** (`backend/Dockerfile`, compose profile `bench`) on `sandbox_net`; measured round trip 40 µs vs 355–451 µs via the published port.
+
 ## Blockers
 
-- None. Docker Desktop is running. Compose `metadata-db` and `sandbox-db` are healthy on PostgreSQL 17.11; sandbox egress was verified blocked (TCP and DNS), with metadata-db as the positive control.
+- None. Compose `metadata-db`, `sandbox-db` and `sandbox-relay` are healthy (they had exited once during the session, apparently with Docker Desktop, and were restarted). The dev database was migrated to `0009`; earlier local databases need `uv run alembic upgrade head`.
 
 ## Deviations / deferred
 
@@ -290,14 +308,20 @@
 
 ## Next actions
 
-1. On the next UTC day (free quota resets at 00:00 UTC), record the two missing smoke cases with the pinned free model (command in PHASE_2_REPORT §10), confirm `run --suite smoke` replays with exit 0, commit, and add the eval smoke step to CI.
+0. **Owner decisions:** review [ADR-0018](../engineering/adr/ADR-0018-robust-sample-quality-gate.md); decide D11 and D12 below.
+1. On the next UTC day (free quota resets at 00:00 UTC), record the two missing Phase 2 smoke cases with the pinned free model (command in PHASE_2_REPORT §10), confirm `run --suite smoke` replays with exit 0, commit, and add the eval smoke step to CI.
 2. ~~Calibration follow-up for `pk_lookup_already_optimal`~~: done (ADR-0017).
-3. Wait for the owner's go-ahead before starting Phase 3.
+3. Then, as free capacity allows, record the Phase 3 Mode C cases (`--suite full --case orders_sandbox_composite_index`, `rewrite_trap_sandbox`; needs `SANDBOX_ADMIN_URL`/`SANDBOX_BENCH_PASSWORD`).
+4. Wait for the owner's go-ahead before starting Phase 4.
 
 ## Verification status
 
 | Check | Result |
 |---|---|
+| Backend (Phase 3, 2026-10-12) | `QC_REQUIRE_DB=1 uv run pytest -q` → **1043 passed** (595 unit, 325 integration, 123 security) on PG 17.11 + sandbox, Python 3.12; ruff, format, `mypy --strict` (162 files) clean; CI green on `fc72846`, `53fa425`, `510f766` |
+| Frontend (Phase 3) | lint, typecheck, `pnpm test` → **65 passed**, build OK; Playwright **2 passed** (incl. sandbox approval flow) |
+| Evals (Phase 3) | smoke replay unchanged: 3 PASS, 2 unrecorded (exit 1); Mode C cases unrecorded; benchmark-engine eval table 9/9 |
+| Compose (Phase 3) | `alembic current` → `0009 (head)`; sandbox egress blocked (re-verified) |
 | Required files exist | See Phase 0 validation in the final summary |
 | Internal links | Checked by script during Phase 0 |
 | Mermaid syntax | Reviewed manually (no renderer installed; not executed) |
@@ -320,10 +344,12 @@ Defaults are chosen so implementation can proceed; change any before the listed 
 | D1 | Public demo backend host (Fly.io / Railway / Render / Cloud Run) | Any small always-on container; decide on price at deploy time | Phase 5 (T5.8) |
 | D2 | Enable Mode B (live inspection) on the public demo? | Disabled | Phase 5 |
 | D3 | Default LLM models per agent | **Decided by the owner (2026-10-12): free OpenRouter models only, every phase** ([ADR-0016](../engineering/adr/ADR-0016-free-openrouter-models-only.md)). The specific `:free` model is pinned from the Phase 2 eval benchmark | Phase 2 exit (model pin) |
-| D4 | Allow user-provisioned sandbox connections (Mode C on user's own non-prod DB) in MVP? | Yes in local profile only, with attestation | Phase 3 |
+| D4 | Allow user-provisioned sandbox connections (Mode C on user's own non-prod DB) in MVP? | Yes in local profile only, with attestation. **Not implemented in Phase 3** (demo workloads only); revisit with Phase 5 | Phase 5 |
 | D5 | Custom domain for demo (needed for same-site cookies) | Required; name TBD | Phase 5 |
 | D6 | Write-overhead benchmark in MVP or Post-MVP | Post-MVP (qualitative class shown until then) | Phase 3 |
 | D7 | ~~Initialize git + branching model~~ | **Resolved:** git on `main`, **main-only workflow** (CLAUDE.md §10 / AGENTS.md Git Branch Policy); push once a remote is configured | — |
 | D8 | Manifest signing (key outside DB) or external timestamping | Deferred; digests + append-only grants + manifest digest in exports (REPLAY_ENGINE §6) | Phase 5 security review |
 | D9 | Replay equivalence margin `m` | 1.25 (±25% speedup drift); revisit after measuring same-machine replay variance in Phase 4 | Phase 4 exit |
 | D10 | Retirement policy for old report builders/renderers | Keep all versions; fallback to stored artifacts if ever retired | Before first builder@2 |
+| D11 | Sample-quality gate on very fast winning arms: on Docker Desktop, sub-ms arms have ≈0.1 ms jitter, so 6–270× wins with CIs far above 1.10× end `inconclusive` (PHASE_3_REPORT §4, §6) | Keep the spec rule (gate 4b applies to every arm). **Recommended:** waive 4b when the primary CI lower bound ≥ 2 × `min_effect`, and label such verdicts with the noisy environment, symmetric to the regression rule | Before demo fixtures are re-recorded / Phase 4 auditor |
+| D12 | Run local benchmarks through the container worker on `sandbox_net` by default? | Opt-in (`docker compose --profile bench up -d worker`); host worker + relay remains the default | Phase 5 (deployment) |

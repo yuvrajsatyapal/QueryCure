@@ -41,8 +41,8 @@ backend/
 │   ├── sql/                    parser.py (SQLGlot), validator.py (allowlist/denylist), fingerprint.py, ddl_allowlist.py
 │   ├── plans/                  parser.py (PG JSON → PlanTree), metrics.py, diff.py, summarize.py (deterministic text for prompts)
 │   ├── connectors/             ssrf_guard.py, session.py (hardened psycopg sessions), inspection_gateway.py, catalog_queries/ (*.sql templates), capabilities.py
-│   ├── sandbox/                provisioner.py (template/clone lifecycle), docker_backend.py, user_sandbox_backend.py, locks.py
-│   ├── benchmark/              engine.py, schedule.py (interleaving), timing.py, correctness.py (row canonicalization, fingerprints), stats.py (bootstrap), rules.py (verdict gates), tournament.py
+│   ├── sandbox/                ✅ provisioner.py (templates, clones, advisory-lock leases, orphan cleanup); user_sandbox_backend.py planned (D4)
+│   ├── benchmark/              ✅ engine.py, executor.py (timing), schedule.py, correctness.py, stats.py, rules.py, tournament.py, fixtures.py (prerecorded)
 │   ├── workloads/              registry.py, <name>/generator.py, <name>/schema.sql, <name>/queries.yaml
 │   ├── llm/                    providers.py (Gemini, OpenRouter via LangChain), credentials.py (BYOK decrypt), structured.py (with_structured_output + repair), rate_limit.py
 │   ├── agents/

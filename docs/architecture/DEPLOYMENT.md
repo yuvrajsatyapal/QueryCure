@@ -58,7 +58,9 @@ flowchart TB
   GH -->|build and push image| HOST
 ```
 
-### Local Compose services (planned `infra/docker/compose.yaml`)
+### Local Compose services (`infra/docker/compose.yaml`)
+
+*Implemented (Phase 3):* `metadata-db`, `sandbox-db` (planner settings pinned with `-c`), `sandbox-relay` (`alpine/socat:1.8.0.3`, loopback `127.0.0.1:55432` → `sandbox-db:5432`, so a host-run worker and the tests can reach the internal-only sandbox), and an opt-in `worker` (profile `bench`, built from `backend/Dockerfile`) on `default` + `sandbox_net`. The container worker is the low-noise benchmarking path: an in-network `SELECT 1` round trip is ≈ 40 µs versus ≈ 355–451 µs through the published port. Stop any host worker before starting it. `api` and `web` still run on the host.
 
 | Service | Image | Notes |
 |---|---|---|

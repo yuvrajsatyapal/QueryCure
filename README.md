@@ -2,7 +2,7 @@
 
 > Autonomous, multi-agent investigation and *verified* optimization of PostgreSQL query performance.
 
-**Project status: Phase 2 (multi-agent intelligence) implemented.** What runs today: SQL and plan parsing, a plan explorer, restricted live `EXPLAIN`, and **multi-agent investigations** (LangGraph supervisor + Query Analyzer, Index Strategist, Workload Investigator) that produce cited, **unverified** hypotheses with a live timeline, using **free OpenRouter models only** ([ADR-0016](docs/engineering/adr/ADR-0016-free-openrouter-models-only.md)). **No benchmarks, verified recommendations, or replayable reports yet**: those arrive in Phases 3–4. See [docs/planning/CURRENT_PHASE.md](docs/planning/CURRENT_PHASE.md) for live status.
+**Project status: Phase 3 (optimization & benchmarking) implemented; Phases 2–3 exit partially met (pending free-quota eval recordings; see the reports).** Demo workloads can now be investigated in **Mode C**: the Optimization Engineer proposes candidates, a human approves the exact SQL, and a deterministic benchmark engine runs a tournament in a disposable, network-isolated sandbox (verdicts in words: verified within the tested scope, rejected, inconclusive). Phase 2 summary: What runs today: SQL and plan parsing, a plan explorer, restricted live `EXPLAIN`, and **multi-agent investigations** (LangGraph supervisor + Query Analyzer, Index Strategist, Workload Investigator) that produce cited, **unverified** hypotheses with a live timeline, using **free OpenRouter models only** ([ADR-0016](docs/engineering/adr/ADR-0016-free-openrouter-models-only.md)). **Replayable reports and the Benchmark Auditor arrive in Phase 4.** Run sandbox benchmarks locally with `docker compose up -d` (includes the loopback sandbox relay) and `SANDBOX_ADMIN_URL`/`SANDBOX_BENCH_PASSWORD` in `backend/.env` (see `.env.example`). See [docs/planning/CURRENT_PHASE.md](docs/planning/CURRENT_PHASE.md) for live status.
 
 ---
 
@@ -156,7 +156,7 @@ The demo database shares the local metadata server only for convenience. Private
 | 0 | Documentation & architecture | Done |
 | 1 | Foundation: repo, API, metadata DB, SQL/plan parsing, demo workloads, editor | Done ([report](docs/planning/reports/PHASE_1_REPORT.md)) |
 | 2 | Multi-agent intelligence: LangGraph supervisor, analyzer agents, streaming | Implemented; exit partially met ([report](docs/planning/reports/PHASE_2_REPORT.md)) |
-| 3 | Optimization & benchmarking: sandbox, benchmark engine, tournament | Planned |
+| 3 | Optimization & benchmarking: sandbox, benchmark engine, tournament | Implemented; exit partially met ([report](docs/planning/reports/PHASE_3_REPORT.md)) |
 | 4 | Verification & replay: auditor, lineage, replay, regression detection | Planned |
 | 5 | Production polish: auth, BYOK, observability, evals, hardening, deploy | Planned |
 

@@ -128,6 +128,8 @@ fault_injection: none   # or: tool_timeout:get_table_stats, llm_invalid_json:que
 
 ## 6. Benchmark-engine evaluation
 
+*Implemented (Phase 3):* `tests/integration/test_benchmark_eval_table.py` (real sandbox, sf=0.1, spec thresholds). Positive cases accept `verified` or, as the documented noisy-hardware outcome, only `inconclusive` from gate 4 (`insufficient_evidence`). Negative cases are strict. The noisy case injects 0–20 ms of latency through the engine's test-only `noise` seam. Measured frequency on the development Mac: 4/9 positive runs verified, 5/9 inconclusive, 0 rejected (PHASE_3_REPORT §4).
+
 Uses the demo workloads in [BENCHMARK_ENGINE §11](../architecture/BENCHMARK_ENGINE.md#11-demo-workloads-ground-truth-fixtures) with **hand-written candidates** (no LLM) to test the engine alone:
 
 | Case | Expected verdict |

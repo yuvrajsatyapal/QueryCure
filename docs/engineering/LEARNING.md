@@ -116,9 +116,13 @@ The full graph topology, which nodes are deterministic vs LLM, how state flows, 
 - Don't run an implicit `ANALYZE` after creating an index — it would also refresh statistics and confound the comparison.
 - `prepare_threshold=None` avoids psycopg switching to prepared statements mid-run (generic plans can differ from custom plans).
 - Bootstrap: resample each arm independently, compute ratio of medians, take 2.5/97.5 percentiles; seed the RNG.
+- *Learned while building (2026-10-12, PHASE_3_REPORT §9):* measure the harness before tuning a gate. A bare `SELECT 1` through Docker Desktop's port forward had robust CV ≈ 0.27, so sub-millisecond arms were measuring the network. Open the transaction outside the timer, stream rows in one round trip, and run the client next to the server when you can.
+- Noise widens a bootstrap CI: a CI entirely on the bad side of a threshold is decisive even with noisy samples, which is why regression is checked before dispersion (ADR-0018).
+- Lock upgrades deadlock: `FOR SHARE` followed by an `UPDATE` of the same row in two concurrent transactions. Take the lock you will need at the end (`FOR NO KEY UPDATE`) at the start.
+- LangGraph `interrupt()` re-runs the whole node on resume: keep the node idempotent and the decision in the database.
 
 ### Modules to study
-`benchmark/schedule.py`, `benchmark/timing.py`, `benchmark/stats.py`, `benchmark/correctness.py`, `sandbox/provisioner.py`, `agents/nodes/optimization_engineer.py`.
+`benchmark/schedule.py`, `benchmark/executor.py` (timing), `benchmark/stats.py`, `benchmark/rules.py`, `benchmark/correctness.py`, `replay/canonical/row_v1.py`, `sandbox/provisioner.py`, `sql/ddl_allowlist.py`, `agents/nodes/optimization_engineer.py`, `agents/nodes/approval_gate.py`, `agents/nodes/run_experiment.py`, `evidence/store.py`.
 
 ### Interview questions
 1. How do you know an optimization actually helped? What would convince a skeptical senior engineer?
@@ -128,6 +132,9 @@ The full graph topology, which nodes are deterministic vs LLM, how state flows, 
 5. How does `CREATE DATABASE … TEMPLATE` work and why is it faster than reloading data?
 6. What are the sources of noise in a database benchmark on a laptop and how does your design mitigate each?
 7. How do you cancel a running query from Python safely?
+8. Your verdict gate rejects a 177× win as "insufficient evidence". Is the gate wrong, the harness, or the environment? How do you find out?
+9. Why can noisy data justify a rejection but not a verification?
+10. Two transactions each `SELECT … FOR SHARE` a row and then `UPDATE` it. What happens, and how do you fix it?
 
 ### Exercises
 - Run the same query 100 times; plot the latency distribution. Compute mean, median, p95, and a bootstrap CI by hand in a notebook.

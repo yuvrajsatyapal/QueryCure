@@ -213,6 +213,16 @@ The worker uses `asyncio`; parallel branches share one event loop. Per-run concu
 - Missing LLM configuration fails the run with `CONFIGURATION_ERROR` before the graph starts. A dead-lettered job fails its run (`JOB_DEAD_LETTERED`) via the worker's `on_dead` callback, which now fires for both dead-letter paths.
 - Phase 2 `write_report` is deterministic: outcome from stop reason → a `not_material` verdict with cited evidence (`no_action_needed`, even when capped hypotheses exist) → hypotheses (`unverified_recommendations`, since nothing is benchmarked yet) → cited `no_action_evidence` (`no_action_needed`) → `inconclusive`. A `cancelling` run always ends `cancelled`. It stores an interim report (`reports/interim.py`, builder `interim-report@2`, which adds the materiality verdict to `@1`; no clock reads) as `report_json`/`report_md` artifacts, roles `output.report_json`/`output.report_md`, then changes status in the same transaction. `report.ready` is not emitted until Phase 4 (it carries a manifest digest). Runs failed by dead-lettering have no report (they never reached `write_report`); Phase 4 finalization covers them.
 
+### Optimization loop (implemented in Phase 3)
+
+- **Mode C context:** `collect_context` opens the same hardened inspection gateway on a throwaway clone of the demo workload as `qc_bench` (`agents/services.sandbox_inspector`), so Mode C runs get `measured` plain-EXPLAIN plan evidence and a schema snapshot. The template is built here if needed.
+- **`optimization_engineer`** (`optimization_engineer@1`): one structured call per round (`invocation_key = optimization_engineer:<round>`), no tools. `agents/candidates.judge_candidates` keeps only candidates that address known hypothesis keys, pass the sandbox DDL allowlist / SELECT validator for their kind, are not repeats (by SQL digest) of an earlier candidate, and fit `candidates_per_round`. More than half removed → one retry listing the problems. Keys are `oc_` + hash(run, round, position).
+- **`approval_gate`**: see §8; `interrupt()` re-runs the node on resume, so the node reads the decision from `approval_requests` and is idempotent.
+- **`run_experiment`**: builds `ExperimentConfig` from the approval payload (the SQL the human saw), runs the engine in a worker thread (`asyncio.to_thread`) with `DbHooks` bridging persistence and progress back to the loop, stores `experiment_config` / `environment` / `plan_analyze` / `experiment_result` artifacts, sets candidate statuses from the rule verdicts, records `benchmark_metric` and `correctness_check` evidence, and emits `verification.completed`. Experiment IDs are `uuid5(run, round)`, so a re-run resumes the same experiment.
+- **Loop:** no verified winner and a `rejected`/`inconclusive` round → `next_round` (bounded by `budget.max_optimization_rounds`, default 2; demo 1) → the engineer sees earlier candidates with their reason codes. A failed experiment (sandbox unavailable) goes to the report.
+- **Outcomes** (`write_report`): verified winner → `verified_recommendation`; expired approval, or benchmarked without a winner → `inconclusive`; never benchmarked (declined, no Mode C, no valid candidate) → `unverified_recommendations`. Report builder `interim-report@3` adds the rounds.
+- The Benchmark Auditor is Phase 4; until then the route goes straight from `run_experiment` to the loop or the report.
+
 ## 8. Human-in-the-loop
 
 Approval is required for:
@@ -223,6 +233,8 @@ Approval is required for:
 | Mode B `EXPLAIN` on a connection with `environment = production` | required | No |
 | Budget extension (more rounds/time) | required | No |
 | Candidate classified `high` risk (e.g., large index on write-heavy table) | required, flagged | No |
+
+Implemented in Phase 3 (`agents/nodes/approval_gate.py`, `jobs/approvals.py`): pre-authorization (`pre_authorize_demo_sandbox`, demo workloads) writes the row already `approved` with `decided_by = pre_authorized`; time spent awaiting approval is added to `investigation_runs.waiting_seconds` and excluded from the wall-clock budget; the worker sweeps expired approvals every 60 s; the benchmark engine refuses any arm whose SQL digest differs from the approved one.
 
 Mechanism: `approval_gate` creates an `approval_requests` row (with the exact SQL to be run and sandbox target), emits `approval.requested`, then calls `interrupt(payload)`. The run status becomes `awaiting_approval`. The decision endpoint validates the user owns the run and that the request is still `pending` (idempotent), then enqueues a `resume` job. Approvals expire after 24 h → run ends `inconclusive` (`approval_expired`).
 

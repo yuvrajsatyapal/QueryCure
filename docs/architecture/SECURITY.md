@@ -159,6 +159,8 @@ Controls:
 | Disposability | Clones created per experiment arm via `CREATE DATABASE … TEMPLATE`, dropped after; container recreated on failure |
 | Data | Synthetic demo workloads, or a user-provisioned sandbox (purpose=`sandbox`) that the user attests is non-production |
 
+**Implemented (Phase 3), all with tests:** two roles on the sandbox server. The admin role is used only by the provisioner. `qc_bench` (no superuser, CREATEDB, CREATEROLE, replication or BYPASSRLS; no server-program or server-file roles; connection limit 16) owns templates and clones and runs every candidate statement and benchmark query, the queries inside `READ ONLY` transactions with per-statement timeouts (`tests/security/test_sandbox_isolation.py`). The DDL allowlist is a strict, fail-closed grammar (`sql/ddl_allowlist.py`). The engine re-validates every arm and checks it against the approved SQL digest before creating any clone. Locally, a `socat` relay publishes only `127.0.0.1:55432` → `sandbox-db:5432`, so the sandbox itself keeps no egress (re-verified). User-provisioned sandboxes (D4) are not implemented.
+
 A user-provisioned sandbox connection gets Mode C privileges **only** if flagged `purpose=sandbox` and the user confirms an explicit attestation; QueryCure still only touches databases it creates (`qc_clone_*`) and refuses if it cannot `CREATE DATABASE`.
 
 ## 9. Application security baseline
