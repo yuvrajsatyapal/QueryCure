@@ -250,11 +250,13 @@ Mirror the Pydantic models in [AGENT_SYSTEM.md §4](AGENT_SYSTEM.md#key-models-a
 Index: `(run_id) WHERE status = 'pending'`.
 
 ### experiments
+*Implemented (migration 0008)* with these additions: `approval_request_id` (the approval that authorized the DDL), `result_artifact_id` (an `experiment_result` artifact: builds, measurements, stats, rule verdicts, tournament), `seed`, and `error JSONB`. Unique `(run_id, round)` for non-replay experiments. `optimization_candidates` stores `ddl TEXT[]`, `query_sql` (rewrites only, enforced by a CHECK) and `sql_sha256`, the digest the approval pins.
+
 `run_id`, `kind` (`single`, `tournament`), `status` (`pending`, `provisioning`, `running`, `completed`, `failed`, `cancelled`), `config_artifact_id` (full `ExperimentConfig`), `environment JSONB` (`EnvironmentFingerprint`), `environment_digest TEXT`, `engine_version TEXT` (`bench@N`), `row_profile TEXT` (`qc-row-v1`), `replay_of_experiment_id` (nullable, set by experiment replay), `round INT`, `started_at`, `finished_at`.
 
 ### benchmark_runs (append-only)
 `experiment_id`, `candidate_id` (NULL = baseline), `arm TEXT`, `param_set TEXT`, `block INT` (interleaving block index), `latencies_ns JSONB` (array of integers; raw samples, never floats — REPLAY_ENGINE §2.1 rule 4), `rows_returned INT`, `result_fingerprint TEXT`, `plan_artifact_id`, `buffers JSONB`, `index_size_bytes BIGINT`, `index_build_ns BIGINT`, `provenance TEXT`.
-Unique `(experiment_id, arm, param_set, block)` → idempotent resume.
+Unique `(experiment_id, arm, param_set, phase, block)` → idempotent resume. *Implemented (migration 0008):* a `phase` column (`build` | `measure` | `plan`) lets build costs (`param_set = '*'`) and the post-timing `EXPLAIN (ANALYZE, BUFFERS)` capture share the resume key with measured blocks. `sample_errors JSONB` lists failed executions (`timeout` | `error`), and `ordered_fingerprint` sits next to the multiset `result_fingerprint` (`inconsistent` when executions of one block disagree). `build_error JSONB` carries `{reason, detail}`, with SQLSTATE only and never the message. Only `INSERT`/`SELECT` are granted to `qc_app` (grant tests in `test_benchmark_schema.py`).
 
 ### verification_results
 `experiment_id`, `candidate_id`, `verdict` (`verified`, `rejected`, `inconclusive`), `reasons JSONB` (list of `{code, detail}`), `stats JSONB` (`SpeedupStats` per param set), `auditor_notes TEXT`, `auditor_downgraded BOOL`.

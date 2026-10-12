@@ -146,3 +146,17 @@ class IdempotencyConflictError(QueryCureError):
 class ConcurrencyLimitError(QueryCureError):
     code = "CONCURRENCY_LIMIT"
     status = 429
+
+
+class SandboxUnavailableError(QueryCureError):
+    """The sandbox server cannot be reached, is busy past the wait limit, or is full."""
+
+    code = "SANDBOX_UNAVAILABLE"
+    status = 503
+
+
+class SandboxPolicyError(QueryCureError):
+    """Candidate SQL outside the sandbox DDL allowlist (SECURITY §6.5)."""
+
+    code = "SANDBOX_SQL_NOT_ALLOWED"
+    status = 422

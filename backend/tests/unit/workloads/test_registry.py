@@ -58,3 +58,7 @@ def test_every_example_query_passes_the_validator() -> None:
     for spec in WORKLOADS.values():
         for query in spec.example_queries:
             validate_select(query.sql)
+
+
+def test_phase3_workloads_are_registered() -> None:
+    assert {"join_fanout", "stale_stats", "index_regression"} <= set(WORKLOADS)

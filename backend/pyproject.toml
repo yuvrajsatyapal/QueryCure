@@ -48,7 +48,7 @@ select = ["E", "W", "F", "I", "B", "UP", "ASYNC", "S", "RUF", "SIM", "PT"]
 
 [tool.ruff.lint.per-file-ignores]
 # Tests build hostile SQL (S608) and hostile addresses like 0.0.0.0 (S104) on purpose.
-"tests/**" = ["S101", "S104", "S608"]
+"tests/**" = ["S101", "S104", "S311", "S608"]
 # Migration SQL reads better unwrapped.
 "migrations/**" = ["E501"]
 

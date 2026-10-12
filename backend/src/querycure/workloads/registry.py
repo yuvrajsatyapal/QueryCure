@@ -38,6 +38,7 @@ class ParamSet(BaseModel):
 
     name: str
     values: list[Any]
+    edge_case: bool = False
 
 
 class ExampleQuery(BaseModel):
@@ -159,6 +160,89 @@ def _no_benefit(sf: float, seed: int) -> list[Statement]:
     ]
 
 
+def _join_fanout(sf: float, seed: int) -> list[Statement]:
+    authors, posts = max(500, round(20_000 * sf)), round(500_000 * sf)
+    m = {f"m{i}": mix(seed, 20 + i) for i in range(1, 6)}
+    return [
+        # tier is a function of country, so `country = $1 AND tier = $2` is estimated as two
+        # independent predicates and the matching authors are underestimated (misestimate).
+        sql.SQL(
+            "CREATE TABLE authors (id bigint PRIMARY KEY, country smallint NOT NULL, "
+            "tier smallint NOT NULL, handle text NOT NULL)"
+        ),
+        sql.SQL(
+            "INSERT INTO authors SELECT g, {m1} % 50, ({m1} % 50) % 3, 'author-' || g "
+            "FROM generate_series(1, {n}) g"
+        ).format(n=sql.Literal(authors), **m),
+        # posts.author_id is a foreign key by meaning but has no index (the injected problem).
+        sql.SQL(
+            "CREATE TABLE posts (id bigint PRIMARY KEY, author_id bigint NOT NULL, "
+            "words int NOT NULL, published_at timestamptz NOT NULL)"
+        ),
+        sql.SQL(
+            "INSERT INTO posts SELECT g, 1 + {m2} % {authors}, 50 + {m3} % 2000, "
+            "{epoch} - ({m4} % 525600) * interval '1 minute' FROM generate_series(1, {n}) g"
+        ).format(epoch=EPOCH, authors=sql.Literal(authors), n=sql.Literal(posts), **m),
+        sql.SQL("ANALYZE authors"),
+        sql.SQL("ANALYZE posts"),
+    ]
+
+
+def _stale_stats(sf: float, seed: int) -> list[Statement]:
+    accounts, events = max(500, round(50_000 * sf)), round(200_000 * sf)
+    m = {f"m{i}": mix(seed, 40 + i) for i in range(1, 5)}
+    return [
+        sql.SQL("CREATE TABLE accounts (id bigint PRIMARY KEY, plan text NOT NULL)"),
+        sql.SQL(
+            "INSERT INTO accounts SELECT g, (ARRAY['free','pro','team'])[1 + {m1} % 3] "
+            "FROM generate_series(1, {n}) g"
+        ).format(n=sql.Literal(accounts), **m),
+        sql.SQL(
+            "CREATE TABLE events (id bigint PRIMARY KEY, account_id bigint NOT NULL, "
+            "kind text NOT NULL, amount int NOT NULL)"
+        ),
+        sql.SQL("CREATE INDEX events_kind_idx ON events (kind)"),
+        sql.SQL(
+            "INSERT INTO events SELECT g, 1 + {m2} % {accounts}, 'view', {m3} % 100 "
+            "FROM generate_series(1, {n}) g"
+        ).format(accounts=sql.Literal(accounts), n=sql.Literal(events), **m),
+        sql.SQL("ANALYZE accounts"),
+        sql.SQL("ANALYZE events"),
+        # The injected problem: a bulk load after ANALYZE. Statistics say every event is a
+        # 'view', so 'purchase' is estimated at ~1 row although half the table now matches.
+        sql.SQL(
+            "INSERT INTO events SELECT {base} + g, 1 + {m4} % {accounts}, 'purchase', "
+            "{m3} % 500 FROM generate_series(1, {n}) g"
+        ).format(
+            base=sql.Literal(events), accounts=sql.Literal(accounts), n=sql.Literal(events), **m
+        ),
+    ]
+
+
+def _index_regression(sf: float, seed: int) -> list[Statement]:
+    tickets = round(300_000 * sf)
+    m = {f"m{i}": mix(seed, 60 + i) for i in range(1, 4)}
+    return [
+        sql.SQL(
+            "CREATE TABLE tickets (id bigint PRIMARY KEY, status text NOT NULL, "
+            "priority smallint NOT NULL, opened_at timestamptz NOT NULL)"
+        ),
+        # Rows are inserted in hash order, so opened_at order is unrelated to heap order.
+        # 'escalated' (1%) exists only among the newest 1% of tickets: an index on opened_at
+        # finds 10 'open' tickets at once but walks ~99% of the index for 'escalated'.
+        sql.SQL(
+            "INSERT INTO tickets SELECT g, "
+            "CASE WHEN t >= {late} THEN 'escalated' "
+            "WHEN {m1} % 10 < 3 THEN 'open' ELSE 'closed' END, {m2} % 5, "
+            "{epoch} - interval '400 days' + t * interval '1 minute' "
+            "FROM (SELECT g, ({m3} % {n}) AS t FROM generate_series(1, {n}) g) s"
+        ).format(
+            epoch=EPOCH, late=sql.Literal(tickets - tickets // 100), n=sql.Literal(tickets), **m
+        ),
+        sql.SQL("ANALYZE tickets"),
+    ]
+
+
 WORKLOADS: dict[str, WorkloadSpec] = {
     spec.name: spec
     for spec in (
@@ -213,6 +297,72 @@ WORKLOADS: dict[str, WorkloadSpec] = {
                 )
             ],
             build=_no_benefit,
+        ),
+        WorkloadSpec(
+            name="join_fanout",
+            version=1,
+            description="Posts by authors from one country and tier; posts.author_id is "
+            "unindexed and tier depends on country.",
+            injected_problem="Join on an unindexed foreign-key column, with a correlated "
+            "predicate pair the planner underestimates.",
+            tables=["authors", "posts"],
+            example_queries=[
+                ExampleQuery(
+                    name="posts_by_country_tier",
+                    sql=(
+                        "SELECT p.id, p.words FROM authors a JOIN posts p ON p.author_id = a.id "
+                        "WHERE a.country = $1 AND a.tier = $2"
+                    ),
+                    param_sets=[
+                        ParamSet(name="country_7", values=[7, 1]),
+                        ParamSet(name="country_42", values=[42, 0]),
+                        ParamSet(name="no_match", values=[7, 2], edge_case=True),
+                    ],
+                )
+            ],
+            build=_join_fanout,
+        ),
+        WorkloadSpec(
+            name="stale_stats",
+            version=1,
+            description="Events joined to accounts; half the events were loaded after the "
+            "last ANALYZE with a kind the statistics have never seen.",
+            injected_problem="Stale statistics: 'purchase' is estimated at ~1 row, so the "
+            "planner picks a nested loop over ~half the table.",
+            tables=["accounts", "events"],
+            example_queries=[
+                ExampleQuery(
+                    name="revenue_by_kind",
+                    sql=(
+                        "SELECT count(*), sum(e.amount) FROM events e "
+                        "JOIN accounts a ON a.id = e.account_id WHERE e.kind = $1"
+                    ),
+                    param_sets=[
+                        ParamSet(name="purchases", values=["purchase"]),
+                        ParamSet(name="views", values=["view"]),
+                    ],
+                )
+            ],
+            build=_stale_stats,
+        ),
+        WorkloadSpec(
+            name="index_regression",
+            version=1,
+            description="Oldest tickets with a status; 'escalated' tickets are all recent.",
+            injected_problem="An index on opened_at helps common statuses but walks almost "
+            "the whole index for 'escalated' (ORDER BY ... LIMIT trap).",
+            tables=["tickets"],
+            example_queries=[
+                ExampleQuery(
+                    name="oldest_by_status",
+                    sql="SELECT * FROM tickets WHERE status = $1 ORDER BY opened_at, id LIMIT 10",
+                    param_sets=[
+                        ParamSet(name="open", values=["open"]),
+                        ParamSet(name="escalated", values=["escalated"]),
+                    ],
+                )
+            ],
+            build=_index_regression,
         ),
     )
 }

@@ -26,9 +26,26 @@ services:
       retries: 10
 
   # Mode C sandbox (SECURITY.md §8). Internal network = no egress and no host port.
-  # Nothing uses it until the benchmark engine (Phase 3), when the worker container joins sandbox_net.
+  # Planner/memory settings are pinned here and recorded in every EnvironmentFingerprint
+  # (BENCHMARK_ENGINE §3). jit=off: JIT compile time adds variance to short queries.
   sandbox-db:
     image: postgres:17
+    command:
+      - postgres
+      - -c
+      - shared_buffers=256MB
+      - -c
+      - work_mem=16MB
+      - -c
+      - effective_cache_size=1GB
+      - -c
+      - random_page_cost=1.1
+      - -c
+      - jit=off
+      - -c
+      - max_parallel_workers_per_gather=0
+      - -c
+      - max_connections=40
     environment:
       POSTGRES_USER: qc_sandbox_admin
       POSTGRES_PASSWORD: ${QC_SANDBOX_PASSWORD:-qc_local_dev_only}
@@ -47,7 +64,27 @@ services:
       timeout: 3s
       retries: 10
 
+  # Local profile: the worker and tests run on the host, which cannot join an internal network.
+  # This relay forwards one host port (loopback only) to sandbox-db:5432 and nothing else, so
+  # sandbox-db itself stays on sandbox_net with no egress. The relay container has a default
+  # network for the published port; it runs only socat with a fixed target.
+  sandbox-relay:
+    image: alpine/socat:1.8.0.3
+    command: ["TCP-LISTEN:5432,fork,reuseaddr", "TCP:sandbox-db:5432"]
+    networks:
+      - default
+      - sandbox_net
+    ports:
+      - "127.0.0.1:55432:5432"
+    depends_on:
+      sandbox-db:
+        condition: service_healthy
+    cpus: 0.5
+    mem_limit: 64m
+    pids_limit: 64
+
 networks:
+  default:
   sandbox_net:
     internal: true
 

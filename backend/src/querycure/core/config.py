@@ -44,8 +44,19 @@ class Settings(BaseSettings):
     database_migration_url: SecretStr | None = Field(
         default=None, validation_alias=_env("DATABASE_MIGRATION_URL")
     )
+    # Mode C sandbox server (SECURITY §8). The admin role only creates/drops databases and
+    # builds templates; candidate SQL runs as qc_bench with SANDBOX_BENCH_PASSWORD.
     sandbox_admin_url: SecretStr | None = Field(
         default=None, validation_alias=_env("SANDBOX_ADMIN_URL")
+    )
+    sandbox_bench_password: SecretStr | None = Field(
+        default=None, validation_alias=_env("SANDBOX_BENCH_PASSWORD")
+    )
+    sandbox_lease_timeout_seconds: float = Field(
+        default=120.0, gt=0, validation_alias=_env("SANDBOX_LEASE_TIMEOUT_SECONDS")
+    )
+    sandbox_image_digest: str = Field(
+        default="unrecorded", validation_alias=_env("SANDBOX_IMAGE_DIGEST")
     )
     master_key: SecretStr | None = Field(default=None, validation_alias=_env("QC_MASTER_KEY"))
     master_key_version: int = Field(default=1, ge=1, validation_alias=_env("QC_MASTER_KEY_VERSION"))

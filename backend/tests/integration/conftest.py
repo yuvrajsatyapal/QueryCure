@@ -127,3 +127,6 @@ async def app_engine(migrated_db: str) -> AsyncIterator[AsyncEngine]:
     engine = make_engine(migrated_db, set_role="qc_app")
     yield engine
     await engine.dispose()
+
+
+from tests.integration.sandbox_fixtures import bench_password, provisioner  # noqa: E402, F401

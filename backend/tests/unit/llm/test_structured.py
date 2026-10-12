@@ -159,7 +159,7 @@ async def test_jitter_stays_within_bounds() -> None:
         Verdict,
         policy=RetryPolicy(jitter_seconds=1.0),
         sleep=sleeps,
-        rng=random.Random(7),  # noqa: S311 - jitter, not security
+        rng=random.Random(7),
     )
 
     assert 2.0 <= sleeps.delays[0] <= 3.0

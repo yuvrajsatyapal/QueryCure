@@ -62,8 +62,24 @@ jobs:
           --health-interval 5s
           --health-timeout 3s
           --health-retries 10
+      # Mode C sandbox server (BENCHMARK_ENGINE §3). Service containers take no command line,
+      # so the planner settings compose pins with -c are applied with ALTER SYSTEM below.
+      sandbox:
+        image: postgres:17
+        env:
+          POSTGRES_USER: qc_sandbox_admin
+          POSTGRES_PASSWORD: qc_ci_only
+          POSTGRES_DB: sandbox_admin
+        ports:
+          - 55432:5432
+        options: >-
+          --health-cmd "pg_isready -U qc_sandbox_admin -d sandbox_admin"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
     env:
       QC_TEST_ADMIN_URL: postgresql://qc_owner:qc_ci_only@127.0.0.1:5432/postgres
+      QC_TEST_SANDBOX_URL: postgresql://qc_sandbox_admin:qc_ci_only@127.0.0.1:55432/sandbox_admin
       QC_REQUIRE_DB: "1"
     steps:
       - uses: actions/checkout@v7
@@ -73,6 +89,13 @@ jobs:
           cache-dependency-glob: backend/uv.lock
       - name: Install
         run: uv sync --locked
+      - name: Pin sandbox settings
+        run: >-
+          psql "$QC_TEST_SANDBOX_URL" -v ON_ERROR_STOP=1
+          -c "ALTER SYSTEM SET jit = off"
+          -c "ALTER SYSTEM SET max_parallel_workers_per_gather = 0"
+          -c "ALTER SYSTEM SET random_page_cost = 1.1"
+          -c "SELECT pg_reload_conf()"
       - name: Integration tests
         run: uv run pytest -q -m integration
 
