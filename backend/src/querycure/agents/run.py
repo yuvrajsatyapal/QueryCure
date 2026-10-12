@@ -41,7 +41,7 @@ def env_clients(settings: Settings) -> ClientsFactory:
 
     def make(inputs: RunInputs) -> LlmClients:
         if settings.llm_provider == "stub":
-            return LlmClients(primary=StubClient())
+            return LlmClients(primary=StubClient(settings.llm_stub_delay_seconds))
         key = resolve_api_key(settings, settings.llm_provider)
         primary = build_client(settings.llm_provider, settings.llm_model, key, settings=settings)
         fallback = (

@@ -264,6 +264,7 @@
   - Cursor pagination with "Load more" (`useInfiniteQuery` over `next_cursor`), title search and status filter sent to the API, newest first, empty state with a link to start one, soft delete with an inline **Undo** (restore endpoint). Side nav "History" enabled.
   - Tests: 4 Vitest (cursor passed to the next page, delete then undo, empty state, filters sent) + side-nav test updated. 59 frontend tests pass; lint, typecheck, build clean.
   - Live browser check against the real API: the list showed the real investigations; delete → "Deleted … Undo" → restored.
+- [x] **Acceptance #2, literal process kill** (`tests/integration/test_worker_kill.py`): a real `python -m querycure.worker` (stub LLM with a 1.5 s per-call delay, lease 5 s) is SIGKILLed once `synthesize_hypotheses` has started; a second worker reclaims the expired lease and the run completes with identical evidence/finding counts, both analysts' single successful executions untouched, statuses `running → queued → running → completed`, job `done` after 2 attempts. 6/6 repeated passes after fixing a test-side race (stopping the worker before the job was marked done).
 
 ## Blockers
 

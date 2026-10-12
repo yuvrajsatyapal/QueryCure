@@ -97,6 +97,10 @@ class Settings(BaseSettings):
     llm_call_timeout_seconds: float = Field(
         default=120.0, ge=5, validation_alias=_env("LLM_CALL_TIMEOUT_SECONDS")
     )
+    # Stub provider only: seconds each canned answer takes, so tests can act mid-call.
+    llm_stub_delay_seconds: float = Field(
+        default=0.0, ge=0, le=60, validation_alias=_env("LLM_STUB_DELAY_SECONDS")
+    )
     llm_max_concurrency: int = Field(default=1, ge=1, validation_alias=_env("LLM_MAX_CONCURRENCY"))
     llm_fallback_model: str | None = Field(
         default=None, validation_alias=_env("LLM_FALLBACK_MODEL")

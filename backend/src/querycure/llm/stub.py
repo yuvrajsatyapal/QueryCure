@@ -5,6 +5,7 @@ the whole pipeline (citations, persistence, events, UI) runs without a model. It
 canned, is labelled `stub` in every record, and must never be presented as a diagnosis.
 """
 
+import asyncio
 import json
 import re
 from collections.abc import Sequence
@@ -29,7 +30,12 @@ class StubClient:
     provider = "stub"
     model = STUB_MODEL
 
+    def __init__(self, delay_seconds: float = 0.0) -> None:
+        self._delay = delay_seconds
+
     async def complete_json(self, messages: Sequence[ChatMessage]) -> RawCompletion:
+        if self._delay:
+            await asyncio.sleep(self._delay)
         system = messages[0].content if messages else ""
         prompt = "\n".join(m.content for m in messages)
         cited = _first_evidence(prompt, ("Seq Scan", "Index Scan", "Sort"))
