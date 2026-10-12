@@ -20,6 +20,7 @@ Index of decisions. Full records (context, alternatives, decision, rationale, tr
 | [0014](adr/ADR-0014-python-tooling.md) | uv, ruff, mypy --strict, pytest, import-linter | Rigor vs early velocity |
 | [0015](adr/ADR-0015-canonicalization-finalization-integrity.md) | Frozen RFC 8785-based canonicalization profiles, atomic finalization, integrity ≠ authenticity, equivalence-margin replay comparison (amends 0010) | Cross-version stability vs owning canonicalization code; no signing yet |
 | [0016](adr/ADR-0016-free-openrouter-models-only.md) | Free OpenRouter models only: config guard, per-response zero-cost check, no paid fallback, free-tier rate and daily limits, served-model provenance | Zero spend and graceful stops vs fewer runs per day and weaker models |
+| [0017](adr/ADR-0017-deterministic-materiality-gate.md) | Deterministic optimization-materiality gate after synthesis: workload share, measured latency vs planning overhead, rows touched, table size and spills; `not_material` caps hypotheses and ends `no_action_needed` | Calibration independent of the model vs conservative thresholds that leave borderline cases `undetermined` |
 
 ## Smaller decisions (not worth a full ADR)
 

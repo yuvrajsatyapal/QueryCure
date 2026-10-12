@@ -1,7 +1,9 @@
 """write_report (terminal, deterministic): outcome, interim report artifacts, final status.
 
 Phase 2 has no candidates or benchmarks, so a run with hypotheses ends
-`unverified_recommendations`: diagnoses with a suggested verification, nothing verified.
+`unverified_recommendations`: diagnoses with a suggested verification, nothing verified. When
+the deterministic materiality check finds nothing worth optimizing, the run ends
+`no_action_needed` even if hypotheses exist (they are kept, capped at low confidence).
 """
 
 import uuid
@@ -26,6 +28,7 @@ def decide(
     stop_reason: str | None,
     has_hypotheses: bool,
     has_no_action_evidence: bool,
+    not_material: bool = False,
 ) -> tuple[RunStatus, RunOutcome | None]:
     if current is RunStatus.CANCELLING or stop_reason == "cancelled":
         return RunStatus.CANCELLED, None
@@ -33,6 +36,8 @@ def decide(
         return RunStatus.FAILED, None
     if stop_reason in ("budget_exhausted", "invalid_input"):
         return RunStatus.COMPLETED, RunOutcome.INCONCLUSIVE
+    if not_material and has_no_action_evidence:
+        return RunStatus.COMPLETED, RunOutcome.NO_ACTION_NEEDED
     if has_hypotheses:
         return RunStatus.COMPLETED, RunOutcome.UNVERIFIED_RECOMMENDATIONS
     if has_no_action_evidence:
@@ -65,11 +70,13 @@ async def write_report(state: InvestigationState, runtime: Runtime[RunContext]) 
         if current in TERMINAL_STATUSES:
             return {"outcome": row.outcome}  # re-run after a crash: already written
         hypotheses = await list_hypotheses(conn, ctx.run_id)
+        materiality = state.get("materiality") or {}
         final, outcome = decide(
             current=current,
             stop_reason=state.get("stop_reason"),
             has_hypotheses=bool(hypotheses),
             has_no_action_evidence=bool(state.get("no_action_evidence")),
+            not_material=materiality.get("verdict") == "not_material",
         )
         report = build_report(
             run_id=str(ctx.run_id),
@@ -83,6 +90,7 @@ async def write_report(state: InvestigationState, runtime: Runtime[RunContext]) 
             errors=state.get("errors", []),
             usage=row.usage,
             synthesis_summary=state.get("synthesis_summary", ""),
+            materiality=materiality or None,
         )
         as_json = await store_json(conn, kind="report_json", value=report)
         as_md = await store_text(conn, kind="report_md", text=render_markdown(report))

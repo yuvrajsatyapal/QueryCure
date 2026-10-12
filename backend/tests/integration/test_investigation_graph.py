@@ -33,6 +33,7 @@ from tests.integration.test_context_nodes import SETTINGS, _connection
 pytestmark = pytest.mark.integration
 
 PLANS = Path(__file__).parents[1] / "fixtures" / "plans"
+EVAL_PLANS = Path(__file__).parents[2] / "evals" / "fixtures" / "plans"
 SQL = "SELECT * FROM orders WHERE customer_id = $1 ORDER BY created_at DESC LIMIT 20"
 EV = re.compile(r"(ev_[0-9a-f]{12})\] \([a-z_]+\) ([^\n]*)")
 BUDGET = RunBudget(
@@ -121,6 +122,7 @@ async def create_run(
     modes: tuple[str, ...] = ("offline",),
     sql: str = SQL,
     plan_file: str | None = "pg17_canonical_hot_analyze.json",
+    plans_dir: Path = PLANS,
     user_id: uuid.UUID | None = None,
     connection_id: uuid.UUID | None = None,
 ) -> uuid.UUID:
@@ -147,7 +149,7 @@ async def create_run(
         art = await store.store_raw_sql(conn, sql)
         await store.link(conn, run_id=run_id, artifact_id=art.id, role="input.query")
         if plan_file:
-            doc = json.loads((PLANS / plan_file).read_text())
+            doc = json.loads((plans_dir / plan_file).read_text())
             art = await store.store_json(conn, kind="plan_analyze", value=doc)
             await store.link(conn, run_id=run_id, artifact_id=art.id, role="input.plan")
     return run_id
@@ -222,6 +224,8 @@ async def test_offline_investigation_runs_end_to_end(
     assert body["hypotheses"][0]["category"] == "missing_index"
     assert {f["agent"] for f in body["findings"]} == {"query_analyzer", "index_strategist"}
     assert body["partial"] is False
+    assert body["materiality"]["verdict"] == "material"
+    assert body["hypotheses"][0]["confidence"] == "high"
     assert any("Seq Scan on orders" in e["summary"] for e in body["evidence"])
     checkpoints = owner.execute(
         "SELECT count(*) FROM langgraph.checkpoints WHERE thread_id = %s", (str(run_id),)
@@ -235,6 +239,53 @@ async def test_offline_investigation_runs_end_to_end(
     ).fetchone()
     assert md is not None
     assert "Nothing in this report has been benchmarked" in md[0]
+
+
+async def test_already_optimal_query_ends_no_action_needed_despite_a_confident_model(
+    app_engine: AsyncEngine, owner: psycopg.Connection, migrated_db: str
+) -> None:
+    # Regression for the pk_lookup_already_optimal eval: the model confidently proposes an
+    # index for a 50-row table read in 0.039 ms. The deterministic materiality check keeps the
+    # hypothesis visible but caps it, and the run ends no_action_needed with cited evidence.
+    run_id = await create_run(
+        app_engine,
+        sql="SELECT value FROM app_settings WHERE key = $1",
+        plan_file="pg17_no_benefit_pk_lookup_analyze.json",
+        plans_dir=EVAL_PLANS,
+    )
+    client = RoleClient(
+        {
+            "plan": [plan("query_analyzer")],
+            "query_analyzer": [analyst_final(r"^Seq Scan on app_settings", "Seq Scan filters")],
+            "synthesis": [synthesis("missing_index", r"^Seq Scan on app_settings")],
+        }
+    )
+
+    await execute_run(services(app_engine, migrated_db, client), run_id, attempt=1, reclaimed=False)
+
+    assert run_row(owner, run_id) == ("completed", "no_action_needed", None)
+    body = report(owner, run_id)
+    assert body["builder_version"] == "interim-report@2"
+    assert body["materiality"]["verdict"] == "not_material"
+    [h] = body["hypotheses"]
+    assert (h["category"], h["confidence"]) == ("missing_index", "low")
+    assert "Not worth optimizing" in h["uncertainty_notes"]
+    assert set(body["materiality"]["evidence_ids"]) <= set(h["contradicting_evidence"])
+    cited = {e["id"] for e in body["evidence"]}
+    assert set(body["materiality"]["evidence_ids"]) <= cited
+    stored = owner.execute(
+        "SELECT confidence FROM hypotheses WHERE run_id = %s", (run_id,)
+    ).fetchall()
+    assert [r[0] for r in stored] == ["low"]
+    summaries = [
+        r[0]["text"]
+        for r in owner.execute(
+            "SELECT payload FROM investigation_events WHERE run_id = %s "
+            "AND type = 'agent.summary' ORDER BY seq",
+            (run_id,),
+        )
+    ]
+    assert any(t.startswith("Not worth optimizing") for t in summaries)
 
 
 async def test_budget_exhaustion_ends_inconclusive_with_a_partial_report(

@@ -27,6 +27,8 @@ class Expect(Strict):
     same_tools_as_case: str | None = None  # reported, not pass/fail (live models vary)
     # Tool names that appear only in injected text: attempting any of them fails the case.
     injected_tool_names: list[str] = Field(default_factory=list)
+    # Deterministic materiality verdict the run must reach (evidence/materiality.py).
+    materiality: Literal["material", "not_material", "undetermined"] | None = None
 
 
 class Forbid(Strict):

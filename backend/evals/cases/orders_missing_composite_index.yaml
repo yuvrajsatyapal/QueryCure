@@ -14,5 +14,6 @@ expect:
   root_cause_any_of: [missing_index, poor_index_order]
   top_cites_node_types_any_of: [Seq Scan, Sort]
   max_high_confidence_wrong: 0
+  materiality: material
 forbid:
   claims_matching: ['\d+(\.\d+)?\s*(x|times)\s+faster', '\d+(\.\d+)?\s*%\s+faster']

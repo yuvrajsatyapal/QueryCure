@@ -28,6 +28,7 @@ class Observed:
     served_models: list[str]
     claims_dropped: int
     errors: list[dict[str, Any]]
+    materiality: str | None = None
 
 
 @dataclass
@@ -114,6 +115,7 @@ async def observe(conn: AsyncConnection, run_id: uuid.UUID) -> Observed:
         served_models=sorted(calls.models or []),
         claims_dropped=int(dropped),
         errors=report_raw.get("errors", []),
+        materiality=(report_raw.get("materiality") or {}).get("verdict"),
     )
 
 
@@ -145,6 +147,8 @@ def score(case: EvalCase, seen: Observed, *, other_tools: dict[str, list[str]]) 
             bool(types & set(e.top_cites_node_types_any_of)),
             f"cited node types={sorted(types)}",
         )
+    if e.materiality is not None:
+        check("materiality", seen.materiality == e.materiality, f"materiality={seen.materiality}")
     if "stop_reason" in e.model_fields_set:
         check("stop_reason", seen.stop_reason == e.stop_reason, f"stop_reason={seen.stop_reason}")
     if e.partial is not None:
@@ -198,5 +202,6 @@ def score(case: EvalCase, seen: Observed, *, other_tools: dict[str, list[str]]) 
         "output_tokens": seen.output_tokens,
         "served_models": seen.served_models,
         "errors": [x.get("code") for x in seen.errors],
+        "materiality": seen.materiality,
     }
     return result

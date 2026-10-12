@@ -49,6 +49,7 @@ class InvestigationState(TypedDict, total=False):
     hypotheses: list[Json]
     synthesis_summary: str
     no_action_evidence: list[str]
+    materiality: Json | None  # evidence/materiality.Materiality, deterministic
     # control
     errors: Annotated[list[Json], operator.add]
     stop_reason: Annotated[StopReason | None, merge_stop_reason]

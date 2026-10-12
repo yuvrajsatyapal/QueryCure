@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | Phase | **2 — Multi-agent intelligence** (Phase 1 complete: [PHASE_1_REPORT](reports/PHASE_1_REPORT.md)) |
-| Status | **Phase 2 implemented; exit partially met** ([PHASE_2_REPORT](reports/PHASE_2_REPORT.md)). Acceptance #1, #2, #3, #5 met; #4 met by deterministic tests, its recorded-model case waits for the next free-quota day. Phase 3 not started (awaiting go-ahead) |
+| Status | **Phase 2 implemented; exit partially met** ([PHASE_2_REPORT](reports/PHASE_2_REPORT.md)). Acceptance #1, #2, #3, #5 met; #4 met by deterministic tests, its recorded-model case waits for the next free-quota day. Acceptance follow-up 2026-10-12 (PHASE_2_REPORT §11): calibration failure fixed by a deterministic materiality gate (ADR-0017); free-only now enforced before dispatch; two smoke recordings still pending (free quota spent). Phase 3 not started (awaiting go-ahead) |
 | Last updated | 2026-10-12 |
 | Application code | Phase 1 foundation: API (session, connections, inspect, workloads, health), metadata DB migrations, SQL/plan parsing, inspection gateway, artifact store, demo workloads; web app with connections and plan workspace (tree + graph). No agents yet. |
 
@@ -264,6 +264,11 @@
   - Cursor pagination with "Load more" (`useInfiniteQuery` over `next_cursor`), title search and status filter sent to the API, newest first, empty state with a link to start one, soft delete with an inline **Undo** (restore endpoint). Side nav "History" enabled.
   - Tests: 4 Vitest (cursor passed to the next page, delete then undo, empty state, filters sent) + side-nav test updated. 59 frontend tests pass; lint, typecheck, build clean.
   - Live browser check against the real API: the list showed the real investigations; delete → "Deleted … Undo" → restored.
+- [x] **Acceptance follow-up (2026-10-12, PHASE_2_REPORT §11).**
+  - Materiality gate (`evidence/materiality.py`, ADR-0017): a deterministic verdict from workload share, measured execution vs planning overhead, rows scanned, catalog size of Seq-Scanned tables, and spills. `not_material` caps hypotheses at low confidence and ends the run `no_action_needed`. `pk_lookup_already_optimal` now PASSes on its existing recording; report builder `interim-report@2`.
+  - Free-only before dispatch: `OpenRouterClient` refuses a non-free id at construction and before every request (a gap: a paid id could previously be sent and was only caught by the cost check).
+  - Recordings for `orders_injection_in_schema` and `orders_plain_explain`: **not made**. Today's free quota was already used (ledger 60 ≥ 45); no request was sent.
+  - Tests: backend 774 passed (405 unit, 263 integration, 106 security); frontend 59 + build; e2e 1 passed; eval smoke replay 3/5 (two unrecorded).
 - [x] **Acceptance #2, literal process kill** (`tests/integration/test_worker_kill.py`): a real `python -m querycure.worker` (stub LLM with a 1.5 s per-call delay, lease 5 s) is SIGKILLed once `synthesize_hypotheses` has started; a second worker reclaims the expired lease and the run completes with identical evidence/finding counts, both analysts' single successful executions untouched, statuses `running → queued → running → completed`, job `done` after 2 attempts. 6/6 repeated passes after fixing a test-side race (stopping the worker before the job was marked done).
 
 ## Blockers
@@ -286,7 +291,7 @@
 ## Next actions
 
 1. On the next UTC day (free quota resets at 00:00 UTC), record the two missing smoke cases with the pinned free model (command in PHASE_2_REPORT §10), confirm `run --suite smoke` replays with exit 0, commit, and add the eval smoke step to CI.
-2. Calibration follow-up for `pk_lookup_already_optimal` (known baseline failure).
+2. ~~Calibration follow-up for `pk_lookup_already_optimal`~~: done (ADR-0017).
 3. Wait for the owner's go-ahead before starting Phase 3.
 
 ## Verification status
@@ -298,7 +303,8 @@
 | Mermaid syntax | Reviewed manually (no renderer installed; not executed) |
 | Backend (Phase 2, 2026-10-12) | `uv run pytest -q` → **743 passed** (375 unit, 262 integration incl. a real-process SIGKILL test, 106 security) on PG 17.11, Python 3.12; ruff, format, `mypy --strict` (134 files) clean; CI green on 3.12/3.13 + integration |
 | Frontend (Phase 2) | lint, typecheck, `pnpm test` → **59 passed**, build OK (Node 22); Playwright e2e **1 passed** (real API/worker/DB, stub LLM; CI job `e2e` green); browser-verified start → live timeline → findings → evidence chip → plan node, history delete/undo, 375 px |
-| Evals (replay) | `python -m querycure.evals run --suite smoke` → 2 PASS, 1 XFAIL (known baseline), 2 not yet recorded |
+| Backend (acceptance follow-up, 2026-10-12) | `QC_REQUIRE_DB=1 uv run pytest -q` → **774 passed** (405 unit, 263 integration, 106 security); ruff, format, `mypy --strict` (135 files) clean. Frontend lint/typecheck/59 tests/build clean; Playwright e2e 1 passed |
+| Evals (replay) | `python -m querycure.evals run --suite smoke` → **3 PASS** (incl. `pk_lookup_already_optimal`, formerly XFAIL), 2 not yet recorded → exit 1 |
 | Compose (Phase 2) | `alembic current` → `0007 (head)` |
 | Backend (through T1.19) | `uv run pytest -q` → 448 passed: 359 unit/security + 89 integration on PG 17.11, Python 3.12; CI also runs 3.13 and a `postgres:17` integration job. `ruff check`/`format --check` clean; `mypy --strict` clean on 57 files. Live API check as `qc_app`: readyz ok, session flow 401 → 201 → 200, CSRF 403 envelope |
 | Frontend (through T1.18) | `pnpm lint` and `pnpm typecheck` clean; `pnpm test` → 41 passed; `pnpm build` compiles; browser-verified against the live API, including 375 px width |

@@ -9,8 +9,9 @@ from typing import Any
 
 from querycure.domain.investigation import Evidence, Finding, Hypothesis
 
-BUILDER_VERSION = "interim-report@1"
-REPORT_SCHEMA_VERSION = 1
+# @2 adds the deterministic materiality verdict (@1 stays as released, ADR-0015).
+BUILDER_VERSION = "interim-report@2"
+REPORT_SCHEMA_VERSION = 2
 
 
 def build_report(
@@ -26,10 +27,12 @@ def build_report(
     errors: list[dict[str, Any]],
     usage: dict[str, Any],
     synthesis_summary: str,
+    materiality: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     cited = sorted(
         {i for _, f in findings for i in f.evidence_ids}
         | {i for h in hypotheses for i in h.supporting_evidence + h.contradicting_evidence}
+        | set((materiality or {}).get("evidence_ids", []))
     )
     by_id = {e.id: e for e in evidence}
     return {
@@ -42,6 +45,7 @@ def build_report(
         "stop_reason": stop_reason,
         "partial": stop_reason is not None or final_status != "completed",
         "summary": synthesis_summary,
+        "materiality": materiality,
         "hypotheses": [h.model_dump() for h in sorted(hypotheses, key=lambda h: h.rank)],
         "findings": [{"key": key, **f.model_dump()} for key, f in findings],
         "evidence": [by_id[i].model_dump() for i in cited if i in by_id],
@@ -65,9 +69,15 @@ def render_markdown(report: dict[str, Any]) -> str:
         )
     lines += [
         "- Nothing in this report has been benchmarked; hypotheses are unverified.",
-        "",
-        "## Hypotheses",
     ]
+    materiality = report.get("materiality")
+    if materiality and materiality["verdict"] == "not_material":
+        lines.append(
+            "- **Not worth optimizing** (deterministic materiality check): "
+            + " ".join(materiality["reasons"])
+            + f" — evidence {', '.join(materiality['evidence_ids'])}"
+        )
+    lines += ["", "## Hypotheses"]
     if not report["hypotheses"]:
         lines.append("No hypotheses were produced.")
     for h in report["hypotheses"]:

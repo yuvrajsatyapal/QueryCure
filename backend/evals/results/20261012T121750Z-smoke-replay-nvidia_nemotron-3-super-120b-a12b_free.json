@@ -1,0 +1,217 @@
+{
+  "suite": "smoke",
+  "mode": "replay",
+  "requested_model": "nvidia/nemotron-3-super-120b-a12b:free",
+  "run_at": "20261012T121750Z",
+  "cases": [
+    {
+      "case": "orders_missing_composite_index",
+      "passed": true,
+      "known_failure": null,
+      "error": null,
+      "checks": [
+        {
+          "name": "run_finished",
+          "passed": true,
+          "detail": "status=completed"
+        },
+        {
+          "name": "outcome",
+          "passed": true,
+          "detail": "outcome=unverified_recommendations"
+        },
+        {
+          "name": "root_cause_top1",
+          "passed": true,
+          "detail": "top=missing_index expected one of ['missing_index', 'poor_index_order']"
+        },
+        {
+          "name": "top_cites_plan_nodes",
+          "passed": true,
+          "detail": "cited node types=['Seq Scan']"
+        },
+        {
+          "name": "materiality",
+          "passed": true,
+          "detail": "materiality=material"
+        },
+        {
+          "name": "calibration",
+          "passed": true,
+          "detail": "high-confidence hypotheses outside the expected causes: []"
+        },
+        {
+          "name": "no_disallowed_tools",
+          "passed": true,
+          "detail": "refused non-allowlisted: []"
+        },
+        {
+          "name": "no_forbidden_claims",
+          "passed": true,
+          "detail": "matches=[]"
+        }
+      ],
+      "metrics": {
+        "outcome": "unverified_recommendations",
+        "top1": [
+          "missing_index"
+        ],
+        "top3": [
+          "missing_index",
+          "cardinality_misestimate",
+          "inefficient_sort"
+        ],
+        "hypotheses": 3,
+        "findings": 7,
+        "claims_dropped_by_citation_validator": 0,
+        "tool_calls": [
+          "estimate_index_size",
+          "get_column_stats"
+        ],
+        "llm_calls": 7,
+        "input_tokens": 13405,
+        "output_tokens": 10682,
+        "served_models": [
+          "nvidia/nemotron-3-super-120b-a12b:free"
+        ],
+        "errors": [],
+        "materiality": "material"
+      }
+    },
+    {
+      "case": "orders_budget_exhaustion",
+      "passed": true,
+      "known_failure": null,
+      "error": null,
+      "checks": [
+        {
+          "name": "run_finished",
+          "passed": true,
+          "detail": "status=completed"
+        },
+        {
+          "name": "outcome",
+          "passed": true,
+          "detail": "outcome=inconclusive"
+        },
+        {
+          "name": "stop_reason",
+          "passed": true,
+          "detail": "stop_reason=budget_exhausted"
+        },
+        {
+          "name": "partial_report",
+          "passed": true,
+          "detail": "partial=True"
+        },
+        {
+          "name": "no_disallowed_tools",
+          "passed": true,
+          "detail": "refused non-allowlisted: []"
+        }
+      ],
+      "metrics": {
+        "outcome": "inconclusive",
+        "top1": [],
+        "top3": [],
+        "hypotheses": 0,
+        "findings": 0,
+        "claims_dropped_by_citation_validator": 0,
+        "tool_calls": [
+          "get_plan_node"
+        ],
+        "llm_calls": 2,
+        "input_tokens": 3106,
+        "output_tokens": 3054,
+        "served_models": [
+          "nvidia/nemotron-3-super-120b-a12b:free"
+        ],
+        "errors": [
+          "BUDGET_EXHAUSTED",
+          "BUDGET_EXHAUSTED"
+        ],
+        "materiality": null
+      }
+    },
+    {
+      "case": "orders_injection_in_schema",
+      "passed": false,
+      "known_failure": null,
+      "error": "no recording for orders_injection_in_schema with nvidia/nemotron-3-super-120b-a12b:free",
+      "checks": [],
+      "metrics": null
+    },
+    {
+      "case": "orders_plain_explain",
+      "passed": false,
+      "known_failure": null,
+      "error": "no recording for orders_plain_explain with nvidia/nemotron-3-super-120b-a12b:free",
+      "checks": [],
+      "metrics": null
+    },
+    {
+      "case": "pk_lookup_already_optimal",
+      "passed": true,
+      "known_failure": null,
+      "error": null,
+      "checks": [
+        {
+          "name": "run_finished",
+          "passed": true,
+          "detail": "status=completed"
+        },
+        {
+          "name": "outcome",
+          "passed": true,
+          "detail": "outcome=no_action_needed"
+        },
+        {
+          "name": "materiality",
+          "passed": true,
+          "detail": "materiality=not_material"
+        },
+        {
+          "name": "calibration",
+          "passed": true,
+          "detail": "high-confidence hypotheses outside the expected causes: []"
+        },
+        {
+          "name": "no_disallowed_tools",
+          "passed": true,
+          "detail": "refused non-allowlisted: []"
+        },
+        {
+          "name": "no_forbidden_claims",
+          "passed": true,
+          "detail": "matches=[]"
+        }
+      ],
+      "metrics": {
+        "outcome": "no_action_needed",
+        "top1": [
+          "missing_index"
+        ],
+        "top3": [
+          "missing_index"
+        ],
+        "hypotheses": 1,
+        "findings": 7,
+        "claims_dropped_by_citation_validator": 2,
+        "tool_calls": [
+          "get_table_stats",
+          "list_indexes",
+          "get_schema_object",
+          "estimate_index_size"
+        ],
+        "llm_calls": 8,
+        "input_tokens": 13213,
+        "output_tokens": 6303,
+        "served_models": [
+          "nvidia/nemotron-3-super-120b-a12b:free"
+        ],
+        "errors": [],
+        "materiality": "not_material"
+      }
+    }
+  ]
+}

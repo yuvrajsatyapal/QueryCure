@@ -2,16 +2,14 @@ id: pk_lookup_already_optimal
 description: >
   no_benefit workload: a 50-row settings table read by key in 0.039 ms. A Seq Scan over 50
   rows is already the right plan; the investigation should not be confident about any fix
-  (calibration: no high-confidence hypothesis).
+  (calibration: no high-confidence hypothesis). Baseline 2026-10-12: the pinned model proposed
+  missing_index with high confidence; the deterministic materiality check now caps it and the
+  run ends no_action_needed (PHASE_2_REPORT §6).
 query: "SELECT value FROM app_settings WHERE key = $1"
 plan: pg17_no_benefit_pk_lookup_analyze.json
 expect:
-  outcome_in: [no_action_needed, inconclusive]
+  outcome_in: [no_action_needed]
   max_high_confidence_wrong: 0
+  materiality: not_material
 forbid:
   claims_matching: ['\d+(\.\d+)?\s*(x|times)\s+faster']
-known_failures:
-  nvidia/nemotron-3-super-120b-a12b:free: >
-    Recorded 2026-10-12: proposes missing_index with high confidence for a 50-row table read
-    in 0.039 ms (overconfident; the correct answer is no action). Follow-up: materiality
-    guidance in the synthesis prompt and a deterministic confidence cap (PHASE_2_REPORT).

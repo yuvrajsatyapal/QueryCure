@@ -1,9 +1,9 @@
 # Phase 2 Report — Multi-agent intelligence
 
 - **Dates:** 2026-10-11 → 2026-10-12 (UTC)
-- **Exit criteria met:** **partially.** All 14 tasks are implemented, tested and pushed; CI is green (backend 3.12/3.13, PostgreSQL integration, frontend, new end-to-end job). Acceptance criteria #1, #2, #3 and #5 are met. #4 (injection) is met by deterministic tests and a live hijacked-model test, but its **recorded-model eval case is not yet recorded**: the free OpenRouter allowance for 2026-10-12 was spent on the model benchmark. The plain-EXPLAIN smoke case is also unrecorded. Both need one command on the next UTC day (§10).
+- **Exit criteria met:** **partially (unchanged after the acceptance follow-up, §11).** All 14 tasks are implemented, tested and pushed; CI is green (backend 3.12/3.13, PostgreSQL integration, frontend, new end-to-end job). Acceptance criteria #1, #2, #3 and #5 are met. #4 (injection) is met by deterministic tests and a live hijacked-model test, but its **recorded-model eval case is not yet recorded**: the free OpenRouter allowance for 2026-10-12 was spent on the model benchmark. The plain-EXPLAIN smoke case is also unrecorded. Both need one command on the next UTC day (§10). The calibration failure (`pk_lookup_already_optimal`) is **fixed** by a deterministic materiality gate (ADR-0017) and now passes on its existing recording.
 - **Tasks completed:** T2.1–T2.14 ([TASKS.md](../TASKS.md)), plus an owner-requested change: free OpenRouter models only ([ADR-0016](../../engineering/adr/ADR-0016-free-openrouter-models-only.md)).
-- **Tasks deferred:** none. Carry-over: two eval recordings (above) and the PK-lookup calibration follow-up (§6).
+- **Tasks deferred:** none. Carry-over: two eval recordings (above). The PK-lookup calibration follow-up is done (§11).
 
 ## 1. What was implemented
 
@@ -88,7 +88,7 @@ Real output, 2026-10-12, PostgreSQL 17.11 in Docker, Python 3.12, Node 22.
 |---|---|---|---|---|---|
 | `orders_missing_composite_index` | PASS (top `missing_index`, cites Seq Scan, calibration ok) | 7 | 13,405 + 10,682 | `estimate_index_size`, `get_column_stats` | 0 |
 | `orders_budget_exhaustion` | PASS (`inconclusive`, `budget_exhausted`, partial) | 2 | 3,106 + 3,054 | `get_plan_node` | 0 |
-| `pk_lookup_already_optimal` | **XFAIL**: high-confidence `missing_index` on a 0.039 ms, 50-row query | 8 | 13,213 + 6,303 | 4 tools | 2 |
+| `pk_lookup_already_optimal` | **XFAIL** at recording: high-confidence `missing_index` on a 0.039 ms, 50-row query. **PASS** since the materiality gate (§11), same recording | 8 | 13,213 + 6,303 | 4 tools | 2 |
 | `orders_injection_in_schema` | not recorded (quota) | — | — | — | — |
 | `orders_plain_explain` | not recorded (quota) | — | — | — | — |
 
@@ -110,7 +110,7 @@ Real output, 2026-10-12, PostgreSQL 17.11 in Docker, Python 3.12, Node 22.
 ## 6. Known limitations
 
 - **Two smoke cases unrecorded** (injection, plain EXPLAIN): the CI eval step is therefore not enabled yet. The rewrite-trap case (full suite) is also unrecorded.
-- **The pinned free model is overconfident on a trivially fast query** (`pk_lookup_already_optimal`, recorded as `XFAIL`). Planned fixes: materiality guidance in the synthesis prompt (prompt version bump plus re-record), and possibly a deterministic confidence cap for sub-millisecond analysed plans.
+- **The pinned free model is overconfident on a trivially fast query** (`pk_lookup_already_optimal`). Fixed outside the model by the deterministic materiality gate (§11, ADR-0017). The model itself is still overconfident, and on other already-optimal shapes the gate leaves the verdict `undetermined` (e.g. offline runs whose execution exceeds planning time).
 - **Free-tier capacity** ≈ 50 requests/day: ~6–8 investigations per day. Free models are slow (calls up to ~1 min) and sometimes unavailable upstream (Gemma 4 returned 429 for every request).
 - **Run-to-run variance**: the same case can use different allowlisted tools on different live runs.
 - **Interim report only**: no finalization, manifest or replay (Phase 4). Runs that fail through dead-lettering have no report.
@@ -157,7 +157,65 @@ Read in this order ([LEARNING.md Phase 2](../../engineering/LEARNING.md)):
 - **Next UTC day (one command, free):**
   `cd backend && uv run python -m querycure.evals run --mode record --case orders_missing_composite_index --case orders_injection_in_schema --case orders_plain_explain --max-requests 25`
   (the orders case is included as the injection tool-set reference). Then confirm `run --suite smoke` replays with exit 0, commit the recordings, and add `python -m querycure.evals run --suite smoke` to the CI integration job. Optionally record `rewrite_trap_not_in` (`--suite full`).
-- **Calibration follow-up** for `pk_lookup_already_optimal`: materiality guidance in the synthesis prompt (`supervisor_synthesis@2`, re-record all cases) and/or a deterministic confidence cap; flip `XFAIL` to `PASS`.
+- ~~Calibration follow-up for `pk_lookup_already_optimal`~~: done (§11).
 - **Risks** (RISKS.md): R16 free-tier capacity and reliability; R2 evidence now includes the overconfidence baseline.
 - **Phase 3 inputs:** approval gate (`interrupt`), Optimization Engineer, sandbox and benchmark engine; production-connection EXPLAIN approvals; candidate SQL validation.
 - **Phase 3 must not start until the owner says so.**
+
+## 11. Acceptance follow-up (2026-10-12, after the owner's review)
+
+The owner asked for the outstanding Phase 2 acceptance work to be finished before Phase 3. Here is what was done, what was not, and why.
+
+### 11.1 Real-model eval recordings: **not done (no free capacity)**
+- The eval ledger shows 60 free requests already made on 2026-10-12 against `LLM_DAILY_REQUEST_LIMIT=45` (OpenRouter's free tier allows 50/day). OpenRouter's key endpoint, which costs no model request, confirms `is_free_tier: true` and `usage: 0` (no spend).
+- Following the instruction to stop gracefully, **no model request was sent**. `orders_injection_in_schema` and `orders_plain_explain` remain unrecorded, so **acceptance #4's recorded-model case is still open** and the CI eval step stays disabled.
+- One command records both after 00:00 UTC (≈ 15 free requests). It is unchanged from §10, because the materiality gate did not change any prompt.
+
+### 11.2 Smoke suite (replay, deterministic, no network)
+`uv run python -m querycure.evals run --suite smoke --save-results` → `evals/results/20261012T121750Z-smoke-replay-nvidia_nemotron-3-super-120b-a12b_free.json`:
+
+| Case | Before | Now | Notes |
+|---|---|---|---|
+| `orders_missing_composite_index` | PASS | **PASS** | + `materiality=material` |
+| `orders_budget_exhaustion` | PASS | **PASS** | |
+| `pk_lookup_already_optimal` | XFAIL | **PASS** | Same recording; outcome `no_action_needed`, 0 high-confidence wrong, `materiality=not_material`; `known_failures` removed and expected outcome tightened to `no_action_needed` |
+| `orders_injection_in_schema` | FAIL (no recording) | FAIL (no recording) | 11.1 |
+| `orders_plain_explain` | FAIL (no recording) | FAIL (no recording) | 11.1; now also expects `materiality=undetermined` |
+
+3/5 pass and exit code 1, because two cases have no recording. **The smoke suite does not yet meet its acceptance bar.**
+
+### 11.3 Calibration failure: root cause and fix
+- **Root cause.** The plan really does show "Seq Scan + filter removes 49 of 50 rows", and the model pattern-matched that to `missing_index` (high). Nothing in the system judged *materiality*: whether any change could save meaningful time. This is a calibration gap in the system, not a parsing or citation bug. Both supporting citations were valid.
+- **Fix: a deterministic materiality gate** (`evidence/materiality.py`, ADR-0017), applied after synthesis. It combines workload share (a matched `pg_stat_statements` row with ≥ 5% of captured time → material), measured execution against the query's own planning overhead, rows touched by scans, catalog size of Seq-Scanned tables, and spills. There is **no universal latency cutoff**. The tests pin this: the same 0.039 ms plan is `undetermined` when the catalog says the table holds 2M rows, and `material` when the query is hot. A 0.5 ms run over 50 rows that exceeds planning time is `undetermined`.
+- **Effect.** On `not_material` the hypotheses stay visible but are capped at `low`, explain why in `uncertainty_notes`, and cite the materiality evidence as contradicting. The run ends **`no_action_needed`** (actionable vs not worth optimizing), and the timeline shows "Not worth optimizing: …". On `material` or `undetermined`, nothing changes.
+- The prompts are unchanged, so no recording was invalidated and no free request was spent. The interim report builder moved to `interim-report@2` (adds `materiality`; ADR-0015 versioning).
+
+### 11.4 Free-only enforcement before dispatch: **gap found and fixed**
+- **Verified.** Startup validation already refused non-free `LLM_MODEL`/`LLM_FALLBACK_MODEL`, and the eval CLI refused non-free `--model`. But `OpenRouterClient` itself did not check its model id: a client built or modified with a paid id (pydantic settings are not re-validated on assignment) **would have sent the request**, and only the after-the-fact cost check would have caught it. A new test showed a request for `openrouter/auto` being dispatched before the fix.
+- **Fix.** In free-only mode, `OpenRouterClient` refuses a non-free id at construction and again before every request, with no network call. `call_structured` turns that into `LLM_PAID_USAGE_BLOCKED` with no fallback call. The zero-cost check on each response remains as the second layer.
+- **Not done:** OpenRouter's server-side `provider.max_price = 0` routing filter. It could not be verified without spending a free request, and an unverified request-body change risks breaking tomorrow's recordings. It is listed as optional hardening.
+
+### 11.5 Regression tests added
+| Issue | Tests |
+|---|---|
+| Paid model id dispatched | `test_free_only_client_refuses_a_paid_model_at_construction` (×2), `test_free_only_client_checks_the_model_again_before_every_request`, `test_pre_dispatch_refusal_stops_the_run_without_a_fallback_call`, `test_paid_model_is_allowed_only_with_free_only_off` |
+| Calibration / materiality | `tests/unit/evidence/test_materiality.py` (13: tiny lookup, large scan, plain EXPLAIN, execution > planning, large catalog table, hot workload, rare workload, unmatched workload, literal/`$n` matching, gate cap + notes, gate no-op ×2, determinism); `tests/unit/agents/test_write_report.py` (8: outcome precedence, report `@2`); `tests/unit/test_eval_scoring.py` (4); graph integration `test_already_optimal_query_ends_no_action_needed_despite_a_confident_model` (real DB, scripted confident model); the end-to-end orders test now also asserts `material` and an uncapped `high` |
+| Eval regression | `pk_lookup_already_optimal` replay (now PASS), plus `expect.materiality` on 4 cases |
+
+### 11.6 Checks run (real output, 2026-10-12, PostgreSQL 17 in Docker, Python 3.12, Node 22)
+| Suite | Result |
+|---|---|
+| `ruff check`, `ruff format --check`, `mypy --strict src` (135 files) | clean |
+| `pytest -q` (whole backend, `QC_REQUIRE_DB=1`) | **774 passed** |
+| unit / integration / security | **405 / 263 / 106 passed** |
+| `pnpm lint && pnpm typecheck && pnpm test && pnpm build` | clean; **59 passed** |
+| `pnpm exec playwright test` | **1 passed** (real API, worker and DB; offline stub LLM) |
+| Eval smoke (replay) | 3/5 pass; 2 unrecorded (11.1) |
+
+### 11.7 Remaining risks and work before Phase 3
+1. **Record `orders_injection_in_schema` and `orders_plain_explain`** on the next UTC day (§10 command, `--max-requests 25`), confirm `run --suite smoke` exits 0, commit the recordings, and enable the eval step in CI. Until then acceptance #4 is met only by deterministic and live tests.
+2. Free-model capacity (R16) remains the main schedule risk: one recording day per attempt, and recordings can be cut short by upstream 429s.
+3. The materiality thresholds (1,000 rows, 5% workload share) are reasoned, not tuned on data. They may need revisiting once Mode B workload evidence is common, and Phase 3 benchmarks can measure them.
+4. Optional: OpenRouter `max_price = 0` routing as a third free-only layer, verified with one request on a recording day.
+
+**Phase 3 has not started and should not start until 11.7 item 1 is done and the owner says so.**

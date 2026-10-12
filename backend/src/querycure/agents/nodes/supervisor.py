@@ -2,15 +2,18 @@
 
 The LLM proposes; deterministic rules dispose. Analysts outside the AGENT_SYSTEM §2
 eligibility rules are dropped from a plan, a failed supervisor call falls back to running
-every eligible analyst, and `proposed_by` is computed from shared citations.
+every eligible analyst, and `proposed_by` is computed from shared citations. After synthesis
+the deterministic materiality check (evidence/materiality.py) caps hypotheses about a query
+that is not worth optimizing; the model can neither see nor override it.
 """
 
 import uuid
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from typing import Any
 
 from langgraph.runtime import Runtime
 from langgraph.types import Send
+from sqlalchemy.ext.asyncio import AsyncConnection
 
 from querycure.agents.agent_runner import AgentFailedError, run_agent
 from querycure.agents.citations import CitationReport
@@ -22,6 +25,7 @@ from querycure.agents.state import InvestigationState, findings_of, plan_of
 from querycure.db.repositories.findings import insert_hypotheses
 from querycure.domain.investigation import (
     AgentName,
+    Evidence,
     Finding,
     Hypothesis,
     InvestigationPlan,
@@ -32,8 +36,11 @@ from querycure.events.emitter import emit
 from querycure.events.types import EventType
 from querycure.evidence.builders import context_summary
 from querycure.evidence.ids import keyed_id
+from querycure.evidence.materiality import Materiality, assess_materiality, gate_hypotheses
 from querycure.evidence.sanitize import clean_text
 from querycure.evidence.store import list_evidence
+from querycure.replay.artifact_store import get_artifact
+from querycure.sql.fingerprint import match_key
 
 PLAN_NODE = "supervisor_plan"
 SYNTHESIS_NODE = "synthesize_hypotheses"
@@ -167,11 +174,18 @@ async def synthesize_hypotheses(
     ctx = runtime.context
     engine = ctx.db()
     findings = findings_of(state)
-    if not findings:
-        return {"hypotheses": [], "synthesis_summary": "", "no_action_evidence": []}
-
     async with engine.connect() as conn:
         evidence = await list_evidence(conn, ctx.run_id)
+        query_key = await _query_key(conn, state, evidence)
+    materiality = assess_materiality(evidence, query_key=query_key)
+    if not findings:
+        return {
+            "hypotheses": [],
+            "synthesis_summary": "",
+            "no_action_evidence": _no_action(materiality),
+            "materiality": materiality.model_dump(),
+        }
+
     try:
         result = await run_agent(
             ctx,
@@ -191,9 +205,16 @@ async def synthesize_hypotheses(
     except AgentFailedError as exc:
         error = NodeError(node=SYNTHESIS_NODE, code=exc.code, message=exc.message, recoverable=True)
         await ctx.events.emit(EventType.ERROR, error.model_dump())
-        return {"hypotheses": [], "errors": [error.model_dump()]}
+        return {
+            "hypotheses": [],
+            "errors": [error.model_dump()],
+            "no_action_evidence": _no_action(materiality),
+            "materiality": materiality.model_dump(),
+        }
 
-    hypotheses = rank_hypotheses(ctx.run_id, 0, result.output, findings)
+    hypotheses = gate_hypotheses(
+        rank_hypotheses(ctx.run_id, 0, result.output, findings), materiality
+    )
     async with engine.begin() as conn:
         new = set(await insert_hypotheses(conn, ctx.run_id, 0, hypotheses))
         for h in hypotheses:
@@ -202,8 +223,33 @@ async def synthesize_hypotheses(
     summary = clean_text(result.output.summary, 600)
     if summary:
         await ctx.events.emit(EventType.AGENT_SUMMARY, {"agent": "supervisor", "text": summary})
+    if materiality.verdict == "not_material":
+        await ctx.events.emit(
+            EventType.AGENT_SUMMARY,
+            {
+                "agent": "supervisor",
+                "text": "Not worth optimizing: " + " ".join(materiality.reasons),
+            },
+        )
+    no_action = result.output.no_action_evidence if not hypotheses else []
     return {
         "hypotheses": [h.model_dump() for h in hypotheses],
         "synthesis_summary": summary,
-        "no_action_evidence": result.output.no_action_evidence if not hypotheses else [],
+        "no_action_evidence": list(dict.fromkeys([*no_action, *_no_action(materiality)])),
+        "materiality": materiality.model_dump(),
     }
+
+
+def _no_action(materiality: Materiality) -> list[str]:
+    return materiality.evidence_ids if materiality.verdict == "not_material" else []
+
+
+async def _query_key(
+    conn: AsyncConnection, state: InvestigationState, evidence: Sequence[Evidence]
+) -> str | None:
+    """Only needed to match `pg_stat_statements` rows, which only live runs collect."""
+    sha = state.get("query_sql_sha256")
+    if sha is None or not any(e.kind == "workload_stat" for e in evidence):
+        return None
+    artifact = await get_artifact(conn, sha)
+    return None if artifact is None else match_key(artifact.content.decode())
