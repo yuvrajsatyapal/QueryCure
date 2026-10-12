@@ -130,7 +130,8 @@ async def test_create_queues_a_run_with_inputs_and_a_job(
     [
         ({"query": "DELETE FROM orders"}, 422, "SQL_NOT_ALLOWED"),
         ({"query": None}, 422, "VALIDATION_ERROR"),
-        ({"modes": ["sandbox_benchmark"]}, 403, "FEATURE_DISABLED"),
+        ({"modes": ["sandbox_benchmark"]}, 422, "VALIDATION_ERROR"),  # needs a workload
+        ({"pre_authorize_demo_sandbox": True}, 422, "VALIDATION_ERROR"),  # sandbox only
         ({"modes": ["live_inspection"]}, 422, "VALIDATION_ERROR"),
         ({"plan_artifact_sha256": "f" * 64}, 422, "VALIDATION_ERROR"),
         ({"workload_id": "nope"}, 422, "VALIDATION_ERROR"),

@@ -18,6 +18,7 @@ from querycure.api.routers import (
     health,
     inspect,
     investigations,
+    optimization,
     runs,
     session,
     workloads,
@@ -80,6 +81,7 @@ def create_app(settings: Settings | None = None, engine: AsyncEngine | None = No
     app.include_router(inspect.router, prefix=API_PREFIX)
     app.include_router(workloads.router, prefix=API_PREFIX)
     app.include_router(runs.router, prefix=API_PREFIX)
+    app.include_router(optimization.router, prefix=API_PREFIX)
     app.include_router(investigations.router, prefix=API_PREFIX)
     app.include_router(artifacts.router, prefix=API_PREFIX)
     app.include_router(settings_router.router, prefix=API_PREFIX)

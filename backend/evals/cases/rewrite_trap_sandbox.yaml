@@ -1,0 +1,11 @@
+id: rewrite_trap_sandbox
+description: >
+  Mode C on rewrite_trap: whatever the Optimization Engineer proposes, the run must never end
+  verified_recommendation with a NOT EXISTS rewrite, because the NULL in closed_regions makes
+  it return different rows (BENCHMARK_ENGINE §11). Approval is requested before execution.
+suites: [full]
+query: "SELECT count(*) FROM accounts WHERE region_code NOT IN (SELECT region_code FROM closed_regions)"
+workload: "rewrite_trap@v1:sf=0.1:seed=42"
+expect:
+  outcome_in: [inconclusive, unverified_recommendations, verified_recommendation, no_action_needed]
+  must_request_approval: true

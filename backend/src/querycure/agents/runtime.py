@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 
 from querycure.agents.services import InspectorFactory
 from querycure.agents.state import InvestigationState
+from querycure.benchmark.engine import EngineOptions
 from querycure.core.errors import BudgetExhaustedError, RunCancelledError
 from querycure.core.logging import get_logger
 from querycure.domain.investigation import NodeError, RunBudget
@@ -19,6 +20,7 @@ from querycure.events.types import EventType
 from querycure.llm.rate_limit import LlmGate
 from querycure.llm.structured import RetryPolicy
 from querycure.llm.types import ChatClient
+from querycure.sandbox.provisioner import SandboxProvisioner
 
 log = get_logger(__name__)
 
@@ -66,6 +68,9 @@ class RunContext:
     llm_gate: LlmGate | None = None
     # Per-run cap on concurrent LLM calls across parallel branches (AGENT_SYSTEM §6).
     llm_slots: asyncio.Semaphore = field(default_factory=lambda: asyncio.Semaphore(3))
+    # Mode C (Phase 3): None when the sandbox is not configured for this process.
+    sandbox: SandboxProvisioner | None = None
+    engine_options: EngineOptions = field(default_factory=EngineOptions)
 
     async def before_llm_call(self) -> None:
         """Run budget first, then the provider's free-tier limits."""

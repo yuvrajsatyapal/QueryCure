@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from langchain_core.runnables import RunnableConfig
+from langgraph.types import Command
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine
 
@@ -17,6 +18,7 @@ from querycure.agents.graph import compile_graph
 from querycure.agents.runtime import LlmClients, RunContext
 from querycure.agents.services import GatewayInspectorFactory
 from querycure.agents.state import InvestigationState
+from querycure.benchmark.engine import EngineOptions
 from querycure.core.config import Settings
 from querycure.core.errors import ConfigurationError
 from querycure.core.logging import get_logger
@@ -30,6 +32,7 @@ from querycure.llm.providers import build_client
 from querycure.llm.rate_limit import LlmGate
 from querycure.llm.structured import RetryPolicy
 from querycure.llm.stub import StubClient
+from querycure.sandbox.provisioner import SandboxProvisioner
 
 log = get_logger(__name__)
 
@@ -62,6 +65,8 @@ class RunServices:
     clients: ClientsFactory
     llm_gate: LlmGate | None = None  # one per process: free-tier limits span every run
     checkpoint_role: str | None = None  # tests only
+    sandbox: SandboxProvisioner | None = None  # Mode C; None when not configured
+    engine_options: EngineOptions | None = None
 
 
 async def fail_run(engine: AsyncEngine, run_id: uuid.UUID, error: dict[str, Any]) -> None:
@@ -133,12 +138,21 @@ async def execute_run(
         llm_gate=services.llm_gate,
         llm_retry=RetryPolicy(call_timeout_seconds=services.settings.llm_call_timeout_seconds),
         llm_slots=asyncio.Semaphore(services.settings.llm_max_concurrency),
+        sandbox=services.sandbox,
+        engine_options=services.engine_options or EngineOptions(),
     )
     config: RunnableConfig = {"configurable": {"thread_id": str(run_id)}}
     async with open_checkpointer(services.checkpoint_url, role=services.checkpoint_role) as saver:
         graph = compile_graph(saver)
         resume = await saver.aget_tuple(config) is not None
-        log.info("run_executing", run_id=str(run_id), attempt=attempt, resume=resume)
-        # None resumes from the last checkpoint; an empty state starts the graph fresh.
-        initial: InvestigationState | None = None if resume else InvestigationState()
+        waiting = resume and bool((await graph.aget_state(config)).interrupts)
+        log.info(
+            "run_executing", run_id=str(run_id), attempt=attempt, resume=resume, waiting=waiting
+        )
+        # An interrupted approval_gate resumes with Command(resume=…): the node re-runs and
+        # reads the decision from approval_requests. Otherwise None resumes from the last
+        # checkpoint, and an empty state starts the graph fresh.
+        initial: InvestigationState | Command[Any] | None = (
+            Command(resume=True) if waiting else None if resume else InvestigationState()
+        )
         await graph.ainvoke(initial, config, context=ctx)

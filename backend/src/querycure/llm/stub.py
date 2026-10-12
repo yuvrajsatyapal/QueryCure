@@ -26,6 +26,41 @@ def _first_evidence(text: str, prefer: Sequence[str]) -> str | None:
     return lines[0][0] if lines else None
 
 
+_HYPOTHESIS = re.compile(r"- (hy_[0-9a-f]{12}) rank")
+_TABLES = re.compile(r"Tables the query reads: ([a-z_][a-z0-9_]*)")
+_EQUALITY = re.compile(r"WHERE\s+([a-z_][a-z0-9_]*)\s*=\s*\$1", re.IGNORECASE)
+_ORDER = re.compile(r"ORDER BY\s+([a-z_][a-z0-9_]*)", re.IGNORECASE)
+
+
+def _stub_candidates(prompt: str) -> dict[str, object]:
+    """Canned and mechanical: an index on the equality column (+ the sort column) of the first
+    table, or ANALYZE of that table. Earlier rounds are never repeated: round 2 proposes
+    nothing, so the stub's optimization loop always ends."""
+    hypothesis, table = _HYPOTHESIS.search(prompt), _TABLES.search(prompt)
+    if hypothesis is None or table is None or "Earlier rounds:" in prompt:
+        return {"candidates": [], "summary": "Stub: nothing (more) to propose (canned)."}
+    columns = [m.group(1) for m in (_EQUALITY.search(prompt), _ORDER.search(prompt)) if m]
+    candidate: dict[str, object] = (
+        {
+            "kind": "create_index",
+            "ddl": [f"CREATE INDEX ON {table.group(1)} ({', '.join(dict.fromkeys(columns))})"],
+        }
+        if columns
+        else {"kind": "analyze_statistics", "ddl": [f"ANALYZE {table.group(1)}"]}
+    )
+    return {
+        "candidates": [
+            {
+                **candidate,
+                "addresses_hypotheses": [hypothesis.group(1)],
+                "expected_benefit": "Canned stub candidate for UI tests; not a recommendation.",
+                "risks": [],
+            }
+        ],
+        "summary": "Stub candidate (canned).",
+    }
+
+
 class StubClient:
     provider = "stub"
     model = STUB_MODEL
@@ -48,6 +83,8 @@ class StubClient:
                 "focus": [],
                 "rationale": "Stub plan: every eligible analyst.",
             }
+        elif "You are the Optimization Engineer" in system:
+            body = _stub_candidates(prompt)
         elif "Combine the analysts' findings" in system:
             body = {
                 "hypotheses": [

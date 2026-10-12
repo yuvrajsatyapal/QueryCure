@@ -1,16 +1,20 @@
 """collect_context (deterministic): plan, schema and statistics evidence for the analysts.
 
 Uploaded plans/DDL become `imported` evidence. In Mode B the hardened gateway supplies a
-plain EXPLAIN and a redacted schema snapshot (`measured`). A live failure is recorded as
-`tool_error` evidence and the run continues on what it has (ARCHITECTURE failure table).
+plain EXPLAIN and a redacted schema snapshot (`measured`); a Mode C run on a demo workload
+gets the same from a throwaway sandbox clone (`agents/services.sandbox_inspector`).
+A live failure is recorded as `tool_error` evidence and the run continues on what it has
+(ARCHITECTURE failure table).
 """
 
 import uuid
+from contextlib import AbstractAsyncContextManager
 from typing import Any
 
 from langgraph.runtime import Runtime
 
 from querycure.agents.runtime import RunContext, guarded
+from querycure.agents.services import Inspector, sandbox_inspector
 from querycure.agents.state import InvestigationState
 from querycure.core.errors import QueryCureError
 from querycure.domain.investigation import Evidence
@@ -44,16 +48,32 @@ def _tool_error(run_id: uuid.UUID, step: str, exc: QueryCureError) -> Evidence:
     )
 
 
+def _opener(
+    ctx: RunContext, state: InvestigationState
+) -> AbstractAsyncContextManager[Inspector] | None:
+    """Mode B: the user's connection. Mode C only: a throwaway clone of the demo workload."""
+    modes = state.get("modes", [])
+    if ExecutionMode.LIVE_INSPECTION.value in modes:
+        if ctx.inspectors is None or state.get("connection_id") is None:
+            return None
+        return ctx.inspectors.open(uuid.UUID(str(state["connection_id"])))
+    workload = state.get("workload_id")
+    if ExecutionMode.SANDBOX_BENCHMARK.value in modes and workload and ctx.sandbox is not None:
+        return sandbox_inspector(ctx.sandbox, workload_id=workload, run_id=ctx.run_id)
+    return None
+
+
 async def _live(ctx: RunContext, state: InvestigationState, sql: str) -> tuple[list[Evidence], Any]:
     engine = ctx.db()
-    if ctx.inspectors is None or state.get("connection_id") is None:
+    opener = _opener(ctx, state)
+    if opener is None:
         return [], None
     query = state.get("query") or {}
     tables = [TableRef.model_validate(t) for t in query.get("tables", [])]
     items: list[Evidence] = []
     capabilities = None
     try:
-        async with ctx.inspectors.open(uuid.UUID(str(state["connection_id"]))) as gateway:
+        async with opener as gateway:
             capabilities = (await gateway.capabilities()).model_dump(mode="json")
             try:
                 explained = await gateway.explain(sql)
@@ -120,7 +140,7 @@ async def collect_context(
             sql = art.content.decode() if art is not None else None
 
     capabilities = None
-    if ExecutionMode.LIVE_INSPECTION.value in state.get("modes", []) and sql is not None:
+    if sql is not None:
         live_items, capabilities = await _live(ctx, state, sql)
         items += live_items
 

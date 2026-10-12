@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Literal
 
 import yaml
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from querycure.domain.investigation import HypothesisCategory
 
@@ -17,6 +17,14 @@ class Strict(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
 
+class CandidateExpectation(Strict):
+    """At least one proposed candidate of this kind whose index columns start with the prefix
+    (TESTING_STRATEGY §5 `candidate_must_include`)."""
+
+    kind: str
+    columns_prefix: list[str] = Field(default_factory=list)
+
+
 class Expect(Strict):
     outcome_in: list[str] = Field(default_factory=list)
     root_cause_any_of: list[HypothesisCategory] = Field(default_factory=list)
@@ -26,6 +34,10 @@ class Expect(Strict):
     max_high_confidence_wrong: int | None = None
     # Deterministic materiality verdict the run must reach (evidence/materiality.py).
     materiality: Literal["material", "not_material", "undetermined"] | None = None
+    # Mode C (Phase 3): what the Optimization Engineer must propose, and that a human
+    # approval was requested before any sandbox execution.
+    candidate_must_include: CandidateExpectation | None = None
+    must_request_approval: bool | None = None
 
 
 class Forbid(Strict):
@@ -63,6 +75,9 @@ class EvalCase(Strict):
     query: str
     plan: str | None = None  # file in evals/fixtures/plans
     schema_ddl: str | None = None
+    # Mode C: a demo workload ref. The run is sandbox_benchmark, pre-authorized (the approval
+    # row is still written), and needs a sandbox server (SANDBOX_ADMIN_URL).
+    workload: str | None = None
     objective: str = "Why is this query slow, and what should change?"
     budget: BudgetOverride = BudgetOverride()
     expect: Expect = Expect()
@@ -70,6 +85,18 @@ class EvalCase(Strict):
     security: Security | None = None
     # Recorded baseline failures per model: reported as XFAIL, flipped to XPASS when fixed.
     known_failures: dict[str, str] = Field(default_factory=dict)
+
+    @field_validator("workload")
+    @classmethod
+    def _known_workload(cls, value: str | None) -> str | None:
+        if value is not None:
+            from querycure.workloads.registry import WorkloadRef
+
+            try:
+                WorkloadRef.parse(value)
+            except Exception as exc:  # ValidationFailedError: report as a case error
+                raise ValueError(f"unknown workload {value!r}") from exc
+        return value
 
 
 def load_cases(directory: Path = EVALS_DIR / "cases") -> list[EvalCase]:

@@ -44,7 +44,7 @@ from querycure.jobs import queue
 from querycure.replay import artifact_store as store
 from querycure.replay.canonical import canonical_json
 from querycure.sql.validator import validate_select
-from querycure.workloads.registry import WorkloadRef
+from querycure.workloads.registry import WORKLOADS, WorkloadRef
 
 router = APIRouter(prefix="/investigations", tags=["investigations"])
 
@@ -63,7 +63,9 @@ async def _check(
     if len(modes) != len(body.modes):
         raise _invalid("modes", "modes must not repeat")
     if ExecutionMode.SANDBOX_BENCHMARK.value in modes:
-        raise FeatureDisabledError("Sandbox benchmarking arrives in Phase 3.")
+        _check_sandbox(body, settings)
+    elif body.pre_authorize_demo_sandbox:
+        raise _invalid("pre_authorize_demo_sandbox", "only applies to sandbox benchmarking")
     if body.llm is not None and body.llm.credential_id is not None:
         raise FeatureDisabledError("Bring-your-own-key credentials arrive in Phase 5.")
     if body.query is None and body.plan_artifact_sha256 is None:
@@ -99,6 +101,32 @@ async def _check(
         artifact = await store.get_artifact(conn, sha)
         if artifact is None or artifact.kind not in kinds:
             raise _invalid(field, "no uploaded artifact of the right kind has this digest")
+
+
+MAX_BENCH_PARAM_SETS = 5
+
+
+def _check_sandbox(body: CreateInvestigationRequest, settings: Settings) -> None:
+    """Mode C (Phase 3): demo workloads only; the user-provisioned sandbox (D4) is deferred."""
+    if not settings.feature_sandbox:
+        raise FeatureDisabledError("Sandbox benchmarking is disabled on this deployment.")
+    if body.workload_id is None:
+        raise _invalid("workload_id", "sandbox benchmarking needs a demo workload")
+    if body.query is None:
+        raise _invalid("query", "sandbox benchmarking needs the query text")
+    if len(body.param_sets) > MAX_BENCH_PARAM_SETS:
+        raise _invalid(
+            "param_sets", f"at most {MAX_BENCH_PARAM_SETS} param sets can be benchmarked"
+        )
+    expected = validate_select(body.query).metadata.parameter_count
+    for p in body.param_sets:
+        if len(p.values) != expected:
+            raise _invalid("param_sets", f"param set {p.name} needs {expected} value(s)")
+    if expected and not body.param_sets:
+        ref = WorkloadRef.parse(body.workload_id)
+        examples = {q.sql.strip() for q in WORKLOADS[ref.name].example_queries}
+        if body.query.strip() not in examples:
+            raise _invalid("param_sets", "a parameterized query needs at least one param set")
 
 
 def _request_hash(body: CreateInvestigationRequest) -> str:
@@ -171,6 +199,7 @@ async def _create(
         modes=list(body.modes),
         connection_id=body.connection_id,
         workload_id=body.workload_id,
+        pre_authorize_sandbox=body.pre_authorize_demo_sandbox,
     )
     run_id = await repo.insert_run(
         conn,

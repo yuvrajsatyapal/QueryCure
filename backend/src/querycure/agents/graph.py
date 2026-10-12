@@ -1,8 +1,9 @@
-"""The investigation graph through write_report (AGENT_SYSTEM §3, Phase 2 subset).
+"""The investigation graph (AGENT_SYSTEM §3; the Benchmark Auditor follows in Phase 4).
 
 intake → collect_context → supervisor_plan → Send fan-out to the planned analysts →
-synthesize_hypotheses → write_report. Any recorded stop (budget, cancellation, invalid
-input) routes straight to write_report, which always runs.
+synthesize_hypotheses → [Mode C] optimization_engineer → approval_gate (interrupt) →
+run_experiment → next_round (bounded) → … → write_report. Any recorded stop (budget,
+cancellation, invalid input) routes straight to write_report, which always runs.
 """
 
 from typing import Any
@@ -16,8 +17,23 @@ from querycure.agents.nodes.analysts import (
     query_analyzer_node,
     workload_investigator_node,
 )
+from querycure.agents.nodes.approval_gate import approval_gate
 from querycure.agents.nodes.collect_context import collect_context
 from querycure.agents.nodes.intake import intake
+from querycure.agents.nodes.optimization_engineer import optimization_engineer
+from querycure.agents.nodes.optimization_loop import (
+    APPROVAL_NODE,
+    EXPERIMENT_NODE,
+    NEXT_ROUND_NODE,
+    OE_NODE,
+    next_round,
+    route_after_approval,
+    route_after_candidates,
+    route_after_experiment,
+    route_after_next_round,
+    route_after_synthesis,
+)
+from querycure.agents.nodes.run_experiment import run_experiment
 from querycure.agents.nodes.supervisor import (
     route_after_plan,
     supervisor_plan,
@@ -44,6 +60,10 @@ def build_graph() -> StateGraph[InvestigationState, RunContext, Any, Any]:
     for name, node in ANALYSTS.items():
         graph.add_node(name, node)
     graph.add_node("synthesize_hypotheses", synthesize_hypotheses)
+    graph.add_node(OE_NODE, optimization_engineer)
+    graph.add_node(APPROVAL_NODE, approval_gate)
+    graph.add_node(EXPERIMENT_NODE, run_experiment)
+    graph.add_node(NEXT_ROUND_NODE, next_round)
     graph.add_node(REPORT_NODE, write_report)
 
     graph.add_edge(START, "intake")
@@ -57,7 +77,15 @@ def build_graph() -> StateGraph[InvestigationState, RunContext, Any, Any]:
     for name in ANALYSTS:
         # All analysts sent in one step finish before synthesis runs once (fan-in).
         graph.add_edge(name, "synthesize_hypotheses")
-    graph.add_edge("synthesize_hypotheses", REPORT_NODE)
+    graph.add_conditional_edges(
+        "synthesize_hypotheses", route_after_synthesis, [OE_NODE, REPORT_NODE]
+    )
+    graph.add_conditional_edges(OE_NODE, route_after_candidates, [APPROVAL_NODE, REPORT_NODE])
+    graph.add_conditional_edges(APPROVAL_NODE, route_after_approval, [EXPERIMENT_NODE, REPORT_NODE])
+    graph.add_conditional_edges(
+        EXPERIMENT_NODE, route_after_experiment, [NEXT_ROUND_NODE, REPORT_NODE]
+    )
+    graph.add_conditional_edges(NEXT_ROUND_NODE, route_after_next_round, [OE_NODE, REPORT_NODE])
     graph.add_edge(REPORT_NODE, END)
     return graph
 

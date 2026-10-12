@@ -32,6 +32,7 @@ from querycure.evals.recording import (
     model_slug,
 )
 from querycure.evals.scoring import Score, observe, score
+from querycure.jobs.handlers import build_sandbox
 from querycure.llm.openrouter import OpenRouterClient
 from querycure.llm.rate_limit import LlmGate, MinuteRateLimiter
 from querycure.llm.types import ChatClient
@@ -155,14 +156,20 @@ async def _seed(url: str, case: EvalCase, settings: Settings) -> uuid.UUID:
             inv = (
                 await conn.execute(
                     text(
-                        "INSERT INTO investigations (id, user_id, title, objective, modes) "
-                        "VALUES (:inv, :user, :title, :objective, ARRAY['offline']) RETURNING id"
+                        "INSERT INTO investigations (id, user_id, title, objective, modes, "
+                        "workload_id, pre_authorize_sandbox) VALUES (:inv, :user, :title, "
+                        ":objective, :modes, :workload, :pre) RETURNING id"
                     ),
                     {
                         "inv": uuid.uuid5(NAMESPACE, f"{case.id}:investigation"),
                         "user": user_id,
                         "title": case.id,
                         "objective": case.objective,
+                        # Mode C cases are pre-authorized: the approval row is still written
+                        # (scored by must_request_approval) but no human is in the loop.
+                        "modes": ["sandbox_benchmark"] if case.workload else ["offline"],
+                        "workload": case.workload,
+                        "pre": case.workload is not None,
                     },
                 )
             ).scalar_one()
@@ -241,6 +248,14 @@ async def run_case(
         def clients(_: Any) -> LlmClients:
             return LlmClients(primary=client)
 
+        sandbox = build_sandbox(settings) if case.workload else None
+        if case.workload and sandbox is None:
+            return CaseResult(
+                case, None, "Mode C case: set SANDBOX_ADMIN_URL and SANDBOX_BENCH_PASSWORD",
+                model=model,
+            )  # fmt: skip
+        if sandbox is not None:
+            sandbox.bootstrap()
         services = RunServices(
             engine=engine,
             settings=settings,
@@ -248,6 +263,7 @@ async def run_case(
             clients=clients,
             llm_gate=gate,
             checkpoint_role="qc_app",
+            sandbox=sandbox,
         )
         error = None
         try:

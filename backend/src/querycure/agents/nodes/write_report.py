@@ -1,9 +1,10 @@
 """write_report (terminal, deterministic): outcome, interim report artifacts, final status.
 
-Phase 2 has no candidates or benchmarks, so a run with hypotheses ends
-`unverified_recommendations`: diagnoses with a suggested verification, nothing verified. When
-the deterministic materiality check finds nothing worth optimizing, the run ends
-`no_action_needed` even if hypotheses exist (they are kept, capped at low confidence).
+Outcomes (AGENT_SYSTEM §12): a verified tournament winner → `verified_recommendation`; an
+expired approval, or candidates benchmarked without a verified winner → `inconclusive`;
+hypotheses that were never benchmarked (no Mode C, declined approval, no valid candidate) →
+`unverified_recommendations`. When the deterministic materiality check finds nothing worth
+optimizing, the run ends `no_action_needed` even if hypotheses exist.
 """
 
 import uuid
@@ -20,6 +21,7 @@ from querycure.events.emitter import change_status
 from querycure.evidence.store import list_evidence
 from querycure.replay.artifact_store import link, store_json, store_text
 from querycure.reports.interim import build_report, render_markdown
+from querycure.reports.optimization import optimization_section
 
 
 def decide(
@@ -29,12 +31,19 @@ def decide(
     has_hypotheses: bool,
     has_no_action_evidence: bool,
     not_material: bool = False,
+    winner: str | None = None,
+    approval_status: str | None = None,
+    benchmarked: bool = False,
 ) -> tuple[RunStatus, RunOutcome | None]:
     if current is RunStatus.CANCELLING or stop_reason == "cancelled":
         return RunStatus.CANCELLED, None
     if stop_reason == "failed":
         return RunStatus.FAILED, None
+    if winner is not None:
+        return RunStatus.COMPLETED, RunOutcome.VERIFIED_RECOMMENDATION
     if stop_reason in ("budget_exhausted", "invalid_input"):
+        return RunStatus.COMPLETED, RunOutcome.INCONCLUSIVE
+    if approval_status == "expired" or benchmarked:
         return RunStatus.COMPLETED, RunOutcome.INCONCLUSIVE
     if not_material and has_no_action_evidence:
         return RunStatus.COMPLETED, RunOutcome.NO_ACTION_NEEDED
@@ -71,12 +80,17 @@ async def write_report(state: InvestigationState, runtime: Runtime[RunContext]) 
             return {"outcome": row.outcome}  # re-run after a crash: already written
         hypotheses = await list_hypotheses(conn, ctx.run_id)
         materiality = state.get("materiality") or {}
+        evidence = await list_evidence(conn, ctx.run_id)
+        optimization = await optimization_section(conn, ctx.run_id, evidence)
         final, outcome = decide(
             current=current,
             stop_reason=state.get("stop_reason"),
             has_hypotheses=bool(hypotheses),
             has_no_action_evidence=bool(state.get("no_action_evidence")),
             not_material=materiality.get("verdict") == "not_material",
+            winner=state.get("winner"),
+            approval_status=state.get("approval_status"),
+            benchmarked=bool(optimization and optimization["benchmarked"]),
         )
         report = build_report(
             run_id=str(ctx.run_id),
@@ -86,11 +100,12 @@ async def write_report(state: InvestigationState, runtime: Runtime[RunContext]) 
             stop_reason=state.get("stop_reason"),
             findings=await list_findings(conn, ctx.run_id),
             hypotheses=hypotheses,
-            evidence=await list_evidence(conn, ctx.run_id),
+            evidence=evidence,
             errors=state.get("errors", []),
             usage=row.usage,
             synthesis_summary=state.get("synthesis_summary", ""),
             materiality=materiality or None,
+            optimization=optimization,
         )
         as_json = await store_json(conn, kind="report_json", value=report)
         as_md = await store_text(conn, kind="report_md", text=render_markdown(report))

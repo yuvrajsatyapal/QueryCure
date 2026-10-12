@@ -50,6 +50,15 @@ class InvestigationState(TypedDict, total=False):
     synthesis_summary: str
     no_action_evidence: list[str]
     materiality: Json | None  # evidence/materiality.Materiality, deterministic
+    # optimization (Phase 3): references only; SQL and results live in their tables
+    optimization_round: int
+    candidate_keys: list[str]  # proposed in the current round
+    approval_id: str | None
+    approval_status: str | None  # approved | partially_approved | declined | expired
+    experiment_ids: Annotated[list[str], operator.add]
+    winner: str | None  # candidate key of the verified tournament winner
+    verification: str | None  # verified | rejected | inconclusive | failed (last round)
+    rounds_exhausted: bool
     # control
     errors: Annotated[list[Json], operator.add]
     stop_reason: Annotated[StopReason | None, merge_stop_reason]

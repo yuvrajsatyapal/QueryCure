@@ -227,3 +227,53 @@ def test_security_block_is_strict() -> None:
         EvalCase.model_validate(
             {"id": "x", "description": "d", "query": "SELECT 1", "security": {"tools": []}}
         )
+
+
+# --- Optimization (Mode C) expectations ---------------------------------------------------
+
+SANDBOX_CASE = EvalCase.model_validate(
+    {
+        "id": "s",
+        "description": "d",
+        "query": "SELECT * FROM orders WHERE customer_id = $1 ORDER BY created_at DESC LIMIT 20",
+        "workload": "orders_ecommerce@v1:sf=0.1:seed=42",
+        "expect": {
+            "candidate_must_include": {
+                "kind": "create_index",
+                "columns_prefix": ["customer_id", "created_at"],
+            },
+            "must_request_approval": True,
+        },
+    }
+)
+
+
+def _index(columns: str) -> list[dict[str, Any]]:
+    return [{"kind": "create_index", "ddl": [f"CREATE INDEX ON orders ({columns})"]}]
+
+
+@pytest.mark.parametrize(
+    ("candidates", "approvals", "passed"),
+    [
+        (_index("customer_id, created_at"), 1, True),
+        (_index("customer_id, created_at, id"), 1, True),
+        (_index("created_at, customer_id"), 1, False),
+        ([{"kind": "analyze_statistics", "ddl": ["ANALYZE orders"]}], 1, False),
+        ([], 0, False),
+    ],
+)
+def test_candidate_expectation_checks_kind_and_column_prefix(
+    candidates: list[dict[str, Any]], approvals: int, passed: bool
+) -> None:
+    result = score(SANDBOX_CASE, observed(candidates=candidates, approvals=approvals))
+
+    checks = {c.name: c.passed for c in result.checks}
+    assert checks["candidate_included"] is passed
+    assert checks["approval_requested"] is (approvals > 0)
+
+
+def test_sandbox_case_requires_a_known_workload() -> None:
+    with pytest.raises(ValueError, match="workload"):
+        EvalCase.model_validate(
+            {"id": "x", "description": "d", "query": "SELECT 1", "workload": "nope"}
+        )

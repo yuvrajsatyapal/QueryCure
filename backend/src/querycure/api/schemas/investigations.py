@@ -25,6 +25,7 @@ class Strict(BaseModel):
 class ParamSet(Strict):
     name: str = Field(min_length=1, max_length=64, pattern=r"^[A-Za-z0-9_\-]+$")
     values: list[JsonScalar] = Field(max_length=100)
+    edge_case: bool = False  # NULL-bearing or empty-result set (required to verify rewrites)
 
 
 class LlmChoice(Strict):

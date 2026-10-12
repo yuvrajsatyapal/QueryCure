@@ -1,10 +1,12 @@
 """Services nodes reach through the run context: live inspection for Mode B."""
 
+import asyncio
 import uuid
 from collections.abc import AsyncIterator
-from contextlib import AbstractAsyncContextManager, asynccontextmanager
+from contextlib import AbstractAsyncContextManager, ExitStack, asynccontextmanager
 from typing import Protocol
 
+from pydantic import SecretStr
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from querycure.connectors.credentials import target_from_record
@@ -17,12 +19,17 @@ from querycure.connectors.models import (
     StatementStat,
     TableIo,
     TargetCapabilities,
+    TargetConnection,
 )
 from querycure.connectors.ssrf_guard import TargetPolicy
 from querycure.core.config import Settings
 from querycure.core.errors import ApprovalRequiredError, NotFoundError
 from querycure.db.repositories.connections import get_connection
+from querycure.sandbox.provisioner import SandboxProvisioner
 from querycure.sql.validator import TableRef
+from querycure.workloads.registry import WorkloadRef
+
+CONTEXT_LEASE_SECONDS = 120.0
 
 
 class Inspector(Protocol):
@@ -61,3 +68,40 @@ class GatewayInspectorFactory:
             target, policy=TargetPolicy.from_settings(self._settings)
         ) as gateway:
             yield gateway
+
+
+@asynccontextmanager
+async def sandbox_inspector(
+    provisioner: SandboxProvisioner, *, workload_id: str, run_id: uuid.UUID
+) -> AsyncIterator[Inspector]:
+    """Mode C context: the hardened gateway (read-only session, timeouts, plain EXPLAIN only)
+    on a throwaway clone of the workload template, as qc_bench. The template is built here
+    if needed (AGENT_SYSTEM §6: speculative template build during analysis). The clone is
+    dropped and the lease released on exit, whatever happens."""
+    stack = ExitStack()
+    lease = await asyncio.to_thread(
+        stack.enter_context, provisioner.lease(timeout_seconds=CONTEXT_LEASE_SECONDS)
+    )
+    clone: str | None = None
+    try:
+        template = await asyncio.to_thread(lease.ensure_template, WorkloadRef.parse(workload_id))
+        clone = await asyncio.to_thread(
+            lease.create_clone, template, uuid.uuid5(run_id, "context"), 0
+        )
+        info = provisioner.bench_conninfo(clone)
+        target = TargetConnection(
+            host=str(info["host"]),
+            port=int(info["port"]),
+            dbname=clone,
+            username=str(info["user"]),
+            password=SecretStr(str(info["password"])),
+            sslmode="disable",  # our own sandbox on an internal network / loopback relay
+        )
+        # The sandbox is QueryCure's own infrastructure, so private addresses are expected.
+        policy = TargetPolicy(allow_private=True, allowed_ports=frozenset({int(info["port"])}))
+        async with InspectionGateway.open(target, policy=policy) as gateway:
+            yield gateway
+    finally:
+        if clone is not None:
+            await asyncio.to_thread(lease.drop_clone, clone)
+        await asyncio.to_thread(stack.close)

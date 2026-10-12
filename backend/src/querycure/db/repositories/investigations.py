@@ -61,13 +61,14 @@ async def insert_investigation(
     modes: list[str],
     connection_id: uuid.UUID | None,
     workload_id: str | None,
+    pre_authorize_sandbox: bool = False,
 ) -> uuid.UUID:
     return (  # type: ignore[no-any-return]
         await conn.execute(
             text(
                 "INSERT INTO investigations (user_id, title, objective, modes, connection_id, "
-                "workload_id) VALUES (:user_id, :title, :objective, :modes, :connection_id, "
-                ":workload_id) RETURNING id"
+                "workload_id, pre_authorize_sandbox) VALUES (:user_id, :title, :objective, "
+                ":modes, :connection_id, :workload_id, :pre_authorize_sandbox) RETURNING id"
             ),
             {
                 "user_id": user_id,
@@ -76,6 +77,7 @@ async def insert_investigation(
                 "modes": modes,
                 "connection_id": connection_id,
                 "workload_id": workload_id,
+                "pre_authorize_sandbox": pre_authorize_sandbox,
             },
         )
     ).scalar_one()

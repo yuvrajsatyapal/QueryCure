@@ -29,6 +29,11 @@ def _problems(inputs: RunInputs, has_query: bool) -> list[str]:
         problems.append("Live inspection needs a connection.")
     if live and not has_query:
         problems.append("Live inspection needs the query text.")
+    sandbox = ExecutionMode.SANDBOX_BENCHMARK.value in inputs.modes
+    if sandbox and inputs.workload_id is None:
+        problems.append("Sandbox benchmarking needs a demo workload.")
+    if sandbox and not has_query:
+        problems.append("Sandbox benchmarking needs the query text.")
     return problems
 
 

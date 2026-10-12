@@ -32,7 +32,9 @@ _CHARGE_LLM = text(
     "UPDATE investigation_runs SET usage = usage || jsonb_build_object("
     "'llm_calls', coalesce((usage->>'llm_calls')::int, 0) + 1) "
     "WHERE id = :id AND cancel_requested_at IS NULL "
-    "AND (started_at IS NULL OR now() - started_at < make_interval(secs => :wall)) "
+    # Time spent awaiting approval is not run time (migration 0009).
+    "AND (started_at IS NULL OR now() - started_at - make_interval(secs => waiting_seconds) "
+    "< make_interval(secs => :wall)) "
     "AND coalesce((usage->>'llm_calls')::int, 0) < :calls "
     "AND coalesce((usage->>'input_tokens')::int, 0) "
     "+ coalesce((usage->>'output_tokens')::int, 0) < :tokens "
@@ -42,7 +44,9 @@ _CHARGE_TOOL = text(
     "UPDATE investigation_runs SET usage = usage || jsonb_build_object("
     "'tool_calls', coalesce((usage->>'tool_calls')::int, 0) + 1) "
     "WHERE id = :id AND cancel_requested_at IS NULL "
-    "AND (started_at IS NULL OR now() - started_at < make_interval(secs => :wall)) "
+    # Time spent awaiting approval is not run time (migration 0009).
+    "AND (started_at IS NULL OR now() - started_at - make_interval(secs => waiting_seconds) "
+    "< make_interval(secs => :wall)) "
     "AND coalesce((usage->>'tool_calls')::int, 0) < :tools "
     "RETURNING (usage->>'tool_calls')::int"
 )
@@ -55,7 +59,7 @@ _RECORD_TOKENS = text(
 )
 _STATE = text(
     "SELECT cancel_requested_at IS NOT NULL AS cancelled, "
-    "coalesce(extract(epoch FROM now() - started_at), 0) AS elapsed, "
+    "coalesce(extract(epoch FROM now() - started_at) - waiting_seconds, 0) AS elapsed, "
     "coalesce((usage->>'llm_calls')::int, 0) AS llm_calls, "
     "coalesce((usage->>'tool_calls')::int, 0) AS tool_calls, "
     "coalesce((usage->>'input_tokens')::int, 0) "

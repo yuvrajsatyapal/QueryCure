@@ -6,7 +6,13 @@ from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 
 JsonScalar = str | int | float | bool | None
 
-AgentName = Literal["supervisor", "query_analyzer", "index_strategist", "workload_investigator"]
+AgentName = Literal[
+    "supervisor",
+    "query_analyzer",
+    "index_strategist",
+    "workload_investigator",
+    "optimization_engineer",
+]
 ANALYST_AGENTS: tuple[AgentName, ...] = (
     "query_analyzer",
     "index_strategist",
@@ -112,6 +118,10 @@ class RunBudget(Frozen):
     tool_calls: int = Field(ge=1)
     tool_calls_per_agent: int = Field(ge=1)
     wall_clock_seconds: int = Field(ge=1)
+    # Phase 3 (AGENT_SYSTEM §11). Defaults keep Phase 2 budgets readable.
+    candidates_per_round: int = Field(default=4, ge=1, le=4)
+    max_optimization_rounds: int = Field(default=2, ge=0, le=5)  # extra rounds after the first
+    benchmark_seconds: int = Field(default=8 * 60, ge=30)
 
 
 class BudgetUsage(Frozen):

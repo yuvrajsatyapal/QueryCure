@@ -36,6 +36,7 @@ class RoleClient:
         "query_analyzer": "You are the Query Analyzer",
         "index_strategist": "You are the Index Strategist",
         "workload_investigator": "You are the Workload Investigator",
+        "optimization_engineer": "You are the Optimization Engineer",
     }
 
     def __init__(self, scripts: dict[str, Sequence[Step]], model: str = "fake-1") -> None:

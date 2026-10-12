@@ -1,0 +1,17 @@
+id: orders_sandbox_composite_index
+description: >
+  Mode C on the orders_ecommerce demo workload (ROADMAP Phase 3, T3.9): context comes from a
+  sandbox clone (plain EXPLAIN), the Optimization Engineer must propose the composite index
+  on (customer_id, created_at), an approval row must be written before any sandbox DDL, and
+  the deterministic benchmark decides the outcome. `inconclusive` is accepted for the
+  documented noisy-hardware case (ADR-0018); a rejection is not.
+suites: [full]
+query: "SELECT * FROM orders WHERE customer_id = $1 ORDER BY created_at DESC LIMIT 20"
+workload: "orders_ecommerce@v1:sf=0.1:seed=42"
+expect:
+  outcome_in: [verified_recommendation, inconclusive]
+  root_cause_any_of: [missing_index, poor_index_order, inefficient_sort]
+  candidate_must_include: {kind: create_index, columns_prefix: [customer_id, created_at]}
+  must_request_approval: true
+forbid:
+  claims_matching: ["\\d+(\\.\\d+)?x faster"]

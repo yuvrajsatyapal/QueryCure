@@ -12,6 +12,10 @@ from querycure.domain.investigation import Evidence, Finding, Hypothesis
 # @2 adds the deterministic materiality verdict (@1 stays as released, ADR-0015).
 BUILDER_VERSION = "interim-report@2"
 REPORT_SCHEMA_VERSION = 2
+# @3 (Phase 3) adds the optimization rounds: candidates, approvals, experiments and their
+# deterministic verdicts. A run without optimization data still builds byte-identical @2.
+BUILDER_VERSION_V3 = "interim-report@3"
+REPORT_SCHEMA_VERSION_V3 = 3
 
 
 def build_report(
@@ -28,14 +32,16 @@ def build_report(
     usage: dict[str, Any],
     synthesis_summary: str,
     materiality: dict[str, Any] | None = None,
+    optimization: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     cited = sorted(
         {i for _, f in findings for i in f.evidence_ids}
         | {i for h in hypotheses for i in h.supporting_evidence + h.contradicting_evidence}
         | set((materiality or {}).get("evidence_ids", []))
+        | set((optimization or {}).get("evidence_ids", []))
     )
     by_id = {e.id: e for e in evidence}
-    return {
+    report = {
         "schema_version": REPORT_SCHEMA_VERSION,
         "builder_version": BUILDER_VERSION,
         "run_id": run_id,
@@ -53,6 +59,15 @@ def build_report(
         "usage": usage,
         "verification": "not_benchmarked",
     }
+    if optimization is None:
+        return report
+    return {
+        **report,
+        "schema_version": REPORT_SCHEMA_VERSION_V3,
+        "builder_version": BUILDER_VERSION_V3,
+        "verification": optimization["verification"],
+        "optimization": {k: v for k, v in optimization.items() if k != "evidence_ids"},
+    }
 
 
 def render_markdown(report: dict[str, Any]) -> str:
@@ -67,9 +82,13 @@ def render_markdown(report: dict[str, Any]) -> str:
         lines.append(
             f"- Partial report (stopped: {report['stop_reason'] or report['final_status']})"
         )
-    lines += [
-        "- Nothing in this report has been benchmarked; hypotheses are unverified.",
-    ]
+    optimization = report.get("optimization")
+    if optimization is None:
+        lines += [
+            "- Nothing in this report has been benchmarked; hypotheses are unverified.",
+        ]
+    else:
+        lines.append(f"- Verification: {report['verification']}")
     materiality = report.get("materiality")
     if materiality and materiality["verdict"] == "not_material":
         lines.append(
@@ -93,6 +112,8 @@ def render_markdown(report: dict[str, Any]) -> str:
             f"- [{f['agent']}] ({f['severity']}) {f['title']}: {f['detail']} "
             f"— evidence {', '.join(f['evidence_ids'])}"
         )
+    if optimization is not None:
+        lines += _optimization_lines(optimization)
     lines += ["", "## Evidence"]
     for e in report["evidence"]:
         lines.append(f"- `{e['id']}` ({e['kind']}, {e['provenance']}): {e['summary']}")
@@ -101,3 +122,41 @@ def render_markdown(report: dict[str, Any]) -> str:
         lines += [f"- {e['node']}: {e['code']} — {e['message']}" for e in report["errors"]]
     lines.append("")
     return "\n".join(lines)
+
+
+def _optimization_lines(optimization: dict[str, Any]) -> list[str]:
+    lines = ["", "## Optimization (sandbox benchmark)"]
+    for rnd in optimization["rounds"]:
+        approval = rnd["approval"]
+        lines.append(
+            f"### Round {rnd['round'] + 1}: approval {approval['status'] if approval else 'none'}"
+            + (f" by {approval['decided_by']}" if approval and approval["decided_by"] else "")
+        )
+        for c in rnd["candidates"]:
+            sql = " ; ".join(c["ddl"]) if c["ddl"] else (c["query_sql"] or "")
+            reasons = ", ".join(f"{r['code']}" for r in c["reasons"] or [])
+            lines.append(
+                f"- `{c['key']}` {c['kind']}: **{c['status']}**"
+                + (f" ({reasons})" if reasons else "")
+                + f" — `{sql}`"
+            )
+        experiment = rnd["experiment"]
+        if experiment is None:
+            continue
+        lines.append(
+            f"- Experiment `{experiment['id']}` ({experiment['engine_version']}): "
+            f"{experiment['status']}"
+            + (f", winner `{experiment['winner']}`" if experiment["winner"] else "")
+            + (
+                f", environment digest `{experiment['environment_digest']}`"
+                if experiment["environment_digest"]
+                else ""
+            )
+        )
+        for m in experiment["metrics"]:
+            lines.append(f"  - {m['summary']} — evidence {m['evidence_id']} (measured)")
+    lines.append(
+        "- Verified means: faster with matching results on the tested data and parameter sets, "
+        "warm cache, single session, in the sandbox. It is not a production guarantee."
+    )
+    return lines

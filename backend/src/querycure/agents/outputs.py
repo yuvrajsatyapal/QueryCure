@@ -105,3 +105,23 @@ class FinalTurn(Draft):
 
 class AgentTurn(RootModel[Annotated[ToolCallTurn | FinalTurn, Field(discriminator="action")]]):
     """One step of a tool-using analyst: request a tool, or give the final analysis."""
+
+
+class CandidateDraft(Draft):
+    """One proposed change. Only the SQL and the hypotheses it addresses are trusted after
+    deterministic checks; prose is cleaned and never decides anything."""
+
+    kind: Literal["create_index", "query_rewrite", "analyze_statistics", "extended_statistics"]
+    addresses_hypotheses: list[str] = Field(max_length=8)
+    ddl: list[str] = Field(default_factory=list, max_length=4)
+    query: str | None = Field(default=None, max_length=20_000)
+    expected_benefit: str = Field(max_length=500)
+    risks: list[str] = Field(default_factory=list, max_length=5)
+    write_overhead: Literal["low", "medium", "high", "unknown"] = "unknown"
+
+
+class CandidateSet(Draft):
+    """Output of the Optimization Engineer for one round."""
+
+    candidates: list[CandidateDraft] = Field(max_length=6)
+    summary: str = Field(max_length=600)
