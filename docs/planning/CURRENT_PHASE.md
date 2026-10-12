@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | Phase | **2 — Multi-agent intelligence** (Phase 1 complete: [PHASE_1_REPORT](reports/PHASE_1_REPORT.md)) |
-| Status | **Phase 2: all 14 tasks implemented.** 2 of 5 smoke recordings (injection, plain EXPLAIN) wait for the next free-quota day; then acceptance check and PHASE_2_REPORT |
+| Status | **Phase 2 implemented; exit partially met** ([PHASE_2_REPORT](reports/PHASE_2_REPORT.md)). Acceptance #1, #2, #3, #5 met; #4 met by deterministic tests, its recorded-model case waits for the next free-quota day. Phase 3 not started (awaiting go-ahead) |
 | Last updated | 2026-10-12 |
 | Application code | Phase 1 foundation: API (session, connections, inspect, workloads, health), metadata DB migrations, SQL/plan parsing, inspection gateway, artifact store, demo workloads; web app with connections and plan workspace (tree + graph). No agents yet. |
 
@@ -285,8 +285,9 @@
 
 ## Next actions
 
-1. Check every Phase 1 acceptance criterion, then write `docs/planning/reports/PHASE_1_REPORT.md`.
-2. Wait for the user's go-ahead before starting Phase 2.
+1. On the next UTC day (free quota resets at 00:00 UTC), record the two missing smoke cases with the pinned free model (command in PHASE_2_REPORT §10), confirm `run --suite smoke` replays with exit 0, commit, and add the eval smoke step to CI.
+2. Calibration follow-up for `pk_lookup_already_optimal` (known baseline failure).
+3. Wait for the owner's go-ahead before starting Phase 3.
 
 ## Verification status
 
@@ -295,6 +296,10 @@
 | Required files exist | See Phase 0 validation in the final summary |
 | Internal links | Checked by script during Phase 0 |
 | Mermaid syntax | Reviewed manually (no renderer installed; not executed) |
+| Backend (Phase 2, 2026-10-12) | `uv run pytest -q` → **743 passed** (375 unit, 262 integration incl. a real-process SIGKILL test, 106 security) on PG 17.11, Python 3.12; ruff, format, `mypy --strict` (134 files) clean; CI green on 3.12/3.13 + integration |
+| Frontend (Phase 2) | lint, typecheck, `pnpm test` → **59 passed**, build OK (Node 22); Playwright e2e **1 passed** (real API/worker/DB, stub LLM; CI job `e2e` green); browser-verified start → live timeline → findings → evidence chip → plan node, history delete/undo, 375 px |
+| Evals (replay) | `python -m querycure.evals run --suite smoke` → 2 PASS, 1 XFAIL (known baseline), 2 not yet recorded |
+| Compose (Phase 2) | `alembic current` → `0007 (head)` |
 | Backend (through T1.19) | `uv run pytest -q` → 448 passed: 359 unit/security + 89 integration on PG 17.11, Python 3.12; CI also runs 3.13 and a `postgres:17` integration job. `ruff check`/`format --check` clean; `mypy --strict` clean on 57 files. Live API check as `qc_app`: readyz ok, session flow 401 → 201 → 200, CSRF 403 envelope |
 | Frontend (through T1.18) | `pnpm lint` and `pnpm typecheck` clean; `pnpm test` → 41 passed; `pnpm build` compiles; browser-verified against the live API, including 375 px width |
 | Compose | Running: `metadata-db` and `sandbox-db` healthy; `alembic current` → `0002 (head)`; `qc_app` login verified (INSERT yes, UPDATE no on `artifacts`) |

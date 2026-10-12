@@ -2,7 +2,7 @@
 
 > Autonomous, multi-agent investigation and *verified* optimization of PostgreSQL query performance.
 
-**Project status: Phase 1 (Foundation) complete; Phase 2 not started.** What runs today: SQL and plan parsing, an offline plan explorer (tree and graph), restricted live `EXPLAIN` against a database you connect, and demo workload generators. **No LLM agents, benchmarks, or reports yet.** Those arrive in Phases 2–4. Features below marked *planned* do not exist yet. See [docs/planning/CURRENT_PHASE.md](docs/planning/CURRENT_PHASE.md) for live status.
+**Project status: Phase 2 (multi-agent intelligence) implemented.** What runs today: SQL and plan parsing, a plan explorer, restricted live `EXPLAIN`, and **multi-agent investigations** (LangGraph supervisor + Query Analyzer, Index Strategist, Workload Investigator) that produce cited, **unverified** hypotheses with a live timeline, using **free OpenRouter models only** ([ADR-0016](docs/engineering/adr/ADR-0016-free-openrouter-models-only.md)). **No benchmarks, verified recommendations, or replayable reports yet**: those arrive in Phases 3–4. See [docs/planning/CURRENT_PHASE.md](docs/planning/CURRENT_PHASE.md) for live status.
 
 ---
 
@@ -119,9 +119,17 @@ cd frontend && pnpm install && pnpm dev
 
 Open <http://localhost:3000/app>. A local session is created automatically.
 
-**5. Inspect a plan offline.** Go to **New investigation**, paste the output of `EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON) …`, and choose **Analyze plan**. Real example plans are in `backend/tests/fixtures/plans/pg17_*.json`.
+**5. LLM key and worker (for investigations).** QueryCure uses free OpenRouter models only; paid models are refused. Put your key after `OPENROUTER_API_KEY=` in `backend/.env` (the pinned model is in `.env.example`), then run the worker in a third terminal:
 
-**6. Optional: live EXPLAIN against a demo database.** Load the `orders_ecommerce` workload (100k orders at `sf=0.1`) into its own database, then create a restricted role for QueryCure to connect as:
+```bash
+cd backend && uv run python -m querycure.worker
+```
+
+Without a key, investigations stop with a configuration error. To try the UI with no model at all, start the API and worker with `LLM_PROVIDER=stub` (canned, labelled output for testing; local profile only).
+
+**6. Inspect a plan offline, then investigate.** Go to **New investigation**, paste the output of `EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON) …`, and choose **Analyze plan**. Real example plans are in `backend/tests/fixtures/plans/pg17_*.json`. Then choose **New investigation**, give it a title and start it: the timeline streams live, and findings cite evidence you can click through to the plan node. Past runs are under **History**. Free models are slow (a run takes a few minutes) and limited to about 50 requests per day.
+
+**7. Optional: live EXPLAIN against a demo database.** Load the `orders_ecommerce` workload (100k orders at `sf=0.1`) into its own database, then create a restricted role for QueryCure to connect as:
 
 ```bash
 docker compose -f infra/docker/compose.yaml exec metadata-db psql -U qc_owner -d querycure -c "CREATE DATABASE qc_demo_orders"
@@ -147,7 +155,7 @@ The demo database shares the local metadata server only for convenience. Private
 |---|---|---|
 | 0 | Documentation & architecture | Done |
 | 1 | Foundation: repo, API, metadata DB, SQL/plan parsing, demo workloads, editor | Done ([report](docs/planning/reports/PHASE_1_REPORT.md)) |
-| 2 | Multi-agent intelligence: LangGraph supervisor, analyzer agents, streaming | Planned |
+| 2 | Multi-agent intelligence: LangGraph supervisor, analyzer agents, streaming | Implemented; exit partially met ([report](docs/planning/reports/PHASE_2_REPORT.md)) |
 | 3 | Optimization & benchmarking: sandbox, benchmark engine, tournament | Planned |
 | 4 | Verification & replay: auditor, lineage, replay, regression detection | Planned |
 | 5 | Production polish: auth, BYOK, observability, evals, hardening, deploy | Planned |
