@@ -8,7 +8,8 @@ test("available sections are links; planned ones are visibly disabled, not dead 
   render(<SideNav />);
 
   expect(screen.getByRole("link", { name: "Dashboard" }).getAttribute("href")).toBe("/app");
-  const planned = screen.getByText("History").closest("[aria-disabled]");
+  expect(screen.getByRole("link", { name: "History" }).getAttribute("href")).toBe("/app/history");
+  const planned = screen.getByText("Settings").closest("[aria-disabled]");
   expect(planned?.getAttribute("aria-disabled")).toBe("true");
-  expect(screen.queryByRole("link", { name: /History/ })).toBeNull();
+  expect(screen.queryByRole("link", { name: /Settings/ })).toBeNull();
 });

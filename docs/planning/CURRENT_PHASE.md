@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | Phase | **2 — Multi-agent intelligence** (Phase 1 complete: [PHASE_1_REPORT](reports/PHASE_1_REPORT.md)) |
-| Status | **Phase 2 in progress.** T2.1–T2.12 and T2.14 done; 2 of 5 smoke recordings wait for the next free-quota day; T2.13 next |
+| Status | **Phase 2: all 14 tasks implemented.** 2 of 5 smoke recordings (injection, plain EXPLAIN) wait for the next free-quota day; then acceptance check and PHASE_2_REPORT |
 | Last updated | 2026-10-12 |
 | Application code | Phase 1 foundation: API (session, connections, inspect, workloads, health), metadata DB migrations, SQL/plan parsing, inspection gateway, artifact store, demo workloads; web app with connections and plan workspace (tree + graph). No agents yet. |
 
@@ -260,6 +260,10 @@
   - Environment: this shell defaulted to Node 20; the test stack needs Node 22 (CI's version). Added `.nvmrc` (22).
   - Tests: Vitest 55 (start flow with idempotency key and param sets, invalid param set, event merge/parse/terminal, param-set parsing, run view: unverified claims, **chip → plan node selected**, timeline in words, budget + cancel). **Playwright e2e** against the real API, worker and metadata DB with the stub LLM: upload plan → start → live timeline to "Run completed" → stub hypothesis → chip → Seq Scan row selected (3/3 runs, ~5 s each). New CI job `e2e`. Backend 740 passed.
   - **Live browser check with the real free model:** started from the UI, the timeline streamed live; the run completed `unverified_recommendations` in 7 calls (all `nvidia/nemotron-3-super-120b-a12b:free` via Nvidia, cost 0) with ranked hypotheses `missing_index` (high) / `cardinality_misestimate` / `inefficient_sort`; the chip highlighted the Seq Scan (62.6 ms, 91.1%). No page-level horizontal scroll at 375 px.
+- [x] **T2.13 history page** (`/app/history`, `components/history/HistoryView.tsx`).
+  - Cursor pagination with "Load more" (`useInfiniteQuery` over `next_cursor`), title search and status filter sent to the API, newest first, empty state with a link to start one, soft delete with an inline **Undo** (restore endpoint). Side nav "History" enabled.
+  - Tests: 4 Vitest (cursor passed to the next page, delete then undo, empty state, filters sent) + side-nav test updated. 59 frontend tests pass; lint, typecheck, build clean.
+  - Live browser check against the real API: the list showed the real investigations; delete → "Deleted … Undo" → restored.
 
 ## Blockers
 
