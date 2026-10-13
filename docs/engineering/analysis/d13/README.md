@@ -1,6 +1,6 @@
 # D13 analysis: does the clean `verified` gate need block agreement?
 
-Evidence for [ADR-0021 (proposed)](../../adr/ADR-0021-d13-clean-verification-block-agreement.md). Collected 2026-10-13. None of this changes the engine. Every safeguard is evaluated **on top of** the real `bench@2` code (`querycure.benchmark.rules.assess`), and can only turn a clean `verified` into `inconclusive`.
+Evidence for [ADR-0021 (accepted 2026-10-13: no change)](../../adr/ADR-0021-d13-clean-verification-block-agreement.md). Collected 2026-10-13. None of this changes the engine. Every safeguard is evaluated **on top of** the real `bench@2` code (`querycure.benchmark.rules.assess`), and can only turn a clean `verified` into `inconclusive`.
 
 ## Contents
 

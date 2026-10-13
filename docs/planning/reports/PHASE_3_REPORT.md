@@ -151,7 +151,7 @@ See [LEARNING.md](../../engineering/LEARNING.md) Phase 3.
   - Phase 2: `orders_injection_in_schema`, `orders_plain_explain` (smoke);
   - Phase 3: `orders_sandbox_composite_index`, `rewrite_trap_sandbox` (full; need `SANDBOX_ADMIN_URL`).
   - Record after 00:00 UTC on a day with free capacity, Phase 2 first.
-- ~~Owner decisions on ADR-0018, D11, D12~~: done (§11). Open: **D13** (risk R18), whether `bench@3` adds block agreement to the clean `verified` gate and/or uses more, smaller blocks.
+- ~~Owner decisions on ADR-0018, D11, D12~~: done (§11). **D13** (risk R18) closed 2026-10-13: [ADR-0021](../../engineering/adr/ADR-0021-d13-clean-verification-block-agreement.md) accepted, no change to `bench@2`.
 - Re-record the prerecorded demo fixtures under `bench@2` (they stay labeled `bench@1` until then).
 - **New risks (RISKS.md):** R1 updated with measurements; R17 lock-ordering regressions in content writers.
 - Phase 4 is not started.
@@ -212,7 +212,7 @@ The owner approved ADR-0018 in principle, rejected a plain gate-4b waiver for D1
 
 ### 11.4 Unresolved statistical concerns
 
-1. **Block checks are probabilistic (R18).** With 6 default blocks, each with a 5-sample median, and the block-to-block variation measured here, the regression corroboration and the screen's block check protect against arm-specific disturbances only partially. More, smaller blocks would strengthen them, at the cost of more scheduling overhead. This needs an owner decision (D13).
+1. **Block checks are probabilistic (R18).** With 6 default blocks, each with a 5-sample median, and the block-to-block variation measured here, the regression corroboration and the screen's block check protect against arm-specific disturbances only partially. More, smaller blocks would strengthen them, at the cost of more scheduling overhead. Owner decision D13 (2026-10-13, ADR-0021): no change; the measured false-verification rate did not justify the power cost.
 2. **The clean `verified` path has no block check.** A tight, arm-specific bias present in almost every block verifies under both versions (`test_known_limitation_tight_bias_in_most_blocks_is_not_verified`, strict xfail). It is unlikely in practice, because interleaving shuffles arm order, but it is not excluded.
 3. **Same-host replication only.** Three agreeing experiments rule out per-run accidents, not a systematic artefact of this host that recurs. `verified_with_noise_warning` is labelled accordingly.
 4. **Multiple comparisons.** Each replicate is tested against fixed thresholds, with no correction across candidates × param sets × replicates. This is acceptable for a conservative AND-rule, but it is not formally controlled.

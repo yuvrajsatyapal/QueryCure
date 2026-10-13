@@ -284,7 +284,7 @@ def test_unknown_engine_version_is_refused() -> None:
     strict=True,
     reason="Known limitation (ADR-0019 residual risk, PHASE_3_REPORT §6): the clean verified "
     "path has no block check, so a tight arm-specific bias in 5 of 6 blocks verifies. "
-    "Changing gate 6 is an owner decision.",
+    "Accepted as documented, no gate-6 change (D13, ADR-0021).",
 )
 def test_known_limitation_tight_bias_in_most_blocks_is_not_verified() -> None:
     hot = _samples(10_000)

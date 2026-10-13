@@ -229,6 +229,7 @@ Until F-47 ships, the Index Strategist provides a qualitative write-overhead cla
 - Synthetic or user-provisioned sandbox data; distribution may differ from production — and the planner's choices depend on statistics derived from that data.
 - Sandbox hardware/config ≠ production; ratios transfer better than absolute times, but neither is guaranteed.
 - Docker on macOS adds virtualization noise; CV gate exists for this reason. Measured block-to-block variation is large: block ratios for a neutral index on a ~4 ms scan ranged 0.54–1.57. Block corroboration and the noise screen's block check are therefore probabilistic protections, strongest with many blocks ([ADR-0019](../engineering/adr/ADR-0019-noise-warning-verification-and-corroborated-regression.md) residual risks).
+- The clean `verified` gate has no block check. A tight bias tied to one arm in most blocks would be verified; this is a limit of single-experiment inference, accepted as documented (D13, [ADR-0021](../engineering/adr/ADR-0021-d13-clean-verification-block-agreement.md): 0 of 2,250 real experiments below `min_effect` were verified on the development host).
 - `verified_with_noise_warning` means three same-environment experiments agree. A disturbance that is systematic and repeats in every run on the same host cannot be excluded.
 
 ## 11. Demo workloads (ground-truth fixtures)

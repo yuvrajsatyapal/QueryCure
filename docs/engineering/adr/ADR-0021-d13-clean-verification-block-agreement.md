@@ -1,6 +1,6 @@
 # ADR-0021: Block agreement for the clean `verified` gate (D13): no change to `bench@2`
 
-- Status: **Proposed** (2026-10-13). Awaiting an owner decision. Nothing in the engine, rules, schedule or tests has changed.
+- Status: **Accepted** (2026-10-13, owner approval). Proposed 2026-10-13. Nothing in the engine, rules, schedule or tests has changed, and acceptance changes none of them.
 - Area: Benchmarking / Verification
 - Relates to: [ADR-0008](ADR-0008-benchmark-statistics.md), [ADR-0018](ADR-0018-robust-sample-quality-gate.md), [ADR-0019](ADR-0019-noise-warning-verification-and-corroborated-regression.md) (residual risk R18), [ADR-0020](ADR-0020-container-worker-default-for-local-benchmarks.md)
 - Evidence: [analysis/d13](../analysis/d13/README.md): harness, raw data from 3,050 real experiments, 135,000 simulated experiments
@@ -80,15 +80,17 @@ Schedule changes under `bench@2`, for true effects 1.05 / 1.10 / 1.20:
 5. **Smaller blocks are not free under `bench@2`.** In the simulation they help near the threshold: correlated jitter at 1.10× drops from 3.6% to 0.4%, and power at 1.20× is higher. Real calibration at block size 1 is slightly conservative (3.8% vs 5.8%). The real power gains (94% vs 81% at 1.18×) were measured at different times, so they are confounded and should not be relied on. But `bench@2`'s own block checks require *every* block to agree: R-blocks for regressions and S-blocks for the noise path. With 30 one-sample blocks those checks become far stricter. The simulated noise-warning path under bursts at 3× falls from 34.8% to 22.2%, and the raw-block S-blocks / R-blocks would have to be redefined on pooled windows. That is a rule change.
 6. **Counterbalanced arm order** only removes a first-segment penalty (15.2% → 1.0% at the 1.10× boundary in the simulation). On this host that penalty was below the measurement resolution (|effect| ≤ about 1.5%).
 
-## Decision (proposed)
+## Decision
+
+Accepted by the owner on 2026-10-13, with the D13 recommendation.
 
 **No change.** `bench@2`'s gate 6, its schedule, its block size and its verdict semantics stay as released. The strict-xfail test stays, because it documents a real limitation. Its framing gets corrected in the docs: the limitation is a property of single-experiment inference, not a missing gate-6 check.
 
 Rationale: the smallest statistically defensible change has to buy a measurable reduction in false verification. On this host the measured false-verification rate is already 0 in 2,250 (upper bound 0.17%), and the simulated rate is 0 for every time-structured disturbance. The only safeguard that addresses the documented pattern still leaves a large share of that pattern verified. It also costs about 27–29 points of correct verifications at realistic effect sizes. That is not a good trade, and the evidence does not support it.
 
-## If the owner wants a change anyway
+## Options considered and not adopted
 
-These are ordered from least to most semantic impact. Each requires `bench@3`.
+The owner chose no change, so none of these is implemented. They are kept as the record of what a change would cost. They are ordered from least to most semantic impact, and each would require `bench@3`. Option A (block diagnostics) remains a future consideration for the Phase 4 Benchmark Auditor, not a commitment.
 
 | Option | Effect | Compatibility implications |
 |---|---|---|
@@ -109,4 +111,9 @@ In every case, stored `bench@1`/`bench@2` verdicts are never re-scored, and prer
 
 ## Consequences
 
-- If accepted: R18 stays open with these measurements attached, D13 is closed as "no change", and the strict-xfail test keeps documenting the limitation. Revisit when the container path, cloud hardware or new workloads are measured, or when the Phase 4 Benchmark Auditor needs block diagnostics (option A).
+- D13 is closed as "no change". `bench@2` (gate 6, schedule, block size, verdict semantics) stays as released. No `bench@3`, no new block-agreement gate and no scheduling change.
+- R18 stays open as an accepted, documented limitation, with these measurements attached.
+- The strict-xfail test `test_known_limitation_tight_bias_in_most_blocks_is_not_verified` stays. It documents a property of single-experiment inference, not a missing gate-6 check.
+- The analysis data, raw measurements and reproducibility scripts in [analysis/d13](../analysis/d13/README.md) are kept unchanged.
+- Block diagnostics (option A) are a possible input for the Phase 4 Benchmark Auditor. They are optional, not a Phase 4 requirement.
+- Reopen only on new evidence: measurements on the ADR-0020 container path, on cloud or demo hardware, or on new workloads that show arm-specific disturbances.

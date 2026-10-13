@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | Phase | **3 — Optimization & benchmarking** (Phase 1 complete: [PHASE_1_REPORT](reports/PHASE_1_REPORT.md); Phase 2 implemented, acceptance partially met: [PHASE_2_REPORT](reports/PHASE_2_REPORT.md)) |
-| Status | **Phase 3 implemented; exit partially met** ([PHASE_3_REPORT](reports/PHASE_3_REPORT.md)). Owner decisions applied 2026-10-12/13: ADR-0018 approved in principle with documented assumptions; **D11** resolved as `verified_with_noise_warning` via independent replication; **D12** container worker is the local default (ADR-0019, ADR-0020, engine `bench@2`, migration 0010). Acceptance #1, #3, #4, #5 met against real PostgreSQL 17. #2: fresh engine-level sf=1 runs (host relay, 5 seeds, not a full API run) ended `verified` (3/5) or `verified_with_noise_warning` (2/5). The committed sf=1 fixture stays the recorded `bench@1` `inconclusive` until re-recorded. **Pending, tracked separately:** Phase 2 smoke recordings `orders_injection_in_schema`, `orders_plain_explain` (Phase 2 acceptance stays partial until recorded) and Phase 3 Mode C recordings `orders_sandbox_composite_index`, `rewrite_trap_sandbox`. No OpenRouter request was sent in Phase 3 or in this change. Phase 4 not started (awaiting go-ahead) |
+| Status | **Phase 3 implemented; exit partially met** ([PHASE_3_REPORT](reports/PHASE_3_REPORT.md)). Owner decisions applied 2026-10-12/13: ADR-0018 approved in principle with documented assumptions; **D11** resolved as `verified_with_noise_warning` via independent replication; **D12** container worker is the local default (ADR-0019, ADR-0020, engine `bench@2`, migration 0010); **D13** closed 2026-10-13 as no change to `bench@2` (ADR-0021 accepted). Acceptance #1, #3, #4, #5 met against real PostgreSQL 17. #2: fresh engine-level sf=1 runs (host relay, 5 seeds, not a full API run) ended `verified` (3/5) or `verified_with_noise_warning` (2/5). The committed sf=1 fixture stays the recorded `bench@1` `inconclusive` until re-recorded. **Pending, tracked separately** (see [Pending real-model evaluations](#pending-real-model-evaluations)): Phase 2 smoke recordings `orders_injection_in_schema`, `orders_plain_explain` (Phase 2 acceptance stays partial until recorded) and Phase 3 Mode C recordings `orders_sandbox_composite_index`, `rewrite_trap_sandbox`. No OpenRouter request was sent in Phase 3 or in this change. Phase 4 not started (awaiting go-ahead) |
 | Last updated | 2026-10-13 |
 | Application code | Phases 1–3: API, metadata DB (migrations 0001–0010), parsing, inspection gateway, artifact store, six demo workloads; multi-agent graph with Optimization Engineer, approval gate (interrupt/resume, expiry), sandbox benchmark engine (`bench@2`: corroborated regressions, noise screen, independent replication) and tournament; web app with workspace (upload / live EXPLAIN / demo workload), live timeline, findings, approval card and tournament tab. |
 
@@ -309,16 +309,28 @@ Started 2026-10-12 on the owner's instruction; `main` clean at `ffe9321`. Detail
 
 ## Next actions
 
-0. ~~Owner decisions on ADR-0018, D11, D12~~: applied (ADR-0019, ADR-0020). **Owner question D13 (R18):** investigated; [ADR-0021](../engineering/adr/ADR-0021-d13-clean-verification-block-agreement.md) proposes no change to `bench@2` (evidence in [analysis/d13](../engineering/analysis/d13/README.md)). Awaiting decision. The four pending real-model recordings (Phase 2: `orders_injection_in_schema`, `orders_plain_explain`; Phase 3: `orders_sandbox_composite_index`, `rewrite_trap_sandbox`) remain tracked separately and untouched; no OpenRouter request was sent.
+0. ~~Owner decisions on ADR-0018, D11, D12, D13~~: applied (ADR-0019, ADR-0020, ADR-0021). D13 closed 2026-10-13: [ADR-0021](../engineering/adr/ADR-0021-d13-clean-verification-block-agreement.md) accepted, no change to `bench@2` (evidence kept in [analysis/d13](../engineering/analysis/d13/README.md)). No `bench@3`, block-agreement gate or scheduling change; the strict xfail stays. Block diagnostics for the Phase 4 Benchmark Auditor are a future consideration only. Do not reopen Phase 3 statistical decisions without new evidence. No OpenRouter request was sent.
 1. On the next UTC day (free quota resets at 00:00 UTC), record the two missing Phase 2 smoke cases with the pinned free model (command in PHASE_2_REPORT §10), confirm `run --suite smoke` replays with exit 0, commit, and add the eval smoke step to CI.
 2. ~~Calibration follow-up for `pk_lookup_already_optimal`~~: done (ADR-0017).
 3. Then, as free capacity allows, record the Phase 3 Mode C cases (`--suite full --case orders_sandbox_composite_index`, `rewrite_trap_sandbox`; needs `SANDBOX_ADMIN_URL`/`SANDBOX_BENCH_PASSWORD`).
 4. Wait for the owner's go-ahead before starting Phase 4.
 
+## Pending real-model evaluations
+
+Tracked separately from phase work. Each needs free OpenRouter quota (ADR-0016; resets 00:00 UTC). No paid API is ever used. Record Phase 2 first.
+
+| Case | Phase | Suite | Status | Notes |
+|---|---|---|---|---|
+| `orders_injection_in_schema` | 2 | smoke | Not recorded | Phase 2 acceptance stays partial until recorded (command in PHASE_2_REPORT §10) |
+| `orders_plain_explain` | 2 | smoke | Not recorded | As above; then add the eval smoke step to CI |
+| `orders_sandbox_composite_index` | 3 | full | Not recorded | Needs `SANDBOX_ADMIN_URL` / `SANDBOX_BENCH_PASSWORD` |
+| `rewrite_trap_sandbox` | 3 | full | Not recorded | As above |
+
 ## Verification status
 
 | Check | Result |
 |---|---|
+| D13 closure / ADR-0021 accepted (2026-10-13, docs + xfail reason text only) | `QC_REQUIRE_DB=1 uv run pytest -q` → **1104 passed, 1 xfailed** (strict xfail kept); ruff, format, `mypy --strict` (162 files) clean; `git diff backend/src` empty; smoke eval replay 3/5 PASS, 2 unrecorded; no OpenRouter request |
 | Backend (owner decisions ADR-0019/0020, 2026-10-13) | `QC_REQUIRE_DB=1 uv run pytest -q` → **1104 passed, 1 xfailed** (652 unit, 330 integration, 123 security collected; 1 strict xfail documents R18); ruff, format, `mypy --strict` (162 files) clean; migration 0010 up/down/up verified |
 | Frontend (2026-10-13) | lint, typecheck, `pnpm test` → **68 passed**, build OK; Playwright **2 passed** (container worker stopped for the run) |
 | Compose (2026-10-13) | `alembic current` → `0010 (head)`; worker container default, `container_runtime=docker-network`, uid 10001; sandbox egress (TCP, DNS, metadata-db) blocked, re-verified |
@@ -358,4 +370,4 @@ Defaults are chosen so implementation can proceed; change any before the listed 
 | D10 | Retirement policy for old report builders/renderers | Keep all versions; fallback to stored artifacts if ever retired | Before first builder@2 |
 | D11 | ~~Sample-quality gate on very fast winning arms~~ | **Decided by the owner (2026-10-12): no plain waiver.** The single experiment keeps `inconclusive`. `verified_with_noise_warning` needs a noise screen (n ≥ 30, no censoring, no param-set regression, quartile separation, every block ≥ `min_effect`) plus agreement of 3 independent experiments ([ADR-0019](../engineering/adr/ADR-0019-noise-warning-verification-and-corroborated-regression.md), `bench@2`) | — |
 | D12 | ~~Container worker by default?~~ | **Decided by the owner (2026-10-12): yes** for local Mode C benchmarking. The host worker + relay stays supported, and sandbox isolation is unchanged ([ADR-0020](../engineering/adr/ADR-0020-container-worker-default-for-local-benchmarks.md)) | — |
-| D13 | Block agreement for the clean `verified` gate and/or more, smaller blocks (risk R18) | **Investigated 2026-10-13; [ADR-0021](../engineering/adr/ADR-0021-d13-clean-verification-block-agreement.md) proposed: no change.** 0 of 2,250 real experiments with a true effect < 1.10× were verified; the only rule that fixes the strict-xfail fixture costs about 28 points of correct verifications at 1.18× and still leaves about 27% of the simulated generalized pattern verified. Engine, rules and tests unchanged | Owner decision on ADR-0021 |
+| D13 | ~~Block agreement for the clean `verified` gate and/or more, smaller blocks (risk R18)~~ | **Decided by the owner (2026-10-13): no change to `bench@2`** ([ADR-0021](../engineering/adr/ADR-0021-d13-clean-verification-block-agreement.md), accepted). 0 of 2,250 real experiments with a true effect < 1.10× were verified; the only rule that fixes the strict-xfail fixture costs about 28 points of correct verifications at 1.18× and still leaves about 27% of the simulated generalized pattern verified. Engine, rules and tests unchanged; strict xfail kept; R18 accepted as documented | — |

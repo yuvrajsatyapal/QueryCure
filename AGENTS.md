@@ -38,6 +38,7 @@ Instructions for any coding agent (Codex, Claude Code, Cursor, etc.). [CLAUDE.md
 * Do not automatically resolve merge conflicts by discarding changes.
 * If the working tree is dirty, conflicts exist, tests fail, or pushing is rejected, report the problem and resolve it safely rather than forcing the operation.
 * Do not commit secrets, credentials, `.env` files, virtual environments, build artifacts, or dependency directories.
+* No AI attribution in commits or PRs. Never add `Co-Authored-By`, `Signed-off-by`, `Generated-by`, or any similar trailer or footer naming Claude, Anthropic, or another AI assistant or vendor, and no "Generated with …" lines. Commits use only the owner's configured Git author and committer identity (`git config user.name` / `user.email`); never override them with `--author` or environment variables. Check every commit message before committing or pushing; if a trailer slipped in, amend it before pushing. Legitimate human co-authors are kept.
 * Follow this workflow for every subsequent implementation task unless I explicitly instruct otherwise.
 
 ## Definition of done
