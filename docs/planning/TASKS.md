@@ -77,6 +77,8 @@ IDs `T<phase>.<n>`. Priority: **P0** blocks the phase exit, **P1** needed for ph
 | T4.8 | Lineage drawer UI + replay page | P1 | T4.5 | "Why?" walks to source artifact |
 | T4.9 | Full eval suite run + baseline in phase report | P0 | T4.2 | Metrics recorded |
 
+**Phase 4 status (2026-10-13):** T4.1–T4.9 implemented ([PHASE_4_REPORT](reports/PHASE_4_REPORT.md)). Additionally: the re-investigation start endpoint (owner request; diff stays Post-MVP) and `GET /runs/{id}/verifications`. T4.7's acceptance met as "documented inconclusive" with one `reproduced` pair out of 14 ([analysis/replay_variance](../engineering/analysis/replay_variance/README.md)).
+
 ## Phase 5 — Production polish
 
 | ID | Task | Pri | Deps | Acceptance criteria |

@@ -126,6 +126,14 @@ Mode B is **disabled by default** on the public demo (`FEATURE_LIVE_INSPECTION_P
 
 `/inspect/plan` and `/inspect/schema` store content-addressed artifacts without an owner. `POST /investigations` accepts their digests, after which they become readable through the new run. Naming a digest therefore requires having seen it (it is shown only to the uploader) or having the content (a SHA-256 cannot be guessed). Planned hardening: per-user upload records, so a digest is accepted only from the user who uploaded it.
 
+## 5b. Phase 4 controls (implemented)
+- **Sealing:** after `finalize_run`, the emitter accepts only lifecycle events, `link()` and every content repository refuse the run (`RUN_FINALIZED`), and `verification_results` / `investigation_reports` / `replay_manifests` are append-only for `qc_app` (grant tests).
+- **Auditor authority:** an upgrade is refused by a database CHECK, not only by code (ADR-0009, ADR-0022).
+- **Experiment replay re-checks SQL:** the API re-runs the DDL allowlist and compares every arm's digest with the source approval; the engine again refuses unapproved digests; the replay's approval row is written only from the user's explicit `confirm_ddl` and shows the exact SQL first. Only the sandbox executes SQL; no LLM is reachable during report or experiment replay (tests patch the transports to fail).
+- **Re-investigation needs consent** (`confirm_new_llm_run`) and free capacity; replays never start one.
+- **Authorization:** every Phase 4 endpoint is user-scoped (404 tests for reports, manifests, attempts, verifications, experiments, investigations).
+- **Exports** carry digests and run IDs only; reports contain no connection details or keys (they are built from records that never held them).
+
 ## 6. Prompt injection
 
 Untrusted text sources: user objective, query text and comments, identifiers, table/column comments, plan JSON, workload query texts from `pg_stat_statements` (other users' queries!).

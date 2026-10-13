@@ -76,7 +76,7 @@ A run may combine **B + C** (diagnose on target, verify on a sandbox with a simi
 3. Each node emits **events** into `investigation_events` (monotonic `seq` per run) and `NOTIFY run_<id>`; large outputs go to **artifacts**; facts go to **evidence**.
 4. **API SSE endpoint** replays events after `Last-Event-ID`, then streams new ones on `NOTIFY` ([ADR-0005](../engineering/adr/ADR-0005-sse-event-log.md)).
 5. At an approval gate the graph calls `interrupt()`; the job completes with status `awaiting_approval`. The API's decision endpoint inserts a `resume` job; the worker resumes from the checkpoint with `Command(resume=decision)`.
-6. Benchmarks run inside the worker against sandbox clones; results persist as `benchmark_runs`; the deterministic audit produces `verification_results`.
+6. Benchmarks run inside the worker against sandbox clones; results persist as `benchmark_runs`; the Benchmark Auditor (`audit/` deterministic checks, then an optional downgrade-only LLM review) produces `verification_results`. Experiment replays run as `experiment_replay` jobs: a new run and experiment in a fresh sandbox, no LLM, compared statistically with the original (`replay/comparison.py`).
 7. The report node **finalizes** the run in one transaction: fixes the event cutoff, computes the events digest, builds the report from persisted records only (enables zero-LLM report replay), stores report and manifest artifacts, and sets the terminal status ([REPLAY_ENGINE §5](REPLAY_ENGINE.md#5-atomic-finalization)).
 
 ## 5. Trust boundaries (summary)

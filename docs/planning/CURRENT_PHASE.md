@@ -2,10 +2,10 @@
 
 | Field | Value |
 |---|---|
-| Phase | **3 — Optimization & benchmarking** (Phase 1 complete: [PHASE_1_REPORT](reports/PHASE_1_REPORT.md); Phase 2 implemented, acceptance partially met: [PHASE_2_REPORT](reports/PHASE_2_REPORT.md)) |
-| Status | **Phase 3 implemented; exit partially met** ([PHASE_3_REPORT](reports/PHASE_3_REPORT.md)). Owner decisions applied 2026-10-12/13: ADR-0018 approved in principle with documented assumptions; **D11** resolved as `verified_with_noise_warning` via independent replication; **D12** container worker is the local default (ADR-0019, ADR-0020, engine `bench@2`, migration 0010); **D13** closed 2026-10-13 as no change to `bench@2` (ADR-0021 accepted). Acceptance #1, #3, #4, #5 met against real PostgreSQL 17. #2: fresh engine-level sf=1 runs (host relay, 5 seeds, not a full API run) ended `verified` (3/5) or `verified_with_noise_warning` (2/5). The committed sf=1 fixture stays the recorded `bench@1` `inconclusive` until re-recorded. **Pending, tracked separately** (see [Pending real-model evaluations](#pending-real-model-evaluations)): Phase 2 smoke recordings `orders_injection_in_schema`, `orders_plain_explain` (Phase 2 acceptance stays partial until recorded) and Phase 3 Mode C recordings `orders_sandbox_composite_index`, `rewrite_trap_sandbox`. No OpenRouter request was sent in Phase 3 or in this change. Phase 4 not started (awaiting go-ahead) |
+| Phase | **4 — Verification & replay** (Phase 1 complete: [PHASE_1_REPORT](reports/PHASE_1_REPORT.md); Phase 2 complete 2026-10-13: [PHASE_2_REPORT](reports/PHASE_2_REPORT.md) §13; Phase 3: [PHASE_3_REPORT](reports/PHASE_3_REPORT.md)) |
+| Status | **Phase 4 implemented; exit met** ([PHASE_4_REPORT](reports/PHASE_4_REPORT.md)): ROADMAP #1, #3, #4 met; #2 met as TASKS T4.7 states it (1/14 same-machine pairs `reproduced`, the rest documented `inconclusive`, 0 `not_reproduced`). All four pending real-model evaluations recorded 2026-10-13 with the pinned free model (31/45 free requests): Phase 2 cases PASS (Phase 2 complete), Phase 3 Mode C cases PASS when recorded (replay `DIVERGED` by design, ADR-0022 §10). Open owner decision: D9 margin (proposal: keep 1.25). Phase 5 not started (awaiting authorization) |
 | Last updated | 2026-10-13 |
-| Application code | Phases 1–3: API, metadata DB (migrations 0001–0010), parsing, inspection gateway, artifact store, six demo workloads; multi-agent graph with Optimization Engineer, approval gate (interrupt/resume, expiry), sandbox benchmark engine (`bench@2`: corroborated regressions, noise screen, independent replication) and tournament; web app with workspace (upload / live EXPLAIN / demo workload), live timeline, findings, approval card and tournament tab. |
+| Application code | Phases 1–3 (API, metadata DB, parsing, inspection gateway, artifact store, six demo workloads, multi-agent graph, approval gate, sandbox benchmark engine `bench@2`, tournament, web workspace) plus Phase 4: Benchmark Auditor (deterministic checks + downgrade-only review), atomic finalization with versioned reports (`report-builder@1`, `report-md@1`), report replay, experiment replay with statistical comparison, re-investigation start, plan diff; migrations 0001–0012; web app adds Report tab, report and replay pages, lineage drawer, audit panel and plan diff |
 
 ## Completed
 
@@ -341,7 +341,9 @@ Decisions taken without changing any frozen contract (recorded for the owner):
 1. On the next UTC day (free quota resets at 00:00 UTC), record the two missing Phase 2 smoke cases with the pinned free model (command in PHASE_2_REPORT §10), confirm `run --suite smoke` replays with exit 0, commit, and add the eval smoke step to CI.
 2. ~~Calibration follow-up for `pk_lookup_already_optimal`~~: done (ADR-0017).
 3. Then, as free capacity allows, record the Phase 3 Mode C cases (`--suite full --case orders_sandbox_composite_index`, `rewrite_trap_sandbox`; needs `SANDBOX_ADMIN_URL`/`SANDBOX_BENCH_PASSWORD`).
-4. Wait for the owner's go-ahead before starting Phase 4.
+4. ~~Wait for the owner's go-ahead before starting Phase 4~~: Phase 4 done (2026-10-13).
+5. Owner: confirm D9 (`m = 1.25`, evidence in [analysis/replay_variance](../engineering/analysis/replay_variance/README.md)).
+6. Wait for the owner's authorization before starting Phase 5.
 
 ## Pending real-model evaluations
 
@@ -358,6 +360,7 @@ Tracked separately from phase work. Each needs free OpenRouter quota (ADR-0016; 
 
 | Check | Result |
 |---|---|
+| Phase 4 exit (2026-10-13) | Backend `QC_REQUIRE_DB=1 uv run pytest -q` → unit 727 passed + 1 xfailed, integration 418, security 123 (PG 17 + sandbox); ruff, format, `mypy --strict` (185 files) clean; smoke evals 5/5; full replay 5 PASS / 2 DIVERGED / 1 unrecorded; frontend lint, typecheck, 78 tests, build OK (Node 22); Playwright 3 passed incl. the Phase 4 lifecycle; migrations 0011/0012 up/down/up verified; CI green |
 | Git history cleanup (2026-10-13, owner-authorized one-time rewrite) | 5 `Co-Authored-By: Claude` trailers removed from `main` (`187c920`→`7c699bc`, `06998e2`→`aaa137d`, `a36c610`→`3fbec97`, `efa1921`→`cf8e91b`, `22b383b`→`799381b`; `3e1bb1f`→`376377d`, `096e271`→`d3852d8` rehashed only). 59 commits, trees, identities and timestamps unchanged; pushed with `--force-with-lease`; local backup tag `backup/main-pre-ai-trailer-cleanup-2026-10-13` |
 | D13 closure / ADR-0021 accepted (2026-10-13, docs + xfail reason text only) | `QC_REQUIRE_DB=1 uv run pytest -q` → **1104 passed, 1 xfailed** (strict xfail kept); ruff, format, `mypy --strict` (162 files) clean; `git diff backend/src` empty; smoke eval replay 3/5 PASS, 2 unrecorded; no OpenRouter request |
 | Backend (owner decisions ADR-0019/0020, 2026-10-13) | `QC_REQUIRE_DB=1 uv run pytest -q` → **1104 passed, 1 xfailed** (652 unit, 330 integration, 123 security collected; 1 strict xfail documents R18); ruff, format, `mypy --strict` (162 files) clean; migration 0010 up/down/up verified |
@@ -395,7 +398,7 @@ Defaults are chosen so implementation can proceed; change any before the listed 
 | D6 | Write-overhead benchmark in MVP or Post-MVP | Post-MVP (qualitative class shown until then) | Phase 3 |
 | D7 | ~~Initialize git + branching model~~ | **Resolved:** git on `main`, **main-only workflow** (CLAUDE.md §10 / AGENTS.md Git Branch Policy); push once a remote is configured | — |
 | D8 | Manifest signing (key outside DB) or external timestamping | Deferred; digests + append-only grants + manifest digest in exports (REPLAY_ENGINE §6) | Phase 5 security review |
-| D9 | Replay equivalence margin `m` | 1.25 (±25% speedup drift); revisit after measuring same-machine replay variance in Phase 4 | Phase 4 exit |
+| D9 | Replay equivalence margin `m` | 1.25 (±25% speedup drift). **Measured 2026-10-13** (14 same-machine pairs): only 2 pairs passed gate 4; 1 reproduced at 1.25, 1 had an upper drift bound of 1.26–1.43; point drifts 0.83–1.24 in 12/14. **Proposal: keep 1.25** (owner to confirm) | Phase 4 exit |
 | D10 | Retirement policy for old report builders/renderers | Keep all versions; fallback to stored artifacts if ever retired | Before first builder@2 |
 | D11 | ~~Sample-quality gate on very fast winning arms~~ | **Decided by the owner (2026-10-12): no plain waiver.** The single experiment keeps `inconclusive`. `verified_with_noise_warning` needs a noise screen (n ≥ 30, no censoring, no param-set regression, quartile separation, every block ≥ `min_effect`) plus agreement of 3 independent experiments ([ADR-0019](../engineering/adr/ADR-0019-noise-warning-verification-and-corroborated-regression.md), `bench@2`) | — |
 | D12 | ~~Container worker by default?~~ | **Decided by the owner (2026-10-12): yes** for local Mode C benchmarking. The host worker + relay stays supported, and sandbox isolation is unchanged ([ADR-0020](../engineering/adr/ADR-0020-container-worker-default-for-local-benchmarks.md)) | — |

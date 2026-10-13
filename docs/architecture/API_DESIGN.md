@@ -106,6 +106,8 @@ Error messages never include credentials, DSNs, or raw driver errors (driver err
 | GET | `/runs/{run_id}/experiments` | `ExperimentSummary[]` | 3 |
 | GET | `/experiments/{id}` | `ExperimentDetail` (arms, stats, verdicts, environment) | 3 |
 | GET | `/runs/{run_id}/report` | `InvestigationReport` JSON | 4 |
+| GET | `/runs/{run_id}/report.json` | Export: `{export: {run_id, manifest_sha256, report_json_sha256, report_md_sha256, verify[]}, report}` (attachment) | 4 |
+| GET | `/runs/{run_id}/verifications` | Benchmark Auditor verdicts (`engine_verdict`, `verdict`, checks, concerns, `auditor_downgraded`) | 4 |
 | GET | `/runs/{run_id}/report.md` | Markdown export (`text/markdown`, attachment); footer carries `run_id`, manifest digest and digest-reproduction instructions (REPLAY_ENGINE §6.3) | 4 |
 | GET | `/artifacts/{sha256}` | artifact content if owned via a run | 2 |
 
@@ -126,6 +128,8 @@ Error messages never include credentials, DSNs, or raw driver errors (driver err
   "pre_authorize_demo_sandbox": false
 }
 ```
+
+**Phase 4 (implemented).** All Phase 4 rows above are implemented and user-scoped (404 for another user's run, attempt, experiment or investigation). `GET /runs/{id}/report` returns the stored, digest-verified report JSON with its versions and the manifest digest; 404 `NOT_FINALIZED` for runs that were never sealed (all runs from before Phase 4). `report.md` appends an export footer after `<!-- qc-export-footer -->` (manifest digest, report digest, `shasum` reproduction; deleting the footer restores the stored bytes exactly). `POST /runs/{id}/replay/report` accepts `{client_schema_versions}`. `POST /experiments/{id}/replay` needs `{confirm_ddl: true}` and the per-user concurrency limit; a failed precondition is recorded as a `not_replayable` attempt and answered 422 `EXPERIMENT_NOT_REPLAYABLE` with `details[0].code` and `replay_attempt_id`. Cancelling a replay run (either endpoint) cancels its attempt. `GET /runs/{id}/plans/diff?from=&to=` accepts plan artifacts of the run with roles `input.plan`, `context.plan` or `experiment.plan`. Idempotency-Key is not implemented for `POST /experiments/{id}/replay` (each confirmation is a new attempt).
 
 **Phase 3 (implemented, T3.10/T3.12).**
 - `sandbox_benchmark` needs `FEATURE_SANDBOX` (local default on, otherwise 403), a demo `workload_id`, the query, ≤ 5 param sets with one value per `$n` (a parameterized query may omit them only if it is one of the workload's example queries, whose sets are then used), and accepts `pre_authorize_demo_sandbox` (422 outside sandbox mode). Param sets accept `edge_case`.
@@ -152,7 +156,7 @@ Implemented in T2.11. Phase 2 rules for `POST /investigations`:
 | GET | `/replay-attempts/{id}` | `ReplayAttempt` (status, failure_code, warnings, result) | 4 |
 | GET | `/runs/{run_id}/replay/attempts` | Paginated attempts for a source run | 4 |
 | POST | `/replay-attempts/{id}/cancel` | Cancels a queued/running experiment replay (cancels its replay run) → 202 | 4 |
-| POST | `/investigations/{id}/reinvestigate` | New run (`kind=reinvestigation`) with optional model override → 202 | Post-MVP |
+| POST | `/investigations/{id}/reinvestigate` | Body `{confirm_new_llm_run: true}` → 202 `CreateInvestigationResponse` with a new `reinvestigation` run (parent = latest run, inputs linked, own budget, Idempotency-Key). 409 while a run is active, 503 without a key, 429 `LLM_QUOTA_EXHAUSTED` when today's free capacity is spent. Model override not implemented | 4 (start only) |
 | GET | `/runs/{run_id}/compare/{other_run_id}` | Conclusion diff | Post-MVP |
 
 ### Health
@@ -194,6 +198,7 @@ data: {"run_id":"…","seq":42,"ts":"2026-10-11T12:00:03.120Z","type":"hypothesi
 | `verification.completed` | `{experiment_id, candidate_key, verdict, gate, reasons[]}` |
 | `budget.warning` | `{budget, used, limit}` |
 | `error` | `{node, code, message, recoverable}` |
+| `run.concluded` | `{final_status, outcome, stop_reason, synthesis_summary, materiality, no_action_evidence, usage, error}` — last content event, written by `finalize_run` (ADR-0022) |
 | `report.ready` | `{report_url, outcome, manifest_sha256}` — lifecycle event, emitted after the events cutoff |
 | `replay.status_changed` | `{replay_attempt_id, from, to, failure_code?}` — on the replay run's stream |
 | `replay.compared` | `{replay_attempt_id, status, comparison_mode, pairs_summary}` (clients label results by `comparison_mode`, REPLAY_ENGINE §9.2) — on the replay run's stream, before its finalization |

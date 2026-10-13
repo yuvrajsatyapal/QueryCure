@@ -1,6 +1,6 @@
 # Replay Engine
 
-Status: Planned (artifact store and canonicalization in Phase 1, events in Phase 2, finalization and replay in Phase 4). Decisions: [ADR-0010](../engineering/adr/ADR-0010-content-addressed-artifacts.md) (artifact store), [ADR-0015](../engineering/adr/ADR-0015-canonicalization-finalization-integrity.md) (canonicalization profiles, finalization protocol, integrity scope).
+Status: **Implemented** (artifact store and canonicalization in Phase 1, events in Phase 2, finalization, report replay, experiment replay and the re-investigation start in Phase 4; implementation decisions in [ADR-0022](../engineering/adr/ADR-0022-phase4-verification-replay-implementation.md)). Decisions: [ADR-0010](../engineering/adr/ADR-0010-content-addressed-artifacts.md) (artifact store), [ADR-0015](../engineering/adr/ADR-0015-canonicalization-finalization-integrity.md) (canonicalization profiles, finalization protocol, integrity scope).
 
 ## 1. Three kinds of replay — never conflate them
 
@@ -8,7 +8,7 @@ Status: Planned (artifact store and canonicalization in Phase 1, events in Phase
 |---|---|---|---|---|---|
 | **Report replay** | Verifies a finalized run's stored evidence against its manifest and redisplays it | 0 | none | No | "Replayed from saved evidence · integrity checked against stored digests" |
 | **Experiment replay** | Re-executes a stored `ExperimentConfig` in a fresh sandbox, then compares statistically with the original | 0 | sandbox only | **Yes** — a new run and experiment linked to the original | "New measurement (replay of …)" |
-| **AI re-investigation** | New LLM run on the same inputs, diffed against the original (Post-MVP) | yes | per mode | if it benchmarks | "Re-investigation of …" |
+| **AI re-investigation** | New LLM run on the same inputs (start contract implemented in Phase 4: consent, free capacity, own budget, parent link); the diff against the original is Post-MVP | yes | per mode | if it benchmarks | "Re-investigation of …" |
 
 Every replay request creates a `replay_attempts` row ([DATABASE_DESIGN](DATABASE_DESIGN.md#replay_attempts)) with a state machine and structured failure codes (§8).
 
@@ -82,7 +82,7 @@ The profile tag gives domain separation: identical bytes under two profiles get 
 - **Golden vectors** in `backend/tests/fixtures/canonical/`: input value, expected canonical bytes and digest per profile, including the RFC 8785 number vectors and Unicode edge cases (astral characters, combining marks, control characters, lone surrogates expected to fail).
 - CI runs them on every supported Python version (3.12 and 3.13). Any change in output fails CI; the fix is a new profile, never an edit.
 - Dependency upgrades (Pydantic, psycopg, SQLGlot) cannot change digests, because canonicalization never delegates formatting to them.
-- Verifying an artifact means re-canonicalizing the stored value with its recorded `canonicalization` profile and comparing digests. An unknown profile ID is a `not_replayable: unsupported_profile` result, not a crash.
+- Verifying an artifact means re-canonicalizing the stored value with its recorded `canonicalization` profile and comparing digests. Report replay also requires the stored bytes to equal their re-canonicalized form, so an edit that canonicalization would hide (extra whitespace) is still `integrity_failed` (ADR-0022). An unknown profile ID is a `not_replayable: unsupported_profile` result, not a crash.
 
 ## 3. Evidence lineage
 
@@ -121,6 +121,9 @@ Finalization turns a run's mutable progress into a sealed, replayable record. It
 
 ```
 BEGIN
+ 0. (implementation) emit `run.concluded` {final_status, outcome, stop_reason, synthesis_summary,
+    materiality, no_action_evidence, usage, error}: the last content event, so the builder reads
+    the terminal decision from the sealed log, never from graph state or the run row (ADR-0022)
  1. SELECT … FROM investigation_runs WHERE id = $run FOR UPDATE
     → if finalized_at IS NOT NULL: return the existing manifest (idempotent no-op)
  2. cutoff_seq := last_event_seq                      -- content events are seq 1..cutoff_seq
@@ -278,7 +281,7 @@ stateDiagram-v2
 
 | Status | Codes |
 |---|---|
-| `not_replayable` | `source_not_finalized`, `source_integrity_failed` (the source run fails report-replay checks), `config_artifact_missing`, `unsupported_config_schema`, `workload_unavailable` (generator version removed), `workload_snapshot_changed` (user sandbox data changed), `sandbox_disabled` (profile has no live sandbox), `unsupported_row_profile` |
+| `not_replayable` | `source_not_finalized`, `source_integrity_failed` (the source run fails report-replay checks, or an arm's SQL no longer matches its approval), `source_experiment_incomplete` (no stored result; added in Phase 4), `config_artifact_missing`, `unsupported_config_schema`, `workload_unavailable` (generator version removed), `workload_snapshot_changed` (user sandbox data changed), `sandbox_disabled` (profile has no live sandbox), `unsupported_row_profile` |
 | `failed` | `sandbox_unavailable`, `ddl_failed` (where the original succeeded), `timeout`, `budget_exhausted`, `internal_error` |
 | `cancelled` | `cancelled_by_user` |
 | `inconclusive` (comparison) | `insufficient_evidence`, `drift_undetermined`, `verdict_inconclusive` |
@@ -345,7 +348,9 @@ Both experiments store an `EnvironmentFingerprint` ([BENCHMARK_ENGINE §1](BENCH
 |---|---|---|
 | **Precondition** | workload ID and data digest, row profile | Mismatch → `not_replayable` |
 | **Material** | PostgreSQL major version, planner-relevant settings (`shared_buffers`, `work_mem`, `effective_cache_size`, `random_page_cost`, `seq_page_cost`, `jit`, `max_parallel_workers_per_gather`, `default_statistics_target`), sandbox image digest, benchmark engine version, CPU architecture, CPU model, core count, memory | Any difference → `comparison_mode = cross_environment`; UI banner: "Different environment: ratios may not transfer; absolute latencies are not comparable" |
-| **Minor** | PostgreSQL minor version, OS/kernel version, container runtime version, wall-clock date | Listed in `result.environment`; mode stays `same_environment` |
+| **Minor** | PostgreSQL minor version, OS/kernel version, non-planner `pg_settings`, wall-clock date | Listed in `result.environment`; mode stays `same_environment` |
+
+**Implementation note (ADR-0022).** `container_runtime` is classified **material**: since ADR-0020 it records the measurement path (`docker-network` vs `docker-relay`, round trips about ten times apart), not a runtime version. The comparison also records the drift and its interval for pairs that fail gate 4 (diagnostic only; such pairs stay `inconclusive: insufficient_evidence`). The comparison seed is 52 bits of `sha256(original|replay)` so it fits the canonical JSON integer range. Same-machine measurements: [analysis/replay_variance](../engineering/analysis/replay_variance/README.md).
 
 **Engine versions (ADR-0019).** A replay is scored with the source experiment's rules: `rules.evaluate(..., engine_version=source.engine_version)`, where `bench@1` is kept frozen. A source and replay produced by different engine versions are therefore always `cross_environment` (benchmark engine version is a material field), never "reproduced". Replicates of a noisy round are not replays: they are new experiments of the original run.
 

@@ -55,8 +55,10 @@ backend/
 │   │   ├── fencing.py          untrusted-data fencing for prompts
 │   │   └── citations.py        evidence citation validator
 │   ├── evidence/               store.py (deterministic ids), lineage.py
-│   ├── replay/                 canonical/ (one frozen module per profile), digest.py, artifact_store.py, finalize.py (finalize_run), manifest.py, report_replay.py, experiment_replay.py, compare.py (drift CI + environment diff)
-│   ├── reports/                builders/v{N}.py (records → report JSON), renderers/md_v{N}.py (JSON → Markdown); released versions frozen
+│   ├── audit/                  ✅ checks.py (deterministic auditor checks, pure), loader.py (audit inputs from records)
+│   ├── replay/                 ✅ canonical/ (one frozen module per profile), digest.py, artifact_store.py, events_digest.py (qc-events-v1), finalize.py (finalize_run + manifest), report_replay.py, experiment_replay.py, comparison.py (drift CI + environment classes)
+│   ├── reports/                ✅ inputs.py (records → ReportInputs), builders/v1.py (report-builder@1), renderers/md_v1.py (report-md@1), registry.py, provenance.py (unlabeled-number scan), interim.py + optimization.py (frozen interim builders of earlier runs)
+│   ├── plans/diff.py           ✅ structural plan diff + metric deltas
 │   ├── events/                 emitter.py (insert + NOTIFY in txn), types.py
 │   ├── jobs/                   queue.py (claim/lease/heartbeat), handlers.py
 │   └── worker/__main__.py      worker entrypoint (separate or embedded)

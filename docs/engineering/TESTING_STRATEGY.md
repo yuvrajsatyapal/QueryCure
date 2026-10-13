@@ -53,6 +53,10 @@ Coverage target: ≥ 85% lines on `sql`, `plans`, `benchmark`, `replay`, `eviden
 - **Sandbox:** template build, clone, drop; failure cleanup leaves no `qc_clone_*` databases.
 - **LangGraph:** full graph with a **fake chat model** returning scripted structured outputs; interrupt/resume across process restart (kill worker after checkpoint N, restart, assert completion and no duplicate `benchmark_runs`).
 
+### Implemented in Phase 4
+- `test_finalize.py` (fault injection after each of the five steps of `finalize_run`, idempotent re-run, gap abort, sealing, manifest without self-reference, byte-identical rebuild, dead-letter partial report, approval sweep), `test_report_replay.py` (every §8.1 code reached from a fixture, LLM transports patched to fail), `test_experiment_replay.py` (real API + worker handler + sandbox; same seed, new samples, source seal unchanged, reclaimed job, dead letter, cancel), `test_benchmark_auditor.py` (scripted reviews in the real graph; a cited downgrade lands as `inconclusive` only), `test_verification_schema.py` (grants, downgrade-only CHECK), `test_reinvestigation.py`; unit `audit/test_checks.py` (fixture-derived blocks), `reports/test_report_v1.py` (unlabeled-number scan over nine report shapes, byte-identical rebuild), `replay/test_comparison.py` (each §9.1 row), `plans/test_diff.py`. Frontend: `report.test.tsx`; Playwright `phase4-lifecycle.spec.ts` (workspace → approval → experiment → audit → report → report replay → experiment replay).
+- **Eval replay of live-measurement prompts (ADR-0022 §10):** exact prompt matching everywhere, except a same-agent fallback for prompts that embed new sandbox measurements (auditor, Optimization Engineer rounds ≥ 2). A run that then takes a path the recording lacks is reported `DIVERGED` (never a pass). Mode C cases are scored when recorded; the replay still checks every deterministic prompt before the first live one.
+
 ## 4. Security tests
 
 One file per control in `tests/security/`. Each asserts the control blocks the attack **and** that the layer below would also block it (defense in depth).

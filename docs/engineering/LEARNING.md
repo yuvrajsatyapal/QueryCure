@@ -158,7 +158,22 @@ An experiment from approval to verdict: sandbox clone, DDL, warm-up, interleaved
 | **Content addressing & canonicalization** | Integrity and dedupe; hashes are only meaningful with canonical bytes | `replay/artifact_store.py` |
 | **Provenance & lineage** | Every number must trace back to its source | `evidence/lineage.py` |
 | **Deterministic authority over LLMs** | LLMs can downgrade, never upgrade verdicts | `benchmark/rules.py` + Auditor |
-| **Pure functions for rendering** | Enables zero-LLM replay and snapshot tests | `reports/renderer.py` |
+| **Pure functions for rendering** | Enables zero-LLM replay and snapshot tests | `reports/builders/v1.py`, `reports/renderers/md_v1.py` |
+| **Atomic sealing with a one-directional hash chain** | A report must not depend on its own manifest | `replay/finalize.py`, `replay/events_digest.py` |
+| **Defense in depth for authority** | Code bugs should not be able to upgrade a verdict | `verification_results` CHECK + `domain/audit.audited` |
+| **Equivalence testing vs "no difference found"** | Overlapping CIs do not prove reproduction | `replay/comparison.py` (drift CI inside [1/m, m]) |
+| **Tree alignment** | Matching plan nodes to explain a speed-up | `plans/diff.py` (weighted LCS over children) |
+| **Record/replay testing of non-deterministic systems** | Live measurements change prompts and control flow | `evals/recording.py` (`DIVERGED`) |
+
+### Important implementation details (as built)
+- `finalize_run` writes `run.concluded` *inside* the seal so the builder never reads graph state; it runs in the caller's transaction, and a fault after any step leaves nothing (`test_finalize.py` injects faults after each of five steps).
+- The auditor's strongest check re-scores persisted blocks with the experiment's own rules and demands identical verdicts and statistics: a stored result that disagrees with its samples cannot stay verified.
+- Report replay checks that stored bytes *are* canonical, not just that they re-canonicalize to the digest: canonicalization would otherwise hide whitespace edits.
+- Experiment replay keeps the seed (same interleaving schedule), scores with the source rules, and treats the measurement path as material.
+- A bootstrap seed stored in canonical JSON must fit ±(2^53 − 1): the first replay test failed on a 64-bit seed.
+
+### Modules to study
+`replay/finalize.py` → `reports/inputs.py` → `reports/builders/v1.py` → `replay/report_replay.py` → `audit/checks.py` → `agents/nodes/benchmark_auditor.py` → `replay/comparison.py` → `replay/experiment_replay.py` → `plans/diff.py` → `evals/recording.py`.
 
 ### Interview questions
 1. Your rewrite returns the same rows on 3 parameter sets. Is it equivalent? What would you say in the report?
