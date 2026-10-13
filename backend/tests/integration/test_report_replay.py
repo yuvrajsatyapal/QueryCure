@@ -331,6 +331,7 @@ async def test_other_users_get_404_for_reports_manifests_and_attempts(
             f"/api/v1/runs/{run_id}/report.json",
             f"/api/v1/runs/{run_id}/replay/manifest",
             f"/api/v1/runs/{run_id}/replay/attempts",
+            f"/api/v1/runs/{run_id}/verifications",
             f"/api/v1/replay-attempts/{attempt['id']}",
         ):
             assert (await other.get(path)).status_code == 404, path

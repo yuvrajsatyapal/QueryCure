@@ -21,6 +21,10 @@ export const EVENT_TYPES = [
   "approval.decided",
   "benchmark.progress",
   "verification.completed",
+  "run.concluded",
+  "report.ready",
+  "replay.status_changed",
+  "replay.compared",
 ] as const;
 
 export const TERMINAL = new Set(["completed", "failed", "cancelled"]);

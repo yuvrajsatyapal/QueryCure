@@ -119,6 +119,9 @@ async def test_experiment_replay_measures_anew_and_compares(
 ) -> None:
     run_id, experiment_id = await finalized_sandbox_run(api, app_engine, migrated_db, provisioner)
     source_report = (await api.get(f"/api/v1/runs/{run_id}/report")).json()
+    audits = (await api.get(f"/api/v1/runs/{run_id}/verifications")).json()["items"]
+    assert audits, "the auditor's verdicts are listed"
+    assert {c["name"] for c in audits[0]["checks"]} >= {"rescore", "approval", "plan_change"}
     source_samples = owner.execute(
         "SELECT count(*) FROM benchmark_runs WHERE experiment_id = %s", (experiment_id,)
     ).fetchone()

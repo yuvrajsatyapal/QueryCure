@@ -1561,6 +1561,22 @@
         "title": "ExperimentList",
         "type": "object"
       },
+      "ExperimentReplayRequest": {
+        "additionalProperties": false,
+        "description": "`confirm_ddl` is the human confirmation of the exact SQL shown in the dialog: it\ncreates the sandbox approval for the replay run (AGENT_SYSTEM \u00a78).",
+        "properties": {
+          "confirm_ddl": {
+            "const": true,
+            "title": "Confirm Ddl",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "confirm_ddl"
+        ],
+        "title": "ExperimentReplayRequest",
+        "type": "object"
+      },
       "ExperimentResult": {
         "additionalProperties": false,
         "properties": {
@@ -2442,6 +2458,31 @@
         "title": "LlmChoice",
         "type": "object"
       },
+      "ManifestOut": {
+        "properties": {
+          "manifest": {
+            "additionalProperties": true,
+            "title": "Manifest",
+            "type": "object"
+          },
+          "manifest_sha256": {
+            "title": "Manifest Sha256",
+            "type": "string"
+          },
+          "run_id": {
+            "format": "uuid",
+            "title": "Run Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "run_id",
+          "manifest_sha256",
+          "manifest"
+        ],
+        "title": "ManifestOut",
+        "type": "object"
+      },
       "MeResponse": {
         "properties": {
           "features": {
@@ -2460,6 +2501,50 @@
           "features"
         ],
         "title": "MeResponse",
+        "type": "object"
+      },
+      "MetricDelta": {
+        "properties": {
+          "from_value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "From Value"
+          },
+          "ratio": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ratio"
+          },
+          "to_value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "To Value"
+          }
+        },
+        "required": [
+          "from_value",
+          "to_value",
+          "ratio"
+        ],
+        "title": "MetricDelta",
         "type": "object"
       },
       "ModelsResponse": {
@@ -2945,6 +3030,134 @@
         "title": "ParamSet",
         "type": "object"
       },
+      "PlanDiff": {
+        "properties": {
+          "nodes": {
+            "items": {
+              "$ref": "#/components/schemas/PlanNodeDiff"
+            },
+            "title": "Nodes",
+            "type": "array"
+          },
+          "summary": {
+            "$ref": "#/components/schemas/PlanDiffSummary"
+          }
+        },
+        "required": [
+          "summary",
+          "nodes"
+        ],
+        "title": "PlanDiff",
+        "type": "object"
+      },
+      "PlanDiffOut": {
+        "properties": {
+          "diff": {
+            "$ref": "#/components/schemas/PlanDiff"
+          },
+          "from_sha256": {
+            "title": "From Sha256",
+            "type": "string"
+          },
+          "run_id": {
+            "format": "uuid",
+            "title": "Run Id",
+            "type": "string"
+          },
+          "to_sha256": {
+            "title": "To Sha256",
+            "type": "string"
+          }
+        },
+        "required": [
+          "run_id",
+          "from_sha256",
+          "to_sha256",
+          "diff"
+        ],
+        "title": "PlanDiffOut",
+        "type": "object"
+      },
+      "PlanDiffSummary": {
+        "properties": {
+          "added": {
+            "title": "Added",
+            "type": "integer"
+          },
+          "added_node_types": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Added Node Types",
+            "type": "array"
+          },
+          "changed": {
+            "title": "Changed",
+            "type": "integer"
+          },
+          "execution_time_ms": {
+            "$ref": "#/components/schemas/MetricDelta"
+          },
+          "indexes_used_from": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Indexes Used From",
+            "type": "array"
+          },
+          "indexes_used_to": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Indexes Used To",
+            "type": "array"
+          },
+          "new_indexes_used": {
+            "items": {
+              "type": "string"
+            },
+            "title": "New Indexes Used",
+            "type": "array"
+          },
+          "planning_time_ms": {
+            "$ref": "#/components/schemas/MetricDelta"
+          },
+          "removed": {
+            "title": "Removed",
+            "type": "integer"
+          },
+          "removed_node_types": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Removed Node Types",
+            "type": "array"
+          },
+          "root_total_cost": {
+            "$ref": "#/components/schemas/MetricDelta"
+          },
+          "same": {
+            "title": "Same",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "same",
+          "changed",
+          "added",
+          "removed",
+          "added_node_types",
+          "removed_node_types",
+          "indexes_used_from",
+          "indexes_used_to",
+          "new_indexes_used",
+          "execution_time_ms",
+          "planning_time_ms",
+          "root_total_cost"
+        ],
+        "title": "PlanDiffSummary",
+        "type": "object"
+      },
       "PlanInspection": {
         "properties": {
           "artifact_sha256": {
@@ -3362,6 +3575,154 @@
         "title": "PlanNode",
         "type": "object"
       },
+      "PlanNodeDiff": {
+        "properties": {
+          "changes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Changes",
+            "type": "array"
+          },
+          "depth": {
+            "title": "Depth",
+            "type": "integer"
+          },
+          "from_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "From Id"
+          },
+          "from_locator": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "From Locator"
+          },
+          "index_from": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Index From"
+          },
+          "index_to": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Index To"
+          },
+          "metrics": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/MetricDelta"
+            },
+            "title": "Metrics",
+            "type": "object"
+          },
+          "node_type_from": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Node Type From"
+          },
+          "node_type_to": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Node Type To"
+          },
+          "relation": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Relation"
+          },
+          "status": {
+            "enum": [
+              "same",
+              "changed",
+              "added",
+              "removed"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "to_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "To Id"
+          },
+          "to_locator": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "To Locator"
+          }
+        },
+        "required": [
+          "status",
+          "from_id",
+          "to_id",
+          "from_locator",
+          "to_locator",
+          "node_type_from",
+          "node_type_to",
+          "relation",
+          "index_from",
+          "index_to",
+          "depth",
+          "changes",
+          "metrics"
+        ],
+        "title": "PlanNodeDiff",
+        "type": "object"
+      },
       "PlanTree": {
         "properties": {
           "analyzed": {
@@ -3588,6 +3949,187 @@
         "title": "Reason",
         "type": "object"
       },
+      "ReinvestigateRequest": {
+        "additionalProperties": false,
+        "description": "A new LLM run on the same inputs (REPLAY_ENGINE \u00a71 \"AI re-investigation\"). The flag is\nthe caller's explicit consent to new model calls: replays never make any.",
+        "properties": {
+          "confirm_new_llm_run": {
+            "const": true,
+            "title": "Confirm New Llm Run",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "confirm_new_llm_run"
+        ],
+        "title": "ReinvestigateRequest",
+        "type": "object"
+      },
+      "ReplayAttemptOut": {
+        "properties": {
+          "approval_request_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Approval Request Id"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "failure_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Failure Code"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "report",
+              "experiment"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "replay_experiment_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Replay Experiment Id"
+          },
+          "replay_run_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Replay Run Id"
+          },
+          "result": {
+            "additionalProperties": true,
+            "title": "Result",
+            "type": "object"
+          },
+          "source_experiment_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Experiment Id"
+          },
+          "source_run_id": {
+            "format": "uuid",
+            "title": "Source Run Id",
+            "type": "string"
+          },
+          "started_at": {
+            "format": "date-time",
+            "title": "Started At",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "status",
+          "failure_code",
+          "warnings",
+          "result",
+          "source_run_id",
+          "source_experiment_id",
+          "replay_run_id",
+          "replay_experiment_id",
+          "approval_request_id",
+          "started_at",
+          "finished_at",
+          "created_at"
+        ],
+        "title": "ReplayAttemptOut",
+        "type": "object"
+      },
+      "ReplayAttemptPage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ReplayAttemptOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "items",
+          "next_cursor"
+        ],
+        "title": "ReplayAttemptPage",
+        "type": "object"
+      },
       "ReplicationResult": {
         "additionalProperties": false,
         "properties": {
@@ -3720,6 +4262,96 @@
           "max_robust_cv"
         ],
         "title": "ReplicationVerdict",
+        "type": "object"
+      },
+      "ReportOut": {
+        "description": "The stored, digest-verified report JSON plus its version axes (REPLAY_ENGINE \u00a77).",
+        "properties": {
+          "builder_version": {
+            "title": "Builder Version",
+            "type": "string"
+          },
+          "final_status": {
+            "title": "Final Status",
+            "type": "string"
+          },
+          "manifest_sha256": {
+            "title": "Manifest Sha256",
+            "type": "string"
+          },
+          "md_renderer_version": {
+            "title": "Md Renderer Version",
+            "type": "string"
+          },
+          "outcome": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Outcome"
+          },
+          "report": {
+            "additionalProperties": true,
+            "title": "Report",
+            "type": "object"
+          },
+          "report_json_sha256": {
+            "title": "Report Json Sha256",
+            "type": "string"
+          },
+          "report_md_sha256": {
+            "title": "Report Md Sha256",
+            "type": "string"
+          },
+          "report_schema_version": {
+            "title": "Report Schema Version",
+            "type": "integer"
+          },
+          "run_id": {
+            "format": "uuid",
+            "title": "Run Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "run_id",
+          "final_status",
+          "outcome",
+          "report_schema_version",
+          "builder_version",
+          "md_renderer_version",
+          "report_json_sha256",
+          "report_md_sha256",
+          "manifest_sha256",
+          "report"
+        ],
+        "title": "ReportOut",
+        "type": "object"
+      },
+      "ReportReplayRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "client_schema_versions": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "maxItems": 20,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Client Schema Versions"
+          }
+        },
+        "title": "ReportReplayRequest",
         "type": "object"
       },
       "RuleVerdict": {
@@ -4645,6 +5277,124 @@
         "title": "ValidationError",
         "type": "object"
       },
+      "VerificationList": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/VerificationOut"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "VerificationList",
+        "type": "object"
+      },
+      "VerificationOut": {
+        "description": "One audited verdict (verification_results): the engine verdict, the audited verdict\n(equal, or inconclusive after a downgrade), the deterministic checks and the review.",
+        "properties": {
+          "auditor_concerns": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Auditor Concerns",
+            "type": "array"
+          },
+          "auditor_downgraded": {
+            "title": "Auditor Downgraded",
+            "type": "boolean"
+          },
+          "auditor_notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Auditor Notes"
+          },
+          "auditor_prompt_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Auditor Prompt Version"
+          },
+          "auditor_status": {
+            "title": "Auditor Status",
+            "type": "string"
+          },
+          "candidate_id": {
+            "format": "uuid",
+            "title": "Candidate Id",
+            "type": "string"
+          },
+          "candidate_key": {
+            "title": "Candidate Key",
+            "type": "string"
+          },
+          "checks": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Checks",
+            "type": "array"
+          },
+          "engine_verdict": {
+            "title": "Engine Verdict",
+            "type": "string"
+          },
+          "experiment_id": {
+            "format": "uuid",
+            "title": "Experiment Id",
+            "type": "string"
+          },
+          "reasons": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Reasons",
+            "type": "array"
+          },
+          "round": {
+            "title": "Round",
+            "type": "integer"
+          },
+          "verdict": {
+            "title": "Verdict",
+            "type": "string"
+          }
+        },
+        "required": [
+          "experiment_id",
+          "candidate_id",
+          "candidate_key",
+          "round",
+          "engine_verdict",
+          "verdict",
+          "reasons",
+          "checks",
+          "auditor_status",
+          "auditor_notes",
+          "auditor_concerns",
+          "auditor_prompt_version",
+          "auditor_downgraded"
+        ],
+        "title": "VerificationOut",
+        "type": "object"
+      },
       "WorkloadCatalog": {
         "properties": {
           "items": {
@@ -5118,6 +5868,60 @@
         ]
       }
     },
+    "/api/v1/experiments/{experiment_id}/replay": {
+      "post": {
+        "description": "`confirm_ddl` is the user's confirmation of the exact SQL: it becomes the replay run's\napproval. A failed precondition is recorded as a `not_replayable` attempt and answered 422\nwith `details.code` and `details.replay_attempt_id` (no run is created).",
+        "operationId": "replay_experiment_api_v1_experiments__experiment_id__replay_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "experiment_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Experiment Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExperimentReplayRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReplayAttemptOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Replay Experiment",
+        "tags": [
+          "reports"
+        ]
+      }
+    },
     "/api/v1/healthz": {
       "get": {
         "description": "Liveness only: the process is up.",
@@ -5497,6 +6301,76 @@
         ]
       }
     },
+    "/api/v1/investigations/{investigation_id}/reinvestigate": {
+      "post": {
+        "description": "New `reinvestigation` run on the same inputs, with its own budget and provenance and a\nlink to the run it re-investigates. The conclusion diff is Post-MVP (REPLAY_ENGINE \u00a710).",
+        "operationId": "reinvestigate_api_v1_investigations__investigation_id__reinvestigate_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "investigation_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Investigation Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "idempotency-key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReinvestigateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreateInvestigationResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Reinvestigate",
+        "tags": [
+          "investigations"
+        ]
+      }
+    },
     "/api/v1/investigations/{investigation_id}/restore": {
       "post": {
         "operationId": "restore_investigation_api_v1_investigations__investigation_id__restore_post",
@@ -5580,6 +6454,92 @@
         "summary": "Readyz",
         "tags": [
           "health"
+        ]
+      }
+    },
+    "/api/v1/replay-attempts/{attempt_id}": {
+      "get": {
+        "operationId": "replay_attempt_api_v1_replay_attempts__attempt_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "attempt_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Attempt Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReplayAttemptOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Replay Attempt",
+        "tags": [
+          "reports"
+        ]
+      }
+    },
+    "/api/v1/replay-attempts/{attempt_id}/cancel": {
+      "post": {
+        "operationId": "cancel_replay_api_v1_replay_attempts__attempt_id__cancel_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "attempt_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Attempt Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReplayAttemptOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Cancel Replay",
+        "tags": [
+          "reports"
         ]
       }
     },
@@ -6078,6 +7038,416 @@
         "summary": "Run Plans",
         "tags": [
           "runs"
+        ]
+      }
+    },
+    "/api/v1/runs/{run_id}/plans/diff": {
+      "get": {
+        "description": "Both plans must be plan artifacts of this run (uploaded, live EXPLAIN or experiment).",
+        "operationId": "plan_diff_api_v1_runs__run_id__plans_diff_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Run Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "from",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{64}$",
+              "title": "From",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "to",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{64}$",
+              "title": "To",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlanDiffOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Plan Diff",
+        "tags": [
+          "reports"
+        ]
+      }
+    },
+    "/api/v1/runs/{run_id}/replay/attempts": {
+      "get": {
+        "operationId": "run_replay_attempts_api_v1_runs__run_id__replay_attempts_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Run Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReplayAttemptPage"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Run Replay Attempts",
+        "tags": [
+          "reports"
+        ]
+      }
+    },
+    "/api/v1/runs/{run_id}/replay/manifest": {
+      "get": {
+        "operationId": "run_manifest_api_v1_runs__run_id__replay_manifest_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Run Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ManifestOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Run Manifest",
+        "tags": [
+          "reports"
+        ]
+      }
+    },
+    "/api/v1/runs/{run_id}/replay/report": {
+      "post": {
+        "description": "Synchronous verification; the attempt row records the result (REPLAY_ENGINE \u00a78.1).",
+        "operationId": "replay_report_api_v1_runs__run_id__replay_report_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Run Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/ReportReplayRequest"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReplayAttemptOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Replay Report",
+        "tags": [
+          "reports"
+        ]
+      }
+    },
+    "/api/v1/runs/{run_id}/report": {
+      "get": {
+        "operationId": "run_report_api_v1_runs__run_id__report_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Run Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReportOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Run Report",
+        "tags": [
+          "reports"
+        ]
+      }
+    },
+    "/api/v1/runs/{run_id}/report.json": {
+      "get": {
+        "description": "`report` is the stored report JSON; `export` carries the manifest digest.",
+        "operationId": "run_report_json_api_v1_runs__run_id__report_json_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Run Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Run Report Json",
+        "tags": [
+          "reports"
+        ]
+      }
+    },
+    "/api/v1/runs/{run_id}/report.md": {
+      "get": {
+        "description": "Stored Markdown plus an export footer (manifest digest, run ID, how to verify).",
+        "operationId": "run_report_markdown_api_v1_runs__run_id__report_md_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Run Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Run Report Markdown",
+        "tags": [
+          "reports"
+        ]
+      }
+    },
+    "/api/v1/runs/{run_id}/verifications": {
+      "get": {
+        "description": "The Benchmark Auditor's verdicts for this run, in round and candidate order.",
+        "operationId": "run_verifications_api_v1_runs__run_id__verifications_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Run Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VerificationList"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Run Verifications",
+        "tags": [
+          "reports"
         ]
       }
     },

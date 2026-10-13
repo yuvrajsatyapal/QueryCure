@@ -1,6 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import Link from "next/link";
 import { useState } from "react";
 import { ErrorNotice } from "@/components/common/ErrorNotice";
 import { NodeDetails } from "@/components/plan/NodeDetails";
@@ -17,6 +18,7 @@ import {
 } from "@/lib/api/investigations";
 import { getApprovals, getCandidates, getExperiments, optimizationKeys } from "@/lib/api/optimization";
 import type { EvidenceDetail } from "@/lib/api/types";
+import { ReportPanel } from "@/components/report/ReportPanel";
 import { ApprovalCard } from "@/components/tournament/ApprovalCard";
 import { TournamentPanel } from "@/components/tournament/TournamentPanel";
 import { useRunEvents } from "@/lib/events/useRunEvents";
@@ -24,7 +26,7 @@ import { BudgetMeter } from "./BudgetMeter";
 import { FindingsPanel } from "./FindingsPanel";
 import { Timeline } from "./Timeline";
 
-type Tab = "plan" | "findings" | "tournament";
+type Tab = "plan" | "findings" | "tournament" | "report";
 const ACTIVE = new Set(["queued", "running", "awaiting_approval", "cancelling"]);
 const tabClass = (active: boolean) =>
   `rounded-md px-3 py-1.5 text-sm ${active ? "bg-accent-tint font-medium text-ink" : "text-muted hover:text-ink"}`;
@@ -98,6 +100,9 @@ export function InvestigationView({ id }: { id: string }) {
               Tournament
             </button>
           ) : null}
+          <button role="tab" aria-selected={tab === "report"} className={tabClass(tab === "report")} onClick={() => setTab("report")}>
+            Report
+          </button>
         </div>
         {pending && runId && r?.status === "awaiting_approval" ? <ApprovalCard key={pending.id} approval={pending} runId={runId} /> : null}
         {evidence ? (
@@ -108,8 +113,17 @@ export function InvestigationView({ id }: { id: string }) {
             <p>{evidence.evidence.summary}</p>
           </aside>
         ) : null}
-        {tab === "tournament" ? (
-          <TournamentPanel experiments={experiments.data?.items ?? []} candidates={candidates.data?.items ?? []} />
+        {tab === "report" && runId ? (
+          <ReportPanel
+            runId={runId}
+            onPlanNode={(sha, node) => {
+              setPlanSha(sha);
+              setSelected(node);
+              setTab("plan");
+            }}
+          />
+        ) : tab === "tournament" ? (
+          <TournamentPanel experiments={experiments.data?.items ?? []} candidates={candidates.data?.items ?? []} runId={runId ?? undefined} />
         ) : tab === "findings" ? (
           <FindingsPanel data={findings.data} onEvidence={(e) => void openEvidence(e)} activeEvidence={evidence?.evidence.id ?? null} />
         ) : currentPlan ? (
@@ -151,6 +165,11 @@ export function InvestigationView({ id }: { id: string }) {
           ) : null}
         </div>
         {r?.errorCode ? <p className="text-sm text-rejected">Stopped: {r.errorCode}</p> : null}
+        {r && !ACTIVE.has(r.status) ? (
+          <Link href={`/app/replay/${r.id}`} className="text-sm text-link">
+            Reproducibility & replay
+          </Link>
+        ) : null}
         <ErrorNotice error={cancel.error} />
         {r ? <BudgetMeter run={r} /> : null}
         <Timeline events={events} live={live} />

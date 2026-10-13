@@ -144,6 +144,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/experiments/{experiment_id}/replay": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Replay Experiment
+         * @description `confirm_ddl` is the user's confirmation of the exact SQL: it becomes the replay run's
+         *     approval. A failed precondition is recorded as a `not_replayable` attempt and answered 422
+         *     with `details.code` and `details.replay_attempt_id` (no run is created).
+         */
+        post: operations["replay_experiment_api_v1_experiments__experiment_id__replay_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/healthz": {
         parameters: {
             query?: never;
@@ -251,6 +273,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/investigations/{investigation_id}/reinvestigate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reinvestigate
+         * @description New `reinvestigation` run on the same inputs, with its own budget and provenance and a
+         *     link to the run it re-investigates. The conclusion diff is Post-MVP (REPLAY_ENGINE §10).
+         */
+        post: operations["reinvestigate_api_v1_investigations__investigation_id__reinvestigate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/investigations/{investigation_id}/restore": {
         parameters: {
             query?: never;
@@ -299,6 +342,40 @@ export interface paths {
         get: operations["readyz_api_v1_readyz_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/replay-attempts/{attempt_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Replay Attempt */
+        get: operations["replay_attempt_api_v1_replay_attempts__attempt_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/replay-attempts/{attempt_id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Cancel Replay */
+        post: operations["cancel_replay_api_v1_replay_attempts__attempt_id__cancel_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -471,6 +548,157 @@ export interface paths {
         };
         /** Run Plans */
         get: operations["run_plans_api_v1_runs__run_id__plans_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/runs/{run_id}/plans/diff": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Plan Diff
+         * @description Both plans must be plan artifacts of this run (uploaded, live EXPLAIN or experiment).
+         */
+        get: operations["plan_diff_api_v1_runs__run_id__plans_diff_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/runs/{run_id}/replay/attempts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Run Replay Attempts */
+        get: operations["run_replay_attempts_api_v1_runs__run_id__replay_attempts_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/runs/{run_id}/replay/manifest": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Run Manifest */
+        get: operations["run_manifest_api_v1_runs__run_id__replay_manifest_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/runs/{run_id}/replay/report": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Replay Report
+         * @description Synchronous verification; the attempt row records the result (REPLAY_ENGINE §8.1).
+         */
+        post: operations["replay_report_api_v1_runs__run_id__replay_report_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/runs/{run_id}/report": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Run Report */
+        get: operations["run_report_api_v1_runs__run_id__report_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/runs/{run_id}/report.json": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Run Report Json
+         * @description `report` is the stored report JSON; `export` carries the manifest digest.
+         */
+        get: operations["run_report_json_api_v1_runs__run_id__report_json_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/runs/{run_id}/report.md": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Run Report Markdown
+         * @description Stored Markdown plus an export footer (manifest digest, run ID, how to verify).
+         */
+        get: operations["run_report_markdown_api_v1_runs__run_id__report_md_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/runs/{run_id}/verifications": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Run Verifications
+         * @description The Benchmark Auditor's verdicts for this run, in round and candidate order.
+         */
+        get: operations["run_verifications_api_v1_runs__run_id__verifications_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1055,6 +1283,18 @@ export interface components {
             /** Items */
             items: components["schemas"]["ExperimentSummary"][];
         };
+        /**
+         * ExperimentReplayRequest
+         * @description `confirm_ddl` is the human confirmation of the exact SQL shown in the dialog: it
+         *     creates the sandbox approval for the replay run (AGENT_SYSTEM §8).
+         */
+        ExperimentReplayRequest: {
+            /**
+             * Confirm Ddl
+             * @constant
+             */
+            confirm_ddl: true;
+        };
         /** ExperimentResult */
         ExperimentResult: {
             /** Builds */
@@ -1348,11 +1588,34 @@ export interface components {
             /** Model */
             model?: string | null;
         };
+        /** ManifestOut */
+        ManifestOut: {
+            /** Manifest */
+            manifest: {
+                [key: string]: unknown;
+            };
+            /** Manifest Sha256 */
+            manifest_sha256: string;
+            /**
+             * Run Id
+             * Format: uuid
+             */
+            run_id: string;
+        };
         /** MeResponse */
         MeResponse: {
             features: components["schemas"]["Features"];
             profile: components["schemas"]["Profile"];
             user: components["schemas"]["UserOut"];
+        };
+        /** MetricDelta */
+        MetricDelta: {
+            /** From Value */
+            from_value: number | null;
+            /** Ratio */
+            ratio: number | null;
+            /** To Value */
+            to_value: number | null;
         };
         /** ModelsResponse */
         ModelsResponse: {
@@ -1495,6 +1758,49 @@ export interface components {
             /** Values */
             values: unknown[];
         };
+        /** PlanDiff */
+        PlanDiff: {
+            /** Nodes */
+            nodes: components["schemas"]["PlanNodeDiff"][];
+            summary: components["schemas"]["PlanDiffSummary"];
+        };
+        /** PlanDiffOut */
+        PlanDiffOut: {
+            diff: components["schemas"]["PlanDiff"];
+            /** From Sha256 */
+            from_sha256: string;
+            /**
+             * Run Id
+             * Format: uuid
+             */
+            run_id: string;
+            /** To Sha256 */
+            to_sha256: string;
+        };
+        /** PlanDiffSummary */
+        PlanDiffSummary: {
+            /** Added */
+            added: number;
+            /** Added Node Types */
+            added_node_types: string[];
+            /** Changed */
+            changed: number;
+            execution_time_ms: components["schemas"]["MetricDelta"];
+            /** Indexes Used From */
+            indexes_used_from: string[];
+            /** Indexes Used To */
+            indexes_used_to: string[];
+            /** New Indexes Used */
+            new_indexes_used: string[];
+            planning_time_ms: components["schemas"]["MetricDelta"];
+            /** Removed */
+            removed: number;
+            /** Removed Node Types */
+            removed_node_types: string[];
+            root_total_cost: components["schemas"]["MetricDelta"];
+            /** Same */
+            same: number;
+        };
         /** PlanInspection */
         PlanInspection: {
             /** Artifact Sha256 */
@@ -1585,6 +1891,40 @@ export interface components {
             /** Workers Planned */
             workers_planned?: number | null;
         };
+        /** PlanNodeDiff */
+        PlanNodeDiff: {
+            /** Changes */
+            changes: string[];
+            /** Depth */
+            depth: number;
+            /** From Id */
+            from_id: number | null;
+            /** From Locator */
+            from_locator: string | null;
+            /** Index From */
+            index_from: string | null;
+            /** Index To */
+            index_to: string | null;
+            /** Metrics */
+            metrics: {
+                [key: string]: components["schemas"]["MetricDelta"];
+            };
+            /** Node Type From */
+            node_type_from: string | null;
+            /** Node Type To */
+            node_type_to: string | null;
+            /** Relation */
+            relation: string | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "same" | "changed" | "added" | "removed";
+            /** To Id */
+            to_id: number | null;
+            /** To Locator */
+            to_locator: string | null;
+        };
         /** PlanTree */
         PlanTree: {
             /** Analyzed */
@@ -1662,6 +2002,73 @@ export interface components {
              */
             detail: string;
         };
+        /**
+         * ReinvestigateRequest
+         * @description A new LLM run on the same inputs (REPLAY_ENGINE §1 "AI re-investigation"). The flag is
+         *     the caller's explicit consent to new model calls: replays never make any.
+         */
+        ReinvestigateRequest: {
+            /**
+             * Confirm New Llm Run
+             * @constant
+             */
+            confirm_new_llm_run: true;
+        };
+        /** ReplayAttemptOut */
+        ReplayAttemptOut: {
+            /** Approval Request Id */
+            approval_request_id: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Failure Code */
+            failure_code: string | null;
+            /** Finished At */
+            finished_at: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "report" | "experiment";
+            /** Replay Experiment Id */
+            replay_experiment_id: string | null;
+            /** Replay Run Id */
+            replay_run_id: string | null;
+            /** Result */
+            result: {
+                [key: string]: unknown;
+            };
+            /** Source Experiment Id */
+            source_experiment_id: string | null;
+            /**
+             * Source Run Id
+             * Format: uuid
+             */
+            source_run_id: string;
+            /**
+             * Started At
+             * Format: date-time
+             */
+            started_at: string;
+            /** Status */
+            status: string;
+            /** Warnings */
+            warnings: string[];
+        };
+        /** ReplayAttemptPage */
+        ReplayAttemptPage: {
+            /** Items */
+            items: components["schemas"]["ReplayAttemptOut"][];
+            /** Next Cursor */
+            next_cursor: string | null;
+        };
         /** ReplicationResult */
         ReplicationResult: {
             /**
@@ -1711,6 +2118,42 @@ export interface components {
              * @enum {string}
              */
             verdict: "verified" | "verified_with_noise_warning" | "inconclusive";
+        };
+        /**
+         * ReportOut
+         * @description The stored, digest-verified report JSON plus its version axes (REPLAY_ENGINE §7).
+         */
+        ReportOut: {
+            /** Builder Version */
+            builder_version: string;
+            /** Final Status */
+            final_status: string;
+            /** Manifest Sha256 */
+            manifest_sha256: string;
+            /** Md Renderer Version */
+            md_renderer_version: string;
+            /** Outcome */
+            outcome: string | null;
+            /** Report */
+            report: {
+                [key: string]: unknown;
+            };
+            /** Report Json Sha256 */
+            report_json_sha256: string;
+            /** Report Md Sha256 */
+            report_md_sha256: string;
+            /** Report Schema Version */
+            report_schema_version: number;
+            /**
+             * Run Id
+             * Format: uuid
+             */
+            run_id: string;
+        };
+        /** ReportReplayRequest */
+        ReportReplayRequest: {
+            /** Client Schema Versions */
+            client_schema_versions?: number[] | null;
         };
         /** RuleVerdict */
         RuleVerdict: {
@@ -2022,6 +2465,56 @@ export interface components {
             msg: string;
             /** Error Type */
             type: string;
+        };
+        /** VerificationList */
+        VerificationList: {
+            /** Items */
+            items: components["schemas"]["VerificationOut"][];
+        };
+        /**
+         * VerificationOut
+         * @description One audited verdict (verification_results): the engine verdict, the audited verdict
+         *     (equal, or inconclusive after a downgrade), the deterministic checks and the review.
+         */
+        VerificationOut: {
+            /** Auditor Concerns */
+            auditor_concerns: {
+                [key: string]: unknown;
+            }[];
+            /** Auditor Downgraded */
+            auditor_downgraded: boolean;
+            /** Auditor Notes */
+            auditor_notes: string | null;
+            /** Auditor Prompt Version */
+            auditor_prompt_version: string | null;
+            /** Auditor Status */
+            auditor_status: string;
+            /**
+             * Candidate Id
+             * Format: uuid
+             */
+            candidate_id: string;
+            /** Candidate Key */
+            candidate_key: string;
+            /** Checks */
+            checks: {
+                [key: string]: unknown;
+            }[];
+            /** Engine Verdict */
+            engine_verdict: string;
+            /**
+             * Experiment Id
+             * Format: uuid
+             */
+            experiment_id: string;
+            /** Reasons */
+            reasons: {
+                [key: string]: unknown;
+            }[];
+            /** Round */
+            round: number;
+            /** Verdict */
+            verdict: string;
         };
         /** WorkloadCatalog */
         WorkloadCatalog: {
@@ -2339,6 +2832,41 @@ export interface operations {
             };
         };
     };
+    replay_experiment_api_v1_experiments__experiment_id__replay_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                experiment_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExperimentReplayRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReplayAttemptOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     healthz_api_v1_healthz_get: {
         parameters: {
             query?: never;
@@ -2579,6 +3107,43 @@ export interface operations {
             };
         };
     };
+    reinvestigate_api_v1_investigations__investigation_id__reinvestigate_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "idempotency-key"?: string | null;
+            };
+            path: {
+                investigation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReinvestigateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CreateInvestigationResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     restore_investigation_api_v1_investigations__investigation_id__restore_post: {
         parameters: {
             query?: never;
@@ -2646,6 +3211,68 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ReadinessResponse"];
+                };
+            };
+        };
+    };
+    replay_attempt_api_v1_replay_attempts__attempt_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                attempt_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReplayAttemptOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    cancel_replay_api_v1_replay_attempts__attempt_id__cancel_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                attempt_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReplayAttemptOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -2955,6 +3582,264 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RunPlanList"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    plan_diff_api_v1_runs__run_id__plans_diff_get: {
+        parameters: {
+            query: {
+                from: string;
+                to: string;
+            };
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlanDiffOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    run_replay_attempts_api_v1_runs__run_id__replay_attempts_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                cursor?: string | null;
+            };
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReplayAttemptPage"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    run_manifest_api_v1_runs__run_id__replay_manifest_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ManifestOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    replay_report_api_v1_runs__run_id__replay_report_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["ReportReplayRequest"] | null;
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReplayAttemptOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    run_report_api_v1_runs__run_id__report_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    run_report_json_api_v1_runs__run_id__report_json_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    run_report_markdown_api_v1_runs__run_id__report_md_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    run_verifications_api_v1_runs__run_id__verifications_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VerificationList"];
                 };
             };
             /** @description Validation Error */

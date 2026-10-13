@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { API_BASE_URL } from "@/lib/api/client";
 import { investigationKeys } from "@/lib/api/investigations";
 import { optimizationKeys } from "@/lib/api/optimization";
+import { reportKeys } from "@/lib/api/reports";
 import type { RunEvent } from "@/lib/api/types";
 import { EVENT_TYPES, isTerminal, mergeEvents, parseEvent } from "./runEvents";
 
@@ -59,6 +60,12 @@ export function useRunEvents(runId: string | null): { events: RunEvent[]; live: 
         void client.invalidateQueries({ queryKey: optimizationKeys.candidates(runId) });
         void client.invalidateQueries({ queryKey: ["experiments"] });
       }
+      if (event.type === "verification.completed") {
+        void client.invalidateQueries({ queryKey: reportKeys.verifications(runId) });
+      }
+      if (event.type === "replay.status_changed" || event.type === "replay.compared") {
+        void client.invalidateQueries({ queryKey: ["replay-attempts"] });
+      }
       if (event.type === "evidence.created") {
         void client.invalidateQueries({ queryKey: investigationKeys.plans(runId) });
       }
@@ -69,6 +76,8 @@ export function useRunEvents(runId: string | null): { events: RunEvent[]; live: 
         void client.invalidateQueries({ queryKey: investigationKeys.findings(runId) });
         void client.invalidateQueries({ queryKey: optimizationKeys.experiments(runId) });
         void client.invalidateQueries({ queryKey: ["experiments"] });
+        void client.invalidateQueries({ queryKey: reportKeys.report(runId) });
+        void client.invalidateQueries({ queryKey: reportKeys.verifications(runId) });
       }
     };
     source.onopen = () => setLive(true);

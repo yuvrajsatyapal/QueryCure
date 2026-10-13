@@ -76,3 +76,13 @@ export type CreateConnectionInput = {
   sslmode: "disable" | "require" | "verify-ca" | "verify-full";
   environment: "development" | "staging" | "production";
 };
+
+export type ReportOut = Camel<"ReportOut">;
+export type ManifestOut = Camel<"ManifestOut">;
+export type ReplayAttempt = Camel<"ReplayAttemptOut">;
+export type ReplayAttemptPage = Camel<"ReplayAttemptPage">;
+export type PlanDiffOut = Camel<"PlanDiffOut">;
+export type PlanDiff = Camel<"PlanDiff">;
+export type PlanNodeDiff = Camel<"PlanNodeDiff">;
+export type Verification = Camel<"VerificationOut">;
+export type VerificationList = Camel<"VerificationList">;

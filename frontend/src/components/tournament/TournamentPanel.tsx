@@ -2,7 +2,11 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
+import { AuditSummary } from "@/components/report/ReportView";
+import { PlanDiffView } from "@/components/plan/PlanDiffView";
 import { getExperiment, optimizationKeys } from "@/lib/api/optimization";
+import { getVerifications, reportKeys } from "@/lib/api/reports";
+import type { CandidateAudit } from "@/lib/report/types";
 import type { ExperimentDetail, ExperimentSummary, OptimizationCandidate, SpeedupStats } from "@/lib/api/types";
 import { formatMs } from "@/lib/format";
 import { VerdictBadge } from "./VerdictBadge";
@@ -90,7 +94,66 @@ function ReplicationNote({ replication }: { replication: Replication }) {
   );
 }
 
-export function ExperimentView({ detail, candidates }: { detail: ExperimentDetail; candidates: OptimizationCandidate[] }) {
+/** Benchmark Auditor verdicts for one experiment (downgrade-only, ADR-0009). */
+function AuditList({ runId, experimentId }: { runId: string; experimentId: string }) {
+  const audits = useQuery({ queryKey: reportKeys.verifications(runId), queryFn: ({ signal }) => getVerifications(runId, signal) });
+  const mine = (audits.data?.items ?? []).filter((v) => v.experimentId === experimentId);
+  if (mine.length === 0) return <p className="text-xs text-muted">Benchmark Auditor: not reviewed yet.</p>;
+  return (
+    <section aria-label="Benchmark Auditor" className="flex flex-col gap-2">
+      <h3 className="text-sm font-semibold">Benchmark Auditor</h3>
+      {mine.map((v) => {
+        const audit: CandidateAudit = {
+          arm: v.candidateKey,
+          engineVerdict: v.engineVerdict as CandidateAudit["engineVerdict"],
+          verdict: v.verdict as CandidateAudit["verdict"],
+          downgraded: v.auditorDowngraded,
+          auditorStatus: v.auditorStatus as CandidateAudit["auditorStatus"],
+          promptVersion: v.auditorPromptVersion,
+          notes: v.auditorNotes,
+          checks: v.checks as unknown as CandidateAudit["checks"],
+          concerns: v.auditorConcerns as unknown as CandidateAudit["concerns"],
+        };
+        return <AuditSummary key={v.candidateKey} audit={audit} />;
+      })}
+    </section>
+  );
+}
+
+/** Baseline vs candidate plan for one parameter set, from the post-timing EXPLAIN ANALYZE captures. */
+function PlanCompare({ runId, detail, arm }: { runId: string; detail: ExperimentDetail; arm: string }) {
+  const plans = detail.blocks.filter((b) => b.phase === "plan" && b.planSha256);
+  const sets = [...new Set(plans.filter((b) => b.arm === arm).map((b) => b.paramSet))];
+  const [ps, setPs] = useState<string | null>(null);
+  const chosen = ps ?? sets[0] ?? null;
+  const from = plans.find((b) => b.arm === "baseline" && b.paramSet === chosen)?.planSha256;
+  const to = plans.find((b) => b.arm === arm && b.paramSet === chosen)?.planSha256;
+  if (!chosen || !from || !to) return null;
+  return (
+    <section aria-label="Plan diff" className="flex flex-col gap-2">
+      <div className="flex flex-wrap items-center gap-2">
+        <h3 className="text-sm font-semibold">Plan diff · baseline → {arm}</h3>
+        {sets.map((s) => (
+          <button key={s} type="button" aria-pressed={s === chosen} onClick={() => setPs(s)}
+            className={`rounded-md px-2 py-0.5 font-mono text-xs ${s === chosen ? "bg-accent-tint" : "text-muted"}`}>
+            {s}
+          </button>
+        ))}
+      </div>
+      <PlanDiffView runId={runId} from={from} to={to} />
+    </section>
+  );
+}
+
+export function ExperimentView({
+  detail,
+  candidates,
+  runId,
+}: {
+  detail: ExperimentDetail;
+  candidates: OptimizationCandidate[];
+  runId?: string;
+}) {
   const result = detail.result;
   const [selected, setSelected] = useState<string | null>(null);
   if (!result) {
@@ -168,8 +231,10 @@ export function ExperimentView({ detail, candidates }: { detail: ExperimentDetai
             <p className="text-xs text-muted">{verdicts.get(active)?.reasons[0]?.detail}</p>
           ) : null}
           <Comparison stats={result.stats.filter((s) => s.arm === active)} />
+          {runId ? <PlanCompare runId={runId} detail={detail} arm={active} /> : null}
         </div>
       ) : null}
+      {runId ? <AuditList runId={runId} experimentId={detail.id} /> : null}
       <p className="text-xs text-muted">
         <span className="font-medium">Measured in the sandbox</span> ({detail.engineVersion}, {detail.rowProfile}
         {env ? `, PostgreSQL ${String(env.pgVersion ?? "?")}, ${String(env.cpuArch ?? "?")}` : ""}
@@ -180,7 +245,15 @@ export function ExperimentView({ detail, candidates }: { detail: ExperimentDetai
   );
 }
 
-export function TournamentPanel({ experiments, candidates }: { experiments: ExperimentSummary[]; candidates: OptimizationCandidate[] }) {
+export function TournamentPanel({
+  experiments,
+  candidates,
+  runId,
+}: {
+  experiments: ExperimentSummary[];
+  candidates: OptimizationCandidate[];
+  runId?: string;
+}) {
   // Replicates (ADR-0019) belong to their round's approved experiment, which shows them.
   const rounds = experiments.filter((e) => e.replicate === 0);
   const latest = rounds.at(-1) ?? null;
@@ -213,7 +286,7 @@ export function TournamentPanel({ experiments, candidates }: { experiments: Expe
         </div>
       ) : null}
       {detail.data ? (
-        <ExperimentView detail={detail.data} candidates={candidates} />
+        <ExperimentView detail={detail.data} candidates={candidates} runId={runId} />
       ) : (
         <ul className="flex flex-col gap-2">
           {candidates.map((c) => (

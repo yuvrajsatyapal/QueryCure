@@ -22,6 +22,8 @@ from querycure.api.schemas.replay import (
     ReplayAttemptPage,
     ReportOut,
     ReportReplayRequest,
+    VerificationList,
+    VerificationOut,
 )
 from querycure.core.errors import (
     BadRequestError,
@@ -42,6 +44,7 @@ from querycure.db.repositories.replay import (
     list_attempts,
 )
 from querycure.db.repositories.runs import get_run_for_user
+from querycure.db.repositories.verification import list_verifications
 from querycure.domain.budgets import CONCURRENT_RUNS_PER_USER
 from querycure.domain.users import User
 from querycure.plans.diff import diff_plans
@@ -331,3 +334,13 @@ async def cancel_replay(
     if row.kind == "experiment":
         row = await cancel_replay_attempt(conn, row)
     return attempt_out(row)
+
+
+@router.get("/runs/{run_id}/verifications")
+async def run_verifications(
+    run_id: uuid.UUID, conn: ConnDep, user: CurrentUser
+) -> VerificationList:
+    """The Benchmark Auditor's verdicts for this run, in round and candidate order."""
+    await owned_run(conn, user, run_id)
+    rows = await list_verifications(conn, run_id)
+    return VerificationList(items=[VerificationOut.model_validate(r.model_dump()) for r in rows])

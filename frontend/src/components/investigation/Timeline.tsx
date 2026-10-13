@@ -56,6 +56,14 @@ export function describe(event: RunEvent): { text: string; tone: "normal" | "mut
       const reasons = Array.isArray(p.reasons) && p.reasons.length ? ` (${str((p.reasons[0] as Payload).code)})` : "";
       return { text: `${str(p.candidateKey)}: ${str(p.verdict)}${reasons}`, tone: p.verdict === "rejected" ? "error" : "normal" };
     }
+    case "run.concluded":
+      return { text: `Concluded: ${str(p.finalStatus)}${p.outcome ? ` · ${str(p.outcome).replaceAll("_", " ")}` : ""}`, tone: "normal" };
+    case "report.ready":
+      return { text: "Final report sealed", tone: "normal" };
+    case "replay.status_changed":
+      return { text: `Replay ${str(p.to).replaceAll("_", " ")}${p.failureCode ? ` (${str(p.failureCode)})` : ""}`, tone: p.to === "failed" ? "error" : "normal" };
+    case "replay.compared":
+      return { text: `Replay compared: ${str(p.status).replaceAll("_", " ")} (${str(p.comparisonMode).replaceAll("_", " ")})`, tone: "normal" };
     case "error":
       return { text: `Error in ${str(p.node)}: ${str(p.code)} — ${str(p.message)}`, tone: "error" };
     default:

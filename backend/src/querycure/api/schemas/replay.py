@@ -73,3 +73,26 @@ class PlanDiffOut(BaseModel):
     from_sha256: str
     to_sha256: str
     diff: PlanDiff
+
+
+class VerificationOut(BaseModel):
+    """One audited verdict (verification_results): the engine verdict, the audited verdict
+    (equal, or inconclusive after a downgrade), the deterministic checks and the review."""
+
+    experiment_id: uuid.UUID
+    candidate_id: uuid.UUID
+    candidate_key: str
+    round: int
+    engine_verdict: str
+    verdict: str
+    reasons: list[dict[str, Any]]
+    checks: list[dict[str, Any]]
+    auditor_status: str
+    auditor_notes: str | None
+    auditor_concerns: list[dict[str, Any]]
+    auditor_prompt_version: str | None
+    auditor_downgraded: bool
+
+
+class VerificationList(BaseModel):
+    items: list[VerificationOut]
