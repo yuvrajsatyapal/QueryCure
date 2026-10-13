@@ -1,0 +1,178 @@
+
+== ('genuine_large', None, 1, False) n=50 (verdict mismatches vs stored: 0)
+  verdicts: {('verified', None): 47, ('inconclusive', 4): 3, 'eligible': 2}
+  median speedup 5.447; between-block log-ratio sd (5-sample blocks) median 0.088 p90 0.134
+  bench@2 verified:  94.0% [83.8, 97.9]
+    all_blocks>=1.0          keeps verified:  88.0% [76.2, 94.4]
+    all_blocks>=1.0@pool5    keeps verified:  94.0% [83.8, 97.9]
+    all_blocks>=min          keeps verified:  86.0% [73.8, 93.0]
+    all_blocks>=min@pool5    keeps verified:  94.0% [83.8, 97.9]
+    bench2                   keeps verified:  94.0% [83.8, 97.9]
+    bench2@pool5             keeps verified:  94.0% [83.8, 97.9]
+    blockboot>=1.0           keeps verified:  94.0% [83.8, 97.9]
+    blockboot>=1.0@pool5     keeps verified:  94.0% [83.8, 97.9]
+    blockboot>=min           keeps verified:  94.0% [83.8, 97.9]
+    blockboot>=min@pool5     keeps verified:  94.0% [83.8, 97.9]
+    paired_t>=1.0            keeps verified:  94.0% [83.8, 97.9]
+    paired_t>=1.0@pool5      keeps verified:  94.0% [83.8, 97.9]
+    paired_t>=min            keeps verified:  94.0% [83.8, 97.9]
+    paired_t>=min@pool5      keeps verified:  94.0% [83.8, 97.9]
+    sign_test                keeps verified:  94.0% [83.8, 97.9]
+    sign_test@pool5          keeps verified:  94.0% [83.8, 97.9]
+
+== ('genuine_large', None, 5, False) n=50 (verdict mismatches vs stored: 0)
+  verdicts: {('verified', None): 44, ('inconclusive', 4): 6, 'eligible': 6}
+  median speedup 5.838; between-block log-ratio sd (5-sample blocks) median 0.101 p90 0.260
+  order effect (first segment slower, log): +0.1334 ± 0.1994
+  bench@2 verified:  88.0% [76.2, 94.4]
+    all_blocks>=1.0          keeps verified:  88.0% [76.2, 94.4]
+    all_blocks>=min          keeps verified:  88.0% [76.2, 94.4]
+    bench2                   keeps verified:  88.0% [76.2, 94.4]
+    blockboot>=1.0           keeps verified:  88.0% [76.2, 94.4]
+    blockboot>=min           keeps verified:  88.0% [76.2, 94.4]
+    paired_t>=1.0            keeps verified:  88.0% [76.2, 94.4]
+    paired_t>=min            keeps verified:  88.0% [76.2, 94.4]
+    sign_test                keeps verified:  88.0% [76.2, 94.4]
+
+== ('genuine_moderate', 0.7, 1, False) n=150 (verdict mismatches vs stored: 0)
+  verdicts: {('inconclusive', 4): 1, ('verified', None): 141, ('inconclusive', 6): 8}
+  median speedup 1.180; between-block log-ratio sd (5-sample blocks) median 0.031 p90 0.057
+  bench@2 verified:  94.0% [89.0, 96.8]
+    all_blocks>=1.0          keeps verified:  37.3% [30.0, 45.3]
+    all_blocks>=1.0@pool5    keeps verified:  92.0% [86.5, 95.4]
+    all_blocks>=min          keeps verified:   0.7% [0.1, 3.7]
+    all_blocks>=min@pool5    keeps verified:  71.3% [63.6, 78.0]
+    bench2                   keeps verified:  94.0% [89.0, 96.8]
+    bench2@pool5             keeps verified:  94.0% [89.0, 96.8]
+    blockboot>=1.0           keeps verified:  94.0% [89.0, 96.8]
+    blockboot>=1.0@pool5     keeps verified:  94.0% [89.0, 96.8]
+    blockboot>=min           keeps verified:  93.3% [88.2, 96.3]
+    blockboot>=min@pool5     keeps verified:  93.3% [88.2, 96.3]
+    paired_t>=1.0            keeps verified:  93.3% [88.2, 96.3]
+    paired_t>=1.0@pool5      keeps verified:  94.0% [89.0, 96.8]
+    paired_t>=min            keeps verified:  82.0% [75.1, 87.3]
+    paired_t>=min@pool5      keeps verified:  87.3% [81.1, 91.7]
+    sign_test                keeps verified:  94.0% [89.0, 96.8]
+    sign_test@pool5          keeps verified:  92.0% [86.5, 95.4]
+
+== ('genuine_moderate', 0.7, 1, True) n=100 (verdict mismatches vs stored: 0)
+  verdicts: {('verified', None): 56, ('inconclusive', 6): 42, ('inconclusive', 4): 2}
+  median speedup 1.158; between-block log-ratio sd (5-sample blocks) median 0.047 p90 0.106
+  bench@2 verified:  56.0% [46.2, 65.3]
+    all_blocks>=1.0          keeps verified:  10.0% [5.5, 17.4]
+    all_blocks>=1.0@pool5    keeps verified:  54.0% [44.3, 63.4]
+    all_blocks>=min          keeps verified:   0.0% [0.0, 3.7]
+    all_blocks>=min@pool5    keeps verified:  33.0% [24.6, 42.7]
+    bench2                   keeps verified:  56.0% [46.2, 65.3]
+    bench2@pool5             keeps verified:  56.0% [46.2, 65.3]
+    blockboot>=1.0           keeps verified:  56.0% [46.2, 65.3]
+    blockboot>=1.0@pool5     keeps verified:  56.0% [46.2, 65.3]
+    blockboot>=min           keeps verified:  55.0% [45.2, 64.4]
+    blockboot>=min@pool5     keeps verified:  51.0% [41.3, 60.6]
+    paired_t>=1.0            keeps verified:  55.0% [45.2, 64.4]
+    paired_t>=1.0@pool5      keeps verified:  54.0% [44.3, 63.4]
+    paired_t>=min            keeps verified:  45.0% [35.6, 54.8]
+    paired_t>=min@pool5      keeps verified:  44.0% [34.7, 53.8]
+    sign_test                keeps verified:  56.0% [46.2, 65.3]
+    sign_test@pool5          keeps verified:  54.0% [44.3, 63.4]
+
+== ('genuine_moderate', 0.7, 5, False) n=150 (verdict mismatches vs stored: 0)
+  verdicts: {('verified', None): 122, ('inconclusive', 4): 10, ('inconclusive', 6): 18}
+  median speedup 1.176; between-block log-ratio sd (5-sample blocks) median 0.046 p90 0.166
+  order effect (first segment slower, log): -0.0005 ± 0.0126
+  bench@2 verified:  81.3% [74.3, 86.8]
+    all_blocks>=1.0          keeps verified:  78.7% [71.4, 84.5]
+    all_blocks>=min          keeps verified:  52.7% [44.7, 60.5]
+    bench2                   keeps verified:  81.3% [74.3, 86.8]
+    blockboot>=1.0           keeps verified:  80.7% [73.6, 86.2]
+    blockboot>=min           keeps verified:  78.7% [71.4, 84.5]
+    paired_t>=1.0            keeps verified:  79.3% [72.2, 85.0]
+    paired_t>=min            keeps verified:  62.0% [54.0, 69.4]
+    sign_test                keeps verified:  78.7% [71.4, 84.5]
+
+== ('genuine_moderate', 0.7, 5, True) n=100 (verdict mismatches vs stored: 0)
+  verdicts: {('verified', None): 49, ('inconclusive', 6): 41, ('inconclusive', 4): 10}
+  median speedup 1.160; between-block log-ratio sd (5-sample blocks) median 0.069 p90 0.182
+  order effect (first segment slower, log): -0.0172 ± 0.0155
+  bench@2 verified:  49.0% [39.4, 58.7]
+    all_blocks>=1.0          keeps verified:  47.0% [37.5, 56.7]
+    all_blocks>=min          keeps verified:  22.0% [15.0, 31.1]
+    bench2                   keeps verified:  49.0% [39.4, 58.7]
+    blockboot>=1.0           keeps verified:  49.0% [39.4, 58.7]
+    blockboot>=min           keeps verified:  43.0% [33.7, 52.8]
+    paired_t>=1.0            keeps verified:  48.0% [38.5, 57.7]
+    paired_t>=min            keeps verified:  31.0% [22.8, 40.6]
+    sign_test                keeps verified:  47.0% [37.5, 56.7]
+
+== ('genuine_moderate', 1.7, 1, False) n=100 (verdict mismatches vs stored: 0)
+  verdicts: {('verified', None): 92, ('inconclusive', 4): 7, ('inconclusive', 6): 1}
+  median speedup 1.403; between-block log-ratio sd (5-sample blocks) median 0.039 p90 0.097
+  bench@2 verified:  92.0% [85.0, 95.9]
+    all_blocks>=1.0          keeps verified:  42.0% [32.8, 51.8]
+    all_blocks>=1.0@pool5    keeps verified:  90.0% [82.6, 94.5]
+    all_blocks>=min          keeps verified:  22.0% [15.0, 31.1]
+    all_blocks>=min@pool5    keeps verified:  90.0% [82.6, 94.5]
+    bench2                   keeps verified:  92.0% [85.0, 95.9]
+    bench2@pool5             keeps verified:  92.0% [85.0, 95.9]
+    blockboot>=1.0           keeps verified:  92.0% [85.0, 95.9]
+    blockboot>=1.0@pool5     keeps verified:  92.0% [85.0, 95.9]
+    blockboot>=min           keeps verified:  92.0% [85.0, 95.9]
+    blockboot>=min@pool5     keeps verified:  92.0% [85.0, 95.9]
+    paired_t>=1.0            keeps verified:  92.0% [85.0, 95.9]
+    paired_t>=1.0@pool5      keeps verified:  92.0% [85.0, 95.9]
+    paired_t>=min            keeps verified:  92.0% [85.0, 95.9]
+    paired_t>=min@pool5      keeps verified:  91.0% [83.8, 95.2]
+    sign_test                keeps verified:  92.0% [85.0, 95.9]
+    sign_test@pool5          keeps verified:  90.0% [82.6, 94.5]
+
+== ('genuine_moderate', 1.7, 5, False) n=100 (verdict mismatches vs stored: 0)
+  verdicts: {('verified', None): 98, ('inconclusive', 4): 2}
+  median speedup 1.436; between-block log-ratio sd (5-sample blocks) median 0.035 p90 0.081
+  order effect (first segment slower, log): -0.0118 ± 0.0291
+  bench@2 verified:  98.0% [93.0, 99.4]
+    all_blocks>=1.0          keeps verified:  97.0% [91.5, 99.0]
+    all_blocks>=min          keeps verified:  96.0% [90.2, 98.4]
+    bench2                   keeps verified:  98.0% [93.0, 99.4]
+    blockboot>=1.0           keeps verified:  98.0% [93.0, 99.4]
+    blockboot>=min           keeps verified:  98.0% [93.0, 99.4]
+    paired_t>=1.0            keeps verified:  98.0% [93.0, 99.4]
+    paired_t>=min            keeps verified:  98.0% [93.0, 99.4]
+    sign_test                keeps verified:  97.0% [91.5, 99.0]
+
+== ('neutral_pk', None, 1, False) n=200 (verdict mismatches vs stored: 0)
+  verdicts: {('inconclusive', 6): 161, ('inconclusive', 4): 34, ('rejected', 6): 5}
+  median speedup 0.991; between-block log-ratio sd (5-sample blocks) median 0.066 p90 0.198
+  bench@2 verified:   0.0% [0.0, 1.9]
+
+== ('neutral_pk', None, 5, False) n=200 (verdict mismatches vs stored: 0)
+  verdicts: {('inconclusive', 6): 179, ('inconclusive', 4): 15, ('rejected', 6): 6}
+  median speedup 0.993; between-block log-ratio sd (5-sample blocks) median 0.079 p90 0.204
+  order effect (first segment slower, log): +0.0074 ± 0.0077
+  bench@2 verified:   0.0% [0.0, 1.9]
+
+== ('neutral_scan', None, 1, False) n=300 (verdict mismatches vs stored: 0)
+  verdicts: {('inconclusive', 6): 288, ('inconclusive', 4): 8, ('rejected', 6): 4}
+  median speedup 0.999; between-block log-ratio sd (5-sample blocks) median 0.043 p90 0.095
+  bench@2 verified:   0.0% [0.0, 1.3]
+
+== ('neutral_scan', None, 1, True) n=150 (verdict mismatches vs stored: 0)
+  verdicts: {('inconclusive', 4): 9, ('inconclusive', 6): 137, ('rejected', 6): 4}
+  median speedup 1.000; between-block log-ratio sd (5-sample blocks) median 0.048 p90 0.114
+  bench@2 verified:   0.0% [0.0, 2.5]
+
+== ('neutral_scan', None, 2, False) n=150 (verdict mismatches vs stored: 0)
+  verdicts: {('inconclusive', 4): 17, ('inconclusive', 6): 133}
+  median speedup 0.997; between-block log-ratio sd (5-sample blocks) median 0.080 p90 0.183
+  bench@2 verified:   0.0% [0.0, 2.5]
+
+== ('neutral_scan', None, 5, False) n=300 (verdict mismatches vs stored: 0)
+  verdicts: {('inconclusive', 6): 254, ('inconclusive', 4): 36, ('rejected', 6): 8, ('inconclusive', 5): 2}
+  median speedup 0.999; between-block log-ratio sd (5-sample blocks) median 0.066 p90 0.236
+  order effect (first segment slower, log): -0.0061 ± 0.0064
+  bench@2 verified:   0.0% [0.0, 1.3]
+
+== ('neutral_scan', None, 5, True) n=150 (verdict mismatches vs stored: 0)
+  verdicts: {('inconclusive', 6): 125, ('inconclusive', 4): 20, ('rejected', 6): 5}
+  median speedup 0.999; between-block log-ratio sd (5-sample blocks) median 0.067 p90 0.234
+  order effect (first segment slower, log): -0.0091 ± 0.0083
+  bench@2 verified:   0.0% [0.0, 2.5]

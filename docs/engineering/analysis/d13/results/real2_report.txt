@@ -1,0 +1,22 @@
+
+== ('genuine_moderate', 0.2, 1, False) n=200 (verdict mismatches vs stored: 0)
+  verdicts: {('inconclusive', 6): 185, ('inconclusive', 4): 15}
+  median speedup 1.048; between-block log-ratio sd (5-sample blocks) median 0.048 p90 0.119
+  bench@2 verified:   0.0% [0.0, 1.9]
+
+== ('genuine_moderate', 0.2, 5, False) n=200 (verdict mismatches vs stored: 0)
+  verdicts: {('inconclusive', 6): 200}
+  median speedup 1.050; between-block log-ratio sd (5-sample blocks) median 0.027 p90 0.060
+  order effect (first segment slower, log): -0.0040 ± 0.0039
+  bench@2 verified:   0.0% [0.0, 1.9]
+
+== ('genuine_moderate', 0.3, 1, False) n=200 (verdict mismatches vs stored: 0)
+  verdicts: {('inconclusive', 6): 181, ('inconclusive', 4): 19}
+  median speedup 1.070; between-block log-ratio sd (5-sample blocks) median 0.040 p90 0.121
+  bench@2 verified:   0.0% [0.0, 1.9]
+
+== ('genuine_moderate', 0.3, 5, False) n=200 (verdict mismatches vs stored: 0)
+  verdicts: {('inconclusive', 6): 173, ('inconclusive', 4): 27}
+  median speedup 1.068; between-block log-ratio sd (5-sample blocks) median 0.076 p90 0.250
+  order effect (first segment slower, log): +0.0039 ± 0.0098
+  bench@2 verified:   0.0% [0.0, 1.9]
