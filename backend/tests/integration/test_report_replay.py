@@ -8,7 +8,7 @@ provider client or sending a request fails the test.
 
 import hashlib
 import json
-from collections.abc import AsyncIterator, Iterator
+from collections.abc import AsyncIterator
 from typing import Any
 
 import httpx2 as httpx
@@ -29,7 +29,7 @@ async def api(migrated_db: str) -> AsyncIterator[httpx.AsyncClient]:
 
 
 @pytest.fixture(autouse=True)
-def no_llm(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
+def no_llm(monkeypatch: pytest.MonkeyPatch) -> None:
     """Report replay must never construct or call a model client."""
 
     def refuse(*args: Any, **kwargs: Any) -> Any:
@@ -38,7 +38,6 @@ def no_llm(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
     monkeypatch.setattr("querycure.llm.providers.build_client", refuse)
     monkeypatch.setattr("querycure.llm.openrouter.OpenRouterClient.complete_json", refuse)
     monkeypatch.setattr("querycure.llm.stub.StubClient.complete_json", refuse)
-    yield
 
 
 @pytest.fixture(autouse=True)
