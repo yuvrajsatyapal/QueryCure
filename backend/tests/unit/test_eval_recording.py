@@ -102,3 +102,62 @@ async def test_ledger_counts_requests_across_invocations(tmp_path: Path) -> None
 
     assert QuotaLedger(tmp_path, "2026-10-12").used() == 3
     assert QuotaLedger(tmp_path, "2026-10-13").used() == 0
+
+
+AUDIT = '{"summary": "s", "concerns": []}'
+CANDIDATES = '{"candidates": [], "summary": "none"}'
+
+
+def _agent(system: str, user: str) -> list[ChatMessage]:
+    return [ChatMessage(role="system", content=system), ChatMessage(role="user", content=user)]
+
+
+async def test_live_measurement_prompts_fall_back_to_the_same_agents_recorded_answer() -> None:
+    """The auditor's prompt embeds this run's sandbox measurements, which change every run."""
+    recorded = _agent("You are the Benchmark Auditor ...", "speedup 12.3x measured")
+    client = ReplayClient(
+        Recording(
+            case_id="c",
+            model="m:free",
+            entries={
+                prompt_hash(_prompt()): [{"text": "exact"}],
+                prompt_hash(recorded): [{"text": AUDIT}],
+            },
+        )
+    )
+
+    live = await client.complete_json(_agent("You are the Benchmark Auditor ...", "speedup 11.9x"))
+
+    assert live.text == AUDIT
+    with pytest.raises(RecordingMissingError):  # used up: never served twice
+        await client.complete_json(_agent("You are the Benchmark Auditor ...", "speedup 11.0x"))
+
+
+async def test_fallback_never_crosses_agents_or_covers_deterministic_prompts() -> None:
+    client = ReplayClient(
+        Recording(case_id="c", model="m:free", entries={"h1": [{"text": CANDIDATES}]})
+    )
+
+    # An auditor prompt cannot take an Optimization Engineer answer.
+    with pytest.raises(RecordingMissingError):
+        await client.complete_json(_agent("You are the Benchmark Auditor ...", "x"))
+    # A first-round Optimization Engineer prompt is deterministic: exact match only.
+    with pytest.raises(RecordingMissingError):
+        await client.complete_json(_agent("You are the Optimization Engineer ...", "Hypotheses: x"))
+    # A later round embeds earlier live verdicts: the fallback applies.
+    later = await client.complete_json(
+        _agent("You are the Optimization Engineer ...", "Earlier rounds:\nverdicts")
+    )
+    assert later.text == CANDIDATES
+
+
+async def test_exhausted_live_prompt_is_a_divergence_not_a_prompt_change() -> None:
+    from querycure.evals.recording import LiveDivergenceError
+
+    client = ReplayClient(Recording(case_id="c", model="m:free", entries={}))
+
+    with pytest.raises(LiveDivergenceError):
+        await client.complete_json(_agent("You are the Benchmark Auditor ...", "x"))
+    with pytest.raises(RecordingMissingError) as other:
+        await client.complete_json(_prompt())
+    assert not isinstance(other.value, LiveDivergenceError)

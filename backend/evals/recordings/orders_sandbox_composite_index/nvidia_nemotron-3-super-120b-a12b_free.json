@@ -1,0 +1,72 @@
+{
+  "schema_version": 1,
+  "case": "orders_sandbox_composite_index",
+  "model": "nvidia/nemotron-3-super-120b-a12b:free",
+  "recorded_at": "2026-10-13",
+  "provenance": "recorded",
+  "entries": {
+    "0321a8044baa1de68a3b132fa3465baa0994c57cc92e694d1800a3607448cc26": [
+      {
+        "text": "{\"summary\": \"The index on (customer_id, created_at) produced a verified speed\u2011up with a noise warning. Correctness checks passed and the plan used the new index, but the benchmark measurements showed variability across runs, leading to dispersion and replication warnings.\", \"concerns\": [{\"arm\": \"oc_863aa629a369\", \"severity\": \"warning\", \"text\": \"The hot_customer parameter set exhibits high variability: the first experiment reports a 95% CI lower bound of 1.931x speedup, whereas the other two show lower bounds above 4.3x, indicating inconsistent performance.\", \"evidence_ids\": [\"ev_046b66b86615\", \"ev_8759f206a4e3\", \"ev_f3ff6a0ca6bc\"]}, {\"arm\": \"oc_863aa629a369\", \"severity\": \"warning\", \"text\": \"The verified result relies on agreement across three independent experiments; the measurements are noisy, as shown by differing medians and confidence intervals across the three runs.\", \"evidence_ids\": [\"ev_046b66b86615\", \"ev_8759f206a4e3\", \"ev_f3ff6a0ca6bc\"]}]}",
+        "served_model": "nvidia/nemotron-3-super-120b-a12b:free",
+        "served_by": "Nvidia",
+        "input_tokens": 1957,
+        "output_tokens": 1103
+      }
+    ],
+    "3fdd638368a2f0e17a4e043232a504bd72724bf76f670a49e32af11cb0058b91": [
+      {
+        "text": "{\"action\": \"call_tool\", \"tool\": \"estimate_index_size\", \"args\": {\"table\": \"orders\", \"columns\": [\"customer_id\", \"created_at\"]}}",
+        "served_model": "nvidia/nemotron-3-super-120b-a12b:free",
+        "served_by": "Nvidia",
+        "input_tokens": 2309,
+        "output_tokens": 351
+      }
+    ],
+    "511a97bb4ac59451e7591e090e454a8b95f1bafb1947418bda70574664620c5b": [
+      {
+        "text": "{\"hypotheses\": [{\"statement\": \"The query performs a sequential scan and sort because there is no index on customer_id (or on (customer_id, created_at)) to support the WHERE and ORDER BY clauses, causing the planner to read the entire table and sort all matching rows before applying the LIMIT.\", \"category\": \"missing_index\", \"supporting_evidence\": [\"ev_35bccebcfd86\", \"ev_272692479b2f\", \"ev_914c7f588178\", \"ev_979a355235a7\", \"ev_ed801a4f4297\", \"ev_18dce5850a93\", \"ev_c119b7974fa5\", \"ev_b54eba6ed612\"], \"contradicting_evidence\": [], \"confidence\": \"high\", \"uncertainty_notes\": \"It is uncertain whether the planner would choose an index scan even after creating the index without updated statistics, but an index on (customer_id, created_at) would allow index-only scanning and ordering.\", \"verification_method\": \"explain_compare\"}, {\"statement\": \"Stale statistics on the orders table cause the planner to severely underestimate the number of rows matching the customer_id filter (estimating 6 rows vs ~100k rows * 18% distinct), which may lead to suboptimal plan choices.\", \"category\": \"stale_statistics\", \"supporting_evidence\": [\"ev_b54eba6ed612\", \"ev_35bccebcfd86\", \"ev_ed801a4f4297\", \"ev_d79b67010e74\"], \"contradicting_evidence\": [], \"confidence\": \"medium\", \"uncertainty_notes\": \"It is unknown whether refreshing statistics alone would change the plan to avoid the sequential scan, given the lack of supporting indexes.\", \"verification_method\": \"stats_refresh\"}], \"summary\": \"The query is slow primarily because there is no index to support the filter on customer_id and the ordering by created_at, forcing a sequential scan and sort. Stale statistics exacerbate the issue by causing the planner to underestimate the number of matching rows.\", \"no_action_evidence\": []}",
+        "served_model": "nvidia/nemotron-3-super-120b-a12b:free",
+        "served_by": "Nvidia",
+        "input_tokens": 2753,
+        "output_tokens": 2075
+      }
+    ],
+    "61959c38fe41b49c73ecbbcd6827f027562972596c496652eac14b4d35f2f239": [
+      {
+        "text": "{\"agents\": [\"query_analyzer\", \"index_strategist\"], \"focus\": [\"Seq Scan on orders (ev_35bccebcfd86) reads entire table despite filter on customer_id\", \"Sort operation (ev_272692479b2f) after seq scan adds unnecessary cost\", \"Limit node (ev_914c7f588178) only reduces output after expensive sort\", \"No index on customer_id (ev_ed801a4f4297 shows low correlation, only 18% distinct)\", \"No index supporting ORDER BY created_at DESC (ev_18dce5850a93 shows low correlation ~0.009)\", \"Primary key index orders_pkey (ev_979a355235a7) not useful for this query\", \"Table statistics stale: 0 seq scans / 0 index scans, last analyzed never (ev_b54eba6ed612)\", \"Estimated rows 6 (ev_35bccebcfd86) likely underestimated due to missing stats\"], \"rationale\": \"The query filters on customer_id and orders by created_at DESC with a LIMIT 20, but the plan shows a sequential scan of the orders table (ev_35bccebcfd86) because there is no index on customer_id (ev_ed801a4f4297) or created_at (ev_18dce5850a93). After scanning, it sorts all matching rows (ev_272692479b2f) before applying the limit (ev_914c7f588178), which is wasteful. The only existing index is the primary key on id (ev_979a355235a7), which does not support the filter or order. Statistics are stale (ev_b54eba6ed612), leading to low row estimates (ev_35bccebcfd86) and poor plan choice. Adding a composite index on (customer_id, created_at DESC) would allow an index scan that satisfies both filter and order, eliminating the sort and reducing I/O.\"}",
+        "served_model": "nvidia/nemotron-3-super-120b-a12b:free",
+        "served_by": "Nvidia",
+        "input_tokens": 1304,
+        "output_tokens": 1371
+      }
+    ],
+    "a51874d9a535183d3e4bbe40e8dd457a227557f3403731e08a658587491be387": [
+      {
+        "text": "{\"action\": \"final\", \"analysis\": {\"summary\": \"The query is slow because it scans the whole orders table and sorts the results due to missing index on customer_id and created_at. Statistics are stale, worsening planner estimates. An index on (customer_id, created_at) would allow an indexed ordered scan, eliminating the seq scan and sort, at an estimated size of ~3.0 MiB.\", \"findings\": [{\"title\": \"Query performs sequential scan and sort due to lack of supporting index\", \"detail\": \"The plan shows a Seq Scan on orders filtering customer_id = $1 (ev_35bccebcfd86) followed by a Sort on created_at DESC (ev_272692479b2f) and Limit (ev_914c7f588178). No index exists on customer_id or on (customer_id, created_at) (ev_979a355235a7 shows only primary key).\", \"severity\": \"high\", \"evidence_ids\": [\"ev_35bccebcfd86\", \"ev_272692479b2f\", \"ev_914c7f588178\", \"ev_979a355235a7\"]}, {\"title\": \"Statistics are stale, likely causing poor row estimates\", \"detail\": \"Table public.orders has never been analyzed (ev_b54eba6ed612), which can lead to inaccurate planner estimates such as the low estimate of 6 rows (ev_35bccebcfd86).\", \"severity\": \"medium\", \"evidence_ids\": [\"ev_b54eba6ed612\", \"ev_35bccebcfd86\"]}, {\"title\": \"An index on (customer_id, created_at) could eliminate the scan and sort\", \"detail\": \"An index with equality column customer_id first and sort column created_at second (matching ORDER BY created_at DESC) would allow an index scan that returns rows already filtered and ordered, removing the need for the sequential scan and explicit sort. Estimated size of such index is ~3.0 MiB (ev_c119b7974fa5).\", \"severity\": \"info\", \"evidence_ids\": [\"ev_c119b7974fa5\"]}]}}",
+        "served_model": "nvidia/nemotron-3-super-120b-a12b:free",
+        "served_by": "Nvidia",
+        "input_tokens": 2473,
+        "output_tokens": 1681
+      }
+    ],
+    "c7b2463bc6a5e4b63906a75310e3488b3ecddd812a4358c06463c5eb2e1b1fa3": [
+      {
+        "text": "{\"action\": \"final\", \"analysis\": {\"summary\": \"The query performs a sequential scan of the whole orders table, sorts all matching rows, and then applies the LIMIT, because there is no index to support the filter on customer_id or the ordering by created_at. Stale statistics cause the planner to underestimate the number of matching rows, reinforcing the choice of a seq scan and sort.\", \"findings\": [{\"title\": \"Sequential scan reads entire table despite filter\", \"detail\": \"The plan shows a Seq Scan on orders (ev_35bccebcfd86) that reads the whole table (~100,000 rows, ev_b54eba6ed612) and applies the filter customer_id = $1. No index exists on customer_id, and its low correlation (0.014) and only 18% distinct values (ev_ed801a4f4297) give poor selectivity, so the planner cannot use an index scan.\", \"severity\": \"high\", \"evidence_ids\": [\"ev_35bccebcfd86\", \"ev_b54eba6ed612\", \"ev_ed801a4f4297\"]}, {\"title\": \"Sort operation adds unnecessary cost\", \"detail\": \"After the seq scan, a Sort node (ev_272692479b2f) orders the results by created_at DESC. The created_at column has very low correlation (0.009) (ev_18dce5850a93), meaning its physical order is unrelated to disk order, so an index scan in the needed order is not possible without a suitable index.\", \"severity\": \"medium\", \"evidence_ids\": [\"ev_272692479b2f\", \"ev_18dce5850a93\"]}, {\"title\": \"LIMIT applied after expensive sort\", \"detail\": \"The Limit node (ev_914c7f588178) sits above the Sort, so all rows that match the customer_id filter must be sorted before returning the first 20. The query limits to at most 20 rows (ev_68a33b630de6), but the limit cannot stop the sort early.\", \"severity\": \"medium\", \"evidence_ids\": [\"ev_914c7f588178\", \"ev_68a33b630de6\"]}, {\"title\": \"Table statistics are stale\", \"detail\": \"The orders table has never been analyzed (ev_b54eba6ed612: last analyzed never), leading to outdated row estimates. The planner estimates only 6 rows for the seq scan (ev_35bccebcfd86), which is likely a severe underestimate given the table size and the low distinctness of customer_id.\", \"severity\": \"medium\", \"evidence_ids\": [\"ev_b54eba6ed612\", \"ev_35bccebcfd86\"]}, {\"title\": \"No index supports the WHERE and ORDER BY clauses\", \"detail\": \"The only index is the primary key on id (ev_979a355235a7), which is not useful for filtering on customer_id or ordering by created_at. Consequently the planner cannot use an index scan that would both filter and return rows in the required order, forcing the seq scan + sort approach.\", \"severity\": \"high\", \"evidence_ids\": [\"ev_979a355235a7\"]}]}}",
+        "served_model": "nvidia/nemotron-3-super-120b-a12b:free",
+        "served_by": "Nvidia",
+        "input_tokens": 2366,
+        "output_tokens": 1758
+      }
+    ],
+    "d37746848d696a292f27cd83b8b3bf0cc135eccdf04aef3ef5aef8563fe4c3fc": [
+      {
+        "text": "{\"candidates\": [{\"kind\": \"create_index\", \"addresses_hypotheses\": [\"hy_07150a9c30d7\"], \"ddl\": [\"CREATE INDEX IF NOT EXISTS idx_orders_customer_id_created_at ON orders (customer_id, created_at);\"], \"query\": null, \"expected_benefit\": \"Enable index scan that satisfies WHERE and ORDER BY, eliminating sequential scan and sort, reducing query latency.\", \"risks\": [\"Increased storage usage\", \"Write overhead on INSERT/UPDATE/DELETE\"], \"write_overhead\": \"medium\"}, {\"kind\": \"analyze_statistics\", \"addresses_hypotheses\": [\"hy_21ffa1884085\"], \"ddl\": [], \"query\": null, \"expected_benefit\": \"Refresh table statistics to improve row\u2011estimate accuracy, potentially leading the planner to choose a better plan.\", \"risks\": [\"Minimal lock during analyze\"], \"write_overhead\": \"low\"}], \"summary\": \"Propose creating a composite index on (customer_id, created_at) to support the filter and ordering, and refreshing statistics to address stale estimates.\"}",
+        "served_model": "nvidia/nemotron-3-super-120b-a12b:free",
+        "served_by": "Nvidia",
+        "input_tokens": 2136,
+        "output_tokens": 741
+      }
+    ]
+  }
+}

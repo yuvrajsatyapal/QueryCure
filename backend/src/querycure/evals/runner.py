@@ -25,6 +25,7 @@ from querycure.db.engine import make_engine
 from querycure.domain.budgets import default_budget
 from querycure.evals.cases import EVALS_DIR, EvalCase
 from querycure.evals.recording import (
+    LiveDivergenceError,
     Recording,
     RecordingClient,
     RecordingMissingError,
@@ -47,6 +48,9 @@ NAMESPACE = uuid.UUID("7c1f8f8e-2c4b-4f0e-9a51-6f1d2a3b4c5d")
 EVAL_TOOL_CALLS_PER_AGENT = 2
 
 
+DIVERGED = "diverged"
+
+
 @dataclass
 class CaseResult:
     case: EvalCase
@@ -57,6 +61,10 @@ class CaseResult:
     @property
     def passed(self) -> bool:
         return self.error is None and self.score is not None and self.score.passed
+
+    @property
+    def diverged(self) -> bool:
+        return (self.error or "").startswith(DIVERGED)
 
     @property
     def expected_failure(self) -> str | None:
@@ -268,6 +276,11 @@ async def run_case(
         error = None
         try:
             await execute_run(services, run_id, attempt=1, reclaimed=False)
+        except LiveDivergenceError as exc:
+            error = (
+                f"{DIVERGED}: this replay's live sandbox measurements took another path than "
+                f"the recording; the case is scored when recorded ({exc})"
+            )
         except RecordingMissingError:
             error = "recording does not match the current prompts: re-record this case"
         except Exception as exc:  # reported per case, never swallowed

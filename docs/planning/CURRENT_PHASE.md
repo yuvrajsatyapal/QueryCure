@@ -315,6 +315,8 @@ Decisions taken without changing any frozen contract (recorded for the owner):
 
 - [x] **T4.8 + UI** (frontend): Report tab and `/app/reports/[runId]` (stored report JSON rendered for reading; every number labeled with its provenance and a "Why?" lineage drawer to evidence, artifact digest/pointer and plan node; sandbox-only, prerecorded, stub and partial banners; noise-warning and downgrade explanations; MD/JSON export; "Verify report" with exact wording "Integrity check passed against stored digests"; stored-Markdown fallback with "archived format"/newer-schema banner). Tournament: Benchmark Auditor panel (`GET /runs/{id}/verifications`, new) and plan diff mode (baseline vs candidate EXPLAIN ANALYZE per param set). `/app/replay/[runId]`: manifest viewer, verify & replay report, re-run experiment with a confirmation dialog showing the exact SQL (not-replayable reasons in words), attempt history with live polling and cancel, comparison view (drift bar against the margin band, absolute latencies labeled not used, environment diff, cross-environment wording never "reproduced"), re-investigate with explicit consent. Timeline understands `run.concluded`, `report.ready`, `replay.*`. Frontend lint, typecheck, **78 tests** (10 new), build OK under Node 22 (the shell default Node 20 cannot load jsdom 30; CI uses 22).
 
+- [x] **T4.9 evals**: Phase 3 Mode C cases recorded with the pinned free model (18 free requests; ledger 31/45 today): both PASS. Full-suite replay ([results](../../backend/evals/results/20261013T173814Z-full-replay-nvidia_nemotron-3-super-120b-a12b_free.json)): 5 PASS (all smoke cases), 2 `DIVERGED` (Mode C: the replay's live sandbox measurements produce new evidence IDs and may take another path, so recorded auditor/later-round answers cannot match; every deterministic prompt before that still matched exactly), 1 FAIL `rewrite_trap_not_in` (never recorded, Phase 2 optional). Replay client: exact matching everywhere; a same-agent fallback only for prompts that embed live measurements (auditor, Optimization Engineer rounds ≥ 2); a divergence is its own status, never a pass. Eval metrics now record audited verdicts and auditor downgrades (ADR-0009 downgrade rate).
+
 
 ## Blockers
 
@@ -349,8 +351,8 @@ Tracked separately from phase work. Each needs free OpenRouter quota (ADR-0016; 
 |---|---|---|---|---|
 | `orders_injection_in_schema` | 2 | smoke | **Recorded 2026-10-13, PASS** | `nvidia/nemotron-3-super-120b-a12b:free`, 7 calls; all security checks ok (PHASE_2_REPORT §13) |
 | `orders_plain_explain` | 2 | smoke | **Recorded 2026-10-13, PASS** | 6 calls; smoke replay 5/5 PASS (exit 0); CI integration job now runs the smoke replay |
-| `orders_sandbox_composite_index` | 3 | full | Not recorded | Needs `SANDBOX_ADMIN_URL` / `SANDBOX_BENCH_PASSWORD` |
-| `rewrite_trap_sandbox` | 3 | full | Not recorded | As above |
+| `orders_sandbox_composite_index` | 3 | full | **Recorded 2026-10-13, PASS** | 7 calls incl. the Benchmark Auditor; outcome `verified_recommendation`, composite index proposed, approval written. Replay is `DIVERGED` by design (live measurements; see T4.9) |
+| `rewrite_trap_sandbox` | 3 | full | **Recorded 2026-10-13, PASS** | 11 calls, 3 rounds; outcome `inconclusive` (never verified) |
 
 ## Verification status
 

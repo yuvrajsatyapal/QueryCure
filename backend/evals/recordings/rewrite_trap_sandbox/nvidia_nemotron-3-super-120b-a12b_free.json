@@ -1,0 +1,108 @@
+{
+  "schema_version": 1,
+  "case": "rewrite_trap_sandbox",
+  "model": "nvidia/nemotron-3-super-120b-a12b:free",
+  "recorded_at": "2026-10-13",
+  "provenance": "recorded",
+  "entries": {
+    "05a4911fbcd41486c086dc0d726a86b5b3008a2b7d20aa71a115f8f975846e90": [
+      {
+        "text": "{\"summary\": \"The query rewrite that replaces NOT IN with NOT EXISTS (oc_8f9afce46b48) produces a large speedup (median 3.731 ms \u2192 1.085 ms, 3.44\u00d7 faster) while returning the same row count as the baseline. However, the engine marked the result inconclusive due to insufficient evidence, and the deterministic checks flagged high dispersion (candidate robust CV 1.17 vs baseline 0.48).\", \"concerns\": [{\"arm\": \"oc_8f9afce46b48\", \"severity\": \"downgrade\", \"text\": \"The speedup estimate has a wide confidence interval (2.18-5.098), indicating high uncertainty and insufficient evidence to trust the result.\", \"evidence_ids\": [\"ev_9b897175ffec\"]}, {\"arm\": \"oc_8f9afce46b48\", \"severity\": \"info\", \"text\": \"Correctness check shows the rewrite returns the same number of rows as the baseline (1 vs 1 rows).\", \"evidence_ids\": [\"ev_0299fe1fae11\"]}]}",
+        "served_model": "nvidia/nemotron-3-super-120b-a12b:free",
+        "served_by": "Nvidia",
+        "input_tokens": 1639,
+        "output_tokens": 1371
+      }
+    ],
+    "154064616de1f744c749aa54dc27ae3c066b5fdfba967f4bcb52c3df3dec679d": [
+      {
+        "text": "{\"action\": \"final\", \"analysis\": {\"summary\": \"The query performs a sequential scan on the entire accounts table because there is no index on region_code, forcing PostgreSQL to read every row and apply the NOT IN filter via a hashed subplan. The subplan itself is cheap (small closed_regions table). The main cost comes from scanning accounts and evaluating the filter for each row; an index on region_code would allow an index scan or index-only scan and likely reduce I/O.\", \"findings\": [{\"title\": \"Sequential scan on accounts\", \"detail\": \"The plan shows a Seq Scan on accounts (ev_a1e344ffc812) with filter NOT (ANY (region_code = (hashed SubPlan 1).col1)). It estimates 5,000 rows and cost 199.1.\", \"severity\": \"medium\", \"evidence_ids\": [\"ev_a1e344ffc812\"]}, {\"title\": \"Estimate vs actual row count\", \"detail\": \"The accounts table has approximately 10,000 rows (ev_d467ad794af6), about double the planner's estimate of 5,000 rows (ev_a1e344ffc812). This indicates a modest statistics error but not the primary cause of slowness.\", \"severity\": \"low\", \"evidence_ids\": [\"ev_d467ad794af6\", \"ev_a1e344ffc812\"]}, {\"title\": \"Missing index on region_code\", \"detail\": \"Only the primary key index accounts_pkey on id exists (ev_925d469184f0, ev_39d15b4b2ac4). There is no index on accounts.region_code, which forces the sequential scan.\", \"severity\": \"high\", \"evidence_ids\": [\"ev_925d469184f0\", \"ev_39d15b4b2ac4\"]}, {\"title\": \"Subplan on closed_regions is inexpensive\", \"detail\": \"The subplan performs a Seq Scan on closed_regions (ev_149318e148cf) estimating 11 rows at cost 1.1, indicating the subplan itself is not a bottleneck.\", \"severity\": \"info\", \"evidence_ids\": [\"ev_149318e148cf\"]}, {\"title\": \"Column statistics for region_code\", \"detail\": \"accounts.region_code has n_distinct 50 (ev_39d15b4b2ac4) and low correlation (0.016), meaning values are scattered; an index would still be beneficial for filtering.\", \"severity\": \"low\", \"evidence_ids\": [\"ev_39d15b4b2ac4\"]}]}}",
+        "served_model": "nvidia/nemotron-3-super-120b-a12b:free",
+        "served_by": "Nvidia",
+        "input_tokens": 2169,
+        "output_tokens": 1155
+      }
+    ],
+    "28f0d2ce092d2cd34ff5bb0957d9c04e8b6977502ddb66a6fbaab6e59228abf0": [
+      {
+        "text": "{\"candidates\": [{\"kind\": \"query_rewrite\", \"addresses_hypotheses\": [\"hy_790a1f3eebb2\"], \"ddl\": [], \"query\": \"SELECT count(*) FROM accounts WHERE NOT EXISTS (SELECT 1 FROM closed_regions cr WHERE cr.region_code = accounts.region_code) AND NOT EXISTS (SELECT 1 FROM closed_regions cr WHERE cr.region_code IS NULL);\", \"expected_benefit\": \"Provides a semantically equivalent form that may allow the planner to use an index on accounts.region_code if one exists, avoiding a sequential scan.\", \"risks\": [\"If the planner does not recognize the equivalence, performance may not improve.\", \"The extra NOT EXISTS subplan adds overhead if closed_regions is large.\"], \"write_overhead\": \"low\"}], \"summary\": \"Propose a query rewrite that is semantically equivalent to the original NOT IN subquery, handling NULLs correctly, to test whether the planner can utilize an index on accounts.region_code.\"}",
+        "served_model": "nvidia/nemotron-3-super-120b-a12b:free",
+        "served_by": "Nvidia",
+        "input_tokens": 2577,
+        "output_tokens": 2395
+      }
+    ],
+    "4730fdbfcc395cbac1431f0f55f374728e1753455d9c7008ecf8f8f03db4cb6c": [
+      {
+        "text": "{\"hypotheses\": [{\"statement\": \"The query is slow because there is no index on accounts.region_code, forcing a sequential scan that reads ~5,000 rows (estimated) and incurs high cost.\", \"category\": \"missing_index\", \"supporting_evidence\": [\"ev_a1e344ffc812\", \"ev_925d469184f0\", \"ev_39d15b4b2ac4\", \"ev_1fd9f2f6dc13\"], \"contradicting_evidence\": [], \"confidence\": \"high\", \"uncertainty_notes\": \"While the missing index is the primary cause, the exact impact depends on data distribution and concurrent workload; also need to verify that the index is usable for the NOT ANY filter.\", \"verification_method\": \"explain_compare\"}], \"summary\": \"The query performs a sequential scan on accounts due to a missing index on region_code. Creating an index on accounts.region_code should allow an index scan and reduce cost. No other major issues are evident.\", \"no_action_evidence\": []}",
+        "served_model": "nvidia/nemotron-3-super-120b-a12b:free",
+        "served_by": "Nvidia",
+        "input_tokens": 2420,
+        "output_tokens": 914
+      }
+    ],
+    "59590809efec7f86be1408c93817a7df49c43e0ecb1f53ecd40212244e6a60b9": [
+      {
+        "text": "{\"summary\": \"The benchmark evaluated two candidate changes: creating a composite index on accounts(region_code, id) and running ANALYZE on accounts(region_code). Both modifications produced only tiny speedups (1.004x and 1.015x) with 95% confidence intervals that include no effect, and correctness checks confirmed that the query results remained unchanged. Consequently, neither change demonstrated a reliable performance improvement under the tested default parameter set.\", \"concerns\": [{\"arm\": \"oc_6e766746d0a6\", \"severity\": \"warning\", \"text\": \"The observed speedup is minimal (1.004x) and the confidence interval includes no effect (0.846-1.066x), indicating the change does not produce a reliable performance improvement.\", \"evidence_ids\": [\"ev_291f48bd1bee\"]}, {\"arm\": \"oc_9c2f52c7fc3e\", \"severity\": \"warning\", \"text\": \"The observed speedup is slight (1.015x) and the confidence interval crosses unity (0.929-1.081x), suggesting the effect is not statistically significant.\", \"evidence_ids\": [\"ev_c20aceae7b9e\"]}]}",
+        "served_model": "nvidia/nemotron-3-super-120b-a12b:free",
+        "served_by": "Nvidia",
+        "input_tokens": 2084,
+        "output_tokens": 1718
+      }
+    ],
+    "8d58ffab23d4e47bf2dc9b25b86cb8c5ed82cfc178203d929fa370c1edfb58a2": [
+      {
+        "text": "{\"summary\": \"The query rewrite (oc_790a1f3eebb2) reduces median time from 1.942 ms to 1.458 ms (speedup 1.332x, 95% CI 1.147-1.462x) but returns different result rows than the baseline. Creating an index on accounts.region_code (oc_a86e1aa3361a) reduces median time to 1.537 ms (speedup 1.264x, 95% CI 1.057-1.393x) yet the engine judged the evidence insufficient for a significant effect. Running ANALYZE on both tables (oc_ada4b72b09c5) lowers median time to 1.785 ms (speedup 1.088x, 95% CI 1.023-1.165x) with consistent results.\", \"concerns\": [{\"arm\": \"oc_790a1f3eebb2\", \"severity\": \"downgrade\", \"text\": \"The query rewrite returns different result rows than the baseline, indicating a correctness issue.\", \"evidence_ids\": [\"ev_a9ca79385508\"]}, {\"arm\": \"oc_a86e1aa3361a\", \"severity\": \"warning\", \"text\": \"The engine judged the index creation as having insufficient evidence for a significant effect.\", \"evidence_ids\": [\"ev_e98854013623\"]}, {\"arm\": \"oc_ada4b72b09c5\", \"severity\": \"info\", \"text\": \"The analyze statistics arm shows a modest speedup of 1.088x.\", \"evidence_ids\": [\"ev_7d70c4d03f92\"]}]}",
+        "served_model": "nvidia/nemotron-3-super-120b-a12b:free",
+        "served_by": "Nvidia",
+        "input_tokens": 1918,
+        "output_tokens": 2618
+      }
+    ],
+    "9c34d785666a1c6d6a5153e5f7bfcbd26a32fe8132a1ffa9c79e4590dd13372e": [
+      {
+        "text": "{\"action\": \"final\", \"analysis\": {\"summary\": \"The query does a sequential scan on accounts because there is no index on region_code to support the NOT IN filter; adding such an index would allow an index scan and reduce the cost.\", \"findings\": [{\"title\": \"Missing index on accounts.region_code forces sequential scan\", \"detail\": \"The plan shows a Seq Scan on accounts with filter NOT (ANY (region_code = (hashed SubPlan 1).col1)) (ev_a1e344ffc812) and the supervisor notes a missing index on accounts.region_code; only accounts_pkey on id exists (ev_925d469184f0, ev_39d15b4b2ac4).\", \"severity\": \"high\", \"evidence_ids\": [\"ev_a1e344ffc812\", \"ev_925d469184f0\", \"ev_39d15b4b2ac4\"]}, {\"title\": \"Existing index accounts_pkey on id is unused for this query\", \"detail\": \"The only existing index on accounts is accounts_pkey on id (ev_925d469184f0), which is not referenced in the query's filter, join, or ORDER BY, so it provides no benefit for this statement.\", \"severity\": \"low\", \"evidence_ids\": [\"ev_925d469184f0\"]}, {\"title\": \"Estimated size of an index on accounts.region_code\", \"detail\": \"An index on accounts (region_code) would be approximately 0.2 MiB (ev_1fd9f2f6dc13).\", \"severity\": \"info\", \"evidence_ids\": [\"ev_1fd9f2f6dc13\"]}]}}",
+        "served_model": "nvidia/nemotron-3-super-120b-a12b:free",
+        "served_by": "Nvidia",
+        "input_tokens": 2278,
+        "output_tokens": 885
+      }
+    ],
+    "a39e52ac8e9f258bccfe6e56007b566946e3b0d25c8d91d7e06745c169db3230": [
+      {
+        "text": "{\"agents\": [\"query_analyzer\", \"index_strategist\"], \"focus\": [\"Seq Scan on accounts with filter NOT (ANY (region_code = (hashed SubPlan 1).col1)) (ev_a1e344ffc812)\", \"Missing index on accounts.region_code; only accounts_pkey on id exists (ev_925d469184f0, ev_39d15b4b2ac4)\", \"SubPlan Seq Scan on closed_regions (ev_149318e148cf)\"], \"rationale\": \"The query plan shows a sequential scan on accounts (ev_a1e344ffc812) that reads an estimated 5,000 rows (ev_a1e344ffc812) and applies a filter using a hashed subplan (ev_a1e344ffc812). The accounts table lacks an index on region_code, having only a primary\u2011key index on id (ev_925d469184f0) while region_code has 50 distinct values (ev_39d15b4b2ac4). The subplan reads closed_regions via a sequential scan (ev_149318e148cf) with just 11 rows (ev_149318e148cf). Adding an index on accounts.region_code could allow an index scan or bitmap index scan for the NOT IN filter, potentially reducing the sequential scan cost.\"}",
+        "served_model": "nvidia/nemotron-3-super-120b-a12b:free",
+        "served_by": "Nvidia",
+        "input_tokens": 1224,
+        "output_tokens": 2676
+      }
+    ],
+    "dfa78b32c14c39af98f8aebea88700a07072c8e84506a2b095332724c3f840a5": [
+      {
+        "text": "{\"candidates\": [{\"kind\": \"create_index\", \"addresses_hypotheses\": [\"hy_790a1f3eebb2\"], \"ddl\": [\"CREATE INDEX IF NOT EXISTS idx_accounts_region_code ON accounts(region_code);\"], \"expected_benefit\": \"Allow index scan on accounts.region_code to evaluate NOT IN filter, avoiding sequential scan.\", \"risks\": [\"Increased write overhead on accounts table\", \"Index storage (~0.2 MiB)\", \"Potential lock during creation\"], \"write_overhead\": \"medium\"}, {\"kind\": \"query_rewrite\", \"addresses_hypotheses\": [\"hy_790a1f3eebb2\"], \"query\": \"SELECT count(*) FROM accounts WHERE NOT EXISTS (SELECT 1 FROM closed_regions cr WHERE cr.region_code = accounts.region_code);\", \"expected_benefit\": \"Rewrite to NOT EXISTS eliminates NULL-related semantics issues and enables use of indexes on both tables.\", \"risks\": [\"Must verify that rewritten query returns same rows for all data (including NULLs)\", \"Planner may still choose seq scan if indexes missing\"], \"write_overhead\": \"low\"}, {\"kind\": \"analyze_statistics\", \"addresses_hypotheses\": [\"hy_790a1f3eebb2\"], \"ddl\": [\"ANALYZE accounts;\", \"ANALYZE closed_regions;\"], \"expected_benefit\": \"Refresh statistics to help planner pick optimal plan after index creation or rewrite.\", \"risks\": [\"Minimal; analysis consumes some CPU and temporary locks\"], \"write_overhead\": \"low\"}], \"summary\": \"Propose creating an index on accounts.region_code, rewriting the query to NOT EXISTS for safer null handling, and refreshing statistics to ensure the planner uses the best plan.\"}",
+        "served_model": "nvidia/nemotron-3-super-120b-a12b:free",
+        "served_by": "Nvidia",
+        "input_tokens": 1924,
+        "output_tokens": 1659
+      }
+    ],
+    "e5cdaedf9734ade46c5a4a4d20f77eec0fc073fb7be7a8a79671b2793b054342": [
+      {
+        "text": "{\"action\": \"call_tool\", \"tool\": \"estimate_index_size\", \"args\": {\"table\": \"accounts\", \"columns\": [\"region_code\"]}}",
+        "served_model": "nvidia/nemotron-3-super-120b-a12b:free",
+        "served_by": "Nvidia",
+        "input_tokens": 2124,
+        "output_tokens": 823
+      }
+    ],
+    "ebdc24e77498cfe534d50145feea631998f1705ae036100424590f0958068876": [
+      {
+        "text": "{\"candidates\": [{\"kind\": \"create_index\", \"addresses_hypotheses\": [\"hy_790a1f3eebb2\"], \"ddl\": [\"CREATE INDEX IF NOT EXISTS idx_accounts_region_code_id ON accounts(region_code, id)\"], \"query\": null, \"expected_benefit\": \"Enable index scan on accounts.region_code, reducing sequential scan and improving filter performance.\", \"risks\": [\"Write overhead on inserts/updates/deletes to accounts\", \"Index may not be used if selectivity low\", \"Additional storage usage (~0.2 MiB)\"], \"write_overhead\": \"medium\"}, {\"kind\": \"analyze_statistics\", \"addresses_hypotheses\": [\"hy_790a1f3eebb2\"], \"ddl\": [\"ANALYZE accounts(region_code)\"], \"query\": null, \"expected_benefit\": \"Improve planner estimates for region_code filter, potentially leading to better plan choice.\", \"risks\": [\"Minimal overhead\", \"May not change plan if indexes missing\"], \"write_overhead\": \"low\"}], \"summary\": \"Test a composite index on accounts(region_code, id) and column-level statistics on accounts.region_code to address the missing index hypothesis and see if either improves query performance.\"}",
+        "served_model": "nvidia/nemotron-3-super-120b-a12b:free",
+        "served_by": "Nvidia",
+        "input_tokens": 2812,
+        "output_tokens": 4401
+      }
+    ]
+  }
+}

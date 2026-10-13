@@ -26,7 +26,7 @@ def _print(results: list[CaseResult]) -> None:
         if r.passed:
             mark = "XPASS" if r.case.known_failures.get(r.model) else "PASS"
         else:
-            mark = "XFAIL" if r.expected_failure else "FAIL"
+            mark = "DIVERGED" if r.diverged else "XFAIL" if r.expected_failure else "FAIL"
         print(f"{mark}  {r.case.id}")
         if r.expected_failure:
             print(f"      known baseline failure: {r.expected_failure}")
@@ -44,7 +44,11 @@ def _print(results: list[CaseResult]) -> None:
             )
     passed = sum(r.passed for r in results)
     xfail = sum(r.expected_failure is not None for r in results)
-    print(f"\n{passed}/{len(results)} cases passed, {xfail} known baseline failure(s)")
+    diverged = sum(r.diverged for r in results)
+    print(
+        f"\n{passed}/{len(results)} cases passed, {xfail} known baseline failure(s), "
+        f"{diverged} diverged on live measurements (not passed)"
+    )
 
 
 async def _run(args: argparse.Namespace) -> int:

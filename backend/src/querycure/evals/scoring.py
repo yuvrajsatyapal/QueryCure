@@ -58,6 +58,10 @@ class Observed:
     materiality: str | None = None
     candidates: list[dict[str, Any]] = field(default_factory=list)  # kind, ddl, query_sql, status
     approvals: int = 0
+    # Benchmark Auditor (ADR-0009): verdicts reviewed, verified ones, and how many it downgraded.
+    audited: int = 0
+    audited_verified: int = 0
+    auditor_downgrades: int = 0
 
 
 @dataclass
@@ -161,6 +165,7 @@ async def observe(conn: AsyncConnection, run_id: uuid.UUID) -> Observed:
             or (report_raw.get("problem") or {}).get("materiality")
             or {}
         ).get("verdict"),
+        **await _audit_counts(conn, run_id),
         candidates=[
             dict(r._mapping)
             for r in await conn.execute(
@@ -271,8 +276,27 @@ def score(case: EvalCase, seen: Observed) -> Score:
         "served_models": seen.served_models,
         "errors": [x.get("code") for x in seen.errors],
         "materiality": seen.materiality,
+        "audited_verdicts": seen.audited,
+        "audited_verified_by_engine": seen.audited_verified,
+        "auditor_downgrades": seen.auditor_downgrades,
     }
     return result
+
+
+async def _audit_counts(conn: Any, run_id: Any) -> dict[str, int]:
+    """The downgrade rate is tracked on cases whose right answer is `verified` (ADR-0009)."""
+    row = (
+        await conn.execute(
+            text(
+                "SELECT count(*) AS n, count(*) FILTER (WHERE engine_verdict IN "
+                "('verified', 'verified_with_noise_warning')) AS v, "
+                "count(*) FILTER (WHERE auditor_downgraded) AS d "
+                "FROM verification_results WHERE run_id = :id"
+            ),
+            {"id": run_id},
+        )
+    ).one()
+    return {"audited": int(row.n), "audited_verified": int(row.v), "auditor_downgrades": int(row.d)}
 
 
 def _matches(candidate: dict[str, Any], kind: str, prefix: list[str]) -> bool:
