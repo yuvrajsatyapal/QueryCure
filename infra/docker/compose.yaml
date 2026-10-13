@@ -1,5 +1,7 @@
-# Local development databases (DEPLOYMENT.md §2). Application processes run on the host for now;
-# api/worker containers are added when the worker exists (Phase 2/3).
+# Local profile (DEPLOYMENT.md §2). `docker compose up -d` starts the databases, the relay and the
+# worker container, which benchmarks in-network on sandbox_net (ADR-0020). api and web run on the
+# host. Host-run worker instead: `docker compose up -d metadata-db sandbox-db sandbox-relay`, then
+# run the worker on the host (never both: two workers would split jobs across measurement paths).
 name: querycure
 
 services:
@@ -83,13 +85,11 @@ services:
     mem_limit: 64m
     pids_limit: 64
 
-  # Opt-in worker container (`docker compose --profile bench up -d worker`): it reaches the
-  # sandbox on sandbox_net directly, without the relay's host<->VM hop. Measured on Docker
-  # Desktop (2026-10-12): SELECT 1 round trip 40 us median / 24 us IQR in-network vs
-  # 355-451 us / 125-171 us through the published port (ADR-0018). Stop any host worker first,
-  # or both will claim jobs.
+  # Default worker (ADR-0020): it reaches the sandbox on sandbox_net directly, without the
+  # relay's host<->VM hop. Measured on Docker Desktop (2026-10-12): SELECT 1 round trip 40 us
+  # median / 24 us IQR in-network vs 355-451 us / 125-171 us through the published port
+  # (ADR-0018). Rebuild after backend changes: `docker compose up -d --build worker`.
   worker:
-    profiles: ["bench"]
     build: ../../backend
     environment:
       QC_PROFILE: local
@@ -98,6 +98,7 @@ services:
       SANDBOX_ADMIN_URL: postgresql://qc_sandbox_admin:${QC_SANDBOX_PASSWORD:-qc_local_dev_only}@sandbox-db:5432/sandbox_admin
       SANDBOX_BENCH_PASSWORD: ${SANDBOX_BENCH_PASSWORD:-qc_local_dev_only}
       SANDBOX_IMAGE_DIGEST: postgres:17
+      QC_BENCH_PATH: docker-network
       LLM_PROVIDER: ${LLM_PROVIDER:-openrouter}
       LLM_MODEL: ${LLM_MODEL:-nvidia/nemotron-3-super-120b-a12b:free}
       OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}

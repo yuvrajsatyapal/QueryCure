@@ -58,6 +58,11 @@ class Settings(BaseSettings):
     sandbox_image_digest: str = Field(
         default="unrecorded", validation_alias=_env("SANDBOX_IMAGE_DIGEST")
     )
+    # ADR-0020: how this worker reaches the sandbox; recorded as the fingerprint's
+    # container_runtime. Compose sets docker-network for the worker container on sandbox_net.
+    bench_path: Literal["docker-network", "docker-relay"] = Field(
+        default="docker-relay", validation_alias=_env("QC_BENCH_PATH")
+    )
     master_key: SecretStr | None = Field(default=None, validation_alias=_env("QC_MASTER_KEY"))
     master_key_version: int = Field(default=1, ge=1, validation_alias=_env("QC_MASTER_KEY_VERSION"))
     allow_private_targets: bool | None = Field(

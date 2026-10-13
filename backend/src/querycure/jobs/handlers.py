@@ -39,6 +39,14 @@ def build_sandbox(settings: Settings) -> SandboxProvisioner | None:
     )
 
 
+def engine_options(settings: Settings) -> EngineOptions:
+    return EngineOptions(
+        lease_timeout_seconds=settings.sandbox_lease_timeout_seconds,
+        sandbox_image_digest=settings.sandbox_image_digest,
+        container_runtime=settings.bench_path,
+    )
+
+
 def build_services(engine: AsyncEngine, settings: Settings) -> RunServices:
     if settings.database_url is None:
         raise ValueError("DATABASE_URL is required")
@@ -47,10 +55,7 @@ def build_services(engine: AsyncEngine, settings: Settings) -> RunServices:
         sandbox.bootstrap()
     return RunServices(
         sandbox=sandbox,
-        engine_options=EngineOptions(
-            lease_timeout_seconds=settings.sandbox_lease_timeout_seconds,
-            sandbox_image_digest=settings.sandbox_image_digest,
-        ),
+        engine_options=engine_options(settings),
         engine=engine,
         settings=settings,
         checkpoint_url=settings.database_url.get_secret_value(),

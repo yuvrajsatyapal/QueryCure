@@ -80,7 +80,8 @@ uv run pytest tests/security -q
 uv run python -m querycure.evals run --suite smoke   # recorded fixtures, no LLM cost
 # frontend
 cd frontend && pnpm lint && pnpm typecheck && pnpm test && pnpm build
-pnpm exec playwright test                  # e2e, needs api running
+docker compose -f ../infra/docker/compose.yaml stop worker   # e2e starts its own host worker (ADR-0020)
+pnpm exec playwright test                  # e2e; afterwards: docker compose ... up -d worker
 ```
 
 If a command does not exist yet, say so — do not invent output.
