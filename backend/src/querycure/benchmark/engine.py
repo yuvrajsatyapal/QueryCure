@@ -423,7 +423,10 @@ def run_experiment(
     provisioner: SandboxProvisioner,
     hooks: EngineHooks,
     options: EngineOptions | None = None,
+    engine_version: str = ENGINE_VERSION,
 ) -> ExperimentResult:
+    """`engine_version` selects the scoring rules: experiment replay scores a replay with its
+    source experiment's rules (ADR-0019); measurement is always the current engine's."""
     options = options or EngineOptions()
     ddl = _validate(config, approved)  # before any sandbox work
     ref = WorkloadRef.parse(config.workload_id)
@@ -459,7 +462,17 @@ def run_experiment(
                 )
             with _Cancellation(hooks, runners) as watch:
                 try:
-                    return _measure(config, arms, runners, ddl, hooks, options, env_digest, started)
+                    return _measure(
+                        config,
+                        arms,
+                        runners,
+                        ddl,
+                        hooks,
+                        options,
+                        env_digest,
+                        started,
+                        engine_version,
+                    )
                 except RunCancelledError:
                     raise
                 finally:
@@ -481,6 +494,7 @@ def _measure(
     options: EngineOptions,
     env_digest: str,
     started: float,
+    engine_version: str = ENGINE_VERSION,
 ) -> ExperimentResult:
     by_arm = {(a.arm if a else BASELINE_ARM): (a, r) for a, r in zip(arms, runners, strict=True)}
     done = {r.key: r for r in hooks.existing()}
@@ -592,7 +606,12 @@ def _measure(
     hooks.progress("checking")
     hooks.progress("scoring")
     return score(
-        config, builds, list(done.values()), unique_keys=unique_keys, env_digest=env_digest
+        config,
+        builds,
+        list(done.values()),
+        unique_keys=unique_keys,
+        env_digest=env_digest,
+        engine_version=engine_version,
     )
 
 

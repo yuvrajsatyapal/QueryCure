@@ -320,13 +320,15 @@ async def create_experiment(
     row_profile: str,
     seed: int,
     replicate: int = 0,
+    replay_of_experiment_id: uuid.UUID | None = None,
 ) -> ExperimentRow:
     await ensure_writable(conn, run_id)
     await conn.execute(
         text(
             "INSERT INTO experiments (id, run_id, round, replicate, kind, approval_request_id, "
-            "config_artifact_id, engine_version, row_profile, seed) VALUES (:id, :run_id, "
-            ":round, :replicate, :kind, :approval, :config, :engine, :profile, :seed) "
+            "config_artifact_id, engine_version, row_profile, seed, replay_of_experiment_id) "
+            "VALUES (:id, :run_id, :round, :replicate, :kind, :approval, :config, :engine, "
+            ":profile, :seed, :replay_of) "
             "ON CONFLICT DO NOTHING"
         ),
         {
@@ -340,6 +342,7 @@ async def create_experiment(
             "engine": engine_version,
             "profile": row_profile,
             "seed": seed,
+            "replay_of": replay_of_experiment_id,
         },
     )
     row = await get_experiment_row(conn, experiment_id)

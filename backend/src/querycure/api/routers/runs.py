@@ -32,6 +32,7 @@ from querycure.db.repositories import investigations
 from querycure.db.repositories.artifacts import artifacts_for_run
 from querycure.db.repositories.events import list_events
 from querycure.db.repositories.findings import list_findings, list_hypotheses
+from querycure.db.repositories.replay import attempt_for_replay_run
 from querycure.db.repositories.runs import get_run_for_user
 from querycure.domain.runs import TERMINAL_STATUSES, RunStatus
 from querycure.domain.users import User
@@ -40,6 +41,7 @@ from querycure.evidence.store import list_evidence
 from querycure.plans.metrics import compute_metrics
 from querycure.plans.parser import parse_plan
 from querycure.replay.artifact_store import get_artifact
+from querycure.replay.experiment_replay import cancel_replay_attempt
 from querycure.replay.finalize import Conclusion, finalize_run
 
 router = APIRouter(tags=["runs"])
@@ -135,7 +137,10 @@ async def cancel_run(run_id: uuid.UUID, conn: ConnDep, user: CurrentUser) -> Run
     to cancelling and the worker stops at its next safe point."""
     run = await _owned_run(conn, user, run_id)
     current = RunStatus(run.status)
-    if current not in TERMINAL_STATUSES and current is not RunStatus.CANCELLING:
+    attempt = await attempt_for_replay_run(conn, run_id)
+    if attempt is not None:  # an experiment-replay run: its attempt is cancelled with it
+        await cancel_replay_attempt(conn, attempt)
+    elif current not in TERMINAL_STATUSES and current is not RunStatus.CANCELLING:
         await investigations.mark_cancel_requested(conn, run_id)
         if current is RunStatus.RUNNING:
             await change_status(conn, run_id, RunStatus.CANCELLING)

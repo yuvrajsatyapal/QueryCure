@@ -7,6 +7,7 @@ from querycure.benchmark.engine import EngineOptions
 from querycure.core.config import Settings
 from querycure.jobs.queue import Job, JobKind, ReapedJob
 from querycure.llm.rate_limit import DailyQuota, LlmGate, MinuteRateLimiter
+from querycure.replay.experiment_replay import execute_experiment_replay, mark_replay_failed
 from querycure.sandbox.provisioner import SandboxProvisioner
 from querycure.worker.runner import DeadCallback, Handler, PermanentJobError
 
@@ -23,6 +24,7 @@ def run_handler(services: RunServices) -> Handler:
 def dead_job_handler(services: RunServices) -> DeadCallback:
     async def on_dead(job: Job | ReapedJob) -> None:
         if job.run_id is not None:
+            await mark_replay_failed(services.engine, job.run_id, "internal_error")
             await fail_run(services.engine, job.run_id, {"code": "JOB_DEAD_LETTERED"})
 
     return on_dead
@@ -70,6 +72,25 @@ def build_services(engine: AsyncEngine, settings: Settings) -> RunServices:
     )
 
 
+def replay_handler(services: RunServices) -> Handler:
+    async def handle(job: Job) -> None:
+        if job.run_id is None:
+            raise PermanentJobError("JOB_WITHOUT_RUN")
+        await execute_experiment_replay(
+            services.engine,
+            job.run_id,
+            sandbox=services.sandbox,
+            options=services.engine_options or EngineOptions(),
+            reclaimed=job.reclaimed,
+        )
+
+    return handle
+
+
 def build_handlers(services: RunServices) -> dict[JobKind, Handler]:
     handle = run_handler(services)
-    return {"run_start": handle, "run_resume": handle}
+    return {
+        "run_start": handle,
+        "run_resume": handle,
+        "experiment_replay": replay_handler(services),
+    }

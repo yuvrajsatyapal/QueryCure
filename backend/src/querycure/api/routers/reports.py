@@ -9,12 +9,13 @@ import json
 import uuid
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Query, Response
+from fastapi import APIRouter, Query, Response, status
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncConnection
 
-from querycure.api.deps import ConnDep, CurrentUser, EngineDep
+from querycure.api.deps import ConnDep, CurrentUser, EngineDep, SettingsDep
 from querycure.api.schemas.replay import (
+    ExperimentReplayRequest,
     ManifestOut,
     PlanDiffOut,
     ReplayAttemptOut,
@@ -22,8 +23,16 @@ from querycure.api.schemas.replay import (
     ReportOut,
     ReportReplayRequest,
 )
-from querycure.core.errors import BadRequestError, NotFinalizedError, NotFoundError
+from querycure.core.errors import (
+    BadRequestError,
+    ConcurrencyLimitError,
+    ExperimentNotReplayableError,
+    NotFinalizedError,
+    NotFoundError,
+)
 from querycure.core.logging import get_logger
+from querycure.db.repositories import investigations as inv_repo
+from querycure.db.repositories.optimization import get_user_experiment
 from querycure.db.repositories.replay import (
     AttemptRow,
     decode_cursor,
@@ -33,10 +42,12 @@ from querycure.db.repositories.replay import (
     list_attempts,
 )
 from querycure.db.repositories.runs import get_run_for_user
+from querycure.domain.budgets import CONCURRENT_RUNS_PER_USER
 from querycure.domain.users import User
 from querycure.plans.diff import diff_plans
 from querycure.plans.parser import parse_plan
 from querycure.replay.artifact_store import get_artifact
+from querycure.replay.experiment_replay import cancel_replay_attempt, start_replay
 from querycure.replay.report_replay import verify_report
 
 router = APIRouter(tags=["reports"])
@@ -274,3 +285,49 @@ async def plan_diff(
     return PlanDiffOut(
         run_id=run_id, from_sha256=from_, to_sha256=to, diff=diff_plans(before, after)
     )
+
+
+@router.post("/experiments/{experiment_id}/replay", status_code=status.HTTP_202_ACCEPTED)
+async def replay_experiment(
+    experiment_id: uuid.UUID,
+    body: ExperimentReplayRequest,
+    engine: EngineDep,
+    user: CurrentUser,
+    settings: SettingsDep,
+) -> ReplayAttemptOut:
+    """`confirm_ddl` is the user's confirmation of the exact SQL: it becomes the replay run's
+    approval. A failed precondition is recorded as a `not_replayable` attempt and answered 422
+    with `details.code` and `details.replay_attempt_id` (no run is created)."""
+    async with engine.begin() as conn:
+        if await get_user_experiment(conn, user_id=user.id, experiment_id=experiment_id) is None:
+            raise NotFoundError("Experiment not found.")
+        limit = CONCURRENT_RUNS_PER_USER[settings.profile]
+        if await inv_repo.count_active_runs(conn, user.id) >= limit:
+            raise ConcurrencyLimitError(f"At most {limit} runs can be active at once.")
+        attempt = await start_replay(
+            conn, settings=settings, user_id=user.id, experiment_id=experiment_id
+        )
+    if attempt.status == "not_replayable":
+        raise ExperimentNotReplayableError(
+            f"This experiment cannot be replayed ({attempt.failure_code}).",
+            details=[
+                {
+                    "code": attempt.failure_code,
+                    "replay_attempt_id": str(attempt.id),
+                    "detail": attempt.result.get("detail", ""),
+                }
+            ],
+        )
+    return attempt_out(attempt)
+
+
+@router.post("/replay-attempts/{attempt_id}/cancel", status_code=status.HTTP_202_ACCEPTED)
+async def cancel_replay(
+    attempt_id: uuid.UUID, conn: ConnDep, user: CurrentUser
+) -> ReplayAttemptOut:
+    row = await get_attempt(conn, attempt_id, user_id=user.id)
+    if row is None:
+        raise NotFoundError("Replay attempt not found.")
+    if row.kind == "experiment":
+        row = await cancel_replay_attempt(conn, row)
+    return attempt_out(row)
