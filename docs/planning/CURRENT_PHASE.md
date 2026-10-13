@@ -330,6 +330,7 @@ Tracked separately from phase work. Each needs free OpenRouter quota (ADR-0016; 
 
 | Check | Result |
 |---|---|
+| Git history cleanup (2026-10-13, owner-authorized one-time rewrite) | 5 `Co-Authored-By: Claude` trailers removed from `main` (`187c920`→`7c699bc`, `06998e2`→`aaa137d`, `a36c610`→`3fbec97`, `efa1921`→`cf8e91b`, `22b383b`→`799381b`; `3e1bb1f`→`376377d`, `096e271`→`d3852d8` rehashed only). 59 commits, trees, identities and timestamps unchanged; pushed with `--force-with-lease`; local backup tag `backup/main-pre-ai-trailer-cleanup-2026-10-13` |
 | D13 closure / ADR-0021 accepted (2026-10-13, docs + xfail reason text only) | `QC_REQUIRE_DB=1 uv run pytest -q` → **1104 passed, 1 xfailed** (strict xfail kept); ruff, format, `mypy --strict` (162 files) clean; `git diff backend/src` empty; smoke eval replay 3/5 PASS, 2 unrecorded; no OpenRouter request |
 | Backend (owner decisions ADR-0019/0020, 2026-10-13) | `QC_REQUIRE_DB=1 uv run pytest -q` → **1104 passed, 1 xfailed** (652 unit, 330 integration, 123 security collected; 1 strict xfail documents R18); ruff, format, `mypy --strict` (162 files) clean; migration 0010 up/down/up verified |
 | Frontend (2026-10-13) | lint, typecheck, `pnpm test` → **68 passed**, build OK; Playwright **2 passed** (container worker stopped for the run) |

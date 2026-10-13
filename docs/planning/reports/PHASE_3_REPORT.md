@@ -158,7 +158,7 @@ See [LEARNING.md](../../engineering/LEARNING.md) Phase 3.
 
 ## 11. Owner decisions follow-up (2026-10-12 → 2026-10-13)
 
-The owner approved ADR-0018 in principle, rejected a plain gate-4b waiver for D11 in favour of a conservative replicated outcome, and made the container worker the local default (D12). The ADRs were committed **before** the code (`187c920`), including the compatibility analysis.
+The owner approved ADR-0018 in principle, rejected a plain gate-4b waiver for D11 in favour of a conservative replicated outcome, and made the container worker the local default (D12). The ADRs were committed **before** the code (`7c699bc`), including the compatibility analysis.
 
 ### 11.1 What changed
 
