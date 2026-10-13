@@ -169,12 +169,12 @@ export function ComparisonView({ comparison, replayRunId }: { comparison: Compar
   );
 }
 
-function ReplayConfirm({ experiment, onDone }: { experiment: ExperimentSummary; onDone: () => void }) {
+function ReplayConfirm({ experiment, runId, onDone }: { experiment: ExperimentSummary; runId: string; onDone: () => void }) {
   const client = useQueryClient();
   const detail = useQuery({ queryKey: optimizationKeys.experiment(experiment.id), queryFn: ({ signal }) => getExperiment(experiment.id, signal) });
   const start = useMutation({
     mutationFn: () => replayExperiment(experiment.id),
-    onSettled: () => void client.invalidateQueries({ queryKey: ["replay-attempts"] }),
+    onSettled: () => void client.invalidateQueries({ queryKey: reportKeys.attempts(runId) }),
     onSuccess: () => onDone(),
   });
   const arms = ((detail.data?.config as { candidates?: { arm: string; ddl: string[]; query: string | null }[] } | null)?.candidates ?? []);
@@ -323,7 +323,7 @@ export function ReplayView({ runId }: { runId: string }) {
                 {e.replicate > 0 ? ` · replicate ${e.replicate}` : ""} · <span className="font-mono text-xs">{e.id.slice(0, 8)}</span> · {e.engineVersion}
               </p>
               {confirming === e.id ? (
-                <ReplayConfirm experiment={e} onDone={() => setConfirming(null)} />
+                <ReplayConfirm experiment={e} runId={runId} onDone={() => setConfirming(null)} />
               ) : (
                 <button type="button" onClick={() => setConfirming(e.id)} className="self-start rounded-md border border-border-strong px-3 py-1">
                   Re-run experiment…

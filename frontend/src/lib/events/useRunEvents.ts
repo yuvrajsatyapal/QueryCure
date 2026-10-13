@@ -64,7 +64,7 @@ export function useRunEvents(runId: string | null): { events: RunEvent[]; live: 
         void client.invalidateQueries({ queryKey: reportKeys.verifications(runId) });
       }
       if (event.type === "replay.status_changed" || event.type === "replay.compared") {
-        void client.invalidateQueries({ queryKey: ["replay-attempts"] });
+        void client.invalidateQueries({ predicate: (q) => q.queryKey.includes("replay-attempts") });
       }
       if (event.type === "evidence.created") {
         void client.invalidateQueries({ queryKey: investigationKeys.plans(runId) });

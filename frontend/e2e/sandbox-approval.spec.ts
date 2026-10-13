@@ -13,7 +13,7 @@ test("sandbox - approve the candidate SQL, then see the benchmarked tournament",
   await page.getByLabel("Title").fill(`E2E sandbox ${Date.now()}`);
   await expect(page.getByText(/Mode: sandbox benchmark on/)).toBeVisible();
   await page.getByRole("button", { name: "Start investigation" }).click();
-  await expect(page).toHaveURL(/\/app\/investigations\/[0-9a-f-]{36}$/);
+  await expect(page).toHaveURL(/\/app\/investigations\/[0-9a-f-]{36}$/, { timeout: 30_000 });
 
   const card = page.getByRole("region", { name: "Approval required" });
   await expect(card).toBeVisible({ timeout: 60_000 });

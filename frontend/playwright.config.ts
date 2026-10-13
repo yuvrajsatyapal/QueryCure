@@ -10,6 +10,9 @@ export default defineConfig({
   testDir: "./e2e",
   timeout: 90_000,
   fullyParallel: false,
+  // One spec at a time: the local profile allows 2 active runs per user, and sandbox
+  // measurements should not overlap.
+  workers: 1,
   retries: 0,
   use: { baseURL: `http://localhost:${WEB_PORT}`, trace: "retain-on-failure" },
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],

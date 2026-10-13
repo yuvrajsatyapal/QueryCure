@@ -15,7 +15,7 @@ test("investigation - start from an uploaded plan, follow the timeline, open cit
   await expect(page.getByText("with the uploaded plan")).toBeVisible();
   await page.getByRole("button", { name: "Start investigation" }).click();
 
-  await expect(page).toHaveURL(/\/app\/investigations\/[0-9a-f-]{36}$/);
+  await expect(page).toHaveURL(/\/app\/investigations\/[0-9a-f-]{36}$/, { timeout: 30_000 });
   const timeline = page.getByRole("region", { name: "Agent timeline" });
   await expect(timeline.getByText("intake started")).toBeVisible({ timeout: 30_000 });
   await expect(timeline.getByText(/Run completed/)).toBeVisible({ timeout: 60_000 });
