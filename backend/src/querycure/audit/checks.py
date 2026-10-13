@@ -179,19 +179,21 @@ def rescore_check(
     again = next(v for v in rescored.verdicts if v.arm == arm)
     if stored != again:
         return _check(
-            "rescore", "fail",
+            "rescore",
+            "fail",
             f"stored verdict {stored.verdict} (gate {stored.gate}) but the persisted samples "
             f"give {again.verdict} (gate {again.gate}) under {inputs.result.engine_version}",
             ids,
-        )  # fmt: skip
+        )
     stored_stats = [s for s in inputs.result.stats if s.arm == arm]
     if stored_stats != [s for s in rescored.stats if s.arm == arm]:
         return _check("rescore", "fail", "stored statistics differ from the samples", ids)
     return _check(
-        "rescore", "pass",
+        "rescore",
+        "pass",
         f"samples re-scored under {inputs.result.engine_version} reproduce the stored verdict",
         ids,
-    )  # fmt: skip
+    )
 
 
 def approval_check(inputs: AuditInputs, arm: str) -> AuditCheck:
@@ -232,18 +234,20 @@ def environment_check(inputs: AuditInputs) -> AuditCheck:
     if not (computed == inputs.environment_digest == inputs.result.environment_digest):
         return _check("environment", "fail", "environment digests disagree")
     return _check(
-        "environment", "pass",
+        "environment",
+        "pass",
         f"PostgreSQL {env.pg_version}, {env.cpu_arch}, {env.container_runtime}",
-    )  # fmt: skip
+    )
 
 
 def provenance_check(inputs: AuditInputs) -> AuditCheck:
     kinds = {inputs.result.provenance, *inputs.record_provenance}
     if kinds != {"measured"}:
         return _check(
-            "provenance", "fail",
+            "provenance",
+            "fail",
             f"samples are labelled {', '.join(sorted(kinds))}; only measured samples count",
-        )  # fmt: skip
+        )
     return _check("provenance", "pass", "all samples were measured in this run's sandbox")
 
 
@@ -252,9 +256,12 @@ def _arm_stats(result: ExperimentResult, arm: str) -> list[Any]:
 
 
 def samples_check(
-    config: ExperimentConfig, result: ExperimentResult, arm: str, ids: Sequence[str],
+    config: ExperimentConfig,
+    result: ExperimentResult,
+    arm: str,
+    ids: Sequence[str],
     verdict: FinalVerdict,
-) -> AuditCheck:  # fmt: skip
+) -> AuditCheck:
     stats = _arm_stats(result, arm)
     if not stats:
         return _check("samples", "skip", "no statistics (arm not measured)", ids)
@@ -269,10 +276,11 @@ def samples_check(
         return _check("samples", "fail", "fewer than the minimum samples: " + "; ".join(short), ids)
     if short:
         return _check(
-            "samples", "warn",
+            "samples",
+            "warn",
             f"fewer than the configured {config.measured_runs} samples: " + "; ".join(short),
             ids,
-        )  # fmt: skip
+        )
     return _check("samples", "pass", f"{config.measured_runs} samples per arm and set", ids)
 
 
@@ -372,14 +380,17 @@ def plan_check(inputs: AuditInputs, arm: str, kind: str, verdict: FinalVerdict) 
     without = [ps for ps, v in used.items() if not v]
     if not names:
         return _check(
-            "plan_change", "fail", "no captured candidate plan uses a new index; the speed-up "
+            "plan_change",
+            "fail",
+            "no captured candidate plan uses a new index; the speed-up "
             "is not explained by the candidate",
-        )  # fmt: skip
+        )
     if without:
         return _check(
-            "plan_change", "warn",
+            "plan_change",
+            "warn",
             f"new index {', '.join(names)} used, but not on {', '.join(without)}",
-        )  # fmt: skip
+        )
     return _check("plan_change", "pass", f"new index used: {', '.join(names)}")
 
 

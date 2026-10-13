@@ -127,8 +127,12 @@ async def benchmark_auditor(
     state: InvestigationState, runtime: Runtime[RunContext]
 ) -> dict[str, Any]:
     ctx = runtime.context
-    if state.get("verification") not in ("verified", "verified_with_noise_warning", "rejected",
-                                          "inconclusive"):  # fmt: skip
+    if state.get("verification") not in (
+        "verified",
+        "verified_with_noise_warning",
+        "rejected",
+        "inconclusive",
+    ):
         return {}  # failed or not run: nothing to audit
     experiment_id = experiment_id_for(ctx.run_id, state.get("optimization_round", 0))
     async with ctx.db().connect() as conn:
@@ -140,8 +144,11 @@ async def benchmark_auditor(
     assessment = audit_experiment(inputs)
     if stored:  # re-run after a crash: the recorded audit stands
         verdicts = {r.candidate_key: r.verdict for r in stored}
-        audits = [a.model_copy(update={"verdict": verdicts[a.arm]}) for a in assessment.candidates
-                  if a.arm in verdicts]  # fmt: skip
+        audits = [
+            a.model_copy(update={"verdict": verdicts[a.arm]})
+            for a in assessment.candidates
+            if a.arm in verdicts
+        ]
         winner = pick_winner(inputs.result, inputs.replication, verdicts)
         return {"winner": winner, "verification": _round_verification(audits, winner)}
 
@@ -159,11 +166,15 @@ async def benchmark_auditor(
         stop = exc
 
     concerns = [
-        AuditConcern(arm=c.arm, severity=c.severity, text=clean_text(c.text, 600),
-                     evidence_ids=c.evidence_ids)
+        AuditConcern(
+            arm=c.arm,
+            severity=c.severity,
+            text=clean_text(c.text, 600),
+            evidence_ids=c.evidence_ids,
+        )
         for c in (narrative.concerns if narrative else [])
         if c.evidence_ids
-    ]  # fmt: skip
+    ]
     audits = apply_concerns(assessment, concerns)
     verdicts = {a.arm: a.verdict for a in audits}
     winner = pick_winner(inputs.result, inputs.replication, verdicts)
@@ -179,8 +190,9 @@ async def benchmark_auditor(
             downgraded = audit.verdict != audit.engine_verdict
             reasons = [r.model_dump() for r in rules[audit.arm].reasons]
             if downgraded:
-                reasons += [{"code": "audit_downgrade", "detail": d[:300]}
-                            for d in audit.downgrade_reasons]  # fmt: skip
+                reasons += [
+                    {"code": "audit_downgrade", "detail": d[:300]} for d in audit.downgrade_reasons
+                ]
             await insert_verification(
                 conn,
                 ctx.run_id,
@@ -224,10 +236,15 @@ async def benchmark_auditor(
                 },
             )
     downgraded_arms = [a.arm for a in audits if a.verdict != a.engine_verdict]
-    text = "Audit: " + (
-        f"downgraded {', '.join(downgraded_arms)} to inconclusive. " if downgraded_arms
-        else "no verdict changed. "
-    ) + summary  # fmt: skip
+    text = (
+        "Audit: "
+        + (
+            f"downgraded {', '.join(downgraded_arms)} to inconclusive. "
+            if downgraded_arms
+            else "no verdict changed. "
+        )
+        + summary
+    )
     await ctx.events.emit(
         EventType.AGENT_SUMMARY, {"agent": "benchmark_auditor", "text": text[:600].strip()}
     )

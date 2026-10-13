@@ -77,15 +77,18 @@ async def run_to_end(
     roles = scripts([candidates(INDEX), NOTHING_MORE])
     roles["benchmark_auditor"] = auditor
     client = RoleClient(roles)
-    await execute_run(services(engine, migrated_db, client, provisioner), run_id, attempt=1,
-                      reclaimed=False)  # fmt: skip
+    await execute_run(
+        services(engine, migrated_db, client, provisioner), run_id, attempt=1, reclaimed=False
+    )
     return run_id
 
 
 async def test_audit_records_checks_and_never_upgrades(
-    app_engine: AsyncEngine, owner: psycopg.Connection, migrated_db: str,
+    app_engine: AsyncEngine,
+    owner: psycopg.Connection,
+    migrated_db: str,
     provisioner: SandboxProvisioner,
-) -> None:  # fmt: skip
+) -> None:
     neutral = json.dumps({"summary": "No concerns beyond the checks.", "concerns": []})
     run_id = await run_to_end(app_engine, migrated_db, provisioner, [neutral, neutral])
 
@@ -108,9 +111,11 @@ async def test_audit_records_checks_and_never_upgrades(
 
 
 async def test_cited_downgrade_concern_moves_verified_to_inconclusive_only(
-    app_engine: AsyncEngine, owner: psycopg.Connection, migrated_db: str,
+    app_engine: AsyncEngine,
+    owner: psycopg.Connection,
+    migrated_db: str,
     provisioner: SandboxProvisioner,
-) -> None:  # fmt: skip
+) -> None:
     run_id = await run_to_end(
         app_engine, migrated_db, provisioner, [downgrade_everything, downgrade_everything]
     )
@@ -136,9 +141,11 @@ async def test_cited_downgrade_concern_moves_verified_to_inconclusive_only(
 
 
 async def test_failed_narrative_keeps_the_deterministic_audit(
-    app_engine: AsyncEngine, owner: psycopg.Connection, migrated_db: str,
+    app_engine: AsyncEngine,
+    owner: psycopg.Connection,
+    migrated_db: str,
     provisioner: SandboxProvisioner,
-) -> None:  # fmt: skip
+) -> None:
     outage = LLMError("provider down")
     run_id = await run_to_end(app_engine, migrated_db, provisioner, [outage] * 8)
 

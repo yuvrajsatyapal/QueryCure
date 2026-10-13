@@ -160,3 +160,15 @@ class SandboxPolicyError(QueryCureError):
 
     code = "SANDBOX_SQL_NOT_ALLOWED"
     status = 422
+
+
+class NotFinalizedError(QueryCureError):
+    """A manifest or final report was requested for a run that was never finalized."""
+
+    code = "NOT_FINALIZED"
+    status = 404
+
+
+class ExperimentNotReplayableError(QueryCureError):
+    code = "EXPERIMENT_NOT_REPLAYABLE"
+    status = 422

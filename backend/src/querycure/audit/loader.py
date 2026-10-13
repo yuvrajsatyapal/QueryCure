@@ -98,12 +98,14 @@ async def load_audit_inputs(
     existing = set(
         (
             await conn.execute(
-                text("SELECT id FROM evidence WHERE run_id = :run AND kind IN "
-                     "('benchmark_metric', 'correctness_check')"),
+                text(
+                    "SELECT id FROM evidence WHERE run_id = :run AND kind IN "
+                    "('benchmark_metric', 'correctness_check')"
+                ),
                 {"run": run_id},
             )
         ).scalars()
-    )  # fmt: skip
+    )
     pairs = [(c.arm, p.name) for c in config.candidates for p in config.param_sets]
 
     def ids(kind: str, prefix: str) -> dict[tuple[str, str], str]:
