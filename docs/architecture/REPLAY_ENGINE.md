@@ -347,6 +347,8 @@ Both experiments store an `EnvironmentFingerprint` ([BENCHMARK_ENGINE §1](BENCH
 | **Material** | PostgreSQL major version, planner-relevant settings (`shared_buffers`, `work_mem`, `effective_cache_size`, `random_page_cost`, `seq_page_cost`, `jit`, `max_parallel_workers_per_gather`, `default_statistics_target`), sandbox image digest, benchmark engine version, CPU architecture, CPU model, core count, memory | Any difference → `comparison_mode = cross_environment`; UI banner: "Different environment: ratios may not transfer; absolute latencies are not comparable" |
 | **Minor** | PostgreSQL minor version, OS/kernel version, container runtime version, wall-clock date | Listed in `result.environment`; mode stays `same_environment` |
 
+**Engine versions (ADR-0019).** A replay is scored with the source experiment's rules: `rules.evaluate(..., engine_version=source.engine_version)`, where `bench@1` is kept frozen. A source and replay produced by different engine versions are therefore always `cross_environment` (benchmark engine version is a material field), never "reproduced". Replicates of a noisy round are not replays: they are new experiments of the original run.
+
 ### 9.4 Stated limitations (included in every comparison result)
 
 - **Coverage.** Two experiments are a small sample of environmental variance. `reproduced` means "consistent in this pair of runs", not "portable".

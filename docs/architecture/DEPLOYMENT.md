@@ -60,14 +60,25 @@ flowchart TB
 
 ### Local Compose services (`infra/docker/compose.yaml`)
 
-*Implemented (Phase 3):* `metadata-db`, `sandbox-db` (planner settings pinned with `-c`), `sandbox-relay` (`alpine/socat:1.8.0.3`, loopback `127.0.0.1:55432` → `sandbox-db:5432`, so a host-run worker and the tests can reach the internal-only sandbox), and an opt-in `worker` (profile `bench`, built from `backend/Dockerfile`) on `default` + `sandbox_net`. The container worker is the low-noise benchmarking path: an in-network `SELECT 1` round trip is ≈ 40 µs versus ≈ 355–451 µs through the published port. Stop any host worker before starting it. `api` and `web` still run on the host.
+*Implemented (Phase 3; default changed by [ADR-0020](../engineering/adr/ADR-0020-container-worker-default-for-local-benchmarks.md), D12):*
+- `metadata-db`;
+- `sandbox-db`, with planner settings pinned with `-c`;
+- `sandbox-relay` (`alpine/socat:1.8.0.3`, loopback `127.0.0.1:55432` → `sandbox-db:5432`), so a host-run worker and the tests can reach the internal-only sandbox;
+- `worker`, built from `backend/Dockerfile`, on `default` + `sandbox_net`.
+
+`docker compose up -d` starts all four. **The container worker is the default local Mode C benchmarking path:**
+- an in-network `SELECT 1` round trip is ≈ 33–40 µs, versus ≈ 355–451 µs through the published port;
+- it sets `QC_BENCH_PATH=docker-network`, recorded as the environment fingerprint's `container_runtime`;
+- after backend changes, rebuild it with `docker compose up -d --build worker`.
+
+**Host-run development is still supported:** start `docker compose up -d metadata-db sandbox-db sandbox-relay` and run the worker on the host. Its default `QC_BENCH_PATH=docker-relay` is what the fingerprint then records. **Never run both workers**: they would split jobs across measurement paths. The Playwright e2e starts its own host worker with the stub LLM, so run `docker compose stop worker` first and start it again afterwards. `api` and `web` run on the host.
 
 | Service | Image | Notes |
 |---|---|---|
 | `metadata-db` | `postgres:17` | port 5432 on localhost only; volume `qc_meta` |
 | `sandbox-db` | `postgres:17` + `hypopg` (optional) | networks: `sandbox_net` (internal: true); `cpus: 2`, `mem_limit: 2g`, `shm_size: 512m`; tuned `postgresql.conf` checked into repo |
 | `api` | built from `backend/Dockerfile` | `uvicorn querycure.api.main:app` |
-| `worker` | same image | `python -m querycure.worker`; joins default + `sandbox_net` |
+| `worker` | built from `backend/Dockerfile` | `python -m querycure.worker` as uid 10001; joins default + `sandbox_net`; **default** local benchmarking path (ADR-0020) |
 | `web` | `node:22` (dev) | `pnpm dev`; or run on host |
 
 Developers may run `api`/`worker`/`web` on the host and only the databases in Docker; both are supported.
@@ -115,6 +126,7 @@ Migrations run as a separate release step before new API instances start; migrat
 | `DATABASE_URL` / `DATABASE_URL_DIRECT` | metadata DB pooled / direct (LISTEN), as the restricted `qc_app` role |
 | `DATABASE_MIGRATION_URL` | owner role, used only by Alembic |
 | `SANDBOX_ADMIN_URL` | sandbox server admin DSN (local only) |
+| `QC_BENCH_PATH` | `docker-relay` (default, host worker) or `docker-network` (worker container on `sandbox_net`); recorded as `container_runtime` in the environment fingerprint (ADR-0020) |
 | `QC_MASTER_KEY` | AES-256-GCM key (base64, 32 bytes) |
 | `ALLOW_PRIVATE_TARGETS` | SSRF guard bypass for local profile |
 | `FEATURE_LIVE_INSPECTION_PUBLIC`, `FEATURE_SANDBOX` | feature flags |

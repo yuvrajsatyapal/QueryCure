@@ -129,7 +129,7 @@ Error messages never include credentials, DSNs, or raw driver errors (driver err
 
 **Phase 3 (implemented, T3.10/T3.12).**
 - `sandbox_benchmark` needs `FEATURE_SANDBOX` (local default on, otherwise 403), a demo `workload_id`, the query, ≤ 5 param sets with one value per `$n` (a parameterized query may omit them only if it is one of the workload's example queries, whose sets are then used), and accepts `pre_authorize_demo_sandbox` (422 outside sandbox mode). Param sets accept `edge_case`.
-- `GET /runs/{id}/candidates|approvals|experiments` and `GET /experiments/{id}` are user-scoped (404 otherwise). Experiment detail returns the stored config, environment, `ExperimentResult` and the raw blocks (integer-ns samples, plan digests).
+- `GET /runs/{id}/candidates|approvals|experiments` and `GET /experiments/{id}` are user-scoped (404 otherwise). Experiment detail returns the stored config, environment, `ExperimentResult` and the raw blocks (integer-ns samples, plan digests). `ExperimentSummary` carries `replicate` (0 = the approved experiment) and, on replicate 0 of a noisy round, `replication` (the `ReplicationResult`: per-candidate `verified_with_noise_warning` / `verified` / `inconclusive`, the CI range across experiments, and the experiment IDs; ADR-0019).
 - `POST /approvals/{id}/decision`: `approve` | `decline` | `partial` (a non-empty subset of the offered candidate ids, else 422). Only a `pending` request is decided; a repeat returns the first decision (202); an expired one is 409 `INVALID_STATE`. The transaction records the decision, adds the wait to `waiting_seconds`, moves the run `awaiting_approval → queued`, emits `approval.decided` and queues `run_resume`.
 
 Implemented in T2.11. Phase 2 rules for `POST /investigations`:

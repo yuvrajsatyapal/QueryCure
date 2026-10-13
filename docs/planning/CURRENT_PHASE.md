@@ -3,9 +3,9 @@
 | Field | Value |
 |---|---|
 | Phase | **3 — Optimization & benchmarking** (Phase 1 complete: [PHASE_1_REPORT](reports/PHASE_1_REPORT.md); Phase 2 implemented, acceptance partially met: [PHASE_2_REPORT](reports/PHASE_2_REPORT.md)) |
-| Status | **Phase 3 implemented; exit partially met** ([PHASE_3_REPORT](reports/PHASE_3_REPORT.md)). Acceptance #1, #3, #4, #5 met against real PostgreSQL 17; #2 ends as the documented noisy-hardware `inconclusive` (177×/270× measured, stopped by the sample-quality gate; decision D11 open). Prerecorded demo fixtures committed. **Pending, tracked separately:** Phase 2 smoke recordings `orders_injection_in_schema`, `orders_plain_explain` (Phase 2 acceptance stays partial until recorded) and Phase 3 Mode C recordings `orders_sandbox_composite_index`, `rewrite_trap_sandbox`; no OpenRouter request was sent in Phase 3. Phase 4 not started (awaiting go-ahead) |
-| Last updated | 2026-10-12 |
-| Application code | Phases 1–3: API, metadata DB (migrations 0001–0009), parsing, inspection gateway, artifact store, six demo workloads; multi-agent graph with Optimization Engineer, approval gate (interrupt/resume, expiry), sandbox benchmark engine (`bench@1`) and tournament; web app with workspace (upload / live EXPLAIN / demo workload), live timeline, findings, approval card and tournament tab. |
+| Status | **Phase 3 implemented; exit partially met** ([PHASE_3_REPORT](reports/PHASE_3_REPORT.md)). Owner decisions applied 2026-10-12/13: ADR-0018 approved in principle with documented assumptions; **D11** resolved as `verified_with_noise_warning` via independent replication; **D12** container worker is the local default (ADR-0019, ADR-0020, engine `bench@2`, migration 0010). Acceptance #1, #3, #4, #5 met against real PostgreSQL 17. #2: fresh engine-level sf=1 runs (host relay, 5 seeds, not a full API run) ended `verified` (3/5) or `verified_with_noise_warning` (2/5). The committed sf=1 fixture stays the recorded `bench@1` `inconclusive` until re-recorded. **Pending, tracked separately:** Phase 2 smoke recordings `orders_injection_in_schema`, `orders_plain_explain` (Phase 2 acceptance stays partial until recorded) and Phase 3 Mode C recordings `orders_sandbox_composite_index`, `rewrite_trap_sandbox`. No OpenRouter request was sent in Phase 3 or in this change. Phase 4 not started (awaiting go-ahead) |
+| Last updated | 2026-10-13 |
+| Application code | Phases 1–3: API, metadata DB (migrations 0001–0010), parsing, inspection gateway, artifact store, six demo workloads; multi-agent graph with Optimization Engineer, approval gate (interrupt/resume, expiry), sandbox benchmark engine (`bench@2`: corroborated regressions, noise screen, independent replication) and tournament; web app with workspace (upload / live EXPLAIN / demo workload), live timeline, findings, approval card and tournament tab. |
 
 ## Completed
 
@@ -288,6 +288,7 @@ Started 2026-10-12 on the owner's instruction; `main` clean at `ffe9321`. Detail
 - [x] **T3.13 fixtures**: 4 prerecorded experiments in `backend/evals/fixtures/experiments/`, provenance enforced on import.
 - [x] **Bug fixed**: lock-upgrade deadlock between parallel content writers (`ensure_writable` `FOR SHARE` → `FOR NO KEY UPDATE`), regression test.
 - [x] **Opt-in worker container** (`backend/Dockerfile`, compose profile `bench`) on `sandbox_net`; measured round trip 40 µs vs 355–451 µs via the published port.
+- [x] **Owner decisions (2026-10-12/13):** ADR-0019 (`bench@2`: corroborated regressions; noise screen; `verified_with_noise_warning` by 3 agreeing independent experiments; `bench@1` rules frozen and proven to reproduce stored verdicts; schema-1 results byte-identical), migration 0010 (replicates), `interim-report@4`, UI badge and approval disclosure; ADR-0020 (container worker default, `QC_BENCH_PATH` recorded in the fingerprint).
 
 ## Blockers
 
@@ -308,7 +309,7 @@ Started 2026-10-12 on the owner's instruction; `main` clean at `ffe9321`. Detail
 
 ## Next actions
 
-0. **Owner decisions:** review [ADR-0018](../engineering/adr/ADR-0018-robust-sample-quality-gate.md); decide D11 and D12 below.
+0. ~~Owner decisions on ADR-0018, D11, D12~~: applied (ADR-0019, ADR-0020). **New owner question (R18):** whether `bench@3` adds block agreement to the clean `verified` gate and/or smaller blocks. See PHASE_3_REPORT §6 and §10.
 1. On the next UTC day (free quota resets at 00:00 UTC), record the two missing Phase 2 smoke cases with the pinned free model (command in PHASE_2_REPORT §10), confirm `run --suite smoke` replays with exit 0, commit, and add the eval smoke step to CI.
 2. ~~Calibration follow-up for `pk_lookup_already_optimal`~~: done (ADR-0017).
 3. Then, as free capacity allows, record the Phase 3 Mode C cases (`--suite full --case orders_sandbox_composite_index`, `rewrite_trap_sandbox`; needs `SANDBOX_ADMIN_URL`/`SANDBOX_BENCH_PASSWORD`).
@@ -318,6 +319,10 @@ Started 2026-10-12 on the owner's instruction; `main` clean at `ffe9321`. Detail
 
 | Check | Result |
 |---|---|
+| Backend (owner decisions ADR-0019/0020, 2026-10-13) | `QC_REQUIRE_DB=1 uv run pytest -q` → **1104 passed, 1 xfailed** (652 unit, 330 integration, 123 security collected; 1 strict xfail documents R18); ruff, format, `mypy --strict` (162 files) clean; migration 0010 up/down/up verified |
+| Frontend (2026-10-13) | lint, typecheck, `pnpm test` → **68 passed**, build OK; Playwright **2 passed** (container worker stopped for the run) |
+| Compose (2026-10-13) | `alembic current` → `0010 (head)`; worker container default, `container_runtime=docker-network`, uid 10001; sandbox egress (TCP, DNS, metadata-db) blocked, re-verified |
+| Evals (2026-10-13) | smoke replay unchanged: 3 PASS, 2 unrecorded (exit 1); no OpenRouter request |
 | Backend (Phase 3, 2026-10-12) | `QC_REQUIRE_DB=1 uv run pytest -q` → **1043 passed** (595 unit, 325 integration, 123 security) on PG 17.11 + sandbox, Python 3.12; ruff, format, `mypy --strict` (162 files) clean; CI green on `fc72846`, `53fa425`, `510f766` |
 | Frontend (Phase 3) | lint, typecheck, `pnpm test` → **65 passed**, build OK; Playwright **2 passed** (incl. sandbox approval flow) |
 | Evals (Phase 3) | smoke replay unchanged: 3 PASS, 2 unrecorded (exit 1); Mode C cases unrecorded; benchmark-engine eval table 9/9 |
@@ -351,5 +356,6 @@ Defaults are chosen so implementation can proceed; change any before the listed 
 | D8 | Manifest signing (key outside DB) or external timestamping | Deferred; digests + append-only grants + manifest digest in exports (REPLAY_ENGINE §6) | Phase 5 security review |
 | D9 | Replay equivalence margin `m` | 1.25 (±25% speedup drift); revisit after measuring same-machine replay variance in Phase 4 | Phase 4 exit |
 | D10 | Retirement policy for old report builders/renderers | Keep all versions; fallback to stored artifacts if ever retired | Before first builder@2 |
-| D11 | Sample-quality gate on very fast winning arms: on Docker Desktop, sub-ms arms have ≈0.1 ms jitter, so 6–270× wins with CIs far above 1.10× end `inconclusive` (PHASE_3_REPORT §4, §6) | Keep the spec rule (gate 4b applies to every arm). **Recommended:** waive 4b when the primary CI lower bound ≥ 2 × `min_effect`, and label such verdicts with the noisy environment, symmetric to the regression rule | Before demo fixtures are re-recorded / Phase 4 auditor |
-| D12 | Run local benchmarks through the container worker on `sandbox_net` by default? | Opt-in (`docker compose --profile bench up -d worker`); host worker + relay remains the default | Phase 5 (deployment) |
+| D11 | ~~Sample-quality gate on very fast winning arms~~ | **Decided by the owner (2026-10-12): no plain waiver.** The single experiment keeps `inconclusive`. `verified_with_noise_warning` needs a noise screen (n ≥ 30, no censoring, no param-set regression, quartile separation, every block ≥ `min_effect`) plus agreement of 3 independent experiments ([ADR-0019](../engineering/adr/ADR-0019-noise-warning-verification-and-corroborated-regression.md), `bench@2`) | — |
+| D12 | ~~Container worker by default?~~ | **Decided by the owner (2026-10-12): yes** for local Mode C benchmarking. The host worker + relay stays supported, and sandbox isolation is unchanged ([ADR-0020](../engineering/adr/ADR-0020-container-worker-default-for-local-benchmarks.md)) | — |
+| D13 | Block agreement for the clean `verified` gate and/or more, smaller blocks (risk R18) | Not changed; documented by a strict-xfail test | Before `bench@3` / demo fixture re-recording |

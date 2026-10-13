@@ -250,7 +250,11 @@ Mirror the Pydantic models in [AGENT_SYSTEM.md §4](AGENT_SYSTEM.md#key-models-a
 Index: `(run_id) WHERE status = 'pending'`.
 
 ### experiments
-*Implemented (migration 0008)* with these additions: `approval_request_id` (the approval that authorized the DDL), `result_artifact_id` (an `experiment_result` artifact: builds, measurements, stats, rule verdicts, tournament), `seed`, and `error JSONB`. Unique `(run_id, round)` for non-replay experiments. `optimization_candidates` stores `ddl TEXT[]`, `query_sql` (rewrites only, enforced by a CHECK) and `sql_sha256`, the digest the approval pins.
+*Implemented (migration 0008)* with these additions: `approval_request_id` (the approval that authorized the DDL), `result_artifact_id` (an `experiment_result` artifact: builds, measurements, stats, rule verdicts, tournament), `seed`, and `error JSONB`. Unique `(run_id, round, replicate)` for non-replay experiments. Migration 0010 (ADR-0019) adds:
+- `replicate INT` (0 = the approved experiment; existing rows are 0);
+- `replication_artifact_id` on replicate 0, a `replication_result` artifact holding the replication verdicts;
+- the candidate status `verified_with_noise_warning`.
+The 0010 downgrade refuses to run while any of these is in use. `optimization_candidates` stores `ddl TEXT[]`, `query_sql` (rewrites only, enforced by a CHECK) and `sql_sha256`, the digest the approval pins.
 
 `run_id`, `kind` (`single`, `tournament`), `status` (`pending`, `provisioning`, `running`, `completed`, `failed`, `cancelled`), `config_artifact_id` (full `ExperimentConfig`), `environment JSONB` (`EnvironmentFingerprint`), `environment_digest TEXT`, `engine_version TEXT` (`bench@N`), `row_profile TEXT` (`qc-row-v1`), `replay_of_experiment_id` (nullable, set by experiment replay), `round INT`, `started_at`, `finished_at`.
 

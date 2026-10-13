@@ -1,8 +1,8 @@
 # Benchmark Engine
 
-Status: **Implemented in Phase 3** (`bench@1`; the Benchmark Auditor follows in Phase 4). Decisions: [ADR-0007](../engineering/adr/ADR-0007-sandbox-template-clones.md) (sandbox clones), [ADR-0008](../engineering/adr/ADR-0008-benchmark-statistics.md) (statistics), [ADR-0009](../engineering/adr/ADR-0009-deterministic-verification-authority.md) (verdict authority), [ADR-0018](../engineering/adr/ADR-0018-robust-sample-quality-gate.md) (robust sample-quality gate).
+Status: **Implemented in Phase 3**. Current engine `bench@2`; `bench@1` rules are frozen for re-scoring stored experiments. The Benchmark Auditor follows in Phase 4. Decisions: [ADR-0007](../engineering/adr/ADR-0007-sandbox-template-clones.md) (sandbox clones), [ADR-0008](../engineering/adr/ADR-0008-benchmark-statistics.md) (statistics), [ADR-0009](../engineering/adr/ADR-0009-deterministic-verification-authority.md) (verdict authority), [ADR-0018](../engineering/adr/ADR-0018-robust-sample-quality-gate.md) (robust sample-quality gate), [ADR-0019](../engineering/adr/ADR-0019-noise-warning-verification-and-corroborated-regression.md) (corroborated regressions, `verified_with_noise_warning`, statistical assumptions), [ADR-0020](../engineering/adr/ADR-0020-container-worker-default-for-local-benchmarks.md) (container worker default).
 
-Code: `benchmark/` (`stats`, `schedule`, `correctness`, `rules`, `tournament`, `executor`, `engine`), `sandbox/provisioner.py`, `sql/ddl_allowlist.py`, `replay/canonical/row_v1.py`, models in `domain/benchmark.py`. The engine is synchronous and runs in one worker thread; persistence and progress go through an `EngineHooks` protocol, so it is tested against the real sandbox with in-memory hooks (`tests/integration/test_benchmark_engine.py`, `test_benchmark_eval_table.py`).
+Code: `benchmark/` (`stats`, `schedule`, `correctness`, `rules`, `replication`, `tournament`, `executor`, `engine`), `sandbox/provisioner.py`, `sql/ddl_allowlist.py`, `replay/canonical/row_v1.py`, models in `domain/benchmark.py`. The engine is synchronous and runs in one worker thread; persistence and progress go through an `EngineHooks` protocol, so it is tested against the real sandbox with in-memory hooks (`tests/integration/test_benchmark_engine.py`, `test_benchmark_eval_table.py`).
 
 The benchmark engine is **pure, deterministic Python**. It never calls an LLM. Its job is to answer: *under controlled, recorded conditions, is candidate X faster than the baseline, by how much, with what uncertainty, and does it return the same results?*
 
@@ -32,11 +32,13 @@ class ExperimentConfig(BaseModel):          # stored as an artifact (hash in man
 class ExperimentResult(BaseModel):
     experiment_id: UUID
     environment: EnvironmentFingerprint      # see below; stored on `experiments.environment`
-    engine_version: str                      # "bench@1"; bumped when measurement or stats code changes output
+    engine_version: str                      # "bench@2"; bumped when measurement, stats or rule code changes output
+    schema_version: Literal[1, 2]            # 2 for bench@2: adds noise_screens; schema-1 results serialize unchanged
     arms: list[ArmResult]                    # per arm × param set: latencies_ns (int samples), fingerprint, plan ref, buffers
     build: list[BuildResult]                 # per candidate: index size, build time, DDL errors
     stats: list[SpeedupStats]                # per candidate × param set
     verdicts: list[RuleVerdict]              # deterministic verdict + reason codes
+    noise_screens: list[NoiseScreen] | None  # bench@2: one per arm stopped only by gate 4b (§7.1)
 
 class EnvironmentFingerprint(BaseModel):     # canonicalized with qc-json-v1; digest stored as environment_digest
     pg_version: str                          # server_version_num, e.g. "170002"
@@ -74,6 +76,8 @@ stateDiagram-v2
   note right of completed: clones dropped, lock released in every terminal state
 ```
 
+**Replicates (bench@2, [ADR-0019](../engineering/adr/ADR-0019-noise-warning-verification-and-corroborated-regression.md)).** If the approved experiment ends with no winner and some arm has an eligible noise screen, `run_replicated` measures those arms again in up to two more experiments. Each one is a full lifecycle as above, with its own experiment ID (`uuid5(original, "replicate:i")`), seed (`derive_seed(seed, "replicate", i)`), clones and approval-digest check. They share one time budget, stop as soon as no arm is still eligible, and a failed or out-of-budget replicate simply leaves the arm `inconclusive`.
+
 Each state transition emits a `benchmark.progress` event. Persistence is coarser: `experiments.status` stores `pending`, `provisioning`, `running` (covers building → scoring), `completed`, `failed`, `cancelled`; the fine-grained state travels in the event payload's `state` field ([API_DESIGN §3](API_DESIGN.md#3-streaming-sse)). Measurement is resumable at block granularity (`benchmark_runs` unique key `(experiment_id, arm, param_set, block)`).
 
 ## 3. Sandbox layout
@@ -89,7 +93,7 @@ Each state transition emits a `benchmark.progress` event. Persistence is coarser
 - **Templates** `qc_tpl_<sha256(workload ref ‖ tpl@1)[:16]>` are built under a temporary name (`qc_tplbuild_…`) as `qc_bench`: workload statements, then `autovacuum_enabled = false` per table (clones inherit it), then `VACUUM (FREEZE)` with **no ANALYZE** (`stale_stats` depends on that). The build then renames the database, sets `IS_TEMPLATE true ALLOW_CONNECTIONS false`, and records `workload|tpl@1|data_digest` in the database comment. `data_digest` = `qc-json-v1` digest of the per-table md5 checksums. Rebuilding produces the same digest (integration test).
 - **Clones** `qc_clone_<experiment[:12]>_<arm index>` use `CREATE DATABASE … TEMPLATE … OWNER qc_bench STRATEGY FILE_COPY`, with at most `max_clones` (8) at once.
 - **Lease.** A session-level `pg_try_advisory_lock` on the admin database is polled until a deadline and gives up early on cancellation. A crashed worker's lock ends with its connection. Each lease starts with `cleanup_orphans()`: under the lock, every `qc_clone_*` / `qc_tplbuild_*` is an orphan.
-- **Local network.** The worker and tests run on the host, which cannot join an `internal` network. `sandbox-relay` (`alpine/socat:1.8.0.3`) forwards `127.0.0.1:55432` → `sandbox-db:5432` and nothing else, so `sandbox-db` stays on `sandbox_net` with no egress (re-verified: TCP, DNS and metadata-db are all unreachable from it).
+- **Local network.** By default the worker runs as a container on `sandbox_net` and measures in-network ([ADR-0020](../engineering/adr/ADR-0020-container-worker-default-for-local-benchmarks.md)). Host-run workers and the tests run on the host, which cannot join an `internal` network. `sandbox-relay` (`alpine/socat:1.8.0.3`) forwards `127.0.0.1:55432` → `sandbox-db:5432` and nothing else, so `sandbox-db` stays on `sandbox_net` with no egress (re-verified: TCP, DNS and metadata-db are all unreachable from it).
 
 ## 4. Measurement procedure
 
@@ -125,6 +129,7 @@ Per arm × param set (n = measured runs, after excluding timeouts):
 
 | Statistic | Rule |
 |---|---|
+| block ratio (bench@2) | `median(baseline block) / median(candidate block)` per interleaved block. Used only by the decisive-regression corroboration and the noise screen (§7) |
 | median | always |
 | p95 | only if n ≥ 20; otherwise shown as "n/a (n<20)" |
 | min, max, IQR | always |
@@ -147,12 +152,36 @@ Evaluated in order; first failing gate sets the verdict and reason code.
 | 2 | No errors/timeouts above 10% of samples | `inconclusive` (`unstable_execution`) |
 | 3 | Correctness: all param sets match baseline | `rejected` (`result_mismatch`) / `inconclusive` (`nondeterministic_order`, `result_too_large`) |
 | 4a | Sample count: n ≥ 10 for both arms | `inconclusive` (`insufficient_evidence`) |
-| 5 | No regression: every param set's CI **upper** bound ≥ `max_regression` | `rejected` (`regression`) |
+| 5 | No regression: every param set's CI **upper** bound ≥ `max_regression`. **bench@2:** a CI below it rejects only when corroborated: n ≥ 20 on both arms, no failed baseline sample, ≥ 3 blocks, and every block ratio < `max_regression` | `rejected` (`regression`); bench@2 uncorroborated → `inconclusive` (`insufficient_evidence`) at gate 5, never verified |
 | 4b | Sample quality: robust CV ≤ `max_cv` for both arms | `inconclusive` (`insufficient_evidence`) |
 | 6 | Effect: primary param set CI **lower** bound ≥ `min_effect` | `inconclusive` (`effect_not_significant`) if CI straddles; `rejected` (`no_improvement`) if CI upper < 1.0 |
 | — | All gates pass | `verified` |
 
 Gate 5 runs before 4b ([ADR-0018](../engineering/adr/ADR-0018-robust-sample-quality-gate.md)): noise only widens a bootstrap CI, so a CI entirely below `max_regression` is real harm even when the samples are noisy. Gate 3 also holds rewrites of parameterized queries to the ≥ 3 param sets with an edge case rule (§5) (`inconclusive: insufficient_evidence`). The engine reports the first failing gate's number in `RuleVerdict.gate`.
+
+### 7.1 Noisy samples: `verified_with_noise_warning` (bench@2)
+
+The **statistical assumptions** behind these gates are listed, with the check that defends each one, in [ADR-0019](../engineering/adr/ADR-0019-noise-warning-verification-and-corroborated-regression.md#statistical-assumptions-made-explicit): exchangeable samples, arm-independent disturbances, no informative censoring, enough samples, independent arms, and a stationary effect.
+
+When gate 4b alone stops an arm, its verdict stays `inconclusive: insufficient_evidence`. The engine records a **noise screen**. It is eligible only if all of these hold:
+
+| Check | Rule |
+|---|---|
+| `n` | n ≥ 30 for both arms on every param set, and ≥ 4 blocks |
+| `censor` | no failed sample on either arm |
+| `noregress` | every param set's CI **lower** bound ≥ `max_regression` |
+| `effect` | primary CI lower bound ≥ `min_effect` |
+| `separation` | primary: `Q3(candidate) × min_effect ≤ Q1(baseline)` |
+| `blocks` | primary: every block ratio ≥ `min_effect` |
+
+`benchmark/replication.py` then decides across the approved experiment and its replicates. The result is `verified_with_noise_warning` only if all of these hold:
+
+- **3 experiments:** three independent experiments completed (distinct IDs and seeds, all measured, all `bench@2`);
+- **comparable:** the same environment, workload, query, param sets, thresholds and arm SQL;
+- **each passes alone:** every experiment is either `verified` or a gate-4 stop with an eligible screen, and every param set's CI lower bound is ≥ `max_regression`;
+- **they agree:** the primary CIs share a common value.
+
+Otherwise the result is `inconclusive` (`insufficient_evidence` or `replicates_disagree`). The reported range runs from the smallest lower bound to the largest upper bound across the experiments. The warning is always shown in words; the result is never relabelled plain "verified".
 
 The Benchmark Auditor agent then reviews plans and context and may **downgrade** `verified` → `inconclusive` with a stated reason (e.g., "speedup comes from a plan relying on a correlation present only in synthetic data"). It may never upgrade.
 
@@ -199,7 +228,8 @@ Until F-47 ships, the Index Strategist provides a qualitative write-overhead cla
 - Single-session measurement; no concurrency, lock, or connection-pool effects.
 - Synthetic or user-provisioned sandbox data; distribution may differ from production — and the planner's choices depend on statistics derived from that data.
 - Sandbox hardware/config ≠ production; ratios transfer better than absolute times, but neither is guaranteed.
-- Docker on macOS adds virtualization noise; CV gate exists for this reason.
+- Docker on macOS adds virtualization noise; CV gate exists for this reason. Measured block-to-block variation is large: block ratios for a neutral index on a ~4 ms scan ranged 0.54–1.57. Block corroboration and the noise screen's block check are therefore probabilistic protections, strongest with many blocks ([ADR-0019](../engineering/adr/ADR-0019-noise-warning-verification-and-corroborated-regression.md) residual risks).
+- `verified_with_noise_warning` means three same-environment experiments agree. A disturbance that is systematic and repeats in every run on the same host cannot be excluded.
 
 ## 11. Demo workloads (ground-truth fixtures)
 
