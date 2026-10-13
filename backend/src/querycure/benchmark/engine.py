@@ -14,6 +14,7 @@ Safety properties enforced here, not only upstream:
 - cancellation is checked between blocks and also interrupts the in-flight statement.
 """
 
+import dataclasses
 import hashlib
 import os
 import platform
@@ -31,12 +32,22 @@ from querycure.benchmark.correctness import (
     order_is_total,
 )
 from querycure.benchmark.executor import ArmRunner, Sample, buffers_of
-from querycure.benchmark.rules import CandidateEvidence, compute_stats, evaluate
+from querycure.benchmark.replication import (
+    REPLICATES,
+    Replicate,
+    assess_all,
+    eligible_arms,
+    replicate_config,
+)
+from querycure.benchmark.rules import BlockPair, CandidateEvidence, assess, compute_stats
 from querycure.benchmark.schedule import build_schedule
 from querycure.benchmark.tournament import Contender, rank
-from querycure.core.errors import RunCancelledError, SandboxPolicyError
+from querycure.core.errors import QueryCureError, RunCancelledError, SandboxPolicyError
+from querycure.core.logging import get_logger
 from querycure.domain.benchmark import (
     BASELINE_ARM,
+    ENGINE_VERSION,
+    RESULT_SCHEMA,
     ArmFingerprint,
     ArmMeasurement,
     BuildResult,
@@ -44,6 +55,8 @@ from querycure.domain.benchmark import (
     EnvironmentFingerprint,
     ExperimentConfig,
     ExperimentResult,
+    NoiseScreen,
+    ReplicationResult,
     RuleVerdict,
     SpeedupStats,
 )
@@ -54,6 +67,7 @@ from querycure.sql.ddl_allowlist import AllowedDdl, validate_candidate
 from querycure.sql.validator import validate_select
 from querycure.workloads.registry import WorkloadRef
 
+log = get_logger(__name__)
 INCONSISTENT = "inconsistent"
 Phase = Literal["build", "measure", "plan"]
 State = Literal[
@@ -119,9 +133,14 @@ class EngineOptions:
     lease_timeout_seconds: float = 120.0
     time_budget_seconds: float = 8 * 60
     sandbox_image_digest: str = "unrecorded"
+    # Measurement path (ADR-0020): "docker-network" (worker container on sandbox_net) or
+    # "docker-relay" (host worker through the loopback relay). Recorded in the fingerprint.
     container_runtime: str = "docker"
     # Test seam only: called inside the timed region of each measured sample.
     noise: Callable[[], None] | None = None
+    # Test seam only: like `noise`, but told (arm, param set, block), so tests can inject a
+    # disturbance that hits one arm in some blocks (the "misleadingly narrow CI" cases).
+    arm_noise: Callable[[str, str, int], None] | None = None
 
 
 def _host_memory_bytes() -> int:
@@ -153,6 +172,23 @@ def environment_fingerprint(
         os=f"{platform.system()} {platform.release()}",
         container_runtime=options.container_runtime,
     )
+
+
+def _noise_for(
+    options: EngineOptions, arm: str, param_set: str, block: int
+) -> Callable[[], None] | None:
+    hooks = [h for h in (options.noise,) if h is not None]
+    if options.arm_noise is not None:
+        arm_noise = options.arm_noise
+        hooks.append(lambda: arm_noise(arm, param_set, block))
+    if not hooks:
+        return None
+
+    def run() -> None:
+        for h in hooks:
+            h()
+
+    return run
 
 
 def _check_cancel(hooks: EngineHooks) -> None:
@@ -271,6 +307,15 @@ def assemble(
     return out
 
 
+def assemble_blocks(records: Sequence[BlockRecord], arm: str, param_set: str) -> list[BlockPair]:
+    """Interleaved blocks of one candidate vs the baseline, in block order (ADR-0019)."""
+    by_block: dict[int, dict[str, list[int]]] = defaultdict(dict)
+    for r in records:
+        if r.phase == "measure" and r.param_set == param_set and r.arm in (BASELINE_ARM, arm):
+            by_block[r.block][r.arm] = list(r.latencies_ns)
+    return [(by_block[b].get(BASELINE_ARM, []), by_block[b].get(arm, [])) for b in sorted(by_block)]
+
+
 def _correctness(
     base: ArmMeasurement, cand: ArmMeasurement, *, has_order: bool, has_limit: bool, total: bool
 ) -> CorrectnessOutcome:
@@ -300,8 +345,11 @@ def score(
     *,
     unique_keys: Mapping[str, Sequence[Sequence[str]]],
     env_digest: str,
+    engine_version: str = ENGINE_VERSION,
 ) -> ExperimentResult:
-    """Correctness → stats → gates → tournament, from persisted rows only (resumable)."""
+    """Correctness → stats → gates → tournament, from persisted rows only (resumable).
+
+    `engine_version` selects the rules; a stored experiment is re-scored with its own."""
     meta = validate_select(config.baseline_query).metadata
     total = order_is_total(config.baseline_query, unique_keys)
     has_order, has_limit = bool(meta.order_by), meta.limit is not None
@@ -310,6 +358,7 @@ def score(
     measured = assemble(records, arms, ps_names)
     verdicts: list[RuleVerdict] = []
     stats: list[SpeedupStats] = []
+    screens: list[NoiseScreen] = []
     contenders: list[Contender] = []
     for arm in config.candidates:
         base = {ps: measured[(BASELINE_ARM, ps)] for ps in ps_names}
@@ -324,10 +373,16 @@ def score(
                                  total=total)
                 for ps in ps_names
             },
+            blocks={ps: assemble_blocks(records, arm.arm, ps) for ps in ps_names},
         )  # fmt: skip
         arm_stats = compute_stats(evidence, config)
-        verdict = evaluate(evidence, config, arm_stats, query_has_params=meta.parameter_count > 0)
+        verdict, screen = assess(
+            evidence, config, arm_stats, query_has_params=meta.parameter_count > 0,
+            engine_version=engine_version,
+        )  # fmt: skip
         verdicts.append(verdict)
+        if screen is not None:
+            screens.append(screen)
         stats.extend(arm_stats[ps] for ps in ps_names if ps in arm_stats)
         primary = arm_stats.get(ps_names[0])
         contenders.append(
@@ -342,6 +397,8 @@ def score(
         )
     table, winner = rank(contenders)
     return ExperimentResult(
+        schema_version=RESULT_SCHEMA[engine_version],  # type: ignore[arg-type]
+        engine_version=engine_version,
         experiment_id=config.experiment_id,
         environment_digest=env_digest,
         builds=[builds[c.arm] for c in config.candidates],
@@ -351,6 +408,7 @@ def score(
         tournament=table,
         winner=winner,
         order_is_total=total,
+        noise_screens=screens if RESULT_SCHEMA[engine_version] == 2 else None,
     )
 
 
@@ -493,7 +551,11 @@ def _measure(
                     continue
                 spec, runner = by_arm[name]
                 samples = [
-                    runner.execute(query_for(name), params[block.param_set], noise=options.noise)
+                    runner.execute(
+                        query_for(name),
+                        params[block.param_set],
+                        noise=_noise_for(options, name, block.param_set, block.block),
+                    )
                     for _ in range(block.runs)
                 ]
                 if any(s.failure == "cancelled" for s in samples):
@@ -528,3 +590,81 @@ def _measure(
     return score(
         config, builds, list(done.values()), unique_keys=unique_keys, env_digest=env_digest
     )
+
+
+@dataclass(frozen=True)
+class ReplicatedRun:
+    """The original experiment, any replicates, and the replication verdicts (None when the
+    original needed no replication: a verified winner, or no screen-eligible arm)."""
+
+    replicates: list[Replicate]
+    replication: ReplicationResult | None
+
+    @property
+    def winner(self) -> str | None:
+        if self.replication is not None:
+            return self.replication.winner
+        return self.replicates[0].result.winner
+
+
+def run_replicated(
+    config: ExperimentConfig,
+    approved: ApprovedExperiment,
+    *,
+    provisioner: SandboxProvisioner,
+    hooks_for: Callable[[ExperimentConfig, int], EngineHooks],
+    options: EngineOptions | None = None,
+    on_result: Callable[[ExperimentConfig, int, ExperimentResult], None] | None = None,
+    replicates: int = REPLICATES,
+) -> ReplicatedRun:
+    """D11 (ADR-0019 §3): the approved experiment, then up to `replicates - 1` independent
+    re-measurements of its screen-eligible arms, sharing one time budget.
+
+    Each replicate is a full experiment (own id, seed, clones, approval-digest check). The
+    replicates stop early once no arm is still eligible, or when the budget is spent; missing
+    replicates leave the arm inconclusive.
+    """
+    options = options or EngineOptions()
+    started = time.monotonic()
+
+    def run(cfg: ExperimentConfig, index: int, budget: float) -> ExperimentResult:
+        result = run_experiment(
+            cfg,
+            approved,
+            provisioner=provisioner,
+            hooks=hooks_for(cfg, index),
+            options=dataclasses.replace(options, time_budget_seconds=budget),
+        )
+        if on_result is not None:
+            on_result(cfg, index, result)
+        return result
+
+    first = run(config, 0, options.time_budget_seconds)
+    done = [Replicate(config=config, result=first)]
+    arms = eligible_arms(first)
+    if not arms:
+        return ReplicatedRun(replicates=done, replication=None)
+    for index in range(1, replicates):
+        remaining = options.time_budget_seconds - (time.monotonic() - started)
+        still = [
+            a
+            for a in arms
+            if all(
+                any(v.arm == a and v.verdict == "verified" for v in r.result.verdicts)
+                or a in eligible_arms(r.result.model_copy(update={"winner": None}))
+                for r in done
+            )
+        ]
+        if remaining <= 0 or not still:
+            break
+        cfg = replicate_config(config, index, still)
+        try:
+            done.append(Replicate(config=cfg, result=run(cfg, index, remaining)))
+        except RunCancelledError:
+            raise
+        except QueryCureError as exc:
+            # The approved experiment stands; a failed replicate only means fewer than three,
+            # which leaves the arm inconclusive (assess_arm says how many completed).
+            log.warning("replicate_failed", experiment_id=str(cfg.experiment_id), code=exc.code)
+            break
+    return ReplicatedRun(replicates=done, replication=assess_all(done))

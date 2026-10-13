@@ -76,7 +76,16 @@ def _evidence(
         },
         candidate={ps: _m(ARM, ps, s, (cand_failures or {}).get(ps)) for ps, s in cand.items()},
         correctness=correctness or {ps: MATCH for ps in base},
+        blocks={ps: blocks_of(base[ps], cand[ps]) for ps in base if ps in cand},
     )
+
+
+def blocks_of(base: list[int], cand: list[int], size: int = 5) -> list[tuple[list[int], list[int]]]:
+    """Interleaved blocks as the engine records them: `size` samples per arm per block."""
+    count = max(len(base), len(cand)) // size + (max(len(base), len(cand)) % size > 0)
+    return [
+        (base[i * size : (i + 1) * size], cand[i * size : (i + 1) * size]) for i in range(count)
+    ]
 
 
 def _verdict(ev: CandidateEvidence, config: ExperimentConfig | None = None, **kw: bool):  # type: ignore[no-untyped-def]

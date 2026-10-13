@@ -2,9 +2,9 @@
 artifacts, so every field is always present and raw samples are integer nanoseconds."""
 
 import uuid
-from typing import Literal
+from typing import Any, Literal, Self
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 JsonScalar = str | int | float | bool | None
 CandidateKind = Literal[
@@ -24,9 +24,15 @@ ReasonCode = Literal[
     "effect_not_significant",
     "no_improvement",
     "not_measured",
+    "replicates_disagree",
 ]
 BASELINE_ARM = "baseline"
-ENGINE_VERSION = "bench@1"
+# bench@2 (ADR-0019): corroborated regressions and the noise screen. bench@1 rules stay frozen
+# in benchmark.rules so stored bench@1 experiments can be re-scored by their own rules.
+ENGINE_VERSION = "bench@2"
+ENGINE_VERSIONS = ("bench@1", "bench@2")
+# Result schema per engine version: schema 2 adds `noise_screens`.
+RESULT_SCHEMA = {"bench@1": 1, "bench@2": 2}
 # Simpler changes win ties in the tournament (BENCHMARK_ENGINE §8).
 SIMPLICITY = {
     "analyze_statistics": 0,
@@ -154,6 +160,25 @@ class RuleVerdict(Frozen):
     gate: int | None  # first failing gate (1-6); None when verified
 
 
+NoiseCheckName = Literal["n", "censor", "noregress", "effect", "separation", "blocks"]
+
+
+class NoiseCheck(Frozen):
+    name: NoiseCheckName
+    passed: bool
+    detail: str = ""
+
+
+class NoiseScreen(Frozen):
+    """D11 (ADR-0019 §2): recorded for an arm stopped only by gate 4b. Never changes the verdict;
+    `eligible` admits the arm to replication."""
+
+    arm: str
+    eligible: bool
+    checks: list[NoiseCheck]
+    max_robust_cv: float | None
+
+
 class TournamentEntry(Frozen):
     arm: str
     rank: int
@@ -162,7 +187,7 @@ class TournamentEntry(Frozen):
 
 
 class ExperimentResult(Frozen):
-    schema_version: Literal[1] = 1
+    schema_version: Literal[1, 2] = 2
     experiment_id: uuid.UUID
     engine_version: str = ENGINE_VERSION
     environment_digest: str
@@ -174,3 +199,54 @@ class ExperimentResult(Frozen):
     winner: str | None
     order_is_total: bool
     provenance: Literal["measured", "prerecorded"] = "measured"
+    # Schema 2 (bench@2) only. None on schema-1 results and then omitted, so a stored bench@1
+    # result re-serializes to its original bytes and digest (ADR-0019 § Compatibility).
+    noise_screens: list[NoiseScreen] | None = Field(default=None, exclude_if=lambda v: v is None)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _schema_default(cls, data: Any) -> Any:
+        # Stored results always carry schema_version; new ones follow their engine version.
+        if not isinstance(data, dict):
+            return data
+        engine = data.get("engine_version", ENGINE_VERSION)
+        schema = data.get("schema_version", RESULT_SCHEMA.get(engine, 2))
+        out = {**data, "schema_version": schema}
+        if schema == 2 and out.get("noise_screens") is None:
+            out["noise_screens"] = []
+        return out
+
+    @model_validator(mode="after")
+    def _versions_agree(self) -> Self:
+        if RESULT_SCHEMA.get(self.engine_version) != self.schema_version:
+            raise ValueError(
+                f"result schema {self.schema_version} does not match {self.engine_version}"
+            )
+        if self.schema_version == 1 and self.noise_screens is not None:
+            raise ValueError("noise_screens require result schema 2 (bench@2)")
+        return self
+
+
+ReplicationLabel = Literal["verified", "verified_with_noise_warning", "inconclusive"]
+
+
+class ReplicationVerdict(Frozen):
+    """One candidate across independent experiments (ADR-0019 §3)."""
+
+    arm: str
+    verdict: ReplicationLabel
+    reasons: list[Reason]
+    experiment_ids: list[uuid.UUID]
+    primary_param_set: str
+    ci_low: float | None  # smallest primary lower bound across replicates
+    ci_high: float | None  # largest primary upper bound
+    max_robust_cv: float | None
+
+
+class ReplicationResult(Frozen):
+    schema_version: Literal[1] = 1
+    engine_version: str = ENGINE_VERSION
+    source_experiment_id: uuid.UUID
+    replicates_required: int
+    verdicts: list[ReplicationVerdict]
+    winner: str | None
