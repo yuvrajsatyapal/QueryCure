@@ -44,7 +44,8 @@ export function ApprovalCard({ approval, runId }: { approval: Approval; runId: s
         <p className="text-sm text-muted">
           The SQL below would run only in {approval.payload.sandbox}, on workload{" "}
           <span className="font-mono">{approval.payload.workloadId}</span>. Nothing has run yet. Expires{" "}
-          {new Date(approval.expiresAt).toLocaleString()}.
+          {new Date(approval.expiresAt).toLocaleString()}. If the measurements are too noisy to decide, the same approved SQL
+          may be re-measured up to two more times in new disposable clones.
         </p>
       </div>
       <ul className="flex flex-col gap-2">

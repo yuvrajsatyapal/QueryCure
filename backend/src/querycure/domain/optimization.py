@@ -18,6 +18,7 @@ CandidateStatus = Literal[
     "verified",
     "rejected",
     "inconclusive",
+    "verified_with_noise_warning",  # ADR-0019: replicated noisy verification
 ]
 ApprovalStatus = Literal["pending", "approved", "partially_approved", "declined", "expired"]
 APPROVAL_TTL_SECONDS = 24 * 3600

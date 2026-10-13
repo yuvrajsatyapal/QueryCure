@@ -277,6 +277,7 @@ class ExperimentRow(BaseModel):
     id: uuid.UUID
     run_id: uuid.UUID
     round: int
+    replicate: int = 0
     kind: str
     status: str
     approval_request_id: uuid.UUID
@@ -287,6 +288,7 @@ class ExperimentRow(BaseModel):
     engine_version: str
     row_profile: str
     seed: int
+    replication_artifact_id: uuid.UUID | None = None
     error: dict[str, Any] | None
     started_at: dt.datetime | None
     finished_at: dt.datetime | None
@@ -294,9 +296,9 @@ class ExperimentRow(BaseModel):
 
 
 _EXPERIMENT_COLUMNS = (
-    "id, run_id, round, kind, status, approval_request_id, config_artifact_id, "
+    "id, run_id, round, replicate, kind, status, approval_request_id, config_artifact_id, "
     "result_artifact_id, environment, environment_digest, engine_version, row_profile, seed, "
-    "error, started_at, finished_at, created_at"
+    "replication_artifact_id, error, started_at, finished_at, created_at"
 )
 
 
@@ -312,19 +314,21 @@ async def create_experiment(
     engine_version: str,
     row_profile: str,
     seed: int,
+    replicate: int = 0,
 ) -> ExperimentRow:
     await ensure_writable(conn, run_id)
     await conn.execute(
         text(
-            "INSERT INTO experiments (id, run_id, round, kind, approval_request_id, "
+            "INSERT INTO experiments (id, run_id, round, replicate, kind, approval_request_id, "
             "config_artifact_id, engine_version, row_profile, seed) VALUES (:id, :run_id, "
-            ":round, :kind, :approval, :config, :engine, :profile, :seed) "
+            ":round, :replicate, :kind, :approval, :config, :engine, :profile, :seed) "
             "ON CONFLICT DO NOTHING"
         ),
         {
             "id": experiment_id,
             "run_id": run_id,
             "round": round,
+            "replicate": replicate,
             "kind": kind,
             "approval": approval_request_id,
             "config": config_artifact_id,
@@ -378,11 +382,21 @@ async def list_experiments(conn: AsyncConnection, run_id: uuid.UUID) -> list[Exp
     rows = await conn.execute(
         text(
             f"SELECT {_EXPERIMENT_COLUMNS} FROM experiments "  # noqa: S608
-            "WHERE run_id = :run_id AND deleted_at IS NULL ORDER BY round, created_at"
+            "WHERE run_id = :run_id AND deleted_at IS NULL ORDER BY round, replicate, created_at"
         ),
         {"run_id": run_id},
     )
     return [_experiment(r) for r in rows]
+
+
+async def set_replication(
+    conn: AsyncConnection, experiment_id: uuid.UUID, artifact_id: uuid.UUID
+) -> None:
+    """Attach replication verdicts (ADR-0019) to the round's approved experiment."""
+    await conn.execute(
+        text("UPDATE experiments SET replication_artifact_id = :a WHERE id = :id"),
+        {"id": experiment_id, "a": artifact_id},
+    )
 
 
 async def update_experiment(

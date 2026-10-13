@@ -177,3 +177,61 @@ test("timeline describes optimization events in words", () => {
   );
   expect(verdict).toEqual({ text: "oc_1: rejected (regression)", tone: "error" });
 });
+
+test("a noise-warning verification is labelled as such, never as plain verified", () => {
+  render(<VerdictBadge status="verified_with_noise_warning" />);
+
+  expect(screen.getByText("Verified · noise warning, 3 runs agree")).toBeDefined();
+  expect(screen.queryByText("Verified · tested scope")).toBeNull();
+});
+
+test("approval card says a noisy result may be re-measured", () => {
+  renderWithQuery(<ApprovalCard approval={approval} runId="run-1" />);
+
+  expect(screen.getByText(/may be re-measured up to two more times/)).toBeDefined();
+});
+
+test("a replicated round shows the replication verdict, its range and every replicate", () => {
+  const noisy = {
+    ...detail,
+    winner: null,
+    replicate: 0,
+    replication: {
+      schemaVersion: 1,
+      engineVersion: "bench@2",
+      sourceExperimentId: "ex-1",
+      replicatesRequired: 3,
+      winner: "oc_000000000001",
+      verdicts: [
+        {
+          arm: "oc_000000000001",
+          verdict: "verified_with_noise_warning",
+          reasons: [{ code: "insufficient_evidence", detail: "sample dispersion exceeded max_cv (robust CV up to 0.66); verified by agreement of 3 independent experiments" }],
+          experimentIds: ["ex-1", "ex-2", "ex-3"],
+          primaryParamSet: "hot",
+          ciLow: 43.7,
+          ciHigh: 67.4,
+          maxRobustCv: 0.66,
+        },
+      ],
+    },
+    result: {
+      ...(detail.result as object),
+      winner: null,
+      verdicts: [
+        { arm: "oc_000000000001", verdict: "inconclusive", reasons: [{ code: "insufficient_evidence", detail: "hot: candidate robust CV 0.46 > 0.25" }], gate: 4 },
+        { arm: "oc_000000000002", verdict: "rejected", reasons: [{ code: "no_improvement", detail: "CI below 1" }], gate: 6 },
+      ],
+    },
+  } as unknown as ExperimentDetail;
+
+  render(<ExperimentView detail={noisy} candidates={candidates} />);
+
+  const table = screen.getByRole("table", { name: "Optimization tournament" });
+  const first = within(table).getAllByRole("row")[1] as HTMLElement;
+  expect(within(first).getByText("Verified · noise warning, 3 runs agree")).toBeDefined();
+  expect(within(first).getByText("Winner")).toBeDefined();
+  const note = screen.getByRole("region", { name: "Independent replication" });
+  expect(within(note).getByText(/43\.7× – 67\.4×/)).toBeDefined();
+  expect(within(note).getByText(/across 3 independent experiments/)).toBeDefined();
+});

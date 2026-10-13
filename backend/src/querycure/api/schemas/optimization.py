@@ -6,7 +6,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from querycure.domain.benchmark import ExperimentResult
+from querycure.domain.benchmark import ExperimentResult, ReplicationResult
 from querycure.domain.optimization import ApprovalPayload, OptimizationCandidate
 
 
@@ -45,6 +45,7 @@ class ExperimentSummary(BaseModel):
     id: uuid.UUID
     run_id: uuid.UUID
     round: int
+    replicate: int  # 0 = the approved experiment; > 0 = independent re-measurement (ADR-0019)
     kind: str
     status: str
     engine_version: str
@@ -54,6 +55,8 @@ class ExperimentSummary(BaseModel):
     finished_at: dt.datetime | None
     winner: str | None
     error_code: str | None
+    # On replicate 0 of a noisy round: verdicts across the independent experiments.
+    replication: ReplicationResult | None = None
 
 
 class ExperimentList(BaseModel):

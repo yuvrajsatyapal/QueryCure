@@ -8,6 +8,13 @@ reclaimed job resumes at the first missing block instead of starting over.
 Verdicts are the engine's deterministic rule verdicts (ADR-0009); this node only records
 them: candidate statuses, an `experiment_result` artifact, `benchmark_metric` and
 `correctness_check` evidence, and `verification.completed` events.
+
+Noisy rounds (ADR-0019, bench@2): when the approved experiment ends with screen-eligible arms
+and no winner, the engine re-measures those arms in up to two independent replicate
+experiments (same approved SQL, checked again by digest; new ids, seeds and clones; one shared
+time budget). Each replicate is its own `experiments` row (`replicate` > 0) with its own
+result artifact. The replication verdicts are a `replication_result` artifact; they set the
+final candidate status (`verified_with_noise_warning` or `inconclusive`).
 """
 
 import asyncio
@@ -27,9 +34,10 @@ from querycure.agents.state import InvestigationState
 from querycure.benchmark.engine import (
     ApprovedExperiment,
     BlockRecord,
+    ReplicatedRun,
     State,
+    run_replicated,
 )
-from querycure.benchmark.engine import run_experiment as run_engine
 from querycure.benchmark.schedule import derive_seed
 from querycure.core.errors import QueryCureError, RunCancelledError, SandboxUnavailableError
 from querycure.core.logging import get_logger
@@ -40,6 +48,7 @@ from querycure.db.repositories.optimization import (
     list_benchmark_runs,
     list_candidates,
     set_candidate_status,
+    set_replication,
     update_experiment,
 )
 from querycure.domain.benchmark import (
@@ -377,23 +386,105 @@ async def run_experiment(state: InvestigationState, runtime: Runtime[RunContext]
             c.key: c.sql_sha256 for c in payload.candidates if c.candidate_id in approved_ids
         },
     )
-    hooks = DbHooks(asyncio.get_running_loop(), ctx.db(), ctx.run_id, experiment_id)
+    loop = asyncio.get_running_loop()
     options = dataclasses.replace(
         ctx.engine_options, time_budget_seconds=float(ctx.guard.budget.benchmark_seconds)
     )
+    by_key = {c.key: c for c in candidates}
+    current = {"experiment_id": experiment_id}
+
+    def sync(coro: Coroutine[Any, Any, T]) -> T:
+        return asyncio.run_coroutine_threadsafe(coro, loop).result(timeout=60)
+
+    async def create_replicate(cfg: ExperimentConfig, index: int) -> None:
+        async with ctx.db().begin() as conn:
+            art = await store_json(conn, kind="experiment_config", value=cfg)
+            await link(
+                conn, run_id=ctx.run_id, artifact_id=art.id, role="experiment.config",
+                produced_by=NODE,
+            )  # fmt: skip
+            await create_experiment(
+                conn,
+                experiment_id=cfg.experiment_id,
+                run_id=ctx.run_id,
+                round=round,
+                replicate=index,
+                kind="tournament" if len(cfg.candidates) > 1 else "single",
+                approval_request_id=approval.id,
+                config_artifact_id=art.id,
+                engine_version=ENGINE_VERSION,
+                row_profile="qc-row-v1",
+                seed=cfg.seed,
+            )
+
+    def hooks_for(cfg: ExperimentConfig, index: int) -> DbHooks:
+        if index > 0:
+            sync(create_replicate(cfg, index))
+        current["experiment_id"] = cfg.experiment_id
+        return DbHooks(loop, ctx.db(), ctx.run_id, cfg.experiment_id)
+
+    def on_result(cfg: ExperimentConfig, index: int, result: ExperimentResult) -> None:
+        sync(_record_result(ctx, cfg.experiment_id, result, by_key, primary=index == 0))
+
     try:
-        result = await asyncio.to_thread(
-            run_engine, config, approved, provisioner=ctx.sandbox, hooks=hooks, options=options
-        )
+        run = await asyncio.to_thread(
+            run_replicated, config, approved, provisioner=ctx.sandbox, hooks_for=hooks_for,
+            options=options, on_result=on_result,
+        )  # fmt: skip
     except RunCancelledError:
         async with ctx.db().begin() as conn:
-            await update_experiment(conn, experiment_id, status="cancelled", finished=True)
+            await update_experiment(
+                conn, current["experiment_id"], status="cancelled", finished=True
+            )
         raise
     except QueryCureError as exc:
         log.warning("experiment_failed", run_id=str(ctx.run_id), code=exc.code)
         return await _fail(ctx, experiment_id, candidate_ids, exc)
 
-    by_key = {c.key: c for c in candidates}
+    if run.replication is not None:
+        await _record_replication(ctx, experiment_id, run, by_key)
+    result = run.replicates[0].result
+    winner = run.winner
+    verdicts = {v.verdict for v in result.verdicts}
+    replicated = {v.arm: v for v in (run.replication.verdicts if run.replication else [])}
+    if winner:
+        label = (
+            replicated[winner].verdict.replace("_", " ")
+            if winner in replicated
+            else "verified within the tested scope"
+        )
+        text_ = f"Tournament winner: {winner} ({label})."
+    else:
+        text_ = "No candidate was verified: " + "; ".join(
+            f"{v.arm} {replicated[v.arm].verdict} ({replicated[v.arm].reasons[0].code})"
+            if v.arm in replicated and replicated[v.arm].reasons
+            else f"{v.arm} {v.verdict} ({v.reasons[0].code})"
+            for v in result.verdicts
+            if v.reasons or v.arm in replicated
+        )
+    await ctx.events.emit(EventType.AGENT_SUMMARY, {"agent": "benchmark", "text": text_[:600]})
+    verification: str
+    if winner and winner in replicated:
+        verification = replicated[winner].verdict
+    elif winner:
+        verification = "verified"
+    else:
+        verification = "rejected" if verdicts == {"rejected"} else "inconclusive"
+    return {
+        "experiment_ids": [str(r.config.experiment_id) for r in run.replicates],
+        "winner": winner,
+        "verification": verification,
+    }
+
+
+async def _record_result(
+    ctx: RunContext,
+    experiment_id: uuid.UUID,
+    result: ExperimentResult,
+    by_key: dict[str, Any],
+    *,
+    primary: bool,
+) -> None:
     async with ctx.db().begin() as conn:
         result_art = await store_json(conn, kind="experiment_result", value=result)
         await link(
@@ -406,7 +497,9 @@ async def run_experiment(state: InvestigationState, runtime: Runtime[RunContext]
         await update_experiment(
             conn, experiment_id, status="completed", result_artifact_id=result_art.id, finished=True
         )
-        for verdict in result.verdicts:
+        # Replicates only add evidence; the candidate's status comes from the approved
+        # experiment, then from the replication verdict (ADR-0019).
+        for verdict in result.verdicts if primary else []:
             candidate = by_key[verdict.arm]
             reasons = [r.model_dump() for r in verdict.reasons]
             await set_candidate_status(
@@ -428,23 +521,43 @@ async def run_experiment(state: InvestigationState, runtime: Runtime[RunContext]
     await record_evidence(
         ctx.db(), ctx.run_id, result_evidence(ctx.run_id, result_art.sha256, result)
     )
-    verdicts = {v.verdict for v in result.verdicts}
-    text_ = (
-        f"Tournament winner: {result.winner} (verified within the tested scope)."
-        if result.winner
-        else "No candidate was verified: "
-        + "; ".join(
-            f"{v.arm} {v.verdict} ({v.reasons[0].code})" for v in result.verdicts if v.reasons
-        )
-    )
-    await ctx.events.emit(EventType.AGENT_SUMMARY, {"agent": "benchmark", "text": text_[:600]})
-    verification = (
-        "verified"
-        if result.winner
-        else ("rejected" if verdicts == {"rejected"} else "inconclusive")
-    )
-    return {
-        "experiment_ids": [str(experiment_id)],
-        "winner": result.winner,
-        "verification": verification,
-    }
+
+
+async def _record_replication(
+    ctx: RunContext, experiment_id: uuid.UUID, run: ReplicatedRun, by_key: dict[str, Any]
+) -> None:
+    replication = run.replication
+    if replication is None:  # pragma: no cover - caller checks
+        return
+    async with ctx.db().begin() as conn:
+        art = await store_json(conn, kind="replication_result", value=replication)
+        await link(
+            conn, run_id=ctx.run_id, artifact_id=art.id, role="experiment.replication",
+            produced_by=NODE,
+        )  # fmt: skip
+        await set_replication(conn, experiment_id, art.id)
+        for v in replication.verdicts:
+            candidate = by_key[v.arm]
+            reasons = [r.model_dump() for r in v.reasons]
+            await set_candidate_status(
+                conn, ctx.run_id, [candidate.id] if candidate.id else [], v.verdict,
+                reasons=reasons,
+            )  # fmt: skip
+            await emit(
+                conn,
+                ctx.run_id,
+                EventType.VERIFICATION_COMPLETED,
+                {
+                    "experiment_id": str(experiment_id),
+                    "candidate_key": v.arm,
+                    "verdict": v.verdict,
+                    "gate": None,
+                    "reasons": reasons,
+                    "replication": {
+                        "experiment_ids": [str(i) for i in v.experiment_ids],
+                        "ci_low": v.ci_low,
+                        "ci_high": v.ci_high,
+                        "max_robust_cv": v.max_robust_cv,
+                    },
+                },
+            )

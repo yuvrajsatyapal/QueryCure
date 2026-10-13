@@ -1030,6 +1030,9 @@ export interface components {
              * @enum {string}
              */
             provenance: "measured" | "prerecorded";
+            /** Replicate */
+            replicate: number;
+            replication?: components["schemas"]["ReplicationResult"] | null;
             result: components["schemas"]["ExperimentResult"] | null;
             /** Round */
             round: number;
@@ -1058,7 +1061,7 @@ export interface components {
             builds: components["schemas"]["BuildResult"][];
             /**
              * Engine Version
-             * @default bench@1
+             * @default bench@2
              */
             engine_version: string;
             /** Environment Digest */
@@ -1070,6 +1073,8 @@ export interface components {
             experiment_id: string;
             /** Measurements */
             measurements: components["schemas"]["ArmMeasurement"][];
+            /** Noise Screens */
+            noise_screens?: components["schemas"]["NoiseScreen"][] | null;
             /** Order Is Total */
             order_is_total: boolean;
             /**
@@ -1080,10 +1085,10 @@ export interface components {
             provenance: "measured" | "prerecorded";
             /**
              * Schema Version
-             * @default 1
-             * @constant
+             * @default 2
+             * @enum {integer}
              */
-            schema_version: 1;
+            schema_version: 1 | 2;
             /** Stats */
             stats: components["schemas"]["SpeedupStats"][];
             /** Tournament */
@@ -1110,6 +1115,9 @@ export interface components {
             id: string;
             /** Kind */
             kind: string;
+            /** Replicate */
+            replicate: number;
+            replication?: components["schemas"]["ReplicationResult"] | null;
             /** Round */
             round: number;
             /** Row Profile */
@@ -1389,6 +1397,36 @@ export interface components {
             /** Total Actual Rows */
             total_actual_rows: number | null;
         };
+        /** NoiseCheck */
+        NoiseCheck: {
+            /**
+             * Detail
+             * @default
+             */
+            detail: string;
+            /**
+             * Name
+             * @enum {string}
+             */
+            name: "n" | "censor" | "noregress" | "effect" | "separation" | "blocks";
+            /** Passed */
+            passed: boolean;
+        };
+        /**
+         * NoiseScreen
+         * @description D11 (ADR-0019 §2): recorded for an arm stopped only by gate 4b. Never changes the verdict;
+         *     `eligible` admits the arm to replication.
+         */
+        NoiseScreen: {
+            /** Arm */
+            arm: string;
+            /** Checks */
+            checks: components["schemas"]["NoiseCheck"][];
+            /** Eligible */
+            eligible: boolean;
+            /** Max Robust Cv */
+            max_robust_cv: number | null;
+        };
         /** OptimizationCandidate */
         OptimizationCandidate: {
             /** Addresses Hypotheses */
@@ -1427,7 +1465,7 @@ export interface components {
              * @default proposed
              * @enum {string}
              */
-            status: "proposed" | "approved" | "declined" | "expired" | "benchmarked" | "verified" | "rejected" | "inconclusive";
+            status: "proposed" | "approved" | "declined" | "expired" | "benchmarked" | "verified" | "rejected" | "inconclusive" | "verified_with_noise_warning";
             /** Verdict Reasons */
             verdict_reasons?: {
                 [key: string]: string;
@@ -1617,12 +1655,62 @@ export interface components {
              * Code
              * @enum {string}
              */
-            code: "ddl_failed" | "constraint_violation" | "unstable_execution" | "result_mismatch" | "nondeterministic_order" | "result_too_large" | "insufficient_evidence" | "regression" | "effect_not_significant" | "no_improvement" | "not_measured";
+            code: "ddl_failed" | "constraint_violation" | "unstable_execution" | "result_mismatch" | "nondeterministic_order" | "result_too_large" | "insufficient_evidence" | "regression" | "effect_not_significant" | "no_improvement" | "not_measured" | "replicates_disagree";
             /**
              * Detail
              * @default
              */
             detail: string;
+        };
+        /** ReplicationResult */
+        ReplicationResult: {
+            /**
+             * Engine Version
+             * @default bench@2
+             */
+            engine_version: string;
+            /** Replicates Required */
+            replicates_required: number;
+            /**
+             * Schema Version
+             * @default 1
+             * @constant
+             */
+            schema_version: 1;
+            /**
+             * Source Experiment Id
+             * Format: uuid
+             */
+            source_experiment_id: string;
+            /** Verdicts */
+            verdicts: components["schemas"]["ReplicationVerdict"][];
+            /** Winner */
+            winner: string | null;
+        };
+        /**
+         * ReplicationVerdict
+         * @description One candidate across independent experiments (ADR-0019 §3).
+         */
+        ReplicationVerdict: {
+            /** Arm */
+            arm: string;
+            /** Ci High */
+            ci_high: number | null;
+            /** Ci Low */
+            ci_low: number | null;
+            /** Experiment Ids */
+            experiment_ids: string[];
+            /** Max Robust Cv */
+            max_robust_cv: number | null;
+            /** Primary Param Set */
+            primary_param_set: string;
+            /** Reasons */
+            reasons: components["schemas"]["Reason"][];
+            /**
+             * Verdict
+             * @enum {string}
+             */
+            verdict: "verified" | "verified_with_noise_warning" | "inconclusive";
         };
         /** RuleVerdict */
         RuleVerdict: {

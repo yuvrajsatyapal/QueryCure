@@ -221,23 +221,29 @@ async def test_no_sandbox_ddl_before_approval_then_approved_run_is_benchmarked(
     status, outcome, _ = run_row(owner, run_id)
     assert status == "completed"
     ((_key, _, cand_status, reasons),) = candidate_rows(owner, run_id)
+    replicates = count(
+        owner, "SELECT count(*) FROM experiments WHERE run_id = %s AND replicate > 0", run_id
+    )
     if outcome == "verified_recommendation":
-        assert cand_status == "verified"
-    else:  # the documented noisy-hardware outcome (ADR-0018), never a rejection
+        # Clean on the first experiment, or noisy and confirmed by 3 agreeing ones (ADR-0019).
+        assert cand_status in ("verified", "verified_with_noise_warning")
+        assert (cand_status == "verified_with_noise_warning") == (replicates == 2)
+    else:  # the documented noisy-hardware outcome (ADR-0018/0019), never a rejection
         assert (outcome, cand_status) == ("inconclusive", "inconclusive")
-        assert reasons[0]["code"] == "insufficient_evidence"
+        assert reasons[0]["code"] in ("insufficient_evidence", "replicates_disagree")
+    assert replicates <= 2
     assert statuses(owner, run_id) == [
         "running", "awaiting_approval", "queued", "running", "completed"
     ]  # fmt: skip
     experiment = owner.execute(
         "SELECT status, environment->>'pg_version', engine_version, result_artifact_id "
-        "FROM experiments WHERE run_id = %s",
+        "FROM experiments WHERE run_id = %s AND replicate = 0",
         (run_id,),
     ).fetchone()
     assert experiment is not None
     assert experiment[0] == "completed"
     assert experiment[1].startswith("17")
-    assert experiment[2] == "bench@1"
+    assert experiment[2] == "bench@2"
     assert experiment[3] is not None
     assert count(owner, runs_of_this_run + " AND phase = 'measure'", run_id) > 0
     assert (
@@ -246,10 +252,15 @@ async def test_no_sandbox_ddl_before_approval_then_approved_run_is_benchmarked(
             "SELECT count(*) FROM evidence WHERE run_id = %s AND kind = 'benchmark_metric'",
             run_id,
         )
-        == 2
+        == 2 * (1 + replicates)  # two param sets per experiment
     )
     body = report(owner, run_id)
-    assert body["builder_version"] == "interim-report@3"
+    assert body["builder_version"] == ("interim-report@4" if replicates else "interim-report@3")
+    if cand_status == "verified_with_noise_warning":
+        assert body["verification"] == "verified_with_noise_warning"
+        replication = body["optimization"]["rounds"][0]["experiment"]["replication"]
+        assert replication["verdicts"][0]["verdict"] == "verified_with_noise_warning"
+        assert len(replication["replicates"]) == 2
     assert body["optimization"]["rounds"][0]["experiment"]["status"] == "completed"
     assert clone_names() == []
     usage = owner.execute(
@@ -318,7 +329,9 @@ async def test_pre_authorized_demo_run_records_the_approval_and_runs_straight_th
         "SELECT status, decided_by FROM approval_requests WHERE run_id = %s", (run_id,)
     ).fetchone()
     assert approval == ("approved", "pre_authorized")
-    assert count(owner, "SELECT count(*) FROM experiments WHERE run_id = %s", run_id) == 1
+    approved = "SELECT count(*) FROM experiments WHERE run_id = %s AND replicate = 0"
+    assert count(owner, approved, run_id) == 1
+    assert count(owner, "SELECT count(*) FROM experiments WHERE run_id = %s", run_id) <= 3
 
 
 async def test_candidates_outside_the_policy_never_reach_approval(
@@ -374,7 +387,8 @@ async def test_semantics_changing_rewrite_is_rejected_and_the_loop_is_bounded(
     status, outcome, _ = run_row(owner, run_id)
     assert status == "completed"
     assert outcome in ("inconclusive", "verified_recommendation")
-    assert count(owner, "SELECT count(*) FROM experiments WHERE run_id = %s", run_id) == 2
+    approved = "SELECT count(*) FROM experiments WHERE run_id = %s AND replicate = 0"
+    assert count(owner, approved, run_id) == 2  # one approved experiment per round
 
 
 async def test_cancel_during_measurement_stops_and_leaves_no_clones(

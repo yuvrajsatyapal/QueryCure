@@ -64,6 +64,32 @@ function Comparison({ stats }: { stats: SpeedupStats[] }) {
   );
 }
 
+type Replication = NonNullable<ExperimentDetail["replication"]>;
+
+/** ADR-0019: a noisy round re-measured in independent experiments. The warning is always in
+ * words next to the range, which spans every replicate's CI (the conservative reading). */
+function ReplicationNote({ replication }: { replication: Replication }) {
+  return (
+    <section aria-label="Independent replication" className="flex flex-col gap-1 rounded-md border border-dashed border-border-strong p-3 text-sm">
+      <h3 className="font-semibold">Noisy samples · independent replication</h3>
+      <ul className="flex flex-col gap-1">
+        {replication.verdicts.map((v) => (
+          <li key={v.arm} className="flex flex-wrap items-center gap-2">
+            <span className="font-mono text-xs">{v.arm}</span>
+            <VerdictBadge status={v.verdict} />
+            {v.ciLow !== null && v.ciHigh !== null ? (
+              <span>
+                {x(v.ciLow)} – {x(v.ciHigh)} across {v.experimentIds.length} independent experiments
+              </span>
+            ) : null}
+            {v.reasons[0] ? <span className="text-xs text-muted">{v.reasons[0].detail}</span> : null}
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 export function ExperimentView({ detail, candidates }: { detail: ExperimentDetail; candidates: OptimizationCandidate[] }) {
   const result = detail.result;
   const [selected, setSelected] = useState<string | null>(null);
@@ -81,6 +107,9 @@ export function ExperimentView({ detail, candidates }: { detail: ExperimentDetai
   const primary = (detail.config as { paramSets?: { name: string }[] } | null)?.paramSets?.[0]?.name;
   const active = selected ?? result.tournament[0]?.arm ?? null;
   const env = detail.environment as Record<string, unknown> | null;
+  const replication = detail.replication ?? null;
+  const replicated = new Map((replication?.verdicts ?? []).map((v) => [v.arm, v]));
+  const winner = replication?.winner ?? result.winner;
 
   return (
     <div className="flex flex-col gap-4">
@@ -111,10 +140,10 @@ export function ExperimentView({ detail, candidates }: { detail: ExperimentDetai
                 <td className="py-1 pr-2">
                   <span className="font-mono text-xs">{t.arm}</span>{" "}
                   <span className="break-words font-mono text-xs text-muted">{c ? (c.ddl.join("; ") || c.querySql) : ""}</span>
-                  {result.winner === t.arm ? <span className="ml-1 text-xs font-medium text-verified">Winner</span> : null}
+                  {winner === t.arm ? <span className="ml-1 text-xs font-medium text-verified">Winner</span> : null}
                 </td>
                 <td className="py-1 pr-2">
-                  <VerdictBadge status={t.verdict} />
+                  <VerdictBadge status={replicated.get(t.arm)?.verdict ?? t.verdict} />
                   {v?.reasons[0] ? (
                     <span className="ml-1 font-mono text-[11px] text-muted" title={v.reasons[0].detail}>
                       {v.reasons[0].code}
@@ -128,6 +157,7 @@ export function ExperimentView({ detail, candidates }: { detail: ExperimentDetai
           })}
         </tbody>
       </table>
+      {replication ? <ReplicationNote replication={replication} /> : null}
       {active ? (
         <div className="flex flex-col gap-2">
           <h3 className="text-sm font-semibold">
@@ -151,7 +181,9 @@ export function ExperimentView({ detail, candidates }: { detail: ExperimentDetai
 }
 
 export function TournamentPanel({ experiments, candidates }: { experiments: ExperimentSummary[]; candidates: OptimizationCandidate[] }) {
-  const latest = experiments.at(-1) ?? null;
+  // Replicates (ADR-0019) belong to their round's approved experiment, which shows them.
+  const rounds = experiments.filter((e) => e.replicate === 0);
+  const latest = rounds.at(-1) ?? null;
   const [chosen, setChosen] = useState<string | null>(null);
   const id = chosen ?? latest?.id ?? null;
   const detail = useQuery({
@@ -165,9 +197,9 @@ export function TournamentPanel({ experiments, candidates }: { experiments: Expe
   }
   return (
     <div className="flex flex-col gap-4">
-      {experiments.length > 1 ? (
+      {rounds.length > 1 ? (
         <div role="tablist" aria-label="Rounds" className="flex gap-2">
-          {experiments.map((e) => (
+          {rounds.map((e) => (
             <button
               key={e.id}
               role="tab"

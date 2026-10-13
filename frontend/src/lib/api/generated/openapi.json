@@ -1458,6 +1458,20 @@
             "title": "Provenance",
             "type": "string"
           },
+          "replicate": {
+            "title": "Replicate",
+            "type": "integer"
+          },
+          "replication": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ReplicationResult"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "result": {
             "anyOf": [
               {
@@ -1513,6 +1527,7 @@
           "id",
           "run_id",
           "round",
+          "replicate",
           "kind",
           "status",
           "engine_version",
@@ -1557,7 +1572,7 @@
             "type": "array"
           },
           "engine_version": {
-            "default": "bench@1",
+            "default": "bench@2",
             "title": "Engine Version",
             "type": "string"
           },
@@ -1577,6 +1592,20 @@
             "title": "Measurements",
             "type": "array"
           },
+          "noise_screens": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/NoiseScreen"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Noise Screens"
+          },
           "order_is_total": {
             "title": "Order Is Total",
             "type": "boolean"
@@ -1591,8 +1620,11 @@
             "type": "string"
           },
           "schema_version": {
-            "const": 1,
-            "default": 1,
+            "default": 2,
+            "enum": [
+              1,
+              2
+            ],
             "title": "Schema Version",
             "type": "integer"
           },
@@ -1692,6 +1724,20 @@
             "title": "Kind",
             "type": "string"
           },
+          "replicate": {
+            "title": "Replicate",
+            "type": "integer"
+          },
+          "replication": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ReplicationResult"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "round": {
             "title": "Round",
             "type": "integer"
@@ -1737,6 +1783,7 @@
           "id",
           "run_id",
           "round",
+          "replicate",
           "kind",
           "status",
           "engine_version",
@@ -2606,6 +2653,78 @@
         "title": "NodeMetrics",
         "type": "object"
       },
+      "NoiseCheck": {
+        "additionalProperties": false,
+        "properties": {
+          "detail": {
+            "default": "",
+            "title": "Detail",
+            "type": "string"
+          },
+          "name": {
+            "enum": [
+              "n",
+              "censor",
+              "noregress",
+              "effect",
+              "separation",
+              "blocks"
+            ],
+            "title": "Name",
+            "type": "string"
+          },
+          "passed": {
+            "title": "Passed",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "name",
+          "passed"
+        ],
+        "title": "NoiseCheck",
+        "type": "object"
+      },
+      "NoiseScreen": {
+        "additionalProperties": false,
+        "description": "D11 (ADR-0019 \u00a72): recorded for an arm stopped only by gate 4b. Never changes the verdict;\n`eligible` admits the arm to replication.",
+        "properties": {
+          "arm": {
+            "title": "Arm",
+            "type": "string"
+          },
+          "checks": {
+            "items": {
+              "$ref": "#/components/schemas/NoiseCheck"
+            },
+            "title": "Checks",
+            "type": "array"
+          },
+          "eligible": {
+            "title": "Eligible",
+            "type": "boolean"
+          },
+          "max_robust_cv": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Robust Cv"
+          }
+        },
+        "required": [
+          "arm",
+          "eligible",
+          "checks",
+          "max_robust_cv"
+        ],
+        "title": "NoiseScreen",
+        "type": "object"
+      },
       "OptimizationCandidate": {
         "additionalProperties": false,
         "properties": {
@@ -2715,7 +2834,8 @@
               "benchmarked",
               "verified",
               "rejected",
-              "inconclusive"
+              "inconclusive",
+              "verified_with_noise_warning"
             ],
             "title": "Status",
             "type": "string"
@@ -3450,7 +3570,8 @@
               "regression",
               "effect_not_significant",
               "no_improvement",
-              "not_measured"
+              "not_measured",
+              "replicates_disagree"
             ],
             "title": "Code",
             "type": "string"
@@ -3465,6 +3586,140 @@
           "code"
         ],
         "title": "Reason",
+        "type": "object"
+      },
+      "ReplicationResult": {
+        "additionalProperties": false,
+        "properties": {
+          "engine_version": {
+            "default": "bench@2",
+            "title": "Engine Version",
+            "type": "string"
+          },
+          "replicates_required": {
+            "title": "Replicates Required",
+            "type": "integer"
+          },
+          "schema_version": {
+            "const": 1,
+            "default": 1,
+            "title": "Schema Version",
+            "type": "integer"
+          },
+          "source_experiment_id": {
+            "format": "uuid",
+            "title": "Source Experiment Id",
+            "type": "string"
+          },
+          "verdicts": {
+            "items": {
+              "$ref": "#/components/schemas/ReplicationVerdict"
+            },
+            "title": "Verdicts",
+            "type": "array"
+          },
+          "winner": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Winner"
+          }
+        },
+        "required": [
+          "source_experiment_id",
+          "replicates_required",
+          "verdicts",
+          "winner"
+        ],
+        "title": "ReplicationResult",
+        "type": "object"
+      },
+      "ReplicationVerdict": {
+        "additionalProperties": false,
+        "description": "One candidate across independent experiments (ADR-0019 \u00a73).",
+        "properties": {
+          "arm": {
+            "title": "Arm",
+            "type": "string"
+          },
+          "ci_high": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ci High"
+          },
+          "ci_low": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ci Low"
+          },
+          "experiment_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "Experiment Ids",
+            "type": "array"
+          },
+          "max_robust_cv": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Robust Cv"
+          },
+          "primary_param_set": {
+            "title": "Primary Param Set",
+            "type": "string"
+          },
+          "reasons": {
+            "items": {
+              "$ref": "#/components/schemas/Reason"
+            },
+            "title": "Reasons",
+            "type": "array"
+          },
+          "verdict": {
+            "enum": [
+              "verified",
+              "verified_with_noise_warning",
+              "inconclusive"
+            ],
+            "title": "Verdict",
+            "type": "string"
+          }
+        },
+        "required": [
+          "arm",
+          "verdict",
+          "reasons",
+          "experiment_ids",
+          "primary_param_set",
+          "ci_low",
+          "ci_high",
+          "max_robust_cv"
+        ],
+        "title": "ReplicationVerdict",
         "type": "object"
       },
       "RuleVerdict": {

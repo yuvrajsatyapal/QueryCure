@@ -1,5 +1,11 @@
 const STYLE: Record<string, { icon: string; label: string; className: string }> = {
   verified: { icon: "✓", label: "Verified · tested scope", className: "border-verified text-verified" },
+  // ADR-0019: noisy samples, verified only by agreement of independent experiments.
+  verified_with_noise_warning: {
+    icon: "✓",
+    label: "Verified · noise warning, 3 runs agree",
+    className: "border-dashed border-verified text-verified",
+  },
   rejected: { icon: "✕", label: "Rejected", className: "border-rejected text-rejected" },
   inconclusive: { icon: "?", label: "Inconclusive", className: "border-inconclusive text-inconclusive" },
   proposed: { icon: "○", label: "Proposed · awaiting approval", className: "border-dashed border-hypothesis text-hypothesis" },

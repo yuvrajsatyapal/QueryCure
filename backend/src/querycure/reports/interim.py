@@ -16,6 +16,10 @@ REPORT_SCHEMA_VERSION = 2
 # deterministic verdicts. A run without optimization data still builds byte-identical @2.
 BUILDER_VERSION_V3 = "interim-report@3"
 REPORT_SCHEMA_VERSION_V3 = 3
+# @4 (ADR-0019) adds replicate experiments and replication verdicts to a round. A run without
+# replicates still builds byte-identical @3.
+BUILDER_VERSION_V4 = "interim-report@4"
+REPORT_SCHEMA_VERSION_V4 = 4
 
 
 def build_report(
@@ -61,10 +65,13 @@ def build_report(
     }
     if optimization is None:
         return report
+    replicated = any(
+        (r.get("experiment") or {}).get("replication") is not None for r in optimization["rounds"]
+    )
     return {
         **report,
-        "schema_version": REPORT_SCHEMA_VERSION_V3,
-        "builder_version": BUILDER_VERSION_V3,
+        "schema_version": REPORT_SCHEMA_VERSION_V4 if replicated else REPORT_SCHEMA_VERSION_V3,
+        "builder_version": BUILDER_VERSION_V4 if replicated else BUILDER_VERSION_V3,
         "verification": optimization["verification"],
         "optimization": {k: v for k, v in optimization.items() if k != "evidence_ids"},
     }
@@ -155,8 +162,35 @@ def _optimization_lines(optimization: dict[str, Any]) -> list[str]:
         )
         for m in experiment["metrics"]:
             lines.append(f"  - {m['summary']} — evidence {m['evidence_id']} (measured)")
+        replication = experiment.get("replication")
+        if replication is not None:
+            lines += _replication_lines(replication)
     lines.append(
         "- Verified means: faster with matching results on the tested data and parameter sets, "
         "warm cache, single session, in the sandbox. It is not a production guarantee."
     )
+    return lines
+
+
+def _replication_lines(replication: dict[str, Any]) -> list[str]:
+    """ADR-0019: the noise warning is always spelled out, never shortened to "verified"."""
+    lines = [
+        f"- Noisy result re-measured in {len(replication['replicates'])} independent replicate "
+        "experiment(s) (new seeds and clones, same approved SQL):"
+    ]
+    for r in replication["replicates"]:
+        lines.append(f"  - Replicate {r['replicate']}: `{r['id']}` {r['status']}")
+    for v in replication["verdicts"]:
+        label = {
+            "verified_with_noise_warning": "verified with noise warning",
+            "verified": "verified",
+            "inconclusive": "inconclusive",
+        }[v["verdict"]]
+        span = (
+            f", speedup CI range {v['ci_low']:.2f}-{v['ci_high']:.2f}x across experiments"
+            if v["ci_low"] is not None and v["ci_high"] is not None
+            else ""
+        )
+        why = f" ({v['reasons'][0]['detail']})" if v["reasons"] else ""
+        lines.append(f"  - `{v['arm']}`: **{label}**{span}{why}")
     return lines

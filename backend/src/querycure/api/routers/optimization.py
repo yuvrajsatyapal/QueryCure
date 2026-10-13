@@ -83,6 +83,7 @@ async def _summary(conn: AsyncConnection, row: ExperimentRow) -> ExperimentSumma
         id=row.id,
         run_id=row.run_id,
         round=row.round,
+        replicate=row.replicate,
         kind=row.kind,
         status=row.status,
         engine_version=row.engine_version,
@@ -92,6 +93,7 @@ async def _summary(conn: AsyncConnection, row: ExperimentRow) -> ExperimentSumma
         finished_at=row.finished_at,
         winner=(result or {}).get("winner"),
         error_code=(row.error or {}).get("code"),
+        replication=await _artifact_json(conn, row.replication_artifact_id),
     )
 
 
