@@ -4,6 +4,7 @@ Works with the restricted qc_app role: INSERT … ON CONFLICT DO NOTHING plus re
 UPDATE and never row locks (locking clauses need UPDATE privilege).
 """
 
+import json
 import uuid
 from typing import Any, Literal
 
@@ -130,3 +131,22 @@ async def link(
         ),
         {"run_id": run_id, "artifact_id": artifact_id, "role": role, "produced_by": produced_by},
     )
+
+
+async def get_artifact_by_id(
+    conn: AsyncConnection, artifact_id: uuid.UUID
+) -> StoredArtifact | None:
+    """Fetch by id and re-verify the digest, like `get_artifact`."""
+    sha = (
+        await conn.execute(
+            text("SELECT sha256 FROM artifacts WHERE id = :id AND deleted_at IS NULL"),
+            {"id": artifact_id},
+        )
+    ).scalar_one_or_none()
+    return None if sha is None else await get_artifact(conn, str(sha))
+
+
+async def load_json(conn: AsyncConnection, artifact_id: uuid.UUID) -> Any:
+    """Parsed content of a verified qc-json-v1 artifact; None when it is missing."""
+    artifact = await get_artifact_by_id(conn, artifact_id)
+    return None if artifact is None else json.loads(artifact.content)

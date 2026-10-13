@@ -290,6 +290,20 @@ Started 2026-10-12 on the owner's instruction; `main` clean at `ffe9321`. Detail
 - [x] **Opt-in worker container** (`backend/Dockerfile`, compose profile `bench`) on `sandbox_net`; measured round trip 40 µs vs 355–451 µs via the published port.
 - [x] **Owner decisions (2026-10-12/13):** ADR-0019 (`bench@2`: corroborated regressions; noise screen; `verified_with_noise_warning` by 3 agreeing independent experiments; `bench@1` rules frozen and proven to reproduce stored verdicts; schema-1 results byte-identical), migration 0010 (replicates), `interim-report@4`, UI badge and approval disclosure; ADR-0020 (container worker default, `QC_BENCH_PATH` recorded in the fingerprint).
 
+## Phase 4 progress
+
+Started 2026-10-13 on the owner's instruction; `main` clean at `cbe6e18`, CI green. Plan: T4.1 → T4.3 → T4.2 → T4.4/T4.5 → T4.6 → T4.7 → re-investigation start → API/UI (T4.8) → evals (T4.9) → docs and PHASE_4_REPORT.
+
+Decisions taken without changing any frozen contract (recorded for the owner):
+- **AI re-investigation** is Post-MVP in the roadmap but the owner asked for it: only the documented start contract (`POST /investigations/{id}/reinvestigate`, new `reinvestigation` run with its own budget and a parent link) is implemented; the conclusion diff stays Post-MVP.
+- **`run.concluded`** is a new content event written by `finalize_run` before the cutoff, so the report builder reads only persisted records and events.
+- **`container_runtime` is material** for experiment-replay comparison: ADR-0020 turned the field into the measurement path (≈10× round-trip difference).
+
+- [x] **Phase 2 evals recorded** (`508d343`): `orders_injection_in_schema`, `orders_plain_explain` PASS with the pinned free model (13 requests); smoke replay 5/5, exit 0; CI integration job runs it.
+- [x] **T4.1 migration 0011**: `verification_results` (append-only; CHECK `verification_results_downgrade_only` refuses any auditor upgrade or change of kind), `investigation_reports`, `replay_manifests` (append-only), `replay_attempts` (mutable, kind/status CHECK). 40 grant/constraint tests as `qc_app`/`qc_retention`; up/down/up verified.
+- [x] **T4.3 plan diff** (`plans/diff.py`): weighted order-preserving child alignment (same relation outranks same node type), merged preorder, per-node metric deltas, `new_indexes_used`. 7 unit tests.
+- [x] **T4.2 Benchmark Auditor** (`audit/checks.py`, `audit/loader.py`, `agents/nodes/benchmark_auditor.py`, prompt `benchmark_auditor@1`): 11 deterministic checks (re-score from persisted blocks with the experiment's own engine version, approval digest pinning, config = approval, environment digests, provenance, samples, param-set contradictions, dispersion, correctness, new index used in the plan, replicate environments); a failed check downgrades verified → inconclusive. One LLM narrative call whose cited `downgrade` concerns can only do the same; an LLM failure records `deterministic_only`. 22 unit + 3 real-sandbox integration tests (on this host the downgrade path ran on a real `verified_with_noise_warning` result).
+
 ## Blockers
 
 - None. Compose `metadata-db`, `sandbox-db` and `sandbox-relay` are healthy (they had exited once during the session, apparently with Docker Desktop, and were restarted). The dev database was migrated to `0009`; earlier local databases need `uv run alembic upgrade head`.

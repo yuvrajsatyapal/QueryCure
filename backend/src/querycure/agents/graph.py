@@ -1,9 +1,9 @@
-"""The investigation graph (AGENT_SYSTEM §3; the Benchmark Auditor follows in Phase 4).
+"""The investigation graph (AGENT_SYSTEM §3).
 
 intake → collect_context → supervisor_plan → Send fan-out to the planned analysts →
 synthesize_hypotheses → [Mode C] optimization_engineer → approval_gate (interrupt) →
-run_experiment → next_round (bounded) → … → write_report. Any recorded stop (budget,
-cancellation, invalid input) routes straight to write_report, which always runs.
+run_experiment → benchmark_auditor → next_round (bounded) → … → write_report. Any recorded
+stop (budget, cancellation, invalid input) routes straight to write_report, which always runs.
 """
 
 from typing import Any
@@ -18,11 +18,13 @@ from querycure.agents.nodes.analysts import (
     workload_investigator_node,
 )
 from querycure.agents.nodes.approval_gate import approval_gate
+from querycure.agents.nodes.benchmark_auditor import benchmark_auditor
 from querycure.agents.nodes.collect_context import collect_context
 from querycure.agents.nodes.intake import intake
 from querycure.agents.nodes.optimization_engineer import optimization_engineer
 from querycure.agents.nodes.optimization_loop import (
     APPROVAL_NODE,
+    AUDIT_NODE,
     EXPERIMENT_NODE,
     NEXT_ROUND_NODE,
     OE_NODE,
@@ -63,6 +65,7 @@ def build_graph() -> StateGraph[InvestigationState, RunContext, Any, Any]:
     graph.add_node(OE_NODE, optimization_engineer)
     graph.add_node(APPROVAL_NODE, approval_gate)
     graph.add_node(EXPERIMENT_NODE, run_experiment)
+    graph.add_node(AUDIT_NODE, benchmark_auditor)
     graph.add_node(NEXT_ROUND_NODE, next_round)
     graph.add_node(REPORT_NODE, write_report)
 
@@ -83,8 +86,9 @@ def build_graph() -> StateGraph[InvestigationState, RunContext, Any, Any]:
     graph.add_conditional_edges(OE_NODE, route_after_candidates, [APPROVAL_NODE, REPORT_NODE])
     graph.add_conditional_edges(APPROVAL_NODE, route_after_approval, [EXPERIMENT_NODE, REPORT_NODE])
     graph.add_conditional_edges(
-        EXPERIMENT_NODE, route_after_experiment, [NEXT_ROUND_NODE, REPORT_NODE]
+        EXPERIMENT_NODE, unless_stopped(AUDIT_NODE), [AUDIT_NODE, REPORT_NODE]
     )
+    graph.add_conditional_edges(AUDIT_NODE, route_after_experiment, [NEXT_ROUND_NODE, REPORT_NODE])
     graph.add_conditional_edges(NEXT_ROUND_NODE, route_after_next_round, [OE_NODE, REPORT_NODE])
     graph.add_edge(REPORT_NODE, END)
     return graph

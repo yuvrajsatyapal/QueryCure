@@ -346,12 +346,16 @@ def score(
     unique_keys: Mapping[str, Sequence[Sequence[str]]],
     env_digest: str,
     engine_version: str = ENGINE_VERSION,
+    total: bool | None = None,
 ) -> ExperimentResult:
     """Correctness → stats → gates → tournament, from persisted rows only (resumable).
 
-    `engine_version` selects the rules; a stored experiment is re-scored with its own."""
+    `engine_version` selects the rules; a stored experiment is re-scored with its own.
+    `total` replaces the order-totality proof (which needs the sandbox's unique keys) with a
+    stored value: the Benchmark Auditor re-scores from persisted rows without a sandbox."""
     meta = validate_select(config.baseline_query).metadata
-    total = order_is_total(config.baseline_query, unique_keys)
+    if total is None:
+        total = order_is_total(config.baseline_query, unique_keys)
     has_order, has_limit = bool(meta.order_by), meta.limit is not None
     ps_names = [p.name for p in config.param_sets]
     arms = [BASELINE_ARM, *(c.arm for c in config.candidates)]

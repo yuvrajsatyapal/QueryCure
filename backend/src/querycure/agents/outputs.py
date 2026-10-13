@@ -125,3 +125,36 @@ class CandidateSet(Draft):
 
     candidates: list[CandidateDraft] = Field(max_length=6)
     summary: str = Field(max_length=600)
+
+
+class ConcernDraft(Draft):
+    """One cited concern about an experiment. `downgrade` asks to move a verified arm to
+    inconclusive; nothing the auditor says can verify or reject anything (ADR-0009)."""
+
+    arm: str = Field(min_length=1, max_length=40)
+    severity: Literal["info", "warning", "downgrade"]
+    text: str = Field(min_length=1, max_length=600)
+    evidence_ids: list[str] = Field(max_length=12)
+
+
+class AuditNarrative(Draft):
+    """Output of the Benchmark Auditor for one round."""
+
+    summary: str = Field(max_length=800)
+    concerns: list[ConcernDraft] = Field(default_factory=list, max_length=12)
+
+
+def judge_audit(
+    output: AuditNarrative, evidence_kinds: Mapping[str, str], arms: frozenset[str]
+) -> tuple[AuditNarrative, CitationReport]:
+    """Concerns about unknown arms or without valid citations are dropped. Speed-up numbers
+    need cited benchmark evidence like everywhere else."""
+    verdicts, report = judge_claims(
+        [Claim(c.text, c.evidence_ids) for c in output.concerns], evidence_kinds
+    )
+    kept = [
+        c.model_copy(update={"evidence_ids": v.valid_ids})
+        for c, v in zip(output.concerns, verdicts, strict=True)
+        if v.keep and c.arm in arms
+    ]
+    return output.model_copy(update={"concerns": kept}), report

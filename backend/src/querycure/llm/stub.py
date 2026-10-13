@@ -83,6 +83,8 @@ class StubClient:
                 "focus": [],
                 "rationale": "Stub plan: every eligible analyst.",
             }
+        elif "You are the Benchmark Auditor" in system:
+            body = {"summary": "Stub audit (canned): no concerns raised.", "concerns": []}
         elif "You are the Optimization Engineer" in system:
             body = _stub_candidates(prompt)
         elif "Combine the analysts' findings" in system:

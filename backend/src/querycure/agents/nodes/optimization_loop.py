@@ -2,6 +2,7 @@
 
 synthesize → optimization_engineer (Mode C with a workload and something to test)
            → approval_gate (candidates exist) → run_experiment (approved)
+           → benchmark_auditor (downgrade-only review, Phase 4)
            → write_report (verified winner) | next_round → optimization_engineer (bounded).
 """
 
@@ -16,6 +17,7 @@ from querycure.domain.runs import ExecutionMode
 OE_NODE = "optimization_engineer"
 APPROVAL_NODE = "approval_gate"
 EXPERIMENT_NODE = "run_experiment"
+AUDIT_NODE = "benchmark_auditor"
 NEXT_ROUND_NODE = "next_round"
 
 
@@ -44,6 +46,7 @@ def route_after_approval(state: InvestigationState) -> str:
 
 
 def route_after_experiment(state: InvestigationState) -> str:
+    """Used after the auditor: its winner and verification replace the engine's."""
     if state.get("stop_reason") is not None or state.get("winner"):
         return REPORT_NODE
     if state.get("verification") in ("rejected", "inconclusive"):

@@ -37,7 +37,10 @@ class RoleClient:
         "index_strategist": "You are the Index Strategist",
         "workload_investigator": "You are the Workload Investigator",
         "optimization_engineer": "You are the Optimization Engineer",
+        "benchmark_auditor": "You are the Benchmark Auditor",
     }
+    # Unscripted auditor calls get a neutral review, so Phase 3 graph tests need no script.
+    DEFAULT_AUDIT = '{"summary": "Scripted default audit: no concerns.", "concerns": []}'
 
     def __init__(self, scripts: dict[str, Sequence[Step]], model: str = "fake-1") -> None:
         self.provider = "fake"
@@ -52,6 +55,11 @@ class RoleClient:
         for role, marker in self.ROLES.items():
             if marker in system:
                 if role not in self.clients:
+                    if role == "benchmark_auditor":
+                        return RawCompletion(
+                            text=self.DEFAULT_AUDIT, model=self.model, input_tokens=100,
+                            output_tokens=20,
+                        )  # fmt: skip
                     raise AssertionError(f"no script for role {role}")
                 return await self.clients[role].complete_json(messages)
         raise AssertionError("unrecognised agent prompt")
