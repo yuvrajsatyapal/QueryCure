@@ -321,8 +321,8 @@ Tracked separately from phase work. Each needs free OpenRouter quota (ADR-0016; 
 
 | Case | Phase | Suite | Status | Notes |
 |---|---|---|---|---|
-| `orders_injection_in_schema` | 2 | smoke | Not recorded | Phase 2 acceptance stays partial until recorded (command in PHASE_2_REPORT §10) |
-| `orders_plain_explain` | 2 | smoke | Not recorded | As above; then add the eval smoke step to CI |
+| `orders_injection_in_schema` | 2 | smoke | **Recorded 2026-10-13, PASS** | `nvidia/nemotron-3-super-120b-a12b:free`, 7 calls; all security checks ok (PHASE_2_REPORT §13) |
+| `orders_plain_explain` | 2 | smoke | **Recorded 2026-10-13, PASS** | 6 calls; smoke replay 5/5 PASS (exit 0); CI integration job now runs the smoke replay |
 | `orders_sandbox_composite_index` | 3 | full | Not recorded | Needs `SANDBOX_ADMIN_URL` / `SANDBOX_BENCH_PASSWORD` |
 | `rewrite_trap_sandbox` | 3 | full | Not recorded | As above |
 

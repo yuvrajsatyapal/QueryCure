@@ -1,0 +1,63 @@
+{
+  "schema_version": 1,
+  "case": "orders_plain_explain",
+  "model": "nvidia/nemotron-3-super-120b-a12b:free",
+  "recorded_at": "2026-10-13",
+  "provenance": "recorded",
+  "entries": {
+    "521a6602e1998371c71280cbe6f3d39bd1ace8615f765ec3f51124d53ec417d6": [
+      {
+        "text": "{\"action\": \"final\", \"analysis\": {\"summary\": \"The query scans thousands of rows and sorts them despite a LIMIT 20 because no index supports the filter on customer_id and the ordering by created_at.\", \"findings\": [{\"title\": \"No existing indexes on orders\", \"detail\": \"The table orders has no indexes recorded.\", \"severity\": \"info\", \"evidence_ids\": [\"ev_aeec4d3e637ca07e\"]}, {\"title\": \"Current plan uses sequential scan and sort\", \"detail\": \"Seq Scan on orders estimates 4,333 rows with filter customer_id = 1024 (ev_1cf32b2208f5); Sort estimates 4,333 rows sorting by created_at DESC (ev_84ea2b902b4a); total plan cost 15,072.0 (ev_3457a50008e1).\", \"severity\": \"high\", \"evidence_ids\": [\"ev_1cf32b2208f5\", \"ev_84ea2b902b4a\", \"ev_3457a50008e1\"]}, {\"title\": \"Index could satisfy filter and ordering\", \"detail\": \"An index on (customer_id, created_at) would allow the query to locate rows for customer_id = 1024 already sorted by created_at DESC, eliminating the seq scan and sort.\", \"severity\": \"high\", \"evidence_ids\": [\"ev_d975737c1b81\", \"ev_47519e718a2f\", \"ev_1cf32b2208f5\"]}, {\"title\": \"Index size cannot be estimated\", \"detail\": \"Width of column customer_id is unknown, so estimate_index_size cannot provide a size.\", \"severity\": \"info\", \"evidence_ids\": [\"ev_bd004ec798253e05\"]}]}}",
+        "served_model": "nvidia/nemotron-3-super-120b-a12b:free",
+        "served_by": "Nvidia",
+        "input_tokens": 2202,
+        "output_tokens": 1225
+      }
+    ],
+    "67768dfd2c3788c76895c97ae0428a455d4f43e67de1db34215ff3b4583072bd": [
+      {
+        "text": "{\"agents\": [\"query_analyzer\", \"index_strategist\"], \"focus\": [\"Seq Scan on orders (ev_1cf32b2208f5) estimates 4,333 rows with filter customer_id = 1024\", \"Sort operation (ev_84ea2b902b4a) estimates 4,333 rows, cost 14,080.5, sorting by created_at DESC\", \"Gather Merge (ev_450d515054a7) estimates 8,666 rows, cost 16,080.8\", \"Limit (ev_3d3652ad0d9c) after Sort, estimates 20 rows, cost 15,072.0\", \"Query orders by created_at DESC (ev_47519e718a2f) and filters on customer_id = 1024 (ev_1cf32b2208f5)\", \"Query returns at most 20 rows (ev_820b697b36ff) yet scans thousands of rows per plan estimates\", \"Total plan cost 15,072.0 (ev_3457a50008e1) for a LIMIT 20 query\"], \"rationale\": \"We select query_analyzer to inspect the plan nodes shown in the evidence, such as the Seq Scan (ev_1cf32b2208f5), Sort (ev_84ea2b902b4a), Gather Merge (ev_450d515054a7), and Limit (ev_3d3652ad0d9c), which reveal high row estimates and costs despite a LIMIT 20 (ev_820b697b36ff). We also select index_strategist to assess whether existing indexes support the query\u2019s predicates and ordering indicated by the query facts (ev_d975737c1b81, ev_47519e718a2f, ev_1cf32b2208f5).\"}",
+        "served_model": "nvidia/nemotron-3-super-120b-a12b:free",
+        "served_by": "Nvidia",
+        "input_tokens": 949,
+        "output_tokens": 3072
+      }
+    ],
+    "829d5a6fb542ac83b24809f59f425513017579aa0b6be2afb254a4dda313732e": [
+      {
+        "text": "{\"action\": \"call_tool\", \"tool\": \"estimate_index_size\", \"args\": {\"table\": \"orders\", \"columns\": [\"customer_id\", \"created_at\"]}}",
+        "served_model": "nvidia/nemotron-3-super-120b-a12b:free",
+        "served_by": "Nvidia",
+        "input_tokens": 2100,
+        "output_tokens": 222
+      }
+    ],
+    "abaa4a9298cc200a6e42ce8072d4500c8002c889c5abf0dcdb983ed2745598db": [
+      {
+        "text": "{\"action\": \"final\", \"analysis\": {\"summary\": \"The query performs a sequential scan on orders and sorts thousands of rows before applying a LIMIT 20, indicating missing index support for the filter and ordering.\", \"findings\": [{\"title\": \"Seq Scan processes far more rows than needed\", \"detail\": \"The Seq Scan on orders estimates 4,333 rows (ev_1cf32b2208f5) while the query returns at most 20 rows (ev_820b697b36ff), showing that the scan reads many rows that are later discarded by the filter on customer_id.\", \"severity\": \"medium\", \"evidence_ids\": [\"ev_1cf32b2208f5\", \"ev_820b697b36ff\"]}, {\"title\": \"Sort operation is expensive and unnecessary\", \"detail\": \"The Sort node estimates sorting 4,333 rows (ev_84ea2b902b4a) with cost 14,080.5 before the LIMIT 20 (ev_3d3652ad0d9c), indicating that the entire filtered set is sorted because no index provides the required ordering by created_at DESC.\", \"severity\": \"medium\", \"evidence_ids\": [\"ev_84ea2b902b4a\", \"ev_3d3652ad0d9c\"]}, {\"title\": \"Overall plan cost is high for a small limit\", \"detail\": \"Total plan cost is 15,072.0 (ev_3457a50008e1), driven by the sequential scan and sort, making the query expensive despite returning only up to 20 rows.\", \"severity\": \"high\", \"evidence_ids\": [\"ev_3457a50008e1\"]}]}}",
+        "served_model": "nvidia/nemotron-3-super-120b-a12b:free",
+        "served_by": "Nvidia",
+        "input_tokens": 2059,
+        "output_tokens": 1063
+      }
+    ],
+    "ac51812e3e90271124ec5aef516f73bbb958d17d3e20ddc9c78495c91ef0d1d6": [
+      {
+        "text": "{\"action\": \"call_tool\", \"tool\": \"list_indexes\", \"args\": {\"table\": \"orders\"}}",
+        "served_model": "nvidia/nemotron-3-super-120b-a12b:free",
+        "served_by": "Nvidia",
+        "input_tokens": 2006,
+        "output_tokens": 247
+      }
+    ],
+    "d6e463d51578596d0d866ce8e972ade0307744f33e64a25010bf4032cfa6db1c": [
+      {
+        "text": "{\"hypotheses\": [{\"statement\": \"The query performs a sequential scan on orders and sorts many rows because there is no index that matches the filter on customer_id and the ordering by created_at, causing excessive I/O and CPU work for a small limit.\", \"category\": \"missing_index\", \"supporting_evidence\": [\"ev_1cf32b2208f5\", \"ev_820b697b36ff\", \"ev_84ea2b902b4a\", \"ev_3457a50008e1\", \"ev_d975737c1b81\", \"ev_47519e718a2f\"], \"contradicting_evidence\": [], \"confidence\": \"high\", \"uncertainty_notes\": \"While the estimates indicate a mismatch, the actual row count and index effectiveness depend on data distribution; however, the plan clearly shows unnecessary work.\", \"verification_method\": \"explain_compare\"}], \"summary\": \"The query is slow due to a missing index on (customer_id, created_at), leading to a sequential scan and sort that process far more rows than the LIMIT 20 requires. Adding such an index would allow PostgreSQL to fetch the needed rows directly in the correct order, eliminating the scan and sort.\", \"no_action_evidence\": []}",
+        "served_model": "nvidia/nemotron-3-super-120b-a12b:free",
+        "served_by": "Nvidia",
+        "input_tokens": 1880,
+        "output_tokens": 909
+      }
+    ]
+  }
+}

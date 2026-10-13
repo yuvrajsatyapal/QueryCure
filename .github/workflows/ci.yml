@@ -98,6 +98,8 @@ jobs:
           -c "SELECT pg_reload_conf()"
       - name: Integration tests
         run: uv run pytest -q -m integration
+      - name: Eval smoke (recorded responses, no model calls)
+        run: uv run python -m querycure.evals run --suite smoke --admin-url "$QC_TEST_ADMIN_URL"
 
   frontend:
     name: Frontend
