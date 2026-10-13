@@ -255,13 +255,17 @@ async def test_no_sandbox_ddl_before_approval_then_approved_run_is_benchmarked(
         == 2 * (1 + replicates)  # two param sets per experiment
     )
     body = report(owner, run_id)
-    assert body["builder_version"] == ("interim-report@4" if replicates else "interim-report@3")
+    assert body["builder_version"] == "report-builder@1"
+    first_round = body["rounds"][0]
     if cand_status == "verified_with_noise_warning":
-        assert body["verification"] == "verified_with_noise_warning"
-        replication = body["optimization"]["rounds"][0]["experiment"]["replication"]
+        # Kept by the auditor (a scripted neutral review): the noise warning is always stated.
+        assert body["recommendation"]["status"] == "verified_with_noise_warning"
+        replication = first_round["experiment"]["replication"]
         assert replication["verdicts"][0]["verdict"] == "verified_with_noise_warning"
-        assert len(replication["replicates"]) == 2
-    assert body["optimization"]["rounds"][0]["experiment"]["status"] == "completed"
+        assert len(first_round["replicates"]) == 2
+        assert any("Noise warning" in x for x in body["limitations"])
+    assert first_round["experiment"]["status"] == "completed"
+    assert first_round["experiment"]["audit"], "the auditor reviewed the experiment"
     assert clone_names() == []
     usage = owner.execute(
         "SELECT waiting_seconds FROM investigation_runs WHERE id = %s", (run_id,)

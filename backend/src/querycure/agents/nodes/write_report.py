@@ -1,13 +1,16 @@
-"""write_report (terminal, deterministic): outcome, interim report artifacts, final status.
+"""write_report (terminal, deterministic): outcome, then `finalize_run` (report, manifest, seal).
 
 Outcomes (AGENT_SYSTEM §12): a verified tournament winner → `verified_recommendation`; an
 expired approval, or candidates benchmarked without a verified winner → `inconclusive`;
 hypotheses that were never benchmarked (no Mode C, declined approval, no valid candidate) →
 `unverified_recommendations`. When the deterministic materiality check finds nothing worth
 optimizing, the run ends `no_action_needed` even if hypotheses exist.
+
+Since Phase 4 the report is `report-builder@1` / `report-md@1` written by `finalize_run` in the
+same transaction as the terminal status. The interim builders stay in `reports/interim.py`
+(frozen) for the records of earlier runs.
 """
 
-import uuid
 from typing import Any
 
 from langgraph.runtime import Runtime
@@ -15,12 +18,10 @@ from sqlalchemy import text
 
 from querycure.agents.runtime import REPORT_NODE, RunContext, guarded
 from querycure.agents.state import InvestigationState
-from querycure.db.repositories.findings import list_findings, list_hypotheses
+from querycure.db.repositories.findings import list_hypotheses
 from querycure.domain.runs import TERMINAL_STATUSES, RunOutcome, RunStatus
-from querycure.events.emitter import change_status
 from querycure.evidence.store import list_evidence
-from querycure.replay.artifact_store import link, store_json, store_text
-from querycure.reports.interim import build_report, render_markdown
+from querycure.replay.finalize import Conclusion, finalize_run
 from querycure.reports.optimization import optimization_section
 
 
@@ -54,30 +55,23 @@ def decide(
     return RunStatus.COMPLETED, RunOutcome.INCONCLUSIVE
 
 
-async def _close(
-    conn: Any, run_id: uuid.UUID, current: RunStatus, final: RunStatus, outcome: RunOutcome | None
-) -> None:
-    if final is RunStatus.CANCELLED and current is RunStatus.RUNNING:
-        await change_status(conn, run_id, RunStatus.CANCELLING)
-    await change_status(conn, run_id, final, outcome=outcome)
-
-
 @guarded(REPORT_NODE, terminal=True)
 async def write_report(state: InvestigationState, runtime: Runtime[RunContext]) -> dict[str, Any]:
+    """Decide the outcome from records and state, then seal the run (finalize_run)."""
     ctx = runtime.context
     async with ctx.db().begin() as conn:
         row = (
             await conn.execute(
                 text(
-                    "SELECT status, outcome, usage FROM investigation_runs "
+                    "SELECT status, outcome, finalized_at FROM investigation_runs "
                     "WHERE id = :id FOR UPDATE"
                 ),
                 {"id": ctx.run_id},
             )
         ).one()
         current = RunStatus(row.status)
-        if current in TERMINAL_STATUSES:
-            return {"outcome": row.outcome}  # re-run after a crash: already written
+        if row.finalized_at is not None or current in TERMINAL_STATUSES:
+            return {"outcome": row.outcome}  # re-run after a crash: already sealed
         hypotheses = await list_hypotheses(conn, ctx.run_id)
         materiality = state.get("materiality") or {}
         evidence = await list_evidence(conn, ctx.run_id)
@@ -92,26 +86,16 @@ async def write_report(state: InvestigationState, runtime: Runtime[RunContext]) 
             approval_status=state.get("approval_status"),
             benchmarked=bool(optimization and optimization["benchmarked"]),
         )
-        report = build_report(
-            run_id=str(ctx.run_id),
-            objective=state.get("objective", ""),
-            final_status=final.value,
-            outcome=outcome.value if outcome else None,
-            stop_reason=state.get("stop_reason"),
-            findings=await list_findings(conn, ctx.run_id),
-            hypotheses=hypotheses,
-            evidence=evidence,
-            errors=state.get("errors", []),
-            usage=row.usage,
-            synthesis_summary=state.get("synthesis_summary", ""),
-            materiality=materiality or None,
-            optimization=optimization,
+        await finalize_run(
+            conn,
+            ctx.run_id,
+            Conclusion(
+                final_status=final,
+                outcome=outcome,
+                stop_reason=state.get("stop_reason"),
+                synthesis_summary=state.get("synthesis_summary", ""),
+                materiality=materiality or None,
+                no_action_evidence=list(state.get("no_action_evidence") or []),
+            ),
         )
-        as_json = await store_json(conn, kind="report_json", value=report)
-        as_md = await store_text(conn, kind="report_md", text=render_markdown(report))
-        for artifact, role in ((as_json, "output.report_json"), (as_md, "output.report_md")):
-            await link(
-                conn, run_id=ctx.run_id, artifact_id=artifact.id, role=role, produced_by=REPORT_NODE
-            )
-        await _close(conn, ctx.run_id, current, final, outcome)
     return {"outcome": outcome.value if outcome else None}

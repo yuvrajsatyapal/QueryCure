@@ -265,7 +265,10 @@ async def expire_due_approvals(conn: AsyncConnection) -> list[tuple[uuid.UUID, u
             "UPDATE approval_requests SET status = 'expired', decided_by = 'system', "
             'decided_at = now(), decision = \'{"approved_candidate_ids": [], '
             '"comment": "Approval expired."}\' '
-            "WHERE status = 'pending' AND expires_at < now() RETURNING id, run_id"
+            "WHERE status = 'pending' AND expires_at < now() "
+            # A sealed run (e.g. cancelled while waiting) keeps its approval record as it was.
+            "AND run_id IN (SELECT id FROM investigation_runs WHERE finalized_at IS NULL) "
+            "RETURNING id, run_id"
         )
     )
     return [(r.id, r.run_id) for r in rows]
@@ -289,6 +292,7 @@ class ExperimentRow(BaseModel):
     row_profile: str
     seed: int
     replication_artifact_id: uuid.UUID | None = None
+    replay_of_experiment_id: uuid.UUID | None = None
     error: dict[str, Any] | None
     started_at: dt.datetime | None
     finished_at: dt.datetime | None
@@ -298,7 +302,8 @@ class ExperimentRow(BaseModel):
 _EXPERIMENT_COLUMNS = (
     "id, run_id, round, replicate, kind, status, approval_request_id, config_artifact_id, "
     "result_artifact_id, environment, environment_digest, engine_version, row_profile, seed, "
-    "replication_artifact_id, error, started_at, finished_at, created_at"
+    "replication_artifact_id, replay_of_experiment_id, error, started_at, finished_at, "
+    "created_at"
 )
 
 

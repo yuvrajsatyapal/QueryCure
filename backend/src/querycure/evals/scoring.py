@@ -155,7 +155,12 @@ async def observe(conn: AsyncConnection, run_id: uuid.UUID) -> Observed:
         served_models=sorted(calls.models or []),
         claims_dropped=int(dropped),
         errors=report_raw.get("errors", []),
-        materiality=(report_raw.get("materiality") or {}).get("verdict"),
+        # report-builder@1 keeps the verdict under `problem`; interim reports kept it on top.
+        materiality=(
+            report_raw.get("materiality")
+            or (report_raw.get("problem") or {}).get("materiality")
+            or {}
+        ).get("verdict"),
         candidates=[
             dict(r._mapping)
             for r in await conn.execute(

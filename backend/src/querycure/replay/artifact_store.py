@@ -12,7 +12,12 @@ from pydantic import BaseModel, ConfigDict
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncConnection
 
-from querycure.core.errors import ArtifactConflictError, PayloadTooLargeError, QueryCureError
+from querycure.core.errors import (
+    ArtifactConflictError,
+    PayloadTooLargeError,
+    QueryCureError,
+    RunFinalizedError,
+)
 from querycure.replay.canonical import canonical_json, canonical_raw, canonical_text, to_canonical
 from querycure.replay.digest import digest
 
@@ -123,6 +128,20 @@ async def link(
     role: str,
     produced_by: str | None = None,
 ) -> None:
+    """Sealing rule (REPLAY_ENGINE §5): a finalized run gains no artifacts. The row lock is
+    the one content writers take (evidence store), so a link racing finalization waits for it
+    and then sees the seal."""
+    sealed = (
+        await conn.execute(
+            text(
+                "SELECT finalized_at IS NOT NULL FROM investigation_runs WHERE id = :id "
+                "FOR NO KEY UPDATE"
+            ),
+            {"id": run_id},
+        )
+    ).scalar_one_or_none()
+    if sealed:
+        raise RunFinalizedError("The run is finalized; it cannot gain artifacts.")
     await conn.execute(
         text(
             "INSERT INTO run_artifacts (run_id, artifact_id, role, produced_by) "

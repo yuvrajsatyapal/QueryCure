@@ -32,6 +32,7 @@ from querycure.llm.providers import build_client
 from querycure.llm.rate_limit import LlmGate
 from querycure.llm.structured import RetryPolicy
 from querycure.llm.stub import StubClient
+from querycure.replay.finalize import Conclusion, finalize_run
 from querycure.sandbox.provisioner import SandboxProvisioner
 
 log = get_logger(__name__)
@@ -70,7 +71,30 @@ class RunServices:
 
 
 async def fail_run(engine: AsyncEngine, run_id: uuid.UUID, error: dict[str, Any]) -> None:
-    """Terminal failure outside the graph (dead-lettered job, missing configuration)."""
+    """Terminal failure outside the graph (dead-lettered job, missing configuration).
+
+    The run is finalized like any other, with a partial report (REPLAY_ENGINE §5). If
+    finalization itself fails, the run is still marked terminal, without a manifest: report
+    replay then answers `not_replayable: not_finalized` and never invents one."""
+    try:
+        async with engine.begin() as conn:
+            status = await get_run_status(conn, run_id)
+            if status is None or status in TERMINAL_STATUSES:
+                return
+            cancelled = status in (RunStatus.CANCELLING, RunStatus.AWAITING_APPROVAL)
+            await finalize_run(
+                conn,
+                run_id,
+                Conclusion(
+                    final_status=RunStatus.CANCELLED if cancelled else RunStatus.FAILED,
+                    outcome=None,
+                    stop_reason="cancelled" if cancelled else "failed",
+                    error=error,
+                ),
+            )
+            return
+    except Exception:
+        log.exception("finalize_failed", run_id=str(run_id))
     async with engine.begin() as conn:
         status = await get_run_status(conn, run_id)
         if status is None or status in TERMINAL_STATUSES:

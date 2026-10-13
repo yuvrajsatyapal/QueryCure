@@ -126,7 +126,12 @@ def guarded(
                 log.info("run_cancel_observed", run_id=str(ctx.run_id), node=name)
                 return {"stop_reason": "cancelled"}
             duration_ms = int((time.monotonic() - started) * 1000)
-            await ctx.events.emit(EventType.NODE_COMPLETED, {**meta, "duration_ms": duration_ms})
+            # write_report seals the event log (finalize_run); its completion is the
+            # lifecycle events run.status_changed / report.ready, not a content event.
+            if not terminal:
+                await ctx.events.emit(
+                    EventType.NODE_COMPLETED, {**meta, "duration_ms": duration_ms}
+                )
             return update
 
         node.__name__ = name

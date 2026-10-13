@@ -21,6 +21,9 @@ class EventType(StrEnum):
     VERIFICATION_COMPLETED = "verification.completed"
     BUDGET_WARNING = "budget.warning"
     ERROR = "error"
+    # Content event written by finalize_run just before the cutoff: the terminal decision
+    # (status, outcome, stop reason, synthesis) the report builder reads (REPLAY_ENGINE §5).
+    RUN_CONCLUDED = "run.concluded"
     REPORT_READY = "report.ready"
     REPLAY_STATUS_CHANGED = "replay.status_changed"
     REPLAY_COMPARED = "replay.compared"

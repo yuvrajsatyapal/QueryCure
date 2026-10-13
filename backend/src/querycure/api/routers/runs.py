@@ -40,6 +40,7 @@ from querycure.evidence.store import list_evidence
 from querycure.plans.metrics import compute_metrics
 from querycure.plans.parser import parse_plan
 from querycure.replay.artifact_store import get_artifact
+from querycure.replay.finalize import Conclusion, finalize_run
 
 router = APIRouter(tags=["runs"])
 
@@ -136,8 +137,14 @@ async def cancel_run(run_id: uuid.UUID, conn: ConnDep, user: CurrentUser) -> Run
     current = RunStatus(run.status)
     if current not in TERMINAL_STATUSES and current is not RunStatus.CANCELLING:
         await investigations.mark_cancel_requested(conn, run_id)
-        target = RunStatus.CANCELLING if current is RunStatus.RUNNING else RunStatus.CANCELLED
-        await change_status(conn, run_id, target)
+        if current is RunStatus.RUNNING:
+            await change_status(conn, run_id, RunStatus.CANCELLING)
+        else:  # nothing is executing: seal it now, with a partial report
+            await finalize_run(
+                conn,
+                run_id,
+                Conclusion(final_status=RunStatus.CANCELLED, outcome=None, stop_reason="cancelled"),
+            )
     return run_detail(await _owned_run(conn, user, run_id))
 
 

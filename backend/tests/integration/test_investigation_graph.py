@@ -224,7 +224,7 @@ async def test_offline_investigation_runs_end_to_end(
     assert body["hypotheses"][0]["category"] == "missing_index"
     assert {f["agent"] for f in body["findings"]} == {"query_analyzer", "index_strategist"}
     assert body["partial"] is False
-    assert body["materiality"]["verdict"] == "material"
+    assert body["problem"]["materiality"]["verdict"] == "material"
     assert body["hypotheses"][0]["confidence"] == "high"
     assert any("Seq Scan on orders" in e["summary"] for e in body["evidence"])
     checkpoints = owner.execute(
@@ -238,7 +238,7 @@ async def test_offline_investigation_runs_end_to_end(
         (run_id,),
     ).fetchone()
     assert md is not None
-    assert "Nothing in this report has been benchmarked" in md[0]
+    assert "Nothing in this report was benchmarked" in md[0]
 
 
 async def test_already_optimal_query_ends_no_action_needed_despite_a_confident_model(
@@ -265,14 +265,14 @@ async def test_already_optimal_query_ends_no_action_needed_despite_a_confident_m
 
     assert run_row(owner, run_id) == ("completed", "no_action_needed", None)
     body = report(owner, run_id)
-    assert body["builder_version"] == "interim-report@2"
-    assert body["materiality"]["verdict"] == "not_material"
+    assert body["builder_version"] == "report-builder@1"
+    assert body["problem"]["materiality"]["verdict"] == "not_material"
     [h] = body["hypotheses"]
     assert (h["category"], h["confidence"]) == ("missing_index", "low")
     assert "Not worth optimizing" in h["uncertainty_notes"]
-    assert set(body["materiality"]["evidence_ids"]) <= set(h["contradicting_evidence"])
+    assert set(body["problem"]["materiality"]["evidence_ids"]) <= set(h["contradicting_evidence"])
     cited = {e["id"] for e in body["evidence"]}
-    assert set(body["materiality"]["evidence_ids"]) <= cited
+    assert set(body["problem"]["materiality"]["evidence_ids"]) <= cited
     stored = owner.execute(
         "SELECT confidence FROM hypotheses WHERE run_id = %s", (run_id,)
     ).fetchall()
