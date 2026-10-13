@@ -155,3 +155,10 @@ def run_detail(row: Any) -> RunDetail:
         last_event_seq=row.last_event_seq,
         cancel_requested_at=row.cancel_requested_at,
     )
+
+
+class ReinvestigateRequest(Strict):
+    """A new LLM run on the same inputs (REPLAY_ENGINE §1 "AI re-investigation"). The flag is
+    the caller's explicit consent to new model calls: replays never make any."""
+
+    confirm_new_llm_run: Literal[True]

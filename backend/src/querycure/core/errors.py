@@ -172,3 +172,10 @@ class NotFinalizedError(QueryCureError):
 class ExperimentNotReplayableError(QueryCureError):
     code = "EXPERIMENT_NOT_REPLAYABLE"
     status = 422
+
+
+class LlmQuotaExhaustedError(QueryCureError):
+    """No free model capacity left today (ADR-0016); nothing is started."""
+
+    code = "LLM_QUOTA_EXHAUSTED"
+    status = 429

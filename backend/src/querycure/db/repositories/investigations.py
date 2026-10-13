@@ -269,3 +269,60 @@ async def mark_cancel_requested(conn: AsyncConnection, run_id: uuid.UUID) -> Non
         ),
         {"id": run_id},
     )
+
+
+async def insert_reinvestigation(
+    conn: AsyncConnection,
+    *,
+    investigation_id: uuid.UUID,
+    parent_run_id: uuid.UUID,
+    budget: dict[str, Any],
+    idempotency_key: str | None,
+    request_hash: str | None,
+) -> uuid.UUID:
+    """A new `reinvestigation` run that reuses the parent's input artifacts (by reference)."""
+    run_id: uuid.UUID = (
+        await conn.execute(
+            text(
+                "INSERT INTO investigation_runs (investigation_id, run_number, kind, "
+                "parent_run_id, status, budget, usage, idempotency_key, "
+                "idempotency_request_hash) VALUES (:inv, (SELECT coalesce(max(run_number), 0) "
+                "+ 1 FROM investigation_runs WHERE investigation_id = :inv), 'reinvestigation', "
+                ":parent, 'queued', CAST(:budget AS JSONB), '{}', :key, :hash) RETURNING id"
+            ),
+            {
+                "inv": investigation_id,
+                "parent": parent_run_id,
+                "budget": json.dumps(budget),
+                "key": idempotency_key,
+                "hash": request_hash,
+            },
+        )
+    ).scalar_one()
+    await conn.execute(
+        text(
+            "INSERT INTO run_artifacts (run_id, artifact_id, role, produced_by) "
+            "SELECT :run, artifact_id, role, 'api' FROM run_artifacts "
+            "WHERE run_id = :parent AND role LIKE 'input.%' ON CONFLICT DO NOTHING"
+        ),
+        {"run": run_id, "parent": parent_run_id},
+    )
+    await conn.execute(
+        text("UPDATE investigations SET latest_run_id = :run WHERE id = :inv"),
+        {"run": run_id, "inv": investigation_id},
+    )
+    return run_id
+
+
+async def count_active_runs_in(conn: AsyncConnection, investigation_id: uuid.UUID) -> int:
+    return int(
+        (
+            await conn.execute(
+                text(
+                    "SELECT count(*) FROM investigation_runs WHERE investigation_id = :inv "
+                    "AND status IN ('queued', 'running', 'awaiting_approval', 'cancelling')"
+                ),
+                {"inv": investigation_id},
+            )
+        ).scalar_one()
+    )

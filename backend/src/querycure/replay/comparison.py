@@ -303,23 +303,27 @@ def _classify_pair(
     for who in (BASELINE_ARM, arm):
         if not _same_print(o_meas.get((who, ps)), r_meas.get((who, ps))):
             return "not_reproduced", "result_fingerprint_changed"
+    # Drift is computed whenever every arm has samples (diagnostic); it classifies only after
+    # the evidence-quality gate below.
+    sides = [m.get((who, ps)) for m in (o_meas, r_meas) for who in (BASELINE_ARM, arm)]
+    if all(x is not None and x.latencies_ns for x in sides):
+        ob, oc = o_meas[(BASELINE_ARM, ps)], o_meas[(arm, ps)]
+        rb, rc = r_meas[(BASELINE_ARM, ps)], r_meas[(arm, ps)]
+        s_o = float(statistics.median(ob.latencies_ns)) / float(statistics.median(oc.latencies_ns))
+        s_r = float(statistics.median(rb.latencies_ns)) / float(statistics.median(rc.latencies_ns))
+        low, high = drift_ci(
+            ob.latencies_ns,
+            oc.latencies_ns,
+            rb.latencies_ns,
+            rc.latencies_ns,
+            seed=seed ^ hash_pair(arm, ps),
+            resamples=resamples,
+        )
+        pair.update({"drift": s_r / s_o, "drift_ci_low": low, "drift_ci_high": high})
     for side in (o_meas, r_meas):
         for who in (BASELINE_ARM, arm):
             if _quality(side.get((who, ps)), config.max_cv) is not None:
                 return "inconclusive", "insufficient_evidence"
-    ob, oc = o_meas[(BASELINE_ARM, ps)], o_meas[(arm, ps)]
-    rb, rc = r_meas[(BASELINE_ARM, ps)], r_meas[(arm, ps)]
-    s_o = float(statistics.median(ob.latencies_ns)) / float(statistics.median(oc.latencies_ns))
-    s_r = float(statistics.median(rb.latencies_ns)) / float(statistics.median(rc.latencies_ns))
-    low, high = drift_ci(
-        ob.latencies_ns,
-        oc.latencies_ns,
-        rb.latencies_ns,
-        rc.latencies_ns,
-        seed=seed ^ hash_pair(arm, ps),
-        resamples=resamples,
-    )
-    pair.update({"drift": s_r / s_o, "drift_ci_low": low, "drift_ci_high": high})
     if ov is None or rv is None:
         return "inconclusive", "insufficient_evidence"
     if {ov.verdict, rv.verdict} == {"verified", "rejected"} or (

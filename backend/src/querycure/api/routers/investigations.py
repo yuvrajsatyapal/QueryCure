@@ -19,6 +19,7 @@ from querycure.api.schemas.investigations import (
     InvestigationDetail,
     InvestigationPage,
     InvestigationSummary,
+    ReinvestigateRequest,
     RunSummary,
     run_detail,
 )
@@ -30,6 +31,7 @@ from querycure.core.errors import (
     FeatureDisabledError,
     IdempotencyConflictError,
     InvalidStateError,
+    LlmQuotaExhaustedError,
     NotFoundError,
     ValidationFailedError,
 )
@@ -41,6 +43,8 @@ from querycure.domain.users import User
 from querycure.events.emitter import emit
 from querycure.events.types import EventType
 from querycure.jobs import queue
+from querycure.llm.credentials import resolve_api_key
+from querycure.llm.rate_limit import DailyQuota
 from querycure.replay import artifact_store as store
 from querycure.replay.canonical import canonical_json
 from querycure.sql.validator import validate_select
@@ -357,3 +361,68 @@ async def restore_investigation(
     if not restored:
         raise NotFoundError("Investigation not found.")
     return await _detail(conn, user, investigation_id)
+
+
+async def _check_llm(engine: Any, settings: Settings) -> None:
+    """Free-model availability before a new LLM run (ADR-0016): a configured key and capacity
+    left today. The stub provider is offline and always available."""
+    if settings.llm_provider == "stub":
+        return
+    resolve_api_key(settings, settings.llm_provider)  # ConfigurationError (503) when missing
+    if settings.llm_provider == "openrouter":
+        quota = DailyQuota(engine, settings.llm_daily_request_limit)
+        if await quota.used_today() >= quota.limit:
+            raise LlmQuotaExhaustedError(
+                "Today's free model requests are used up; try again after 00:00 UTC."
+            )
+
+
+@router.post("/{investigation_id}/reinvestigate", status_code=status.HTTP_202_ACCEPTED)
+async def reinvestigate(
+    investigation_id: uuid.UUID,
+    body: ReinvestigateRequest,
+    engine: EngineDep,
+    user: CurrentUser,
+    settings: SettingsDep,
+    idempotency_key: Annotated[str | None, Header()] = None,
+) -> CreateInvestigationResponse:
+    """New `reinvestigation` run on the same inputs, with its own budget and provenance and a
+    link to the run it re-investigates. The conclusion diff is Post-MVP (REPLAY_ENGINE §10)."""
+    key = request_hash = None
+    if idempotency_key is not None:
+        try:
+            key = str(uuid.UUID(idempotency_key))
+        except ValueError:
+            raise BadRequestError("Idempotency-Key must be a UUID.") from None
+        request_hash = hashlib.sha256(
+            canonical_json({"reinvestigate": str(investigation_id), **body.model_dump()})
+        ).hexdigest()
+        async with engine.begin() as conn:
+            replayed = await _replay(conn, user, key, request_hash)
+        if replayed is not None:
+            return replayed
+    await _check_llm(engine, settings)
+    async with engine.begin() as conn:
+        inv = await repo.get_investigation(conn, user_id=user.id, investigation_id=investigation_id)
+        if inv is None:
+            raise NotFoundError("Investigation not found.")
+        if inv.latest_run_id is None:
+            raise InvalidStateError("This investigation has no run to re-investigate.")
+        if await repo.count_active_runs_in(conn, investigation_id) > 0:
+            raise InvalidStateError("A run of this investigation is still active.")
+        limit = CONCURRENT_RUNS_PER_USER[settings.profile]
+        if await repo.count_active_runs(conn, user.id) >= limit:
+            raise ConcurrencyLimitError(f"At most {limit} investigations can run at once.")
+        run_id = await repo.insert_reinvestigation(
+            conn,
+            investigation_id=investigation_id,
+            parent_run_id=inv.latest_run_id,
+            budget=default_budget(settings.profile).model_dump(),
+            idempotency_key=key,
+            request_hash=request_hash,
+        )
+        await emit(conn, run_id, EventType.RUN_STATUS_CHANGED, {"from": None, "to": "queued"})
+        await queue.enqueue(
+            conn, kind="run_start", run_id=run_id, payload={}, dedupe_key=f"run_start:{run_id}"
+        )
+        return await _response(conn, user, run_id)
