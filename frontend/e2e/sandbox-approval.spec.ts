@@ -30,7 +30,11 @@ test("sandbox - approve the candidate SQL, then see the benchmarked tournament",
   await page.getByRole("tab", { name: "Tournament" }).click();
   const table = page.getByRole("table", { name: "Optimization tournament" });
   await expect(table).toBeVisible({ timeout: 15_000 });
-  await expect(table.getByText(/Verified · tested scope|Inconclusive|Rejected/)).toBeVisible();
+  // Any deterministic verdict is legitimate on shared CI hardware, including the noise-warning
+  // verification (ADR-0019) and an auditor downgrade to inconclusive (ADR-0009).
+  await expect(
+    table.getByText(/Verified · tested scope|Verified · noise warning|Inconclusive|Rejected/).first(),
+  ).toBeVisible();
   await expect(page.getByRole("table", { name: /Baseline versus candidate/ })).toBeVisible();
   await expect(page.getByText(/Measured in the sandbox/)).toBeVisible();
 });

@@ -82,7 +82,7 @@ No released contract changed: `bench@1`/`bench@2` rules, canonicalization profil
 | Evals, recorded | `… --mode record …` | Phase 2: 2/2 PASS (13 calls). Phase 3 Mode C: 2/2 PASS (18 calls) | `orders_sandbox_composite_index` → `verified_recommendation` with the real auditor; `rewrite_trap_sandbox` → `inconclusive`, never verified |
 | Frontend | `pnpm lint && pnpm typecheck && pnpm test && pnpm build` | **78 passed** (10 new), build OK | Needs Node 22: jsdom 30 does not load under the shell's default Node 20 |
 | E2E | `pnpm exec playwright test` | **3 passed** | Includes the full lifecycle (§5) |
-| CI | GitHub Actions | Green on every feature commit except `b0a03ba` | That run was cancelled by the next push; `b0a03ba` itself had a lint error, fixed in `c7f5e8f` |
+| CI | GitHub Actions | Green on the final commits; two earlier failures | `b0a03ba` had a lint error (fixed in `c7f5e8f`). `462a40a`'s e2e job failed because the Phase 3 sandbox spec's regex did not accept the `verified_with_noise_warning` badge that a noisy CI runner produced; fixed in the closing commit |
 
 **Auditor downgrade rate (ADR-0009).**
 - Verified-path case `orders_sandbox_composite_index` (recorded with the real model): 0 downgrades out of 1 verified candidate.
