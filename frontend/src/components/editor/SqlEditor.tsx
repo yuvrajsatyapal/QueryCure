@@ -63,7 +63,8 @@ export function SqlEditor({
           cmPlaceholder(placeholder),
           EditorState.readOnly.of(readOnly),
           EditorView.editable.of(!readOnly),
-          EditorView.contentAttributes.of({ "aria-label": ariaLabel }),
+          // An explicit tab stop on the content keeps the scroll region keyboard-reachable (axe).
+          EditorView.contentAttributes.of({ "aria-label": ariaLabel, tabindex: "0" }),
           EditorView.updateListener.of((update) => {
             if (update.docChanged) onChangeRef.current?.(update.state.doc.toString());
           }),

@@ -66,14 +66,18 @@ async def test_mode_c_case_replays_deterministically_from_its_fixture(
     assert all(r["result"]["provenance"] == "prerecorded" for r in replicates)
     assert replicates[0]["blocks"], "raw blocks are kept for the auditor's checks"
 
-    first = await _replay(settings, tmp_path)
-    second = await _replay(settings, tmp_path)
+    assert fixture["context"]["explains"], "the sandbox context reads are recorded too"
+    # Replays get no sandbox configuration at all: nothing may touch a sandbox server.
+    offline = Settings(_env_file=None)
+    first = await _replay(offline, tmp_path)
+    second = await _replay(offline, tmp_path)
 
     for replayed in (first, second):
         assert replayed.error is None, replayed.error
         assert replayed.score is not None
         assert recorded.score is not None
         assert replayed.provenance["measurements"] == "fixture"
+        assert replayed.provenance["context"] == "recorded"
         assert replayed.provenance["measurement_fixture_sha256"]
         assert replayed.provenance["prompt_versions"]["benchmark_auditor"] == "benchmark_auditor@1"
         assert replayed.provenance["scoring_version"] == "eval-scoring@1"
@@ -91,7 +95,7 @@ async def test_mode_c_case_replays_deterministically_from_its_fixture(
     stats = data["rounds"][0]["replicates"][0]["result"]["stats"][0]
     stats["speedup"] = stats["speedup"] * 3
     fixture_file.write_text(json.dumps(data))
-    tampered = await _replay(settings, tmp_path)
+    tampered = await _replay(offline, tmp_path)
     assert not tampered.passed
     assert "re-record" in (tampered.error or "")
 
@@ -99,12 +103,12 @@ async def test_mode_c_case_replays_deterministically_from_its_fixture(
     first_config = data["rounds"][0]["replicates"][0]["config"]
     first_config["candidates"][0]["ddl"] = ["CREATE INDEX ON orders (status)"]
     fixture_file.write_text(json.dumps(data))
-    swapped = await _replay(settings, tmp_path)
+    swapped = await _replay(offline, tmp_path)
     assert not swapped.passed
     assert "measurement fixture mismatch" in (swapped.error or "")
 
     # Without a fixture the case fails with instructions; it is never silently re-measured.
     fixture_file.unlink()
-    missing = await _replay(settings, tmp_path)
+    missing = await _replay(offline, tmp_path)
     assert not missing.passed
     assert "no measurement fixture" in (missing.error or "")

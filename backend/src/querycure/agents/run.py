@@ -19,7 +19,7 @@ from querycure.agents.runtime import LlmClients, RunContext
 from querycure.agents.services import GatewayInspectorFactory
 from querycure.agents.state import InvestigationState
 from querycure.benchmark.engine import EngineOptions
-from querycure.benchmark.measurement_fixtures import MeasureFn
+from querycure.benchmark.measurement_fixtures import ContextOpener, MeasureFn
 from querycure.core.config import Settings
 from querycure.core.errors import ConfigurationError
 from querycure.core.logging import get_logger
@@ -79,6 +79,7 @@ class RunServices:
     sandbox: SandboxProvisioner | None = None  # Mode C; None when not configured
     engine_options: EngineOptions | None = None
     measure: MeasureFn | None = None  # evals only: capture or prerecorded fixture (R19)
+    context_inspector: ContextOpener | None = None  # evals only: recorded sandbox context
 
 
 async def fail_run(engine: AsyncEngine, run_id: uuid.UUID, error: dict[str, Any]) -> None:
@@ -196,6 +197,7 @@ async def execute_run(
         sandbox=services.sandbox,
         engine_options=services.engine_options or EngineOptions(),
         measure=services.measure,
+        context_inspector=services.context_inspector,
     )
     config: RunnableConfig = {"configurable": {"thread_id": str(run_id)}}
     async with open_checkpointer(services.checkpoint_url, role=services.checkpoint_role) as saver:

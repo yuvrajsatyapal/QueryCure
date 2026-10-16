@@ -1,6 +1,7 @@
 """FixtureMeasure (R19): recorded measurements fed back through the engine hooks, with every
 mismatch refused rather than substituted."""
 
+import uuid
 from pathlib import Path
 from typing import Any
 
@@ -17,6 +18,13 @@ from querycure.benchmark.measurement_fixtures import (
 )
 from querycure.domain.benchmark import EnvironmentFingerprint, ExperimentConfig
 
+CAPABILITIES = {
+    "server_version_num": 170000, "server_version": "17.0", "is_superuser": False,
+    "can_create_role": False, "bypasses_rls": False, "is_replication_role": False,
+    "can_read_all_stats": True, "has_pg_stat_statements": False, "ssl_in_use": False,
+    "owned_tables": 2, "schemas": ["public"],
+}  # fmt: skip
+EXPLAIN = {"plan_document": [{"Plan": {"Node Type": "Result", "Total Cost": 0.01}}]}
 FIXTURE = Path(__file__).parents[3] / "evals/fixtures/experiments/index_regression_sf01.json"
 
 
@@ -149,3 +157,32 @@ def test_measured_results_are_refused_in_a_fixture() -> None:
                 ],
             }
         )  # fmt: skip
+
+
+async def test_recorded_context_serves_only_what_the_recording_read() -> None:
+    from querycure.benchmark.measurement_fixtures import (
+        FixtureContext,
+        RecordedContext,
+        RecordedExplain,
+    )
+    from querycure.connectors.models import ExplainResult, TargetCapabilities
+
+    capabilities = TargetCapabilities.model_validate(CAPABILITIES)
+    from querycure.sql.validator import validate_select
+
+    explained = ExplainResult(
+        plan_document=EXPLAIN["plan_document"], validated=validate_select("SELECT 1"),
+        generic_plan=False, server_version_num=170000,
+    )  # fmt: skip
+    context = FixtureContext(
+        RecordedContext(
+            capabilities=capabilities,
+            explains=[RecordedExplain(query="SELECT 1", result=explained)],
+        )
+    )
+    async with context("w", uuid.uuid4()) as inspector:
+        assert await inspector.capabilities() == capabilities
+        assert await inspector.explain("SELECT 1") == explained
+        with pytest.raises(MeasurementFixtureMismatchError):
+            await inspector.explain("SELECT 2")
+    assert "never explained" in (context.mismatch or "")

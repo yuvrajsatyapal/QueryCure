@@ -95,6 +95,7 @@ async def _run(args: argparse.Namespace) -> int:
             cap=cap,
             measurements=args.measurements,
             export_dir=args.export_demo,
+            capture_context=args.capture_context,
         )
         results.append(result)
     _print(results)
@@ -152,6 +153,12 @@ def main() -> None:
         help="free requests already spent today outside eval recording (e.g. live runs)",
     )
     run.add_argument("--save-results", action="store_true", help="also save replay results")
+    run.add_argument(
+        "--capture-context",
+        action="store_true",
+        help="fixture replay: read the sandbox context live and, if every prompt still "
+        "matches exactly, store it in the measurement fixture (needs the sandbox)",
+    )
     run.add_argument(
         "--export-demo",
         type=Path,

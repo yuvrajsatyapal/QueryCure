@@ -181,6 +181,12 @@ class Settings(BaseSettings):
         default=30 * 24 * 3600, ge=300, validation_alias=_env("SESSION_TTL_SECONDS")
     )
 
+    @field_validator("metrics_token", "github_client_secret", mode="before")
+    @classmethod
+    def _blank_secret_is_unset(cls, value: object) -> object:
+        # An empty env var must not become an empty secret (e.g. an empty bearer token).
+        return None if isinstance(value, str) and not value.strip() else value
+
     @field_validator("master_key")
     @classmethod
     def _master_key_is_32_bytes(cls, value: SecretStr | None) -> SecretStr | None:

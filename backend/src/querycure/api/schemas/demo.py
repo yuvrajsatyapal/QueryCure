@@ -10,7 +10,8 @@ from querycure.api.schemas.investigations import RunPlan
 class DemoItem(BaseModel):
     slug: str
     title: str
-    summary: str
+    headline: str  # the sealed report's own headline
+    summary: str  # what the underlying eval case tests
     label: str
     provenance: Literal["prerecorded"] = "prerecorded"
     outcome: str | None

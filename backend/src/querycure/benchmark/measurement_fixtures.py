@@ -15,6 +15,12 @@ test, so they are separated:
   to the recorded one. Exact prompt matching then applies to the whole run.
 - **Live mode** (the default for the worker and for `--measurements live`) is unchanged.
 
+The fixture also holds the run's **sandbox context reads** (capabilities, plain EXPLAIN,
+schema snapshot). They depend on the template's ANALYZE statistics, and ANALYZE samples
+large tables at random, so a freshly built template gives slightly different estimates and
+therefore different prompts. Recording them makes fixture replay independent of the sandbox
+altogether: no template, clone, DDL or query runs.
+
 Safety rails, so a fixture can never quietly stand in for something else:
 - every arm's SQL digest is checked against the approval, as the engine does;
 - the run's experiment config must equal the recorded one (any drift in candidates, param
@@ -30,10 +36,11 @@ Safety rails, so a fixture can never quietly stand in for something else:
 import dataclasses
 import hashlib
 import uuid
-from collections.abc import Callable
-from typing import Any, Literal, Self
+from collections.abc import AsyncIterator, Callable
+from contextlib import AbstractAsyncContextManager, asynccontextmanager
+from typing import Any, Literal, Protocol, Self
 
-from pydantic import BaseModel, ConfigDict, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from querycure.benchmark.engine import (
     ApprovedExperiment,
@@ -51,6 +58,7 @@ from querycure.benchmark.replication import (
     eligible_arms,
     replicate_config,
 )
+from querycure.connectors.models import ExplainResult, SchemaSnapshot, TargetCapabilities
 from querycure.core.errors import QueryCureError
 from querycure.domain.benchmark import (
     EnvironmentFingerprint,
@@ -60,6 +68,7 @@ from querycure.domain.benchmark import (
 )
 from querycure.replay.canonical import canonical_json
 from querycure.sandbox.provisioner import SandboxProvisioner
+from querycure.sql.validator import TableRef
 
 MEASUREMENT_FIXTURE_SCHEMA_VERSION = 1
 
@@ -92,6 +101,30 @@ class RecordedRound(BaseModel):
     replication: ReplicationResult | None
 
 
+class RecordedExplain(BaseModel):
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    query: str
+    result: ExplainResult
+
+
+class RecordedSnapshot(BaseModel):
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    tables: list[TableRef]
+    result: SchemaSnapshot
+
+
+class RecordedContext(BaseModel):
+    """What the run read from its sandbox context clone, in call order."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    capabilities: TargetCapabilities
+    explains: list[RecordedExplain] = Field(default_factory=list)
+    snapshots: list[RecordedSnapshot] = Field(default_factory=list)
+
+
 class MeasurementFixture(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
 
@@ -102,6 +135,7 @@ class MeasurementFixture(BaseModel):
     recorded_on: str  # the record run's date, written once by record mode
     source_note: str
     rounds: list[RecordedRound]
+    context: RecordedContext | None = None
 
     @model_validator(mode="after")
     def _consistent(self) -> Self:
@@ -340,3 +374,91 @@ class FixtureMeasure:
         ):
             raise self._fail("the recorded replication verdicts do not follow from its results")
         return ReplicatedRun(replicates=done, replication=replication)
+
+
+class ContextInspector(Protocol):
+    async def capabilities(self) -> TargetCapabilities: ...
+    async def explain(self, query: str) -> ExplainResult: ...
+    async def schema_snapshot(self, tables: list[TableRef]) -> SchemaSnapshot: ...
+
+
+# (workload_id, run_id) -> an async context manager yielding the context inspector.
+ContextOpener = Callable[[str, uuid.UUID], AbstractAsyncContextManager[Any]]
+
+
+class CapturingContext:
+    """Record mode: open the real sandbox inspector and keep every result it returns."""
+
+    def __init__(self, inner: ContextOpener) -> None:
+        self._inner = inner
+        self.capabilities: TargetCapabilities | None = None
+        self.explains: list[RecordedExplain] = []
+        self.snapshots: list[RecordedSnapshot] = []
+
+    def recorded(self) -> RecordedContext | None:
+        if self.capabilities is None:
+            return None
+        return RecordedContext(
+            capabilities=self.capabilities, explains=self.explains, snapshots=self.snapshots
+        )
+
+    @asynccontextmanager
+    async def __call__(self, workload_id: str, run_id: uuid.UUID) -> AsyncIterator[Any]:
+        capture = self
+
+        class _Inspector:
+            def __init__(self, gateway: Any) -> None:
+                self._gateway = gateway
+
+            async def capabilities(self) -> TargetCapabilities:
+                capture.capabilities = await self._gateway.capabilities()
+                return capture.capabilities
+
+            async def explain(self, query: str) -> ExplainResult:
+                result: ExplainResult = await self._gateway.explain(query)
+                capture.explains.append(RecordedExplain(query=query, result=result))
+                return result
+
+            async def schema_snapshot(self, tables: list[TableRef]) -> SchemaSnapshot:
+                result: SchemaSnapshot = await self._gateway.schema_snapshot(tables)
+                capture.snapshots.append(RecordedSnapshot(tables=list(tables), result=result))
+                return result
+
+        async with self._inner(workload_id, run_id) as gateway:
+            yield _Inspector(gateway)
+
+
+class FixtureContext:
+    """Fixture mode: serve the recorded context reads; anything else is a mismatch."""
+
+    def __init__(self, context: RecordedContext) -> None:
+        self._context = context
+        self.mismatch: str | None = None
+
+    def _fail(self, detail: str) -> MeasurementFixtureMismatchError:
+        self.mismatch = self.mismatch or detail
+        return MeasurementFixtureMismatchError(
+            f"The recorded sandbox context does not match this run ({detail}); re-record."
+        )
+
+    @asynccontextmanager
+    async def __call__(self, workload_id: str, run_id: uuid.UUID) -> AsyncIterator[Any]:
+        context, fixture = self._context, self
+
+        class _Inspector:
+            async def capabilities(self) -> TargetCapabilities:
+                return context.capabilities
+
+            async def explain(self, query: str) -> ExplainResult:
+                for item in context.explains:
+                    if item.query == query:
+                        return item.result
+                raise fixture._fail("EXPLAIN of a query the recording never explained")
+
+            async def schema_snapshot(self, tables: list[TableRef]) -> SchemaSnapshot:
+                for item in context.snapshots:
+                    if item.tables == list(tables):
+                        return item.result
+                raise fixture._fail("schema snapshot of tables the recording never read")
+
+        yield _Inspector()

@@ -1490,6 +1490,10 @@
             "title": "Artifacts",
             "type": "array"
           },
+          "headline": {
+            "title": "Headline",
+            "type": "string"
+          },
           "label": {
             "title": "Label",
             "type": "string"
@@ -1586,6 +1590,7 @@
         "required": [
           "slug",
           "title",
+          "headline",
           "summary",
           "label",
           "outcome",
@@ -1630,6 +1635,10 @@
       },
       "DemoItem": {
         "properties": {
+          "headline": {
+            "title": "Headline",
+            "type": "string"
+          },
           "label": {
             "title": "Label",
             "type": "string"
@@ -1693,6 +1702,7 @@
         "required": [
           "slug",
           "title",
+          "headline",
           "summary",
           "label",
           "outcome",

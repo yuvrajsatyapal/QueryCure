@@ -5,4 +5,8 @@
 .ruff_cache
 .pytest_cache
 tests
-evals
+# Evals stay out of the image, except the labelled fixtures the demo gallery shows.
+evals/*
+!evals/fixtures
+evals/fixtures/*
+!evals/fixtures/experiments

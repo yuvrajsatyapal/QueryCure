@@ -1,0 +1,82 @@
+# Restricted public-demo profile, runnable locally (DEPLOYMENT §3, Phase 5). This is the
+# configuration a real deployment uses, minus TLS and managed services:
+#   - QC_PROFILE=demo: anonymous sessions, BYOK only (no server model key), strict rate limits,
+#     no interactive API docs, Secure cookies (browsers accept them on http://localhost).
+#   - FEATURE_SANDBOX=false and no sandbox server: no live benchmarking; the gallery shows
+#     prerecorded, labelled investigations. FEATURE_LIVE_INSPECTION_PUBLIC=false: no Mode B.
+#   - One API container with the embedded worker (WORKER_MODE=embedded).
+#   - A one-shot `migrate` service runs Alembic as the owner role before the API starts.
+# Usage:
+#   export QC_MASTER_KEY=$(python3 -c "import base64,os;print(base64.b64encode(os.urandom(32)).decode())")
+#   docker compose -f infra/docker/compose.demo.yaml up --build
+#   open http://localhost:3300
+name: querycure-demo
+
+services:
+  demo-db:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: qc_owner
+      POSTGRES_PASSWORD: ${QC_DEMO_DB_PASSWORD:-qc_demo_local_only}
+      POSTGRES_DB: querycure
+      TZ: UTC
+      QC_APP_PASSWORD: ${QC_DEMO_APP_PASSWORD:-qc_demo_local_only}
+      QC_RETENTION_PASSWORD: ${QC_DEMO_RETENTION_PASSWORD:-qc_demo_local_only}
+    volumes:
+      - qc_demo_meta:/var/lib/postgresql/data
+      - ./metadata-init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U qc_owner -d querycure"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  migrate:
+    build: ../../backend
+    command: ["alembic", "upgrade", "head"]
+    environment:
+      DATABASE_MIGRATION_URL: postgresql://qc_owner:${QC_DEMO_DB_PASSWORD:-qc_demo_local_only}@demo-db:5432/querycure
+    depends_on:
+      demo-db:
+        condition: service_healthy
+
+  api:
+    build: ../../backend
+    command: ["uvicorn", "querycure.api.main:app", "--host", "0.0.0.0", "--port", "8000"]
+    environment:
+      QC_PROFILE: demo
+      DATABASE_URL: postgresql://qc_app:${QC_DEMO_APP_PASSWORD:-qc_demo_local_only}@demo-db:5432/querycure
+      DATABASE_URL_DIRECT: postgresql://qc_app:${QC_DEMO_APP_PASSWORD:-qc_demo_local_only}@demo-db:5432/querycure
+      QC_MASTER_KEY: ${QC_MASTER_KEY:?set QC_MASTER_KEY (32 random bytes, base64)}
+      WORKER_MODE: embedded
+      FEATURE_SANDBOX: "false"
+      FEATURE_LIVE_INSPECTION_PUBLIC: "false"
+      ALLOW_PRIVATE_TARGETS: "false"
+      CORS_ORIGINS: '["http://localhost:3300"]'
+      METRICS_TOKEN: ${QC_METRICS_TOKEN:-}
+      TZ: UTC
+    ports:
+      - "127.0.0.1:8300:8000"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/api/v1/readyz').status == 200 else 1)"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+    stop_grace_period: 30s
+
+  web:
+    build:
+      context: ../../frontend
+      args:
+        NEXT_PUBLIC_API_BASE_URL: http://localhost:8300
+    ports:
+      - "127.0.0.1:3300:3000"
+    depends_on:
+      api:
+        condition: service_healthy
+
+volumes:
+  qc_demo_meta:

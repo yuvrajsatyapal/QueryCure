@@ -1,6 +1,18 @@
 # Observability
 
-Status: Planned (structured logging Phase 1, events Phase 2, OpenTelemetry Phase 5).
+Status: structured logging (Phase 1), events (Phase 2), and **Phase 5 operations implemented**: correlation IDs, DB-derived metrics, stuck-work detection, graceful drain and retention. **OpenTelemetry tracing/export and LangSmith are deferred**: they need new dependencies, and nothing in Phase 5 required them to ship (see PHASE_5_REPORT).
+
+## 0. Implemented in Phase 5
+- **Correlation:** API log lines carry `request_id` (response header `X-Request-ID`). Worker log lines written while a job runs, including the graph, engine and LLM layers, carry `job_id`, `job_kind`, `run_id` and `attempt` (structlog contextvars; `test_operations.py`).
+- **Metrics:** `GET /api/v1/internal/metrics`, Prometheus text format, computed from the metadata DB on each scrape:
+  - `qc_jobs{kind,status}`, `qc_jobs_lease_expired`, `qc_jobs_retried`, `qc_jobs_oldest_pending_seconds`;
+  - `qc_runs{status,outcome}`, `qc_run_duration_seconds_{count,sum}`;
+  - `qc_runs_terminal_unsealed` (finalization failures);
+  - `qc_replay_attempts{kind,status,failure_code}`.
+  It is open in the local profile, and needs `Authorization: Bearer $METRICS_TOKEN` elsewhere (404 otherwise; an empty token counts as unset). In-process counters such as LLM latency histograms are not exported yet; `agent_executions` holds the per-call data.
+- **Stuck work:** every 5 minutes the worker logs `stuck_work_detected {expired_leases, orphaned_runs}` and drops orphaned sandbox clones.
+- **Readiness:** `/readyz` checks the metadata DB and that migrations are at head. Settings fail fast at startup. In the demo profile that includes: a master key is required, no server model key, no private targets, and HTTPS URLs when GitHub sign-in is enabled.
+- **Timeouts and pools:** metadata connections carry server-side `statement_timeout` and `idle_in_transaction_session_timeout` as startup options; pool size, overflow and timeout are configurable.
 
 ## 1. Three audiences, three channels
 

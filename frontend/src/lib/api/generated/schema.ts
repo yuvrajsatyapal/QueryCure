@@ -1445,6 +1445,8 @@ export interface components {
         DemoDetail: {
             /** Artifacts */
             artifacts: components["schemas"]["DemoArtifactRef"][];
+            /** Headline */
+            headline: string;
             /** Label */
             label: string;
             /** Manifest Sha256 */
@@ -1495,6 +1497,8 @@ export interface components {
         };
         /** DemoItem */
         DemoItem: {
+            /** Headline */
+            headline: string;
             /** Label */
             label: string;
             /** Measurements Recorded On */

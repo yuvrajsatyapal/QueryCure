@@ -49,7 +49,7 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
 
 function Sql({ lines }: { lines: string[] }) {
   return (
-    <pre className="overflow-x-auto rounded-md border border-border bg-surface-2 p-2 font-mono text-xs">
+    <pre tabIndex={0} className="overflow-x-auto rounded-md border border-border bg-surface-2 p-2 font-mono text-xs">
       {lines.join(";\n")}
     </pre>
   );

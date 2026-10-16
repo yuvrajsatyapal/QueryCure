@@ -42,6 +42,7 @@ def _item(b: DemoBundle) -> DemoItem:
     return DemoItem(
         slug=b.slug,
         title=b.title,
+        headline=str(b.report().get("headline", "")),
         summary=b.summary,
         label=b.label,
         outcome=b.outcome,

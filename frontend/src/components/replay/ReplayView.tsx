@@ -191,7 +191,7 @@ export function ReplayConfirm({ experiment, runId, onDone }: { experiment: Exper
         your database. Confirming approves exactly this SQL for the replay.
       </p>
       {arms.map((a) => (
-        <pre key={a.arm} className="overflow-x-auto rounded border border-border bg-surface-2 p-2 font-mono text-xs">
+        <pre key={a.arm} tabIndex={0} className="overflow-x-auto rounded border border-border bg-surface-2 p-2 font-mono text-xs">
           {a.arm}: {(a.ddl.length ? a.ddl : a.query ? [a.query] : []).join(";\n")}
         </pre>
       ))}

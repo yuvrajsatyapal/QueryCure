@@ -23,10 +23,14 @@ from sqlalchemy import text
 from querycure.agents.prompts import PROMPT_VERSIONS
 from querycure.agents.run import RunServices, execute_run
 from querycure.agents.runtime import LlmClients
+from querycure.agents.services import sandbox_inspector
 from querycure.benchmark.measurement_fixtures import (
+    CapturingContext,
     CapturingMeasure,
+    FixtureContext,
     FixtureMeasure,
     MeasurementFixture,
+    RecordedContext,
 )
 from querycure.core.config import Settings, is_free_model
 from querycure.core.errors import BudgetExhaustedError, ConfigurationError
@@ -246,6 +250,7 @@ async def run_case(
     measurements: Measurements = "fixture",
     fixtures_dir: Path | None = None,
     export_dir: Path | None = None,  # demo bundles: deterministic replays only
+    capture_context: bool = False,  # fixture replay: read and store the sandbox context once
 ) -> CaseResult:
     name = f"qc_eval_{case.id[:30]}_{secrets.token_hex(4)}"
     with psycopg.connect(admin_url, autocommit=True) as admin:
@@ -258,6 +263,8 @@ async def run_case(
         client: ChatClient
         gate: LlmGate | None = None
         measure: CapturingMeasure | FixtureMeasure | None = None
+        context: CapturingContext | FixtureContext | None = None
+        fixture: MeasurementFixture | None = None
         use_fixture = mode == "replay" and case.workload is not None and measurements == "fixture"
         provenance: dict[str, Any] = {
             "model": model,
@@ -296,6 +303,15 @@ async def run_case(
                 provenance["measurement_fixture_sha256"] = fixture.digest()
                 provenance["measurement_recorded_on"] = fixture.recorded_on
                 measure = FixtureMeasure(fixture)
+                if fixture.context is not None and not capture_context:
+                    context = FixtureContext(fixture.context)
+                elif not capture_context:
+                    return CaseResult(
+                        case, None,
+                        "measurement fixture has no recorded sandbox context: run once with "
+                        "--capture-context (needs the sandbox) or re-record the case",
+                        model=model, provenance=provenance,
+                    )  # fmt: skip
             client = ReplayClient(loaded, exact_only=use_fixture)
         else:
             if live_client is None:
@@ -320,14 +336,30 @@ async def run_case(
 
         if mode == "record" and case.workload is not None:
             measure = CapturingMeasure()
-        sandbox = build_sandbox(settings) if case.workload else None
-        if case.workload and sandbox is None:
+        # A fixture replay with recorded context touches no sandbox at all.
+        needs_sandbox = case.workload is not None and not isinstance(context, FixtureContext)
+        sandbox = build_sandbox(settings) if needs_sandbox else None
+        if needs_sandbox and sandbox is None:
             return CaseResult(
                 case, None, "Mode C case: set SANDBOX_ADMIN_URL and SANDBOX_BENCH_PASSWORD",
                 model=model,
             )  # fmt: skip
         if sandbox is not None:
             sandbox.bootstrap()
+            if mode == "record" or capture_context:
+                live_sandbox = sandbox
+
+                def open_live(workload_id: str, run: uuid.UUID) -> Any:
+                    return sandbox_inspector(live_sandbox, workload_id=workload_id, run_id=run)
+
+                context = CapturingContext(open_live)
+        provenance["context"] = (
+            None
+            if case.workload is None
+            else "recorded"
+            if isinstance(context, FixtureContext)
+            else "live sandbox"
+        )
         services = RunServices(
             engine=engine,
             settings=settings,
@@ -337,6 +369,7 @@ async def run_case(
             checkpoint_role="qc_app",
             sandbox=sandbox,
             measure=measure,
+            context_inspector=context,
         )
         error = None
         try:
@@ -365,6 +398,8 @@ async def run_case(
                 for marker in ("eval request cap", "free model allowance", "free model requests")
             )
         ]
+        if isinstance(context, FixtureContext) and error is None and context.mismatch:
+            error = f"measurement fixture mismatch: {context.mismatch}; re-record this case"
         if isinstance(measure, FixtureMeasure) and error is None:
             if measure.mismatch is not None:
                 # Even if the graph recorded the experiment as failed and finished: not a pass.
@@ -380,14 +415,32 @@ async def run_case(
         if mode == "record" and error is None:
             recording.save(recording_path(case, model, recordings_dir))
             if isinstance(measure, CapturingMeasure):
-                _save_fixture(case, model, measure, fixtures_dir)
+                recorded = context.recorded() if isinstance(context, CapturingContext) else None
+                _save_fixture(case, model, measure, recorded, fixtures_dir)
+        # Only from a replay that matched every recorded prompt exactly: the context read now
+        # is provably the one the recording saw.
+        seen_context = context.recorded() if isinstance(context, CapturingContext) else None
+        if capture_context and error is None and fixture is not None and seen_context:
+            path = measurement_fixture_path(case, model, fixtures_dir)
+            _write_fixture(path, fixture.model_copy(update={"context": seen_context}))
         return CaseResult(case, score(case, seen), error, model=model, provenance=provenance)
     finally:
         with psycopg.connect(admin_url, autocommit=True) as admin:
             admin.execute(f'DROP DATABASE IF EXISTS "{name}" WITH (FORCE)')
 
 
-def _save_fixture(case: EvalCase, model: str, measure: CapturingMeasure, root: Path | None) -> None:
+def _write_fixture(path: Path, fixture: MeasurementFixture) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(fixture.model_dump_json(indent=1) + "\n")
+
+
+def _save_fixture(
+    case: EvalCase,
+    model: str,
+    measure: CapturingMeasure,
+    context: RecordedContext | None,
+    root: Path | None,
+) -> None:
     """The measurements this recording's prompts embed, kept so replay is deterministic.
     A recording that ran no complete experiment gets no fixture (an old one is removed, since
     it would describe another recording)."""
@@ -404,8 +457,7 @@ def _save_fixture(case: EvalCase, model: str, measure: CapturingMeasure, root: P
     if fixture is None:
         path.unlink(missing_ok=True)
         return
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(fixture.model_dump_json(indent=1) + "\n")
+    _write_fixture(path, fixture.model_copy(update={"context": context}))
 
 
 async def _export_demo(

@@ -58,8 +58,14 @@ def _opener(
             return None
         return ctx.inspectors.open(uuid.UUID(str(state["connection_id"])))
     workload = state.get("workload_id")
-    if ExecutionMode.SANDBOX_BENCHMARK.value in modes and workload and ctx.sandbox is not None:
-        return sandbox_inspector(ctx.sandbox, workload_id=workload, run_id=ctx.run_id)
+    if ExecutionMode.SANDBOX_BENCHMARK.value in modes and workload:
+        if ctx.context_inspector is not None:
+            opened: AbstractAsyncContextManager[Inspector] = ctx.context_inspector(
+                workload, ctx.run_id
+            )
+            return opened
+        if ctx.sandbox is not None:
+            return sandbox_inspector(ctx.sandbox, workload_id=workload, run_id=ctx.run_id)
     return None
 
 

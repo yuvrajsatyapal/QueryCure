@@ -1,6 +1,6 @@
 # Deployment
 
-Status: Planned. Two operational profiles share one codebase; behaviour differs via `QC_PROFILE=local|demo` and feature flags.
+Status: **Phase 5: deployment artifacts prepared and the restricted demo profile verified locally (2026-10-16); no public deployment has been made** (that needs the owner's approval, a domain and accounts). Two operational profiles share one codebase; behaviour differs via `QC_PROFILE=local|demo` and feature flags.
 
 ## 1. Profiles
 
@@ -83,6 +83,29 @@ flowchart TB
 
 Developers may run `api`/`worker`/`web` on the host and only the databases in Docker; both are supported.
 
+## 2b. Deployment artifacts (Phase 5, implemented)
+
+| Artifact | Purpose |
+|---|---|
+| `backend/Dockerfile` | One image for the **API** (`uvicorn querycure.api.main:app`), the **worker** (default CMD) and the **migration step** (`alembic upgrade head`). Ships `migrations/` (readiness compares with the head) and the demo's prerecorded benchmark fixtures. Runs as uid 10001; SIGTERM drains jobs |
+| `frontend/Dockerfile` | Web app for container hosts (Vercel builds natively instead). `NEXT_PUBLIC_API_BASE_URL` is a build argument |
+| `infra/docker/compose.demo.yaml` | The restricted demo profile, end to end, on one machine: Postgres, a one-shot `migrate` service as the owner role, the API with the **embedded worker**, and the web app. `FEATURE_SANDBOX=false`, no Mode B, BYOK only, strict rate limits |
+| `.github/workflows/audit.yml` | Weekly `pip-audit` and `pnpm audit`, plus on every lockfile change |
+| CI | Builds both images on every push (they must stay buildable) |
+
+**Verified locally on 2026-10-16** with `compose.demo.yaml`:
+- readiness `ok/current`;
+- `/docs` → 404, and `/internal/metrics` → 404 without its token, 200 with it;
+- session cookies `Secure; HttpOnly; SameSite=lax`;
+- `/me` → `profile: demo`, live inspection and sandbox off;
+- an analysis run without a user key → 503 "add your own OpenRouter key";
+- `sandbox_benchmark` → 403, `/connections` → 403;
+- the gallery serves 7 bundles and 4 benchmark fixtures;
+- HSTS, `X-Frame-Options`, `no-store` and the web CSP present;
+- `docker compose stop api` → the embedded worker logged `worker_stopped`, and the process exited in about 2 s.
+
+The BYOK run path was not exercised against OpenRouter from the demo stack (it would send a fabricated key to a third party); it is covered by `test_byok_api.py`.
+
 ## 3. Public demo hosting
 
 | Component | Recommendation | Why | Alternative |
@@ -91,6 +114,17 @@ Developers may run `api`/`worker`/`web` on the host and only the databases in Do
 | API + worker | One small always-on container (Fly.io, Railway, or Render) | SSE needs long-lived connections; embedded worker needs CPU outside request handling (rules out scale-to-zero platforms that throttle CPU between requests) | Google Cloud Run with CPU always allocated (cost ↑) |
 | Metadata DB | Neon free tier | Serverless Postgres, branching for previews; supports `uuid-ossp` and `LISTEN/NOTIFY` on direct (non-pooled) connections | Supabase |
 | Secrets | Host's secret store | `QC_MASTER_KEY`, `DATABASE_URL`, OAuth secrets | — |
+
+### Can free tiers host this safely? (Phase 5 review)
+
+Prices, quotas and policies change: verify them on the day you deploy. This review records characteristics, not numbers.
+
+| Component | Free-tier fit | Notes |
+|---|---|---|
+| Web (Vercel Hobby) | ✅ for a non-commercial portfolio demo | Hobby is for personal, non-commercial use; check the current terms. SSE goes directly to the API, not through Vercel |
+| API + embedded worker | ⚠️ only on an **always-on** container | Platforms that spin services down when idle, or throttle CPU between requests, break SSE streams and stall the worker. Leases recover the jobs, but users see stalls. A small paid always-on instance is the honest recommendation |
+| Metadata DB (Neon free) | ✅ with caveats | Compute auto-suspend adds cold-start latency; `LISTEN` needs the direct (non-pooled) endpoint; storage is small but demo data is disposable; point-in-time restore window is limited |
+| **Sandbox (Mode C)** | ❌ **not on shared free tiers** | Isolation needs a Docker internal network with no egress, CPU/memory/pids limits and a non-superuser role (SECURITY §8). Shared free platforms offer none of these, and noisy neighbours would make measurements meaningless (R1, R21). **Decision: the public demo runs `FEATURE_SANDBOX=false` and shows prerecorded, labelled benchmarks.** Live benchmarking stays a local-profile feature, or needs a dedicated VM later |
 
 **Neon caveat:** `LISTEN/NOTIFY` requires a direct (non-pgbouncer) connection; the API uses the direct endpoint for its single listener connection and the pooled endpoint for request traffic. Neon compute auto-suspend may add cold-start latency to the first request.
 
@@ -110,6 +144,25 @@ Developers may run `api`/`worker`/`web` on the host and only the databases in Do
 | `audit.yml` | weekly | `pip-audit`, `pnpm audit` |
 
 Migrations run as a separate release step before new API instances start; migrations must be backward-compatible with the previous app version (expand → migrate → contract).
+
+## 4b. Release procedure (Phase 5)
+
+1. **CI green** on the commit: lint, types, unit, integration, security, evals (smoke + Mode C fixtures), e2e (including axe), and image builds.
+2. **Migrate first** (expand → migrate → contract): run the image once with `alembic upgrade head` and `DATABASE_MIGRATION_URL` (owner role). Migrations 0013–0015 only add tables, columns and indexes, so the previous app version keeps working against the new schema.
+3. **Deploy the API/worker image**, then wait for `GET /api/v1/readyz` to return 200 (`database: ok`, `migrations: current`). Liveness is `GET /api/v1/healthz`.
+4. **Deploy the web app** with `NEXT_PUBLIC_API_BASE_URL` pointing at the API's public origin.
+5. **Smoke check:** `/me` (profile, features), the demo gallery, one digest verification, `/internal/metrics` with the token.
+
+**Rollback:** redeploy the previous image tag. The schema stays (expand-only migrations are backward compatible); do not run `alembic downgrade` on a database with user data. 0015's downgrade drops stored keys, and 0013's drops the idempotency columns. Downgrades exist for development databases only.
+
+**Worker lifecycle:**
+- SIGTERM stops claiming jobs and lets in-flight jobs finish for `WORKER_SHUTDOWN_GRACE_SECONDS` (default 20 s); give the platform's stop timeout a little more (compose: `stop_grace_period: 30s`).
+- After the grace period, jobs are abandoned to lease expiry (≤ `WORKER_LEASE_SECONDS`), and the next worker resumes them from their LangGraph checkpoint.
+- Every 5 minutes the worker logs `stuck_work_detected` (expired leases, active runs with no job) and drops orphaned sandbox clones.
+
+**Backups:** use the metadata DB provider's point-in-time restore (Neon free tier: a short window). Demo data is disposable by design. Losing `QC_MASTER_KEY` makes stored BYOK keys undecryptable (users re-enter them); it must persist across deploys, but it never protects evidence or reports.
+
+**Retention:** schedule `python -m querycure.ops retention` with `DATABASE_RETENTION_URL` (the `qc_retention` role) daily. It deletes long-expired sessions, idle rate-limit buckets and wiped credential rows, never evidence.
 
 ## 5. Operational limitations
 
@@ -139,7 +192,12 @@ Migrations run as a separate release step before new API instances start; migrat
 | `TRUSTED_PROXY_HOPS` | reverse proxies that append to `X-Forwarded-For` (default 0: the header is ignored); rate limits key on the client address |
 | `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` | GitHub OAuth app; sign-in is offered only when both are set |
 | `PUBLIC_API_URL` / `WEB_BASE_URL` | public origins (OAuth callback, post-sign-in redirect); must be `https://` when GitHub sign-in is enabled outside the local profile |
-| `OTEL_EXPORTER_OTLP_ENDPOINT`, `LANGSMITH_API_KEY` | optional observability |
+| `OTEL_EXPORTER_OTLP_ENDPOINT`, `LANGSMITH_API_KEY` | reserved: OTel export and LangSmith are **not implemented** (deferred, see PHASE_5_REPORT) |
+| `METRICS_TOKEN` | bearer token for `/api/v1/internal/metrics` outside the local profile (empty = endpoint answers 404) |
+| `DB_POOL_SIZE` / `DB_MAX_OVERFLOW` / `DB_POOL_TIMEOUT_SECONDS` | metadata connection pool (defaults 5 / 5 / 10 s) |
+| `DB_STATEMENT_TIMEOUT_MS` / `DB_IDLE_IN_TRANSACTION_TIMEOUT_MS` | server-side limits on the app's metadata connections (60 s / 120 s) |
+| `WORKER_SHUTDOWN_GRACE_SECONDS` | drain time on SIGTERM (default 20) |
+| `DATABASE_RETENTION_URL` | `qc_retention` role for `python -m querycure.ops retention` |
 | `GEMINI_API_KEY`, `OPENROUTER_API_KEY` | local-profile fallback only; ignored in demo |
 | `LLM_PROVIDER` / `LLM_MODEL` / `LLM_FALLBACK_MODEL` | default `openrouter` / `nvidia/nemotron-3-super-120b-a12b:free` (pinned by the Phase 2 benchmark) / none; must be free models while `LLM_FREE_ONLY` is on ([ADR-0016](../engineering/adr/ADR-0016-free-openrouter-models-only.md)); the eval-chosen model is pinned with `LLM_MODEL` |
 | `LLM_FREE_ONLY` | default `true`: refuse non-free models at startup, refuse a non-free model id in the OpenRouter client before any request is sent, and stop a run on any non-zero-cost response |

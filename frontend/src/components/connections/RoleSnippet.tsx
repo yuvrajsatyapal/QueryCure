@@ -13,7 +13,7 @@ export function RoleSnippet() {
         Superuser, CREATEROLE and BYPASSRLS roles are refused. QueryCure only runs plain EXPLAIN and
         catalog reads in read-only sessions.
       </p>
-      <pre className="mt-2 overflow-x-auto rounded-md bg-surface p-3 font-mono text-xs">{SQL}</pre>
+      <pre tabIndex={0} className="mt-2 overflow-x-auto rounded-md bg-surface p-3 font-mono text-xs">{SQL}</pre>
     </details>
   );
 }

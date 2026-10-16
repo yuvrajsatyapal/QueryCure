@@ -193,3 +193,20 @@ async def test_embedded_worker_starts_and_stops_with_the_api(
     finally:
         configure_logging()
     assert "worker_stopped" in stream.getvalue()
+
+
+async def test_an_empty_metrics_token_never_opens_the_endpoint(migrated_db: str) -> None:
+    engine = make_engine(migrated_db, set_role="qc_app")
+    demo = Settings(
+        _env_file=None, profile=Profile.DEMO, allow_private_targets=False,
+        master_key=base64.b64encode(os.urandom(32)).decode(), metrics_token="",
+    )  # fmt: skip
+    assert demo.metrics_token is None
+    try:
+        app = create_app(demo, engine=engine)
+        transport = httpx.ASGITransport(app=app)
+        async with httpx.AsyncClient(transport=transport, base_url="https://t") as client:
+            r = await client.get("/api/v1/internal/metrics", headers={"Authorization": "Bearer "})
+    finally:
+        await engine.dispose()
+    assert r.status_code == 404

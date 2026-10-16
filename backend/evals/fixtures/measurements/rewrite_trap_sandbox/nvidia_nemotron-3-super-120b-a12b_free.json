@@ -5359,5 +5359,225 @@
    ],
    "replication": null
   }
- ]
+ ],
+ "context": {
+  "capabilities": {
+   "server_version_num": 170011,
+   "server_version": "17.11 (Debian 17.11-1.pgdg13+2)",
+   "is_superuser": false,
+   "can_create_role": false,
+   "bypasses_rls": false,
+   "is_replication_role": false,
+   "can_read_all_stats": false,
+   "has_pg_stat_statements": false,
+   "ssl_in_use": false,
+   "owned_tables": 2,
+   "schemas": [
+    "public"
+   ],
+   "warnings": [
+    "role owns 2 table(s); use a non-owner role",
+    "role is not a member of pg_read_all_stats; workload views are limited"
+   ]
+  },
+  "explains": [
+   {
+    "query": "SELECT count(*) FROM accounts WHERE region_code NOT IN (SELECT region_code FROM closed_regions)",
+    "result": {
+     "plan_document": [
+      {
+       "Plan": {
+        "Node Type": "Aggregate",
+        "Strategy": "Plain",
+        "Partial Mode": "Simple",
+        "Parallel Aware": false,
+        "Async Capable": false,
+        "Startup Cost": 211.64,
+        "Total Cost": 211.65,
+        "Plan Rows": 1,
+        "Plan Width": 8,
+        "Plans": [
+         {
+          "Node Type": "Seq Scan",
+          "Parent Relationship": "Outer",
+          "Parallel Aware": false,
+          "Async Capable": false,
+          "Relation Name": "accounts",
+          "Alias": "accounts",
+          "Startup Cost": 1.14,
+          "Total Cost": 199.14,
+          "Plan Rows": 5000,
+          "Plan Width": 0,
+          "Filter": "(NOT (ANY (region_code = (hashed SubPlan 1).col1)))",
+          "Plans": [
+           {
+            "Node Type": "Seq Scan",
+            "Parent Relationship": "SubPlan",
+            "Subplan Name": "SubPlan 1",
+            "Parallel Aware": false,
+            "Async Capable": false,
+            "Relation Name": "closed_regions",
+            "Alias": "closed_regions",
+            "Startup Cost": 0.0,
+            "Total Cost": 1.11,
+            "Plan Rows": 11,
+            "Plan Width": 4
+           }
+          ]
+         }
+        ]
+       }
+      }
+     ],
+     "validated": {
+      "sql": "SELECT count(*) FROM accounts WHERE region_code NOT IN (SELECT region_code FROM closed_regions)",
+      "statement_type": "select",
+      "metadata": {
+       "tables": [
+        {
+         "schema_name": null,
+         "name": "accounts"
+        },
+        {
+         "schema_name": null,
+         "name": "closed_regions"
+        }
+       ],
+       "columns": [
+        {
+         "table": null,
+         "name": "region_code"
+        }
+       ],
+       "order_by": [],
+       "limit": null,
+       "parameter_count": 0,
+       "functions": [
+        "count"
+       ],
+       "functions_to_resolve": []
+      },
+      "fingerprint": {
+       "normalized_sql": "SELECT COUNT(*) FROM accounts WHERE NOT region_code IN (SELECT region_code FROM closed_regions)",
+       "digest": "f3a9a4f09b377cbb41d28f04725ad4923fca9fceb3bab9b11af0ad88df6c0f10"
+      }
+     },
+     "generic_plan": false,
+     "server_version_num": 170011
+    }
+   }
+  ],
+  "snapshots": [
+   {
+    "tables": [
+     {
+      "schema_name": null,
+      "name": "accounts"
+     },
+     {
+      "schema_name": null,
+      "name": "closed_regions"
+     }
+    ],
+    "result": {
+     "tables": [
+      {
+       "schema_name": "public",
+       "name": "accounts",
+       "kind": "r",
+       "estimated_rows": 10000.0,
+       "pages": 73,
+       "total_bytes": 884736,
+       "n_live_tup": 0,
+       "n_dead_tup": 0,
+       "n_mod_since_analyze": 0,
+       "seq_scan": 0,
+       "idx_scan": 0,
+       "last_analyze": null,
+       "last_autoanalyze": null
+      },
+      {
+       "schema_name": "public",
+       "name": "closed_regions",
+       "kind": "r",
+       "estimated_rows": 11.0,
+       "pages": 1,
+       "total_bytes": 40960,
+       "n_live_tup": 0,
+       "n_dead_tup": 0,
+       "n_mod_since_analyze": 0,
+       "seq_scan": 0,
+       "idx_scan": null,
+       "last_analyze": null,
+       "last_autoanalyze": null
+      }
+     ],
+     "columns": [
+      {
+       "schema_name": "public",
+       "table_name": "accounts",
+       "name": "id",
+       "data_type": "bigint",
+       "not_null": true,
+       "position": 1,
+       "null_frac": 0.0,
+       "n_distinct": -1.0,
+       "avg_width": 8,
+       "correlation": 1.0
+      },
+      {
+       "schema_name": "public",
+       "table_name": "accounts",
+       "name": "region_code",
+       "data_type": "integer",
+       "not_null": true,
+       "position": 2,
+       "null_frac": 0.0,
+       "n_distinct": 50.0,
+       "avg_width": 4,
+       "correlation": 0.016385000199079514
+      },
+      {
+       "schema_name": "public",
+       "table_name": "accounts",
+       "name": "name",
+       "data_type": "text",
+       "not_null": true,
+       "position": 3,
+       "null_frac": 0.0,
+       "n_distinct": -1.0,
+       "avg_width": 12,
+       "correlation": 0.8186540603637695
+      },
+      {
+       "schema_name": "public",
+       "table_name": "closed_regions",
+       "name": "region_code",
+       "data_type": "integer",
+       "not_null": false,
+       "position": 1,
+       "null_frac": 0.09090909361839294,
+       "n_distinct": -0.9090908765792847,
+       "avg_width": 4,
+       "correlation": 1.0
+      }
+     ],
+     "indexes": [
+      {
+       "schema_name": "public",
+       "table_name": "accounts",
+       "name": "accounts_pkey",
+       "definition": "CREATE UNIQUE INDEX accounts_pkey ON public.accounts USING btree (id)",
+       "is_unique": true,
+       "is_primary": true,
+       "is_valid": true,
+       "size_bytes": 245760,
+       "idx_scan": 0
+      }
+     ],
+     "unresolved": []
+    }
+   }
+  ]
+ }
 }
