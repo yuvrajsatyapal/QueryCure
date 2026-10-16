@@ -113,7 +113,7 @@ Replay features ship in Phase 4, but their contracts bind from Phase 1 so no dat
   3. `index_regression` → `rejected: regression`; `no_benefit` → never `verified_recommendation`.
   4. Every number in the report has provenance (renderer test scans for unlabeled numbers).
 - **Exit:** acceptance met; full eval suite numbers in phase report.
-- **Status (2026-10-13):** implemented; #1, #3, #4 met; #2 met in TASKS T4.7's form (reproduced or documented inconclusive: 1 of 14 same-machine pairs reproduced, 0 not reproduced, verdicts agreed in 7 and speed-up CIs overlapped in 12; most pairs stopped by the gate-4 noise check). See [PHASE_4_REPORT](reports/PHASE_4_REPORT.md).
+- **Status (2026-10-16, owner-reviewed):** implementation complete; #1, #3, #4 met; #2 **partially demonstrated**: met in TASKS T4.7's form (reproduced or documented inconclusive: 1 of 14 same-machine pairs reproduced, 0 not reproduced), but the stronger wording here (agreeing verdicts and overlapping CIs) held only in part (verdicts agreed in 7 of 14, speed-up CIs overlapped in 12) because of noisy measurements. Margin kept at 1.25 (D9, [ADR-0023](../engineering/adr/ADR-0023-d9-experiment-replay-equivalence-margin.md)). See [PHASE_4_REPORT](reports/PHASE_4_REPORT.md).
 
 ---
 

@@ -1,7 +1,8 @@
 # Phase 4 Report — Verification & Replay
 
 - **Dates:** 2026-10-13 → 2026-10-13 (UTC)
-- **Exit criteria met:** yes for #1, #3 and #4. #2 is met in the form TASKS T4.7 sets: "reproduced or a documented inconclusive". ROADMAP's stronger wording ("agreeing verdicts and overlapping CIs") holds in only part of the 14 measured pairs; see §5.
+- **Outcome (owner-reviewed 2026-10-16):** implementation complete. Exit criteria #1, #3 and #4 are met. #2 is met in the form TASKS T4.7 sets ("reproduced or a documented inconclusive"), but ROADMAP's stronger replay criterion ("agreeing verdicts and overlapping CIs") is only **partially demonstrated**: it held in part of the 14 measured pairs because of noisy measurements; see §5.
+- **Owner decisions (2026-10-16):** D9 approved, margin kept at `m = 1.25` and not widened to raise reproduction success ([ADR-0023](../../engineering/adr/ADR-0023-d9-experiment-replay-equivalence-margin.md)). `bench@1`/`bench@2` semantics and every released replay contract stay as they are. The Mode C eval divergence stays documented as R19; `DIVERGED` is never a pass.
 - **Tasks completed:** T4.1–T4.9 ([TASKS.md](../TASKS.md)), plus two owner-requested extras: the AI re-investigation start contract and `GET /runs/{id}/verifications`.
 - **Tasks deferred:**
   - The re-investigation conclusion diff stays Post-MVP (REPLAY_ENGINE §10).
@@ -50,7 +51,7 @@
 | Comparison stored as content | ADR-0022 §8, migration 0012 | The replay run's report is rebuildable |
 | Re-investigation start only | ADR-0022 §9, API_DESIGN | Owner request; the diff stays Post-MVP |
 | Live-measurement eval replay → `DIVERGED` | ADR-0022 §10, TESTING_STRATEGY, RISKS R19 | Fresh measurements change prompts and control flow; never report that as a pass |
-| D9 margin 1.25 | proposal, owner's call | Measured same-machine drift (§5) does not support widening it |
+| D9 margin stays 1.25 (accepted 2026-10-16) | [ADR-0023](../../engineering/adr/ADR-0023-d9-experiment-replay-equivalence-margin.md), REPLAY_ENGINE §9.1 | Measured same-machine drift (§5) does not support widening it; a wider band would raise the reproduction rate only by weakening the equivalence test |
 
 No released contract changed: `bench@1`/`bench@2` rules, canonicalization profiles, digest formats, interim builders, and stored Phase 1–3 artifacts are all untouched. Runs from earlier phases are not finalized and answer `not_replayable: not_finalized`.
 
@@ -94,14 +95,14 @@ No released contract changed: `bench@1`/`bench@2` rules, canonicalization profil
 | Criterion (ROADMAP Phase 4) | Status | Evidence |
 |---|---|---|
 | 1. Report replay makes 0 LLM calls and all hashes verify; tampering one artifact fails replay | **Met** | `test_report_replay.py`: LLM transports patched to raise. All 10 codes are reached by fixtures: manifest missing, manifest digest mismatch, unsupported schema, unsupported profile, artifact purged, artifact digest mismatch, events purged, events gap, events digest mismatch, rebuild mismatch. A whitespace-only manifest edit fails too. The Playwright lifecycle shows "Integrity check passed against stored digests" |
-| 2. Experiment replay on `orders_ecommerce` gives agreeing verdicts and overlapping CIs on the same machine | **Met as TASKS T4.7 ("reproduced or documented inconclusive"); partial in ROADMAP's wording** | 14 same-machine pairs ([analysis](../../engineering/analysis/replay_variance/README.md)). 1 `reproduced` (container path), 1 `drift_undetermined`, 12 `inconclusive` from the gate-4 noise check, **0 `not_reproduced`**. Verdicts agreed in 7 of 14 pairs (2 both verified). Speed-up CIs overlapped on every parameter set in 12 of 14. Fingerprints always matched. Through the API: `test_experiment_replay.py` and Playwright |
+| 2. Experiment replay on `orders_ecommerce` gives agreeing verdicts and overlapping CIs on the same machine | **Partially demonstrated.** Implementation complete and TASKS T4.7 ("reproduced or documented inconclusive") met; ROADMAP's stronger wording held only in part, because of noisy measurements. Margin unchanged at 1.25 (ADR-0023) | 14 same-machine pairs ([analysis](../../engineering/analysis/replay_variance/README.md)). 1 `reproduced` (container path), 1 `drift_undetermined`, 12 `inconclusive` from the gate-4 noise check, **0 `not_reproduced`**. Verdicts agreed in 7 of 14 pairs (2 both verified). Speed-up CIs overlapped on every parameter set in 12 of 14. Fingerprints always matched. Through the API: `test_experiment_replay.py` and Playwright |
 | 3. `index_regression` → `rejected: regression`; `no_benefit` → never `verified_recommendation` | **Met** | `test_benchmark_eval_table.py` (integration, passing). The Mode C eval `rewrite_trap_sandbox` ended `inconclusive` |
 | 4. Every number in the report has provenance | **Met** | `reports/provenance.unlabeled_numbers` returns empty on 9 report shapes (unit), on reports sealed in integration tests, and on the exported Markdown (`test_report_replay.py`). JSON measurements carry `provenance`, `evidence_id` and `source` {artifact digest, pointer} |
 | Lifecycle E2E (owner): workspace → investigation → agents → candidate → approval → sandbox experiment → audit → final report → report replay; experiment replay through the real API, worker and sandbox | **Met** | `e2e/phase4-lifecycle.spec.ts` (stub LLM, real stack), also in CI |
 
 ## 6. Known limitations
 - **Noise.** On Docker Desktop most single experiments and most replays end `inconclusive`: the gate-4 robust-CV check fails for a sub-millisecond candidate arm (R1). Replay inherits this by design.
-- **Mode C evals cannot replay green** (R19). The recorded runs are the scored evidence. Replay checks the deterministic prefix, then reports `DIVERGED`.
+- **Mode C evals cannot replay green** (R19, kept open by the owner on 2026-10-16). The recorded runs are the scored evidence. Replay checks the deterministic prefix, then reports `DIVERGED`, which is never counted as PASS.
 - **Partial reports for early stops.** A run that dead-letters or is cancelled before `write_report` has no synthesis summary or materiality in its report, because those lived in graph state. The report still lists findings, hypotheses and evidence.
 - **No migrations for old runs.** Runs from Phases 1–3 have only interim reports and are never retro-sealed (`not_finalized`), by design.
 - **Not implemented:** re-investigation model override; the conclusion diff (Post-MVP); Idempotency-Key on experiment replay.
@@ -156,7 +157,12 @@ No released contract changed: `bench@1`/`bench@2` rules, canonicalization profil
 6. **Record/replay meets live measurements.** Mode C eval replays diverge because new measurements create new evidence IDs, so the recorded auditor citations no longer resolve and the run takes another path. Instead of fabricating answers or calling it a pass, the runner reports `DIVERGED` and scores those cases at recording time.
 
 ## 10. Remaining work
-- **Owner decision D9:** confirm `m = 1.25` (proposal, based on §5).
-- **Phase 5** (not started; needs authorization): run picker in the investigation view; re-investigation model override; Idempotency-Key on experiment replay; optional benchmark-free Mode C eval variants for CI (R19); manifest signing (D8); demo gallery with prerecorded replays.
+- **D9:** closed 2026-10-16 ([ADR-0023](../../engineering/adr/ADR-0023-d9-experiment-replay-equivalence-margin.md)): `m = 1.25`, not widened.
+- **Phase 5 priorities carried forward by the owner** (Phase 5 not started; needs authorization):
+  1. Idempotency-Key support on `POST /experiments/{id}/replay`.
+  2. Reliable deterministic/offline Mode C evaluation fixtures, so Mode C cases can be checked without live measurements (R19).
+  3. Run picker and replay navigation in the investigation view.
+  4. Remaining deployment and security hardening (ROADMAP Phase 5, incl. manifest signing D8).
+- Other Phase 5 candidates: re-investigation model override; demo gallery with prerecorded replays.
 - `rewrite_trap_not_in` (full suite) was never recorded. It is optional, from Phase 2.
-- Risks updated: R19 added; R1 is unchanged and also limits replay.
+- Risks updated: R19 added (kept open); R1 is unchanged and also limits replay.

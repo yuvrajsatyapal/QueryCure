@@ -28,3 +28,4 @@ Phase 4 implemented the Benchmark Auditor (ADR-0009), atomic finalization and re
 - 418 integration tests cover sealing, fault injection, every report-replay code, experiment replay through the real worker and sandbox, and re-investigation.
 - Mode C evals cannot be green in CI replay. Their evidence is the recorded run (both PASS on 2026-10-13).
 - REPLAY_ENGINE §8.2 and §9.3, AGENT_SYSTEM, API_DESIGN and TESTING_STRATEGY describe these choices.
+- The replay equivalence margin (D9), left as a proposal here, was accepted at 1.25 in [ADR-0023](ADR-0023-d9-experiment-replay-equivalence-margin.md) (2026-10-16).

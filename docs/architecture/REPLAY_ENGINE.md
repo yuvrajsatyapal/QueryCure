@@ -300,7 +300,7 @@ The comparison is computed per candidate × param set ("pair") from the **raw in
 3. **Speedup drift.** `D = S_replay / S_original`, where `S = median(baseline) / median(candidate)`.
    - The 95% CI of `D` comes from a percentile bootstrap: 2,000 resamples, all four sample sets resampled independently.
    - The bootstrap seed is derived from `sha256(original_experiment_id | replay_experiment_id)`, so the comparison is reproducible.
-4. **Classification.** With equivalence margin `m` (default 1.25, i.e. ±25% drift in the speedup ratio):
+4. **Classification.** With equivalence margin `m` (default 1.25, i.e. ±25% drift in the speedup ratio; confirmed by the owner as D9 in [ADR-0023](../engineering/adr/ADR-0023-d9-experiment-replay-equivalence-margin.md), and not to be widened to raise the reproduction rate):
 
 | Verdicts (original, replay) | D's 95% CI | Pair result |
 |---|---|---|

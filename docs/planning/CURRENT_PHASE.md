@@ -3,8 +3,8 @@
 | Field | Value |
 |---|---|
 | Phase | **4 — Verification & replay** (Phase 1 complete: [PHASE_1_REPORT](reports/PHASE_1_REPORT.md); Phase 2 complete 2026-10-13: [PHASE_2_REPORT](reports/PHASE_2_REPORT.md) §13; Phase 3: [PHASE_3_REPORT](reports/PHASE_3_REPORT.md)) |
-| Status | **Phase 4 implemented; exit met** ([PHASE_4_REPORT](reports/PHASE_4_REPORT.md)): ROADMAP #1, #3, #4 met; #2 met as TASKS T4.7 states it (1/14 same-machine pairs `reproduced`, the rest documented `inconclusive`, 0 `not_reproduced`). All four pending real-model evaluations recorded 2026-10-13 with the pinned free model (31/45 free requests): Phase 2 cases PASS (Phase 2 complete), Phase 3 Mode C cases PASS when recorded (replay `DIVERGED` by design, ADR-0022 §10). Open owner decision: D9 margin (proposal: keep 1.25). Phase 5 not started (awaiting authorization) |
-| Last updated | 2026-10-13 |
+| Status | **Phase 4 implementation complete; owner-reviewed 2026-10-16** ([PHASE_4_REPORT](reports/PHASE_4_REPORT.md)): ROADMAP #1, #3, #4 met; #2 met as TASKS T4.7 states it (1/14 same-machine pairs `reproduced`, the rest documented `inconclusive`, 0 `not_reproduced`), but ROADMAP's stronger replay criterion is only **partially demonstrated** because of noisy measurements. D9 approved: margin stays 1.25 ([ADR-0023](../engineering/adr/ADR-0023-d9-experiment-replay-equivalence-margin.md)). All four pending real-model evaluations recorded 2026-10-13 with the pinned free model (31/45 free requests): Phase 2 cases PASS (Phase 2 complete), Phase 3 Mode C cases PASS when recorded (replay `DIVERGED` by design, ADR-0022 §10). R19 (Mode C replay `DIVERGED`, never a pass) stays open. Phase 5 not started (awaiting authorization) |
+| Last updated | 2026-10-16 |
 | Application code | Phases 1–3 (API, metadata DB, parsing, inspection gateway, artifact store, six demo workloads, multi-agent graph, approval gate, sandbox benchmark engine `bench@2`, tournament, web workspace) plus Phase 4: Benchmark Auditor (deterministic checks + downgrade-only review), atomic finalization with versioned reports (`report-builder@1`, `report-md@1`), report replay, experiment replay with statistical comparison, re-investigation start, plan diff; migrations 0001–0012; web app adds Report tab, report and replay pages, lineage drawer, audit panel and plan diff |
 
 ## Completed
@@ -318,6 +318,8 @@ Decisions taken without changing any frozen contract (recorded for the owner):
 - [x] **T4.9 evals**: Phase 3 Mode C cases recorded with the pinned free model (18 free requests; ledger 31/45 today): both PASS. Full-suite replay ([results](../../backend/evals/results/20261013T173814Z-full-replay-nvidia_nemotron-3-super-120b-a12b_free.json)): 5 PASS (all smoke cases), 2 `DIVERGED` (Mode C: the replay's live sandbox measurements produce new evidence IDs and may take another path, so recorded auditor/later-round answers cannot match; every deterministic prompt before that still matched exactly), 1 FAIL `rewrite_trap_not_in` (never recorded, Phase 2 optional). Replay client: exact matching everywhere; a same-agent fallback only for prompts that embed live measurements (auditor, Optimization Engineer rounds ≥ 2); a divergence is its own status, never a pass. Eval metrics now record audited verdicts and auditor downgrades (ADR-0009 downgrade rate).
 
 
+- [x] **Owner review of Phase 4 (2026-10-16), docs only:** D9 approved, `m = 1.25` kept and not widened ([ADR-0023](../engineering/adr/ADR-0023-d9-experiment-replay-equivalence-margin.md)); `bench@1`/`bench@2` semantics and all released replay contracts preserved; acceptance recorded as implementation complete with ROADMAP's stronger replay criterion only partially demonstrated (noisy measurements); R19 kept open, `DIVERGED` never PASS. PHASE_4_REPORT, ROADMAP, REPLAY_ENGINE, RISKS, DECISIONS, ADR-0022 cross-reference and the replay-variance README updated. No code change.
+
 ## Blockers
 
 - None. Compose `metadata-db`, `sandbox-db` and `sandbox-relay` are healthy (they had exited once during the session, apparently with Docker Desktop, and were restarted). The dev database was migrated to `0009`; earlier local databases need `uv run alembic upgrade head`.
@@ -342,8 +344,8 @@ Decisions taken without changing any frozen contract (recorded for the owner):
 2. ~~Calibration follow-up for `pk_lookup_already_optimal`~~: done (ADR-0017).
 3. Then, as free capacity allows, record the Phase 3 Mode C cases (`--suite full --case orders_sandbox_composite_index`, `rewrite_trap_sandbox`; needs `SANDBOX_ADMIN_URL`/`SANDBOX_BENCH_PASSWORD`).
 4. ~~Wait for the owner's go-ahead before starting Phase 4~~: Phase 4 done (2026-10-13).
-5. Owner: confirm D9 (`m = 1.25`, evidence in [analysis/replay_variance](../engineering/analysis/replay_variance/README.md)).
-6. Wait for the owner's authorization before starting Phase 5.
+5. ~~Owner: confirm D9~~: approved 2026-10-16, `m = 1.25` kept ([ADR-0023](../engineering/adr/ADR-0023-d9-experiment-replay-equivalence-margin.md)).
+6. Wait for the owner's authorization before starting Phase 5. Owner's carried-forward Phase 5 priorities: (a) Idempotency-Key on `POST /experiments/{id}/replay`; (b) reliable deterministic/offline Mode C eval fixtures (R19); (c) run picker and replay navigation; (d) remaining deployment and security hardening.
 
 ## Pending real-model evaluations
 
@@ -398,7 +400,7 @@ Defaults are chosen so implementation can proceed; change any before the listed 
 | D6 | Write-overhead benchmark in MVP or Post-MVP | Post-MVP (qualitative class shown until then) | Phase 3 |
 | D7 | ~~Initialize git + branching model~~ | **Resolved:** git on `main`, **main-only workflow** (CLAUDE.md §10 / AGENTS.md Git Branch Policy); push once a remote is configured | — |
 | D8 | Manifest signing (key outside DB) or external timestamping | Deferred; digests + append-only grants + manifest digest in exports (REPLAY_ENGINE §6) | Phase 5 security review |
-| D9 | Replay equivalence margin `m` | 1.25 (±25% speedup drift). **Measured 2026-10-13** (14 same-machine pairs): only 2 pairs passed gate 4; 1 reproduced at 1.25, 1 had an upper drift bound of 1.26–1.43; point drifts 0.83–1.24 in 12/14. **Proposal: keep 1.25** (owner to confirm) | Phase 4 exit |
+| D9 | ~~Replay equivalence margin `m`~~ | **Decided by the owner (2026-10-16): keep 1.25** (±25% speed-up drift), not widened to raise reproduction success ([ADR-0023](../engineering/adr/ADR-0023-d9-experiment-replay-equivalence-margin.md)). Evidence: 14 same-machine pairs, 2 passed gate 4; 1 reproduced at 1.25, 1 had an upper drift bound of 1.26–1.43 | — |
 | D10 | Retirement policy for old report builders/renderers | Keep all versions; fallback to stored artifacts if ever retired | Before first builder@2 |
 | D11 | ~~Sample-quality gate on very fast winning arms~~ | **Decided by the owner (2026-10-12): no plain waiver.** The single experiment keeps `inconclusive`. `verified_with_noise_warning` needs a noise screen (n ≥ 30, no censoring, no param-set regression, quartile separation, every block ≥ `min_effect`) plus agreement of 3 independent experiments ([ADR-0019](../engineering/adr/ADR-0019-noise-warning-verification-and-corroborated-regression.md), `bench@2`) | — |
 | D12 | ~~Container worker by default?~~ | **Decided by the owner (2026-10-12): yes** for local Mode C benchmarking. The host worker + relay stays supported, and sandbox isolation is unchanged ([ADR-0020](../engineering/adr/ADR-0020-container-worker-default-for-local-benchmarks.md)) | — |
