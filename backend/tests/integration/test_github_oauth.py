@@ -17,7 +17,7 @@ import pytest
 from pydantic import SecretStr
 
 from querycure.api.main import create_app
-from querycure.auth.github import challenge
+from querycure.auth.oauth import challenge
 from querycure.core.config import Profile, Settings
 from querycure.db.engine import make_engine
 

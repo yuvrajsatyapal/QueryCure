@@ -5,45 +5,16 @@ The access token is used for one `GET /user` and then discarded: QueryCure asks 
 beyond public profile data and never stores provider tokens.
 """
 
-import base64
-import hashlib
-import secrets
-from dataclasses import dataclass
 from urllib.parse import urlencode
 
 import httpx
+
+from querycure.auth.oauth import OAuthError, OAuthIdentity, challenge
 
 AUTHORIZE_URL = "https://github.com/login/oauth/authorize"
 TOKEN_URL = "https://github.com/login/oauth/access_token"  # noqa: S105 - an endpoint, not a secret
 USER_URL = "https://api.github.com/user"
 TIMEOUT_SECONDS = 10.0
-
-
-class OAuthError(Exception):
-    """A failed exchange. `code` is a stable reason for the redirect; never a provider body."""
-
-    def __init__(self, code: str) -> None:
-        super().__init__(code)
-        self.code = code
-
-
-@dataclass(frozen=True)
-class GitHubIdentity:
-    subject: str  # numeric user id as text: logins can be renamed, ids cannot
-    login: str
-
-
-def new_state() -> str:
-    return secrets.token_urlsafe(32)
-
-
-def new_verifier() -> str:
-    return secrets.token_urlsafe(48)
-
-
-def challenge(verifier: str) -> str:
-    digest = hashlib.sha256(verifier.encode()).digest()
-    return base64.urlsafe_b64encode(digest).decode().rstrip("=")
 
 
 def authorize_url(*, client_id: str, redirect_uri: str, state: str, verifier: str) -> str:
@@ -69,7 +40,7 @@ async def exchange(
     redirect_uri: str,
     code: str,
     verifier: str,
-) -> GitHubIdentity:
+) -> OAuthIdentity:
     try:
         token_response = await http.post(
             TOKEN_URL,
@@ -103,4 +74,5 @@ async def exchange(
     user_id, login = profile.get("id"), profile.get("login")
     if not isinstance(user_id, int) or not isinstance(login, str):
         raise OAuthError("profile_unavailable")
-    return GitHubIdentity(subject=str(user_id), login=login[:100])
+    # numeric id as the subject: logins can be renamed, ids cannot
+    return OAuthIdentity(subject=str(user_id), display_name=login[:100])

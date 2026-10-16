@@ -11,7 +11,7 @@ Status: **Phase 5: deployment artifacts prepared and the restricted demo profile
 | Mode C sandbox benchmarking | ✅ Docker sandbox | ❌ live; ✅ **prerecorded** demo benchmarks, labeled |
 | Multi-agent investigations | ✅ | ✅ (BYOK, stricter budgets) |
 | Report / experiment replay | ✅ / ✅ | ✅ / ❌ |
-| Auth | Single local user (auto session) | Anonymous sessions; GitHub OAuth (Phase 5) |
+| Auth | Single local user (auto session) | Anonymous sessions; GitHub and Google OAuth (Phase 5) |
 | Worker | separate process | embedded in API container (`WORKER_MODE=embedded`) or separate process |
 | LLM keys | `.env` fallback or BYOK | BYOK only (no shared server key) |
 
@@ -191,7 +191,8 @@ Migrations run as a separate release step before new API instances start; migrat
 | `SESSION_TTL_SECONDS` | session and CSRF cookie lifetime (default 30 days) |
 | `TRUSTED_PROXY_HOPS` | reverse proxies that append to `X-Forwarded-For` (default 0: the header is ignored); rate limits key on the client address |
 | `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` | GitHub OAuth app; sign-in is offered only when both are set |
-| `PUBLIC_API_URL` / `WEB_BASE_URL` | public origins (OAuth callback, post-sign-in redirect); must be `https://` when GitHub sign-in is enabled outside the local profile |
+| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | Google OAuth client (Web application); sign-in is offered only when both are set. Authorized redirect URI: `<PUBLIC_API_URL>/api/v1/auth/google/callback`. Scopes `openid profile`; no email is read |
+| `PUBLIC_API_URL` / `WEB_BASE_URL` | public origins (OAuth callback, post-sign-in redirect); must be `https://` when any OAuth sign-in is enabled outside the local profile |
 | `OTEL_EXPORTER_OTLP_ENDPOINT`, `LANGSMITH_API_KEY` | reserved: OTel export and LangSmith are **not implemented** (deferred, see PHASE_5_REPORT) |
 | `METRICS_TOKEN` | bearer token for `/api/v1/internal/metrics` outside the local profile (empty = endpoint answers 404) |
 | `DB_POOL_SIZE` / `DB_MAX_OVERFLOW` / `DB_POOL_TIMEOUT_SECONDS` | metadata connection pool (defaults 5 / 5 / 10 s) |

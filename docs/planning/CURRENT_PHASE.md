@@ -7,6 +7,10 @@
 | Last updated | 2026-10-16 |
 | Application code | Phases 1–3 (API, metadata DB, parsing, inspection gateway, artifact store, six demo workloads, multi-agent graph, approval gate, sandbox benchmark engine `bench@2`, tournament, web workspace) plus Phase 4: Benchmark Auditor (deterministic checks + downgrade-only review), atomic finalization with versioned reports (`report-builder@1`, `report-md@1`), report replay, experiment replay with statistical comparison, re-investigation start, plan diff; migrations 0001–0012; web app adds Report tab, report and replay pages, lineage drawer, audit panel and plan diff |
 
+## Post-Phase-5 addition (2026-10-16)
+
+- [x] **Google sign-in.** Second OAuth provider on the shared flow (`auth/google.py`, `auth/oauth.py`, provider-parameterised `api/routers/auth.py`); `features.google_login`; `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`; scopes `openid profile`, no email stored; no migration. Tests: `test_google_oauth.py`, config unit tests; ADR-0013 amended. Verified: ruff, mypy, 743 unit, 579 integration + security, frontend lint/typecheck/85 tests/build.
+
 ## Completed
 
 - [x] Repository inspected (was empty).

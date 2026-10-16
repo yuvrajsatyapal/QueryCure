@@ -168,6 +168,12 @@ class Settings(BaseSettings):
     github_client_secret: SecretStr | None = Field(
         default=None, validation_alias=_env("GITHUB_CLIENT_SECRET")
     )
+    # Google sign-in (OpenID Connect). Independent of GitHub: each is offered only when its own
+    # pair is set.
+    google_client_id: str | None = Field(default=None, validation_alias=_env("GOOGLE_CLIENT_ID"))
+    google_client_secret: SecretStr | None = Field(
+        default=None, validation_alias=_env("GOOGLE_CLIENT_SECRET")
+    )
     # Public URLs: the OAuth callback is registered against the API, and sign-in returns the
     # browser to the web app. Must be HTTPS outside the local profile.
     public_api_url: str | None = Field(default=None, validation_alias=_env("PUBLIC_API_URL"))
@@ -181,7 +187,7 @@ class Settings(BaseSettings):
         default=30 * 24 * 3600, ge=300, validation_alias=_env("SESSION_TTL_SECONDS")
     )
 
-    @field_validator("metrics_token", "github_client_secret", mode="before")
+    @field_validator("metrics_token", "github_client_secret", "google_client_secret", mode="before")
     @classmethod
     def _blank_secret_is_unset(cls, value: object) -> object:
         # An empty env var must not become an empty secret (e.g. an empty bearer token).
@@ -250,18 +256,24 @@ class Settings(BaseSettings):
                 # The demo is BYOK only (DEPLOYMENT §1): a shared server key would be spent by
                 # anonymous visitors.
                 raise ValueError("OPENROUTER_API_KEY must not be set in the demo profile (BYOK)")
-            if self.github_client_id is not None:
+            if self.github_client_id is not None or self.google_client_id is not None:
                 for name, url in (("PUBLIC_API_URL", self.public_api_url),
                                   ("WEB_BASE_URL", self.web_base_url)):  # fmt: skip
                     if url is None or not url.startswith("https://"):
-                        raise ValueError(f"{name} must be an https:// URL for GitHub sign-in")
+                        raise ValueError(f"{name} must be an https:// URL for OAuth sign-in")
         if (self.github_client_id is None) != (self.github_client_secret is None):
             raise ValueError("GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET must be set together")
+        if (self.google_client_id is None) != (self.google_client_secret is None):
+            raise ValueError("GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET must be set together")
         return self
 
     @property
     def github_login_enabled(self) -> bool:
         return self.github_client_id is not None and self.github_client_secret is not None
+
+    @property
+    def google_login_enabled(self) -> bool:
+        return self.google_client_id is not None and self.google_client_secret is not None
 
     def engine_options(self) -> "EngineSettings":
         """Keyword arguments for `db.engine.make_engine` (pool and server-side timeouts)."""

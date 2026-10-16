@@ -73,3 +73,29 @@ def test_worker_timing_defaults_are_consistent() -> None:
     settings = Settings()
 
     assert settings.worker_heartbeat_seconds * 2 < settings.worker_lease_seconds
+
+
+def test_google_client_id_and_secret_must_be_set_together() -> None:
+    with pytest.raises(ValidationError, match="GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET"):
+        Settings(_env_file=None, google_client_id="abc.apps.googleusercontent.com")
+
+
+def test_blank_google_secret_is_unset() -> None:
+    settings = Settings(_env_file=None, google_client_secret="  ")  # noqa: S106 - blank on purpose
+
+    assert settings.google_client_secret is None
+    assert settings.google_login_enabled is False
+
+
+def test_google_login_needs_https_public_urls_outside_local() -> None:
+    with pytest.raises(ValidationError, match="PUBLIC_API_URL"):
+        Settings(
+            _env_file=None,
+            profile=Profile.DEMO,
+            allow_private_targets=False,
+            master_key=key(),
+            google_client_id="abc",
+            google_client_secret="s",  # noqa: S106 - test value
+            public_api_url="http://api.example.com",
+            web_base_url="https://app.example.com",
+        )

@@ -100,7 +100,7 @@ FR = functional requirement in [PRD.md](PRD.md). Phase = [ROADMAP.md](../plannin
 | ID | Feature | Tier | Phase |
 |---|---|---|---|
 | F-90 | Local single-user mode + anonymous demo sessions | MVP | 1 |
-| F-91 | GitHub OAuth accounts | MVP | 5 |
+| F-91 | GitHub and Google OAuth accounts | MVP | 5 |
 | F-92 | OTel tracing + optional LangSmith | MVP | 5 |
 | F-93 | CI (lint, type, unit, integration, security, smoke evals) | MVP | 1 (basic), 5 (full) |
 | F-94 | Teams / RBAC | Future | — |

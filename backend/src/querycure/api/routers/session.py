@@ -105,5 +105,6 @@ async def me(user: CurrentUser, settings: SettingsDep) -> MeResponse:
             live_inspection=live,
             sandbox=bool(settings.feature_sandbox),
             github_login=settings.github_login_enabled,
+            google_login=settings.google_login_enabled,
         ),
     )

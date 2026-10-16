@@ -48,7 +48,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Github Callback */
+        /** Callback */
         get: operations["github_callback_api_v1_auth_github_callback_get"];
         put?: never;
         post?: never;
@@ -65,8 +65,42 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Github Login */
+        /** Login */
         get: operations["github_login_api_v1_auth_github_login_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/google/callback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Callback */
+        get: operations["google_callback_api_v1_auth_google_callback_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/google/login": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Login */
+        get: operations["google_login_api_v1_auth_google_login_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1754,6 +1788,11 @@ export interface components {
              * @default false
              */
             github_login: boolean;
+            /**
+             * Google Login
+             * @default false
+             */
+            google_login: boolean;
             /** Live Inspection */
             live_inspection: boolean;
             /** Sandbox */
@@ -3070,6 +3109,70 @@ export interface operations {
         };
     };
     github_login_api_v1_auth_github_login_get: {
+        parameters: {
+            query?: {
+                return_to?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    google_callback_api_v1_auth_google_callback_get: {
+        parameters: {
+            query?: {
+                code?: string | null;
+                state?: string | null;
+                error?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    google_login_api_v1_auth_google_login_get: {
         parameters: {
             query?: {
                 return_to?: string | null;

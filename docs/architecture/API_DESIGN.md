@@ -51,7 +51,7 @@ Error messages never include credentials, DSNs, or raw driver errors (driver err
 - **Rate limits** (`api/rate_limit.py`, `domain/limits.py`): Postgres token buckets per user and per client-address hash on session creation, run creation, replays, inspection, connections and settings. 429 `RATE_LIMITED` with `Retry-After` and `X-RateLimit-Remaining`. The idempotent endpoints charge only after the key lookup, so a retry is never charged twice. `TRUSTED_PROXY_HOPS` decides whether `X-Forwarded-For` is read.
 - **Uploads are no longer capabilities:** `/inspect/plan` and `/inspect/schema` record the uploader (`user_uploads`); `POST /investigations` accepts only digests the caller uploaded (otherwise the same 422 as an unknown digest).
 - **BYOK:** `POST /investigations` and `/reinvestigate` use `llm.credential_id` (must be the caller's, else 404), else the caller's saved key for the configured provider, else the local server key. The demo profile has no server key: 503 `CONFIGURATION_ERROR` until the user adds one. The daily free quota is counted per credential.
-- **`/me`** reports `features.github_login`. **Responses** carry `X-Content-Type-Options`, `Referrer-Policy: no-referrer`, `X-Frame-Options: DENY`, `Cache-Control: no-store`, and HSTS outside the local profile. The interactive `/docs` page exists only in the local profile; `openapi.json` stays.
+- **`/me`** reports `features.github_login` and `features.google_login`. **Responses** carry `X-Content-Type-Options`, `Referrer-Policy: no-referrer`, `X-Frame-Options: DENY`, `Cache-Control: no-store`, and HSTS outside the local profile. The interactive `/docs` page exists only in the local profile; `openapi.json` stays.
 - **Run history:** `RunSummary` (in `InvestigationDetail.runs` and `RunDetail`) gains `parent_run_id`, `finalized` and `replay {attempt_id, status, source_experiment_id}` for `experiment_replay` runs (one LEFT JOIN, no extra requests).
 
 ## 2. Endpoints
@@ -61,7 +61,7 @@ Error messages never include credentials, DSNs, or raw driver errors (driver err
 |---|---|---|---|
 | POST | `/session` | Create anonymous/local session; sets cookies | 1 |
 | GET | `/me` | Current user + feature flags + profile (`local`/`demo`) | 1 |
-| GET | `/auth/github/login?return_to=`, `/auth/github/callback` | OAuth (state + PKCE in a 10-minute HttpOnly cookie; `return_to` must be a relative path). 403 `FEATURE_DISABLED` unless configured. Failures redirect to `WEB_BASE_URL/app?auth_error=<code>` | 5 ✅ |
+| GET | `/auth/{github,google}/login?return_to=`, `/auth/{github,google}/callback` | OAuth (state + PKCE in a 10-minute HttpOnly cookie; `return_to` must be a relative path). 403 `FEATURE_DISABLED` unless configured. Failures redirect to `WEB_BASE_URL/app?auth_error=<code>` | 5 ✅ |
 | POST | `/auth/logout` | 204; revokes the session row and clears both cookies; needs the CSRF token | 5 ✅ |
 | GET / POST | `/settings/llm-credentials` | List (hints only) / add key `{provider, api_key, default_model}` → 201 (replaces the provider's earlier key) | 5 ✅ |
 | DELETE | `/settings/llm-credentials/{id}` | 204; soft delete that wipes ciphertext and nonce in the same statement; 404 for another user's key | 5 ✅ |

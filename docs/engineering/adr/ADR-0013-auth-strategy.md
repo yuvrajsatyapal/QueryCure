@@ -22,3 +22,7 @@ Option 3.
 
 ## Consequences
 All endpoints depend on `current_user`; anonymous users are real `users` rows (`kind=anonymous`) with retention limits.
+
+## Amendment (2026-10-16): Google sign-in
+
+Google is a second OAuth provider on the same flow (authorization code, `state`, PKCE S256, rotated session). The endpoints and the account-linking logic are shared; a `Provider` supplies only its endpoints and credentials. Accounts are identified by `(auth_provider, auth_subject)`, where Google's subject is the OIDC `sub` claim. No migration was needed. Scopes are `openid profile`: no email is requested, so accounts on different providers are never merged by email and the same person on GitHub and Google has two accounts. Each provider is enabled independently by its own client ID and secret.
