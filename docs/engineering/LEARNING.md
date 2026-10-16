@@ -200,27 +200,49 @@ How any claim in a report can be traced to source artifacts, how integrity is ve
 
 ### Concepts
 
-| Concept | Why it matters | How QueryCure uses it |
+| Concept | Why it matters | How QueryCure uses it (as built) |
 |---|---|---|
-| **OAuth 2.0 authorization code flow + PKCE, session cookies, CSRF** | Real auth without storing passwords | GitHub login, cookie sessions |
-| **Authenticated encryption (AES-GCM), nonces, associated data, key rotation** | BYOK keys and DB passwords at rest | `core/crypto.py` |
-| **OpenTelemetry** (traces, spans, context propagation, metrics) | Debugging distributed async work | `core/telemetry.py` |
-| **Rate limiting** (token bucket in Postgres) | Abuse/cost control | `rate_limits` table |
-| **CI/CD, migrations in deploys** (expand → migrate → contract) | Safe releases | GitHub Actions |
-| **Evaluation as engineering** (recorded fixtures, regression thresholds) | Prompt/model changes are code changes | `evals/` |
-| **Threat modeling** | Communicating security trade-offs | SECURITY.md |
+| **Idempotency keys** (scoped key + request hash, unique index, retry returns the original) | Retries and double clicks must not repeat expensive or side-effecting work | `replay_attempts` unique `(user_id, kind, key)`; `reports.py::replay_experiment` |
+| **Unique-constraint concurrency** (let the database pick the winner) | Check-then-insert races; a constraint is atomic | Concurrent duplicates fail at insert, roll back their whole unit of work, then read the winner |
+| **OAuth 2.0 authorization code + PKCE + state**, session rotation | Real sign-in without passwords; stops CSRF on the callback and stolen-code use | `auth/github.py`, `routers/auth.py` |
+| **Authenticated encryption with associated data** (AES-GCM, AAD binds row and owner) | A copied ciphertext must not decrypt for someone else | BYOK `llm_credentials`; re-encryption on account merge |
+| **Token-bucket rate limiting in Postgres** (`SELECT … FOR UPDATE`) | Abuse and cost control without new infrastructure | `api/rate_limit.py`, `domain/limits.py` |
+| **Determinism in evaluation** (separate decision quality from environment) | Evals must fail only when behaviour changes | Measurement and context fixtures, exact prompt matching (ADR-0024) |
+| **Sources of hidden nondeterminism** | "It passes on my machine" | ANALYZE samples large tables at random; cached templates hid it until CI |
+| **Graceful shutdown and leases** | Deploys must not lose or duplicate work | SIGTERM drain grace, then abandon to lease expiry; checkpoint resume |
+| **Operational metrics from durable state** | Survive restarts, cover every process | `/internal/metrics` computed from `jobs`, `investigation_runs`, `replay_attempts` |
+| **Expand → migrate → contract** | Old and new app versions must both run against the schema | Migrations 0013–0015 only add; rollback = previous image, never a downgrade |
+| **Accessibility as a test** | Regressions are invisible without automation | axe in Playwright (light and dark), focus and reduced-motion checks |
+| **Honest demos** | Prerecorded data must never pass as live | Labels at every layer; digest verification that states its own scope |
+
+### Important implementation details (as built)
+- A retried replay is answered **before** rate limiting and before any check that could have changed (for example, run slots now full), so the client sees what the first request got.
+- The fixture path never recomputes verdicts from prerecorded data with the frozen rules (they refuse prerecorded replicates by design). It replays the recorded verdict and *checks* that it follows from the stored results.
+- The authorization sweep enumerates routes from the OpenAPI schema, so a new route without ownership checks fails a test automatically.
+- An empty env var must not become an empty secret: `METRICS_TOKEN=""` would otherwise have accepted `Authorization: Bearer `.
+
+### Modules to study
+`api/routers/reports.py` (idempotent replay) · `benchmark/measurement_fixtures.py` · `api/rate_limit.py` · `api/routers/auth.py` · `llm/credentials.py` · `worker/runner.py` · `demo/gallery.py` · `tests/security/test_api_hardening.py`
 
 ### Interview questions
-1. Why AES-GCM and what goes wrong if you reuse a nonce?
-2. Why do you put the row ID in the associated data?
-3. How would you rotate the master key without downtime?
-4. How do you prevent CSRF with cookie auth? Why `SameSite=Lax` and a token?
-5. How do you test LLM-driven behavior deterministically in CI?
-6. What does your public demo do live, and what is prerecorded — and how do users know?
+1. How does your experiment-replay endpoint stay idempotent when five identical requests arrive at once? What happens if the server crashes before commit?
+2. Why scope idempotency keys per user and per operation? What does a reused key with a different body return, and why not the original?
+3. Why was the Mode C eval nondeterministic even after recording the measurements, and how did you find out?
+4. Why AES-GCM, what goes wrong if you reuse a nonce, and why does the AAD contain the row and user? What did that mean for merging accounts?
+5. What do `state` and PKCE each protect against in the OAuth callback?
+6. How do you prevent CSRF with cookie auth? Why `SameSite=Lax` and a double-submit token?
+7. Why are the public demo's benchmarks prerecorded, and how does a visitor know?
+8. How do you deploy a schema change without downtime, and how do you roll back?
 
 ### Exercises
-- Encrypt/decrypt a value with `cryptography`'s `AESGCM`; tamper with ciphertext and associated data and observe failures.
-- Trace one investigation end to end in a local Jaeger and identify the slowest span.
+- Encrypt with `AESGCM`, then change one byte of the ciphertext, the nonce, or the AAD and observe each failure.
+- Drop the `orders_ecommerce` template, rebuild it twice, and diff `pg_stats` for `orders`: see ANALYZE sampling.
+- Fire 10 concurrent `POST /experiments/{id}/replay` with one key against a local stack and count runs and jobs.
+- Run `compose.demo.yaml`, then `docker compose stop api` while a job runs, and read the worker's drain logs.
+
+### You should be able to explain, unaided
+- The full path of a BYOK run: key saved → run created with `llm_credential_id` → worker decrypts → per-credential quota.
+- Why "consistent with stored digests" is not "authentic", and what signing would add (D8).
 
 ---
 

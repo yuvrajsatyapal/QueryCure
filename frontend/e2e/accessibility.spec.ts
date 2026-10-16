@@ -27,6 +27,14 @@ for (const [path, heading] of PAGES) {
   });
 }
 
+test("a11y - empty states are axe-clean too (the history page with no matches)", async ({ page }) => {
+  await page.goto("/app/history");
+  await page.getByLabel("Search titles").fill(`no-such-investigation-${Date.now()}`);
+  await expect(page.getByText(/No investigations match these filters/)).toBeVisible({ timeout: 30_000 });
+  const result = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]).analyze();
+  expect(result.violations.map((v) => v.id)).toEqual([]);
+});
+
 test("a11y - keyboard reaches the main actions with a visible focus ring", async ({ page }) => {
   await page.goto("/");
   await page.keyboard.press("Tab");

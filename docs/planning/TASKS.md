@@ -93,3 +93,5 @@ IDs `T<phase>.<n>`. Priority: **P0** blocks the phase exit, **P1** needed for ph
 | T5.8 | Deployment (Vercel, container host, Neon, domains, secrets) | P0 | T5.1–T5.3 | Public URL; README updated |
 | T5.9 | Security review vs SECURITY.md; fix findings | P0 | T5.8 | Checklist in phase report |
 | T5.10 | Accessibility pass (axe, keyboard, reduced motion) | P1 | T5.5 | axe clean on core pages |
+
+**Phase 5 status (2026-10-16):** T5.1, T5.2, T5.3, T5.5, T5.7, T5.9 and T5.10 done. T5.4 is partial (correlation IDs and DB-derived metrics; OTel and LangSmith deferred). T5.6 is partial (run history, mobile; edge weights deferred). T5.8 has artifacts prepared and verified locally, with **no public URL** (needs the owner's approval). Also done: experiment-replay idempotency, deterministic Mode C evals (ADR-0024), the retention sweep and the embedded worker mode. See [PHASE_5_REPORT](reports/PHASE_5_REPORT.md).

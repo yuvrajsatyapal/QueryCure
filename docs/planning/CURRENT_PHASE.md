@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | Phase | **5 — Production polish** (authorized by the owner 2026-10-16). Phase 1: [PHASE_1_REPORT](reports/PHASE_1_REPORT.md); Phase 2: [PHASE_2_REPORT](reports/PHASE_2_REPORT.md); Phase 3: [PHASE_3_REPORT](reports/PHASE_3_REPORT.md); Phase 4 owner-reviewed 2026-10-16: [PHASE_4_REPORT](reports/PHASE_4_REPORT.md) |
-| Status | **Phase 5 in progress.** See "Phase 5 progress" below. Phase 4 status unchanged (ROADMAP #1, #3, #4 met; #2 partially demonstrated; D9 kept at 1.25, ADR-0023) |
+| Status | **Phase 5 implementation complete and verified locally (2026-10-16); not publicly deployed; awaiting owner review** ([PHASE_5_REPORT](reports/PHASE_5_REPORT.md)). Exit criterion "deployed" not met by design (needs owner approval, domain, accounts) |
 | Last updated | 2026-10-16 |
 | Application code | Phases 1–3 (API, metadata DB, parsing, inspection gateway, artifact store, six demo workloads, multi-agent graph, approval gate, sandbox benchmark engine `bench@2`, tournament, web workspace) plus Phase 4: Benchmark Auditor (deterministic checks + downgrade-only review), atomic finalization with versioned reports (`report-builder@1`, `report-md@1`), report replay, experiment replay with statistical comparison, re-investigation start, plan diff; migrations 0001–0012; web app adds Report tab, report and replay pages, lineage drawer, audit panel and plan diff |
 
@@ -322,6 +322,9 @@ Decisions taken without changing any frozen contract (recorded for the owner):
 
 ## Phase 5 progress
 
+- [x] **Deterministic Mode C evals (R19 closed, ADR-0024).** Measurement and sandbox-context fixtures; offline fixture replay passes both cases identically; CI runs it.
+- [x] **Run picker and replay navigation**; **security hardening** (rate limits, logout, upload ownership, headers, cross-user sweep); **BYOK** (T5.2); **GitHub OAuth** (T5.1); **operations** (metrics, correlation IDs, drain, embedded worker, retention); **demo gallery** (T5.5); **axe** (T5.10); **deployment artifacts** and the demo profile verified locally (T5.8, not deployed); audit workflow (T5.7).
+- [ ] **Owner:** review PHASE_5_REPORT §7 checklist; decide D1 (host) and D5 (domain); approve or defer a public deployment.
 - [x] **Experiment-replay Idempotency-Key** (owner priority 1). Migration 0013 adds `replay_attempts.idempotency_key` / `idempotency_request_hash`, unique per `(user_id, kind, key)`. Same key and body return the original attempt (also a repeated 422); a different body is 409; concurrent duplicates converge on one attempt, run and job; a crash before commit leaves nothing behind. The web app sends one key per confirmation dialog. Tests: `test_experiment_replay_idempotency.py` (5), `ReplayConfirm.test.tsx`.
 
 ## Blockers
