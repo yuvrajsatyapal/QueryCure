@@ -131,7 +131,7 @@ Replay features ship in Phase 4, but their contracts bind from Phase 1 so no dat
 - **Exit:** deployed; README status updated to reflect what's live.
 - **Status (2026-10-16):** implementation complete and verified locally.
   - #1 partially met: labels done; the BYOK path is tested but no real-key run was made on a deployment.
-  - #2 met locally (4 e2e + axe on 7 pages); CI result in CURRENT_PHASE.
+  - #2 met (e2e + axe green on CI at `ccf143e`).
   - #3: the suite is green, and the checklist is in the report, awaiting sign-off.
   - #4: N/A, nothing is deployed.
   - **Exit not met:** no public deployment without the owner's approval. See [PHASE_5_REPORT](reports/PHASE_5_REPORT.md).

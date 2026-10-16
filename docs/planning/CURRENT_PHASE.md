@@ -324,6 +324,13 @@ Decisions taken without changing any frozen contract (recorded for the owner):
 
 - [x] **Deterministic Mode C evals (R19 closed, ADR-0024).** Measurement and sandbox-context fixtures; offline fixture replay passes both cases identically; CI runs it.
 - [x] **Run picker and replay navigation**; **security hardening** (rate limits, logout, upload ownership, headers, cross-user sweep); **BYOK** (T5.2); **GitHub OAuth** (T5.1); **operations** (metrics, correlation IDs, drain, embedded worker, retention); **demo gallery** (T5.5); **axe** (T5.10); **deployment artifacts** and the demo profile verified locally (T5.8, not deployed); audit workflow (T5.7).
+- [x] **Verification (2026-10-16):**
+  - backend: 1312 passed + 1 known xfail;
+  - frontend: 85 passed and the build succeeds;
+  - e2e: 14 passed (4 journeys + 10 a11y);
+  - evals: smoke 5/5, Mode C fixture 2/2 offline and identical across runs;
+  - audits: no known vulnerabilities;
+  - **CI green at `ccf143e`**, after one re-run of the known noisy `test_benchmark_bench2` measurement test (R18).
 - [ ] **Owner:** review PHASE_5_REPORT §7 checklist; decide D1 (host) and D5 (domain); approve or defer a public deployment.
 - [x] **Experiment-replay Idempotency-Key** (owner priority 1). Migration 0013 adds `replay_attempts.idempotency_key` / `idempotency_request_hash`, unique per `(user_id, kind, key)`. Same key and body return the original attempt (also a repeated 422); a different body is 409; concurrent duplicates converge on one attempt, run and job; a crash before commit leaves nothing behind. The web app sends one key per confirmation dialog. Tests: `test_experiment_replay_idempotency.py` (5), `ReplayConfirm.test.tsx`.
 

@@ -84,7 +84,7 @@ No released contract changed: canonicalization profiles, `report-builder@1` / `r
 | Accessibility | `pnpm exec playwright test e2e/accessibility.spec.ts` | **10 passed**: axe WCAG 2.1 A/AA clean on 7 core pages × light/dark, plus the history empty state; keyboard focus ring; reduced motion | the first local run found 3 violations (badge contrast, keyboard access to scrollable code, editor scroller). CI then found a 4th that only appears on an empty database (an inline link distinguished by colour alone). All fixed; the empty state now has its own test |
 | Dependency audits | `uvx pip-audit@2.9.0 -r <uv export>`; `pnpm audit --prod` | **No known vulnerabilities** (both) | |
 | Demo profile | `docker compose -f infra/docker/compose.demo.yaml up --build` + probes | all restrictions hold (DEPLOYMENT §2b) | SIGTERM → `worker_stopped`, exit in ~2 s |
-| CI | GitHub Actions | `29edec0`: everything green **except e2e**, where one axe check failed on the empty History page (fixed in the following commit; final run recorded in CURRENT_PHASE). `004e69c`: failed only the new Mode C eval step (the ANALYZE finding, §9). `Audit` workflow green | |
+| CI | GitHub Actions | **`ccf143e`: all 5 jobs green** (backend 3.12/3.13, integration incl. smoke + Mode C fixture evals, frontend, e2e incl. axe). This needed one re-run of the integration job: `test_benchmark_bench2::test_win_from_an_arm_specific_disturbance_is_not_noise_verified`, a real-measurement test whose engine and rule files are unchanged since Phase 3, failed once on CI hardware and passed on re-run (the R18 / R1 noise limitation). Earlier runs: `29edec0` failed one axe check on the empty History page (fixed in `2c57a32`); `2c57a32` failed a timing-dependent e2e selector (fixed in `ccf143e`); `004e69c` failed only the new Mode C eval step (the ANALYZE finding, §9). `Audit` workflow green | |
 
 **Free model requests spent:** 43 of 45 on 2026-10-16, all for re-recording the two Mode C cases:
 - 18 in the first combined attempt, of which 7 were lost to a sandbox-password conflict I caused;
@@ -96,7 +96,7 @@ No released contract changed: canonicalization profiles, `report-builder@1` / `r
 | Criterion (ROADMAP Phase 5) | Status | Evidence |
 |---|---|---|
 | 1. Public demo runs offline analysis with a user's key end to end; prerecorded benchmarks visibly labeled | **Partially met.** Labels met; BYOK run path tested, not exercised against OpenRouter from the demo stack | Gallery labels: `demo-gallery.spec.ts`, `test_demo_gallery.py`. BYOK: `test_byok_api.py` (key resolved per run, removed key stops the run). Demo stack: no-key run → 503, sandbox → 403. A real-key run from the demo containers was not done, to avoid spending the last free requests and sending a key from a throwaway stack |
-| 2. Playwright suite + axe scan pass on CI | **Met locally; CI result in CURRENT_PHASE** | 4 journeys + 10 a11y checks pass locally; CI caught one empty-state violation, now fixed and covered |
+| 2. Playwright suite + axe scan pass on CI | **Met** (`ccf143e`, e2e job green) | 4 journeys + 10 a11y checks pass locally; CI caught one empty-state violation, now fixed and covered |
 | 3. Security test suite fully green; manual review checklist signed off in the phase report | **Suite green; checklist below, awaiting the owner's sign-off** | 130 security tests + the hardening sweep; §7 |
 | 4. Demo infra cost within target (record actual) | **Not applicable yet**: nothing deployed, actual cost $0 | DEPLOYMENT §3 lists the free-tier fit honestly |
 | Exit: deployed; README reflects what's live | **Not met** (deployment needs approval) | README says "not publicly deployed" |
@@ -117,6 +117,7 @@ Owner-brief acceptance:
 - **Web CSP allows `'unsafe-inline'` scripts.** Next's bootstrap is inline and nonce-based CSP is not wired.
 - **OTel tracing/export and LangSmith are not implemented.** Metrics have no LLM-latency histograms yet.
 - **Retention covers bookkeeping only** (sessions, rate buckets, wiped keys). Anonymous users' investigations are not purged automatically.
+- **A flaky real-measurement test:** `test_benchmark_bench2::test_win_from_an_arm_specific_disturbance_is_not_noise_verified` can fail on noisy CI hardware (seen once in Phase 5 CI; the re-run passed). The engine is unchanged, and this is the documented R18 limitation. It is not fixed here because a fix would change `bench@2` semantics (ADR-0021).
 - **A pre-existing test-order dependency:** `test_baseline_migration` fails when run after `test_role_grants` in a custom order. Alphabetical order (CI) passes.
 
 ## 7. Security considerations (manual review checklist vs SECURITY.md)
@@ -199,4 +200,4 @@ Owner-brief acceptance:
   - R7 (free-tier changes) relevant at deploy time.
 - **CI:**
   - `004e69c` failed only in the new Mode C eval step, which this phase's fix addresses.
-  - The result for `29edec0` is recorded in CURRENT_PHASE.
+  - Final state: `ccf143e` all green (after one re-run of a known noisy measurement test).
