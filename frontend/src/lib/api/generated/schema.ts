@@ -158,6 +158,12 @@ export interface paths {
          * @description `confirm_ddl` is the user's confirmation of the exact SQL: it becomes the replay run's
          *     approval. A failed precondition is recorded as a `not_replayable` attempt and answered 422
          *     with `details.code` and `details.replay_attempt_id` (no run is created).
+         *
+         *     With an `Idempotency-Key` (UUID), a repeat of the same request by the same user returns the
+         *     original attempt (also a repeated 422), whatever happened since; concurrent duplicates
+         *     converge on one attempt through a unique index; the same key with a different request is
+         *     409 `IDEMPOTENCY_CONFLICT`. Keys are scoped to the user and this operation and kept with
+         *     the attempt (at least the 24 h API_DESIGN promises).
          */
         post: operations["replay_experiment_api_v1_experiments__experiment_id__replay_post"];
         delete?: never;
@@ -2835,7 +2841,9 @@ export interface operations {
     replay_experiment_api_v1_experiments__experiment_id__replay_post: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                "idempotency-key"?: string | null;
+            };
             path: {
                 experiment_id: string;
             };

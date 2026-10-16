@@ -287,8 +287,9 @@ Unique `(experiment_id, arm, param_set, phase, block)` → idempotent resume. *I
 | warnings | TEXT[] | e.g. `builder_retired` |
 | result | JSONB | report: `checks[]`; experiment: `comparison_mode` (`same_environment` / `cross_environment`), pairwise comparison, both environment fingerprints + classified diff, `config` |
 | started_at / finished_at | TIMESTAMPTZ | |
+| idempotency_key / idempotency_request_hash | TEXT | migration 0013: the request's `Idempotency-Key` and the SHA-256 of its `qc-json-v1` body (both or neither) |
 
-Indexes: `(source_run_id, created_at DESC)`; `(status) WHERE status IN ('checking','queued','running','comparing')`; `(replay_run_id)`.
+Indexes: `(source_run_id, created_at DESC)`; `(status) WHERE status IN ('checking','queued','running','comparing')`; `(replay_run_id)`; unique `(user_id, kind, idempotency_key) WHERE idempotency_key IS NOT NULL` (keys are per user and per operation; a concurrent duplicate fails here and its whole transaction rolls back).
 
 ### jobs
 | Column | Type | Notes |

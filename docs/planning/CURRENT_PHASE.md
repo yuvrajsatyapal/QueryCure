@@ -2,8 +2,8 @@
 
 | Field | Value |
 |---|---|
-| Phase | **4 — Verification & replay** (Phase 1 complete: [PHASE_1_REPORT](reports/PHASE_1_REPORT.md); Phase 2 complete 2026-10-13: [PHASE_2_REPORT](reports/PHASE_2_REPORT.md) §13; Phase 3: [PHASE_3_REPORT](reports/PHASE_3_REPORT.md)) |
-| Status | **Phase 4 implementation complete; owner-reviewed 2026-10-16** ([PHASE_4_REPORT](reports/PHASE_4_REPORT.md)): ROADMAP #1, #3, #4 met; #2 met as TASKS T4.7 states it (1/14 same-machine pairs `reproduced`, the rest documented `inconclusive`, 0 `not_reproduced`), but ROADMAP's stronger replay criterion is only **partially demonstrated** because of noisy measurements. D9 approved: margin stays 1.25 ([ADR-0023](../engineering/adr/ADR-0023-d9-experiment-replay-equivalence-margin.md)). All four pending real-model evaluations recorded 2026-10-13 with the pinned free model (31/45 free requests): Phase 2 cases PASS (Phase 2 complete), Phase 3 Mode C cases PASS when recorded (replay `DIVERGED` by design, ADR-0022 §10). R19 (Mode C replay `DIVERGED`, never a pass) stays open. Phase 5 not started (awaiting authorization) |
+| Phase | **5 — Production polish** (authorized by the owner 2026-10-16). Phase 1: [PHASE_1_REPORT](reports/PHASE_1_REPORT.md); Phase 2: [PHASE_2_REPORT](reports/PHASE_2_REPORT.md); Phase 3: [PHASE_3_REPORT](reports/PHASE_3_REPORT.md); Phase 4 owner-reviewed 2026-10-16: [PHASE_4_REPORT](reports/PHASE_4_REPORT.md) |
+| Status | **Phase 5 in progress.** See "Phase 5 progress" below. Phase 4 status unchanged (ROADMAP #1, #3, #4 met; #2 partially demonstrated; D9 kept at 1.25, ADR-0023) |
 | Last updated | 2026-10-16 |
 | Application code | Phases 1–3 (API, metadata DB, parsing, inspection gateway, artifact store, six demo workloads, multi-agent graph, approval gate, sandbox benchmark engine `bench@2`, tournament, web workspace) plus Phase 4: Benchmark Auditor (deterministic checks + downgrade-only review), atomic finalization with versioned reports (`report-builder@1`, `report-md@1`), report replay, experiment replay with statistical comparison, re-investigation start, plan diff; migrations 0001–0012; web app adds Report tab, report and replay pages, lineage drawer, audit panel and plan diff |
 
@@ -319,6 +319,10 @@ Decisions taken without changing any frozen contract (recorded for the owner):
 
 
 - [x] **Owner review of Phase 4 (2026-10-16), docs only:** D9 approved, `m = 1.25` kept and not widened ([ADR-0023](../engineering/adr/ADR-0023-d9-experiment-replay-equivalence-margin.md)); `bench@1`/`bench@2` semantics and all released replay contracts preserved; acceptance recorded as implementation complete with ROADMAP's stronger replay criterion only partially demonstrated (noisy measurements); R19 kept open, `DIVERGED` never PASS. PHASE_4_REPORT, ROADMAP, REPLAY_ENGINE, RISKS, DECISIONS, ADR-0022 cross-reference and the replay-variance README updated. No code change.
+
+## Phase 5 progress
+
+- [x] **Experiment-replay Idempotency-Key** (owner priority 1). Migration 0013 adds `replay_attempts.idempotency_key` / `idempotency_request_hash`, unique per `(user_id, kind, key)`. Same key and body return the original attempt (also a repeated 422); a different body is 409; concurrent duplicates converge on one attempt, run and job; a crash before commit leaves nothing behind. The web app sends one key per confirmation dialog. Tests: `test_experiment_replay_idempotency.py` (5), `ReplayConfirm.test.tsx`.
 
 ## Blockers
 

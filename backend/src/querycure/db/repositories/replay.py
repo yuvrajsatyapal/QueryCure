@@ -59,15 +59,17 @@ async def insert_attempt(
     replay_run_id: uuid.UUID | None = None,
     approval_request_id: uuid.UUID | None = None,
     finished: bool = False,
+    idempotency_key: str | None = None,
+    idempotency_request_hash: str | None = None,
 ) -> AttemptRow:
     row = (
         await conn.execute(
             text(
                 "INSERT INTO replay_attempts AS a (user_id, kind, source_run_id, "  # noqa: S608
                 "source_experiment_id, replay_run_id, approval_request_id, status, failure_code, "
-                "warnings, result, finished_at) VALUES (:user, :kind, :src, :src_exp, :replay, "
-                ":approval, :status, :code, :warnings, CAST(:result AS JSONB), "
-                "CASE WHEN :finished THEN now() END) "
+                "warnings, result, finished_at, idempotency_key, idempotency_request_hash) VALUES "
+                "(:user, :kind, :src, :src_exp, :replay, :approval, :status, :code, :warnings, "
+                "CAST(:result AS JSONB), CASE WHEN :finished THEN now() END, :key, :hash) "
                 f"RETURNING {_COLUMNS}"
             ),
             {
@@ -82,10 +84,33 @@ async def insert_attempt(
                 "warnings": warnings or [],
                 "result": json.dumps(result or {}),
                 "finished": finished,
+                "key": idempotency_key,
+                "hash": idempotency_request_hash,
             },
         )
     ).one()
     return _row(row)
+
+
+async def find_by_idempotency_key(
+    conn: AsyncConnection, *, user_id: uuid.UUID, kind: str, key: str
+) -> tuple[AttemptRow, str] | None:
+    """The attempt this user already started with `key` for this operation, and its request
+    hash. Scoped by user and kind: another user's identical key is a different key."""
+    row = (
+        await conn.execute(
+            text(
+                f"SELECT {_COLUMNS}, a.idempotency_request_hash FROM replay_attempts a "  # noqa: S608
+                "WHERE a.user_id = :user AND a.kind = :kind AND a.idempotency_key = :key"
+            ),
+            {"user": user_id, "kind": kind, "key": key},
+        )
+    ).first()
+    if row is None:
+        return None
+    values = dict(row._mapping)
+    request_hash = values.pop("idempotency_request_hash")
+    return AttemptRow.model_validate(values), request_hash
 
 
 async def update_attempt(

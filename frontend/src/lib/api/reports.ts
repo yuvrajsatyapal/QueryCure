@@ -52,11 +52,14 @@ export const listReplayAttempts = (runId: string, signal?: AbortSignal) =>
   apiFetch<ReplayAttemptPage>(`/runs/${runId}/replay/attempts?limit=50`, { signal });
 export const getReplayAttempt = (id: string, signal?: AbortSignal) =>
   apiFetch<ReplayAttempt>(`/replay-attempts/${id}`, { signal });
-/** Experiment replay: the confirmation is the approval of the exact SQL shown to the user. */
-export const replayExperiment = (experimentId: string) =>
+/** Experiment replay: the confirmation is the approval of the exact SQL shown to the user.
+ * One Idempotency-Key per confirmation: a retried or double-sent request returns the original
+ * attempt instead of queueing a second sandbox benchmark. */
+export const replayExperiment = (experimentId: string, idempotencyKey: string) =>
   apiFetch<ReplayAttempt>(`/experiments/${experimentId}/replay`, {
     method: "POST",
     body: { confirmDdl: true },
+    headers: { "Idempotency-Key": idempotencyKey },
   });
 export const cancelReplayAttempt = (id: string) =>
   apiFetch<ReplayAttempt>(`/replay-attempts/${id}/cancel`, { method: "POST" });

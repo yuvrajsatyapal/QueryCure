@@ -5,13 +5,15 @@ synchronous, reads only the metadata database and makes no LLM call; an integrit
 result (`status = integrity_failed`), not an HTTP error.
 """
 
+import hashlib
 import json
 import uuid
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Query, Response, status
+from fastapi import APIRouter, Header, Query, Response, status
 from sqlalchemy import text
-from sqlalchemy.ext.asyncio import AsyncConnection
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine
 
 from querycure.api.deps import ConnDep, CurrentUser, EngineDep, SettingsDep
 from querycure.api.schemas.replay import (
@@ -29,6 +31,7 @@ from querycure.core.errors import (
     BadRequestError,
     ConcurrencyLimitError,
     ExperimentNotReplayableError,
+    IdempotencyConflictError,
     NotFinalizedError,
     NotFoundError,
 )
@@ -39,6 +42,7 @@ from querycure.db.repositories.replay import (
     AttemptRow,
     decode_cursor,
     encode_cursor,
+    find_by_idempotency_key,
     get_attempt,
     insert_attempt,
     list_attempts,
@@ -50,6 +54,7 @@ from querycure.domain.users import User
 from querycure.plans.diff import diff_plans
 from querycure.plans.parser import parse_plan
 from querycure.replay.artifact_store import get_artifact
+from querycure.replay.canonical import canonical_json
 from querycure.replay.experiment_replay import cancel_replay_attempt, start_replay
 from querycure.replay.report_replay import verify_report
 
@@ -290,26 +295,13 @@ async def plan_diff(
     )
 
 
-@router.post("/experiments/{experiment_id}/replay", status_code=status.HTTP_202_ACCEPTED)
-async def replay_experiment(
-    experiment_id: uuid.UUID,
-    body: ExperimentReplayRequest,
-    engine: EngineDep,
-    user: CurrentUser,
-    settings: SettingsDep,
-) -> ReplayAttemptOut:
-    """`confirm_ddl` is the user's confirmation of the exact SQL: it becomes the replay run's
-    approval. A failed precondition is recorded as a `not_replayable` attempt and answered 422
-    with `details.code` and `details.replay_attempt_id` (no run is created)."""
-    async with engine.begin() as conn:
-        if await get_user_experiment(conn, user_id=user.id, experiment_id=experiment_id) is None:
-            raise NotFoundError("Experiment not found.")
-        limit = CONCURRENT_RUNS_PER_USER[settings.profile]
-        if await inv_repo.count_active_runs(conn, user.id) >= limit:
-            raise ConcurrencyLimitError(f"At most {limit} runs can be active at once.")
-        attempt = await start_replay(
-            conn, settings=settings, user_id=user.id, experiment_id=experiment_id
-        )
+def experiment_replay_request_hash(experiment_id: uuid.UUID, body: ExperimentReplayRequest) -> str:
+    """SHA-256 over the `qc-json-v1` bytes of the operation and its body (API_DESIGN §1)."""
+    value = {"operation": "experiment_replay", "experiment_id": str(experiment_id)}
+    return hashlib.sha256(canonical_json({**value, **body.model_dump(mode="json")})).hexdigest()
+
+
+def _replay_answer(attempt: AttemptRow) -> ReplayAttemptOut:
     if attempt.status == "not_replayable":
         raise ExperimentNotReplayableError(
             f"This experiment cannot be replayed ({attempt.failure_code}).",
@@ -322,6 +314,81 @@ async def replay_experiment(
             ],
         )
     return attempt_out(attempt)
+
+
+async def _keyed_attempt(
+    engine: AsyncEngine, user: User, key: str, request_hash: str
+) -> AttemptRow | None:
+    async with engine.connect() as conn:
+        found = await find_by_idempotency_key(conn, user_id=user.id, kind="experiment", key=key)
+    if found is None:
+        return None
+    attempt, stored_hash = found
+    if stored_hash != request_hash:
+        raise IdempotencyConflictError(
+            "This Idempotency-Key was already used for a different request."
+        )
+    return attempt
+
+
+@router.post("/experiments/{experiment_id}/replay", status_code=status.HTTP_202_ACCEPTED)
+async def replay_experiment(
+    experiment_id: uuid.UUID,
+    body: ExperimentReplayRequest,
+    engine: EngineDep,
+    user: CurrentUser,
+    settings: SettingsDep,
+    idempotency_key: Annotated[str | None, Header()] = None,
+) -> ReplayAttemptOut:
+    """`confirm_ddl` is the user's confirmation of the exact SQL: it becomes the replay run's
+    approval. A failed precondition is recorded as a `not_replayable` attempt and answered 422
+    with `details.code` and `details.replay_attempt_id` (no run is created).
+
+    With an `Idempotency-Key` (UUID), a repeat of the same request by the same user returns the
+    original attempt (also a repeated 422), whatever happened since; concurrent duplicates
+    converge on one attempt through a unique index; the same key with a different request is
+    409 `IDEMPOTENCY_CONFLICT`. Keys are scoped to the user and this operation and kept with
+    the attempt (at least the 24 h API_DESIGN promises).
+    """
+    idempotency: tuple[str, str] | None = None
+    if idempotency_key is not None:
+        try:
+            key = str(uuid.UUID(idempotency_key))
+        except ValueError:
+            raise BadRequestError("Idempotency-Key must be a UUID.") from None
+        idempotency = (key, experiment_replay_request_hash(experiment_id, body))
+        existing = await _keyed_attempt(engine, user, *idempotency)
+        if existing is not None:
+            log.info("experiment_replay_idempotent_hit", replay_attempt_id=str(existing.id))
+            return _replay_answer(existing)
+    try:
+        async with engine.begin() as conn:
+            if (
+                await get_user_experiment(conn, user_id=user.id, experiment_id=experiment_id)
+                is None
+            ):
+                raise NotFoundError("Experiment not found.")
+            limit = CONCURRENT_RUNS_PER_USER[settings.profile]
+            if await inv_repo.count_active_runs(conn, user.id) >= limit:
+                raise ConcurrencyLimitError(f"At most {limit} runs can be active at once.")
+            attempt = await start_replay(
+                conn,
+                settings=settings,
+                user_id=user.id,
+                experiment_id=experiment_id,
+                idempotency=idempotency,
+            )
+    except IntegrityError:
+        # A concurrent request with the same key won the unique index; its transaction
+        # committed the only replay run and job. Answer exactly as it was answered.
+        if idempotency is None:
+            raise
+        winner = await _keyed_attempt(engine, user, *idempotency)
+        if winner is None:
+            raise
+        log.info("experiment_replay_idempotent_race", replay_attempt_id=str(winner.id))
+        return _replay_answer(winner)
+    return _replay_answer(attempt)
 
 
 @router.post("/replay-attempts/{attempt_id}/cancel", status_code=status.HTTP_202_ACCEPTED)

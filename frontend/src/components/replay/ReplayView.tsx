@@ -169,11 +169,13 @@ export function ComparisonView({ comparison, replayRunId }: { comparison: Compar
   );
 }
 
-function ReplayConfirm({ experiment, runId, onDone }: { experiment: ExperimentSummary; runId: string; onDone: () => void }) {
+export function ReplayConfirm({ experiment, runId, onDone }: { experiment: ExperimentSummary; runId: string; onDone: () => void }) {
   const client = useQueryClient();
   const detail = useQuery({ queryKey: optimizationKeys.experiment(experiment.id), queryFn: ({ signal }) => getExperiment(experiment.id, signal) });
+  // One key per opened confirmation: retries after a timeout or a double click reuse it.
+  const [idemKey] = useState(() => crypto.randomUUID());
   const start = useMutation({
-    mutationFn: () => replayExperiment(experiment.id),
+    mutationFn: () => replayExperiment(experiment.id, idemKey),
     onSettled: () => void client.invalidateQueries({ queryKey: reportKeys.attempts(runId) }),
     onSuccess: () => onDone(),
   });

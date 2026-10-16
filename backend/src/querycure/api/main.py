@@ -71,7 +71,7 @@ def create_app(settings: Settings | None = None, engine: AsyncEngine | None = No
         allow_origins=settings.cors_origins,
         allow_credentials=True,
         allow_methods=["GET", "POST", "DELETE"],
-        # Idempotency-Key: investigation creation; Last-Event-ID: SSE reconnects.
+        # Idempotency-Key: run creation, replays; Last-Event-ID: SSE reconnects.
         allow_headers=["Content-Type", "X-CSRF-Token", "Idempotency-Key", "Last-Event-ID"],
         expose_headers=["X-Request-ID"],
     )

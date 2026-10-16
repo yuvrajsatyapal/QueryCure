@@ -5870,7 +5870,7 @@
     },
     "/api/v1/experiments/{experiment_id}/replay": {
       "post": {
-        "description": "`confirm_ddl` is the user's confirmation of the exact SQL: it becomes the replay run's\napproval. A failed precondition is recorded as a `not_replayable` attempt and answered 422\nwith `details.code` and `details.replay_attempt_id` (no run is created).",
+        "description": "`confirm_ddl` is the user's confirmation of the exact SQL: it becomes the replay run's\napproval. A failed precondition is recorded as a `not_replayable` attempt and answered 422\nwith `details.code` and `details.replay_attempt_id` (no run is created).\n\nWith an `Idempotency-Key` (UUID), a repeat of the same request by the same user returns the\noriginal attempt (also a repeated 422), whatever happened since; concurrent duplicates\nconverge on one attempt through a unique index; the same key with a different request is\n409 `IDEMPOTENCY_CONFLICT`. Keys are scoped to the user and this operation and kept with\nthe attempt (at least the 24 h API_DESIGN promises).",
         "operationId": "replay_experiment_api_v1_experiments__experiment_id__replay_post",
         "parameters": [
           {
@@ -5881,6 +5881,22 @@
               "format": "uuid",
               "title": "Experiment Id",
               "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "idempotency-key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
             }
           }
         ],

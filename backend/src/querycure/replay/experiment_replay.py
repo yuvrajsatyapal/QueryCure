@@ -168,7 +168,12 @@ async def start_replay(
     settings: Settings,
     user_id: uuid.UUID,
     experiment_id: uuid.UUID,
+    idempotency: tuple[str, str] | None = None,
 ) -> AttemptRow:
+    """`idempotency` is (key, request hash). The attempt row carries it under a unique index,
+    so a concurrent duplicate fails at insert and its whole transaction (replay run, approval,
+    job) rolls back; the API then answers with the winner's attempt."""
+    key, request_hash = idempotency if idempotency else (None, None)
     pre = await check_preconditions(conn, settings, experiment_id)
     source_run = pre.source_run_id
     if source_run is None:  # pragma: no cover - only for an experiment without a run
@@ -184,6 +189,8 @@ async def start_replay(
             failure_code=pre.code,
             result={"detail": pre.detail},
             finished=True,
+            idempotency_key=key,
+            idempotency_request_hash=request_hash,
         )
     if pre.investigation_id is None:  # pragma: no cover
         raise InvalidStateError("Experiment has no investigation.")
@@ -254,6 +261,8 @@ async def start_replay(
         replay_run_id=replay_run,
         approval_request_id=approval_id,
         status="queued",
+        idempotency_key=key,
+        idempotency_request_hash=request_hash,
     )
     await emit(conn, replay_run, EventType.RUN_STATUS_CHANGED, {"from": None, "to": "queued"})
     await emit(
