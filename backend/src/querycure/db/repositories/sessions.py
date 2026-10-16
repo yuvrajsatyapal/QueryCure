@@ -42,3 +42,14 @@ async def get_session_user(conn: AsyncConnection, token_hash: str) -> User | Non
         )
     ).one_or_none()
     return User.model_validate(row, from_attributes=True) if row is not None else None
+
+
+async def revoke_session(conn: AsyncConnection, token_hash: str) -> None:
+    """Logout: the session stops resolving at once (soft delete, kept for audit)."""
+    await conn.execute(
+        text(
+            "UPDATE sessions SET deleted_at = now() WHERE token_hash = :token_hash "
+            "AND deleted_at IS NULL"
+        ),
+        {"token_hash": token_hash},
+    )

@@ -62,7 +62,7 @@ async def test_local_session_resolves_the_single_local_user(
     me = (await local_client.get("/api/v1/me")).json()
     assert me["user"]["id"] == r.json()["user"]["id"]
     assert me["profile"] == "local"
-    assert me["features"] == {"live_inspection": True, "sandbox": True}
+    assert me["features"] == {"live_inspection": True, "sandbox": True, "github_login": False}
 
 
 async def test_session_cookie_flags(local_client: httpx.AsyncClient) -> None:

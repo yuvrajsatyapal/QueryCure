@@ -135,7 +135,8 @@ async def test_create_queues_a_run_with_inputs_and_a_job(
         ({"modes": ["live_inspection"]}, 422, "VALIDATION_ERROR"),
         ({"plan_artifact_sha256": "f" * 64}, 422, "VALIDATION_ERROR"),
         ({"workload_id": "nope"}, 422, "VALIDATION_ERROR"),
-        ({"llm": {"credential_id": str(uuid.uuid4())}}, 403, "FEATURE_DISABLED"),
+        # BYOK (Phase 5): a credential that is not the caller's own is a 404.
+        ({"llm": {"credential_id": str(uuid.uuid4())}}, 404, "NOT_FOUND"),
         ({"unexpected": 1}, 422, "VALIDATION_ERROR"),
         ({"title": ""}, 422, "VALIDATION_ERROR"),
     ],

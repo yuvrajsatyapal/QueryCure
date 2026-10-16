@@ -26,7 +26,11 @@ def _request_id(request: Request) -> str:
 
 
 def _envelope(err: QueryCureError, request: Request) -> JSONResponse:
-    return JSONResponse(err.to_envelope(request_id=_request_id(request)), status_code=err.status)
+    return JSONResponse(
+        err.to_envelope(request_id=_request_id(request)),
+        status_code=err.status,
+        headers=err.headers,
+    )
 
 
 class MaxBodySizeMiddleware:
@@ -90,6 +94,39 @@ class RequestIdMiddleware:
             await self.app(scope, receive, send_with_id)
         finally:
             structlog.contextvars.unbind_contextvars("request_id")
+
+
+class SecurityHeadersMiddleware:
+    """Headers for every API response (SECURITY §9). JSON is never framed, sniffed or cached
+    (responses are per-user); HSTS only where the API is served over HTTPS (demo profile)."""
+
+    def __init__(self, app: ASGIApp, *, hsts: bool = False) -> None:
+        self.app = app
+        self.headers = [
+            (b"x-content-type-options", b"nosniff"),
+            (b"referrer-policy", b"no-referrer"),
+            (b"x-frame-options", b"DENY"),
+            (b"content-security-policy", b"frame-ancestors 'none'"),
+            (b"cache-control", b"no-store"),
+        ]
+        if hsts:
+            self.headers.append(
+                (b"strict-transport-security", b"max-age=31536000; includeSubDomains")
+            )
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        async def send_with_headers(message: Message) -> None:
+            if message["type"] == "http.response.start":
+                present = {k.lower() for k, _ in message.get("headers", [])}
+                extra = [(k, v) for k, v in self.headers if k not in present]
+                message = {**message, "headers": [*message.get("headers", []), *extra]}
+            await send(message)
+
+        await self.app(scope, receive, send_with_headers)
 
 
 class CsrfMiddleware:

@@ -1,6 +1,45 @@
 {
   "components": {
     "schemas": {
+      "AddLlmCredentialRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "api_key": {
+            "format": "password",
+            "maxLength": 512,
+            "minLength": 8,
+            "title": "Api Key",
+            "type": "string",
+            "writeOnly": true
+          },
+          "default_model": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Model"
+          },
+          "provider": {
+            "default": "openrouter",
+            "enum": [
+              "openrouter",
+              "gemini"
+            ],
+            "title": "Provider",
+            "type": "string"
+          }
+        },
+        "required": [
+          "api_key"
+        ],
+        "title": "AddLlmCredentialRequest",
+        "type": "object"
+      },
       "ApprovalCandidate": {
         "additionalProperties": false,
         "description": "Exactly what the human sees and approves (SECURITY \u00a76.6).",
@@ -1211,6 +1250,494 @@
         "title": "DeclaredTable",
         "type": "object"
       },
+      "DemoArtifactRef": {
+        "properties": {
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "role": {
+            "title": "Role",
+            "type": "string"
+          },
+          "sha256": {
+            "title": "Sha256",
+            "type": "string"
+          }
+        },
+        "required": [
+          "role",
+          "kind",
+          "sha256"
+        ],
+        "title": "DemoArtifactRef",
+        "type": "object"
+      },
+      "DemoBenchmark": {
+        "properties": {
+          "arms": {
+            "items": {
+              "$ref": "#/components/schemas/DemoBenchmarkArm"
+            },
+            "title": "Arms",
+            "type": "array"
+          },
+          "baseline_query": {
+            "title": "Baseline Query",
+            "type": "string"
+          },
+          "engine_version": {
+            "title": "Engine Version",
+            "type": "string"
+          },
+          "environment": {
+            "additionalProperties": true,
+            "title": "Environment",
+            "type": "object"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "provenance": {
+            "const": "prerecorded",
+            "default": "prerecorded",
+            "title": "Provenance",
+            "type": "string"
+          },
+          "recorded_on": {
+            "title": "Recorded On",
+            "type": "string"
+          },
+          "source_note": {
+            "title": "Source Note",
+            "type": "string"
+          },
+          "stats": {
+            "items": {
+              "$ref": "#/components/schemas/DemoBenchmarkStat"
+            },
+            "title": "Stats",
+            "type": "array"
+          },
+          "workload_id": {
+            "title": "Workload Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "label",
+          "recorded_on",
+          "source_note",
+          "workload_id",
+          "baseline_query",
+          "engine_version",
+          "arms",
+          "stats",
+          "environment"
+        ],
+        "title": "DemoBenchmark",
+        "type": "object"
+      },
+      "DemoBenchmarkArm": {
+        "properties": {
+          "arm": {
+            "title": "Arm",
+            "type": "string"
+          },
+          "ddl": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Ddl",
+            "type": "array"
+          },
+          "gate": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gate"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "query": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Query"
+          },
+          "reasons": {
+            "items": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            "title": "Reasons",
+            "type": "array"
+          },
+          "verdict": {
+            "title": "Verdict",
+            "type": "string"
+          }
+        },
+        "required": [
+          "arm",
+          "kind",
+          "ddl",
+          "query",
+          "verdict",
+          "gate",
+          "reasons"
+        ],
+        "title": "DemoBenchmarkArm",
+        "type": "object"
+      },
+      "DemoBenchmarkStat": {
+        "properties": {
+          "arm": {
+            "title": "Arm",
+            "type": "string"
+          },
+          "baseline_median_ms": {
+            "title": "Baseline Median Ms",
+            "type": "number"
+          },
+          "candidate_median_ms": {
+            "title": "Candidate Median Ms",
+            "type": "number"
+          },
+          "ci_high": {
+            "title": "Ci High",
+            "type": "number"
+          },
+          "ci_low": {
+            "title": "Ci Low",
+            "type": "number"
+          },
+          "n": {
+            "title": "N",
+            "type": "integer"
+          },
+          "param_set": {
+            "title": "Param Set",
+            "type": "string"
+          },
+          "speedup": {
+            "title": "Speedup",
+            "type": "number"
+          }
+        },
+        "required": [
+          "arm",
+          "param_set",
+          "speedup",
+          "ci_low",
+          "ci_high",
+          "baseline_median_ms",
+          "candidate_median_ms",
+          "n"
+        ],
+        "title": "DemoBenchmarkStat",
+        "type": "object"
+      },
+      "DemoCheck": {
+        "properties": {
+          "detail": {
+            "title": "Detail",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "passed": {
+            "title": "Passed",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "name",
+          "passed",
+          "detail"
+        ],
+        "title": "DemoCheck",
+        "type": "object"
+      },
+      "DemoDetail": {
+        "properties": {
+          "artifacts": {
+            "items": {
+              "$ref": "#/components/schemas/DemoArtifactRef"
+            },
+            "title": "Artifacts",
+            "type": "array"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "manifest_sha256": {
+            "title": "Manifest Sha256",
+            "type": "string"
+          },
+          "measurements_recorded_on": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Measurements Recorded On"
+          },
+          "model": {
+            "title": "Model",
+            "type": "string"
+          },
+          "outcome": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Outcome"
+          },
+          "plans": {
+            "items": {
+              "$ref": "#/components/schemas/RunPlan"
+            },
+            "title": "Plans",
+            "type": "array"
+          },
+          "provenance": {
+            "const": "prerecorded",
+            "default": "prerecorded",
+            "title": "Provenance",
+            "type": "string"
+          },
+          "recorded_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recorded At"
+          },
+          "report": {
+            "additionalProperties": true,
+            "title": "Report",
+            "type": "object"
+          },
+          "report_json_sha256": {
+            "title": "Report Json Sha256",
+            "type": "string"
+          },
+          "report_md_sha256": {
+            "title": "Report Md Sha256",
+            "type": "string"
+          },
+          "run_id": {
+            "title": "Run Id",
+            "type": "string"
+          },
+          "slug": {
+            "title": "Slug",
+            "type": "string"
+          },
+          "source": {
+            "additionalProperties": true,
+            "title": "Source",
+            "type": "object"
+          },
+          "summary": {
+            "title": "Summary",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "slug",
+          "title",
+          "summary",
+          "label",
+          "outcome",
+          "model",
+          "recorded_at",
+          "measurements_recorded_on",
+          "run_id",
+          "manifest_sha256",
+          "report_json_sha256",
+          "report_md_sha256",
+          "report",
+          "plans",
+          "artifacts",
+          "source"
+        ],
+        "title": "DemoDetail",
+        "type": "object"
+      },
+      "DemoGallery": {
+        "properties": {
+          "benchmarks": {
+            "items": {
+              "$ref": "#/components/schemas/DemoBenchmark"
+            },
+            "title": "Benchmarks",
+            "type": "array"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/DemoItem"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items",
+          "benchmarks"
+        ],
+        "title": "DemoGallery",
+        "type": "object"
+      },
+      "DemoItem": {
+        "properties": {
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "measurements_recorded_on": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Measurements Recorded On"
+          },
+          "model": {
+            "title": "Model",
+            "type": "string"
+          },
+          "outcome": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Outcome"
+          },
+          "provenance": {
+            "const": "prerecorded",
+            "default": "prerecorded",
+            "title": "Provenance",
+            "type": "string"
+          },
+          "recorded_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recorded At"
+          },
+          "slug": {
+            "title": "Slug",
+            "type": "string"
+          },
+          "summary": {
+            "title": "Summary",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "slug",
+          "title",
+          "summary",
+          "label",
+          "outcome",
+          "model",
+          "recorded_at",
+          "measurements_recorded_on"
+        ],
+        "title": "DemoItem",
+        "type": "object"
+      },
+      "DemoVerification": {
+        "properties": {
+          "checks": {
+            "items": {
+              "$ref": "#/components/schemas/DemoCheck"
+            },
+            "title": "Checks",
+            "type": "array"
+          },
+          "scope": {
+            "title": "Scope",
+            "type": "string"
+          },
+          "slug": {
+            "title": "Slug",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "consistent",
+              "mismatch"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "slug",
+          "status",
+          "checks",
+          "scope"
+        ],
+        "title": "DemoVerification",
+        "type": "object"
+      },
       "Evidence": {
         "additionalProperties": false,
         "properties": {
@@ -1865,6 +2392,11 @@
       },
       "Features": {
         "properties": {
+          "github_login": {
+            "default": false,
+            "title": "Github Login",
+            "type": "boolean"
+          },
           "live_inspection": {
             "title": "Live Inspection",
             "type": "boolean"
@@ -2456,6 +2988,77 @@
           }
         },
         "title": "LlmChoice",
+        "type": "object"
+      },
+      "LlmCredentialList": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/LlmCredentialOut"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "LlmCredentialList",
+        "type": "object"
+      },
+      "LlmCredentialOut": {
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "default_model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Model"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "key_hint": {
+            "title": "Key Hint",
+            "type": "string"
+          },
+          "last_used_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Used At"
+          },
+          "provider": {
+            "title": "Provider",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "provider",
+          "key_hint",
+          "default_model",
+          "created_at",
+          "last_used_at"
+        ],
+        "title": "LlmCredentialOut",
         "type": "object"
       },
       "ManifestOut": {
@@ -4490,6 +5093,11 @@
             ],
             "title": "Error Code"
           },
+          "finalized": {
+            "default": false,
+            "title": "Finalized",
+            "type": "boolean"
+          },
           "finished_at": {
             "anyOf": [
               {
@@ -4552,6 +5160,28 @@
               }
             ],
             "title": "Outcome"
+          },
+          "parent_run_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Run Id"
+          },
+          "replay": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RunReplayLink"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "run_number": {
             "title": "Run Number",
@@ -4717,12 +5347,50 @@
         "title": "RunPlanList",
         "type": "object"
       },
+      "RunReplayLink": {
+        "description": "An `experiment_replay` run's attempt: what it replays and how the comparison ended.",
+        "properties": {
+          "attempt_id": {
+            "format": "uuid",
+            "title": "Attempt Id",
+            "type": "string"
+          },
+          "source_experiment_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Experiment Id"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "attempt_id",
+          "status",
+          "source_experiment_id"
+        ],
+        "title": "RunReplayLink",
+        "type": "object"
+      },
       "RunSummary": {
         "properties": {
           "created_at": {
             "format": "date-time",
             "title": "Created At",
             "type": "string"
+          },
+          "finalized": {
+            "default": false,
+            "title": "Finalized",
+            "type": "boolean"
           },
           "finished_at": {
             "anyOf": [
@@ -4760,6 +5428,28 @@
               }
             ],
             "title": "Outcome"
+          },
+          "parent_run_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Run Id"
+          },
+          "replay": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RunReplayLink"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "run_number": {
             "title": "Run Number",
@@ -5580,6 +6270,151 @@
         ]
       }
     },
+    "/api/v1/auth/github/callback": {
+      "get": {
+        "operationId": "github_callback_api_v1_auth_github_callback_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "code",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 200,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Code"
+            }
+          },
+          {
+            "in": "query",
+            "name": "state",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 200,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "State"
+            }
+          },
+          {
+            "in": "query",
+            "name": "error",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 100,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Error"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Github Callback",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/v1/auth/github/login": {
+      "get": {
+        "operationId": "github_login_api_v1_auth_github_login_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "return_to",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 300,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Return To"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Github Login",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/v1/auth/logout": {
+      "post": {
+        "description": "Revokes the session server-side and clears both cookies. Needs the CSRF token like any\nmutation, so another site cannot sign a user out. Idempotent.",
+        "operationId": "logout_api_v1_auth_logout_post",
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Logout",
+        "tags": [
+          "session"
+        ]
+      }
+    },
     "/api/v1/connections": {
       "get": {
         "operationId": "list_connections_api_v1_connections_get",
@@ -5822,6 +6657,111 @@
         "summary": "Test Connection",
         "tags": [
           "connections"
+        ]
+      }
+    },
+    "/api/v1/demo/gallery": {
+      "get": {
+        "operationId": "gallery_api_v1_demo_gallery_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DemoGallery"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Gallery",
+        "tags": [
+          "demo"
+        ]
+      }
+    },
+    "/api/v1/demo/gallery/{slug}": {
+      "get": {
+        "operationId": "demo_detail_api_v1_demo_gallery__slug__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "title": "Slug",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DemoDetail"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Demo Detail",
+        "tags": [
+          "demo"
+        ]
+      }
+    },
+    "/api/v1/demo/gallery/{slug}/verification": {
+      "get": {
+        "operationId": "demo_verification_api_v1_demo_gallery__slug__verification_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "title": "Slug",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DemoVerification"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Demo Verification",
+        "tags": [
+          "demo"
         ]
       }
     },
@@ -7488,9 +8428,107 @@
         ]
       }
     },
+    "/api/v1/settings/llm-credentials": {
+      "get": {
+        "operationId": "list_llm_credentials_api_v1_settings_llm_credentials_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LlmCredentialList"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Llm Credentials",
+        "tags": [
+          "settings"
+        ]
+      },
+      "post": {
+        "description": "Stores the user's own key encrypted (ADR-0012), replacing any earlier key for the same\nprovider. The response, logs and errors show only the last 4 characters.",
+        "operationId": "add_llm_credential_api_v1_settings_llm_credentials_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddLlmCredentialRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LlmCredentialOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Add Llm Credential",
+        "tags": [
+          "settings"
+        ]
+      }
+    },
+    "/api/v1/settings/llm-credentials/{credential_id}": {
+      "delete": {
+        "description": "Soft-deletes the row and wipes the ciphertext in the same statement. Runs that were\nstarted with it stop at their next resume with CONFIGURATION_ERROR.",
+        "operationId": "delete_llm_credential_api_v1_settings_llm_credentials__credential_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "credential_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Credential Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Llm Credential",
+        "tags": [
+          "settings"
+        ]
+      }
+    },
     "/api/v1/settings/models": {
       "get": {
-        "description": "Which provider/model runs use, and whether a key is configured. Never the key.",
+        "description": "Which provider/model runs use, and whether a key exists (the user's own, or the local\nprofile's server key). Never the key.",
         "operationId": "models_api_v1_settings_models_get",
         "responses": {
           "200": {

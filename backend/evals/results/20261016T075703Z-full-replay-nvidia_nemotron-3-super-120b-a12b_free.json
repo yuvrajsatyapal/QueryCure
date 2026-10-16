@@ -1,0 +1,173 @@
+{
+  "suite": "full",
+  "mode": "replay",
+  "measurements": "fixture",
+  "requested_model": "nvidia/nemotron-3-super-120b-a12b:free",
+  "run_at": "20261016T075703Z",
+  "cases": [
+    {
+      "case": "orders_sandbox_composite_index",
+      "passed": true,
+      "known_failure": null,
+      "error": null,
+      "checks": [
+        {
+          "name": "run_finished",
+          "passed": true,
+          "detail": "status=completed"
+        },
+        {
+          "name": "outcome",
+          "passed": true,
+          "detail": "outcome=inconclusive"
+        },
+        {
+          "name": "root_cause_top1",
+          "passed": true,
+          "detail": "top=missing_index expected one of ['missing_index', 'poor_index_order', 'inefficient_sort']"
+        },
+        {
+          "name": "candidate_included",
+          "passed": true,
+          "detail": "candidates=[('analyze_statistics', ['ANALYZE orders']), ('create_index', ['CREATE INDEX IF NOT EXISTS idx_orders_customer_id_created_at_desc ON orders (customer_id, created_at DESC)']), ('analyze_statistics', ['ANALYZE orders (customer_id, created_at)']), ('create_index', ['CREATE INDEX IF NOT EXISTS idx_orders_created_at_customer_id ON orders (created_at DESC, customer_id)']), ('extended_statistics', ['CREATE STATISTICS sts_orders_customer_created ON customer_id, created_at FROM orders', 'ANALYZE orders (customer_id)']), ('create_index', ['CREATE INDEX IF NOT EXISTS idx_orders_customer_id ON orders (customer_id)']), ('create_index', ['CREATE INDEX IF NOT EXISTS idx_orders_customer_created_inc ON orders (customer_id, created_at DESC) INCLUDE (id, status, total)'])]"
+        },
+        {
+          "name": "approval_requested",
+          "passed": true,
+          "detail": "approval requests=3"
+        },
+        {
+          "name": "no_disallowed_tools",
+          "passed": true,
+          "detail": "outside the agent's allowlist: []"
+        },
+        {
+          "name": "no_forbidden_claims",
+          "passed": true,
+          "detail": "matches=[]"
+        }
+      ],
+      "metrics": {
+        "outcome": "inconclusive",
+        "top1": [
+          "missing_index"
+        ],
+        "top3": [
+          "missing_index",
+          "stale_statistics",
+          "inefficient_sort"
+        ],
+        "hypotheses": 4,
+        "findings": 9,
+        "claims_dropped_by_citation_validator": 1,
+        "tool_calls": [
+          "index_strategist:estimate_index_size(ok)"
+        ],
+        "llm_calls": 11,
+        "input_tokens": 29080,
+        "output_tokens": 24391,
+        "served_models": [
+          "nvidia/nemotron-3-super-120b-a12b:free"
+        ],
+        "errors": [],
+        "materiality": "undetermined",
+        "audited_verdicts": 7,
+        "audited_verified_by_engine": 3,
+        "auditor_downgrades": 3
+      },
+      "provenance": {
+        "model": "nvidia/nemotron-3-super-120b-a12b:free",
+        "mode": "replay",
+        "measurements": "fixture",
+        "prompt_versions": {
+          "benchmark_auditor": "benchmark_auditor@1",
+          "index_strategist": "index_strategist@1",
+          "optimization_engineer": "optimization_engineer@1",
+          "query_analyzer": "query_analyzer@1",
+          "supervisor_plan": "supervisor_plan@1",
+          "supervisor_synthesis": "supervisor_synthesis@1",
+          "workload_investigator": "workload_investigator@1"
+        },
+        "scoring_version": "eval-scoring@1",
+        "recording_sha256": "10aa738fff8dccce01e6bc23b6fa5a6112bc4db46c5cb3500fa5fbbc8a33011f",
+        "recorded_at": "2026-10-16",
+        "measurement_fixture_sha256": "3b98c91875a085d0b7e320b8837bd23b938a3bf6709235720e5bf4f1aa489dd8",
+        "measurement_recorded_on": "2026-10-16"
+      }
+    },
+    {
+      "case": "rewrite_trap_sandbox",
+      "passed": true,
+      "known_failure": null,
+      "error": null,
+      "checks": [
+        {
+          "name": "run_finished",
+          "passed": true,
+          "detail": "status=completed"
+        },
+        {
+          "name": "outcome",
+          "passed": true,
+          "detail": "outcome=inconclusive"
+        },
+        {
+          "name": "approval_requested",
+          "passed": true,
+          "detail": "approval requests=3"
+        },
+        {
+          "name": "no_disallowed_tools",
+          "passed": true,
+          "detail": "outside the agent's allowlist: []"
+        }
+      ],
+      "metrics": {
+        "outcome": "inconclusive",
+        "top1": [
+          "missing_index"
+        ],
+        "top3": [
+          "missing_index",
+          "stale_statistics"
+        ],
+        "hypotheses": 2,
+        "findings": 8,
+        "claims_dropped_by_citation_validator": 1,
+        "tool_calls": [
+          "index_strategist:estimate_index_size(ok)"
+        ],
+        "llm_calls": 11,
+        "input_tokens": 25433,
+        "output_tokens": 23642,
+        "served_models": [
+          "nvidia/nemotron-3-super-120b-a12b:free"
+        ],
+        "errors": [],
+        "materiality": "undetermined",
+        "audited_verdicts": 10,
+        "audited_verified_by_engine": 4,
+        "auditor_downgrades": 4
+      },
+      "provenance": {
+        "model": "nvidia/nemotron-3-super-120b-a12b:free",
+        "mode": "replay",
+        "measurements": "fixture",
+        "prompt_versions": {
+          "benchmark_auditor": "benchmark_auditor@1",
+          "index_strategist": "index_strategist@1",
+          "optimization_engineer": "optimization_engineer@1",
+          "query_analyzer": "query_analyzer@1",
+          "supervisor_plan": "supervisor_plan@1",
+          "supervisor_synthesis": "supervisor_synthesis@1",
+          "workload_investigator": "workload_investigator@1"
+        },
+        "scoring_version": "eval-scoring@1",
+        "recording_sha256": "0ac83bddda63e4ef738c3c613e5eb97b809fe90b1f9dcff9523021b1c6cf0476",
+        "recorded_at": "2026-10-16",
+        "measurement_fixture_sha256": "1a401589ca1db37ebe72f98a89e83cf852c1902539f529817e38156b0df8cf51",
+        "measurement_recorded_on": "2026-10-16"
+      }
+    }
+  ]
+}

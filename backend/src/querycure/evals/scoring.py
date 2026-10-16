@@ -16,6 +16,9 @@ from querycure.evals.cases import EvalCase, Security
 from querycure.sql.ddl import parse_ddl
 from querycure.sql.ddl_allowlist import validate_ddl
 
+# Bump when a check or metric definition changes, so results name the rules that scored them.
+SCORING_VERSION = "eval-scoring@1"
+
 _ALLOWED: dict[str, dict[str, Tool]] = {agent: dict(tools) for agent, tools in ALLOWLISTS.items()}
 # Tools take names and numbers, never SQL: statement text in an argument is out of policy.
 _STATEMENT = re.compile(

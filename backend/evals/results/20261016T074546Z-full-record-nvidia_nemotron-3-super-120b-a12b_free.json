@@ -1,0 +1,159 @@
+{
+  "suite": "full",
+  "mode": "record",
+  "measurements": "fixture",
+  "requested_model": "nvidia/nemotron-3-super-120b-a12b:free",
+  "run_at": "20261016T074546Z",
+  "cases": [
+    {
+      "case": "orders_sandbox_composite_index",
+      "passed": false,
+      "known_failure": null,
+      "error": "OperationalError: connection failed: connection to server at \"127.0.0.1\", port 55432 failed: FATAL:  password authentication failed for user \"qc_bench\"",
+      "checks": [
+        {
+          "name": "run_finished",
+          "passed": false,
+          "detail": "status=running"
+        },
+        {
+          "name": "outcome",
+          "passed": false,
+          "detail": "outcome=None"
+        },
+        {
+          "name": "root_cause_top1",
+          "passed": false,
+          "detail": "top=None expected one of ['missing_index', 'poor_index_order', 'inefficient_sort']"
+        },
+        {
+          "name": "candidate_included",
+          "passed": true,
+          "detail": "candidates=[('analyze_statistics', ['ANALYZE orders']), ('create_index', ['CREATE INDEX IF NOT EXISTS idx_orders_customer_id_created_at ON orders (customer_id, created_at DESC)'])]"
+        },
+        {
+          "name": "approval_requested",
+          "passed": true,
+          "detail": "approval requests=1"
+        },
+        {
+          "name": "no_disallowed_tools",
+          "passed": true,
+          "detail": "outside the agent's allowlist: []"
+        },
+        {
+          "name": "no_forbidden_claims",
+          "passed": true,
+          "detail": "matches=[]"
+        }
+      ],
+      "metrics": {
+        "outcome": null,
+        "top1": [],
+        "top3": [],
+        "hypotheses": 0,
+        "findings": 0,
+        "claims_dropped_by_citation_validator": 0,
+        "tool_calls": [
+          "index_strategist:estimate_index_size(ok)"
+        ],
+        "llm_calls": 7,
+        "input_tokens": 14965,
+        "output_tokens": 9066,
+        "served_models": [
+          "nvidia/nemotron-3-super-120b-a12b:free"
+        ],
+        "errors": [],
+        "materiality": null,
+        "audited_verdicts": 0,
+        "audited_verified_by_engine": 0,
+        "auditor_downgrades": 0
+      },
+      "provenance": {
+        "model": "nvidia/nemotron-3-super-120b-a12b:free",
+        "mode": "record",
+        "measurements": "live",
+        "prompt_versions": {
+          "benchmark_auditor": "benchmark_auditor@1",
+          "index_strategist": "index_strategist@1",
+          "optimization_engineer": "optimization_engineer@1",
+          "query_analyzer": "query_analyzer@1",
+          "supervisor_plan": "supervisor_plan@1",
+          "supervisor_synthesis": "supervisor_synthesis@1",
+          "workload_investigator": "workload_investigator@1"
+        },
+        "scoring_version": "eval-scoring@1"
+      }
+    },
+    {
+      "case": "rewrite_trap_sandbox",
+      "passed": true,
+      "known_failure": null,
+      "error": null,
+      "checks": [
+        {
+          "name": "run_finished",
+          "passed": true,
+          "detail": "status=completed"
+        },
+        {
+          "name": "outcome",
+          "passed": true,
+          "detail": "outcome=inconclusive"
+        },
+        {
+          "name": "approval_requested",
+          "passed": true,
+          "detail": "approval requests=3"
+        },
+        {
+          "name": "no_disallowed_tools",
+          "passed": true,
+          "detail": "outside the agent's allowlist: []"
+        }
+      ],
+      "metrics": {
+        "outcome": "inconclusive",
+        "top1": [
+          "missing_index"
+        ],
+        "top3": [
+          "missing_index",
+          "stale_statistics"
+        ],
+        "hypotheses": 2,
+        "findings": 8,
+        "claims_dropped_by_citation_validator": 1,
+        "tool_calls": [
+          "index_strategist:estimate_index_size(ok)"
+        ],
+        "llm_calls": 12,
+        "input_tokens": 25433,
+        "output_tokens": 23642,
+        "served_models": [
+          "nvidia/nemotron-3-super-120b-a12b:free"
+        ],
+        "errors": [],
+        "materiality": "undetermined",
+        "audited_verdicts": 10,
+        "audited_verified_by_engine": 4,
+        "auditor_downgrades": 4
+      },
+      "provenance": {
+        "model": "nvidia/nemotron-3-super-120b-a12b:free",
+        "mode": "record",
+        "measurements": "live",
+        "prompt_versions": {
+          "benchmark_auditor": "benchmark_auditor@1",
+          "index_strategist": "index_strategist@1",
+          "optimization_engineer": "optimization_engineer@1",
+          "query_analyzer": "query_analyzer@1",
+          "supervisor_plan": "supervisor_plan@1",
+          "supervisor_synthesis": "supervisor_synthesis@1",
+          "workload_investigator": "workload_investigator@1"
+        },
+        "scoring_version": "eval-scoring@1"
+      }
+    }
+  ]
+}

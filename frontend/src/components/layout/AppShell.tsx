@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
+import { AccountMenu } from "./AccountMenu";
 import { SessionGate } from "./SessionGate";
 import { SideNav } from "./SideNav";
 
@@ -11,7 +12,10 @@ export function AppShell({ children }: { children: ReactNode }) {
         <Link href="/app" className="text-sm font-semibold tracking-tight text-ink">
           QueryCure
         </Link>
-        <ThemeToggle />
+        <div className="flex min-w-0 items-center gap-3">
+          <AccountMenu />
+          <ThemeToggle />
+        </div>
       </header>
       <div className="flex flex-1 flex-col md:flex-row">
         <SideNav />

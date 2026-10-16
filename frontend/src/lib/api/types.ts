@@ -86,3 +86,5 @@ export type PlanDiff = Camel<"PlanDiff">;
 export type PlanNodeDiff = Camel<"PlanNodeDiff">;
 export type Verification = Camel<"VerificationOut">;
 export type VerificationList = Camel<"VerificationList">;
+export type LlmCredential = Camel<"LlmCredentialOut">;
+export type LlmCredentialList = Camel<"LlmCredentialList">;

@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, Query, Response, status
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from querycure.api.deps import ConnDep, CurrentUser, SettingsDep, get_engine
+from querycure.api.rate_limit import rate_limit
 from querycure.api.schemas.connections import (
     ConnectionList,
     ConnectionSummary,
@@ -60,7 +61,9 @@ def _target(record: ConnectionRecord, user: User, settings: Settings) -> TargetC
     return target_from_record(record, user.id, settings)
 
 
-@router.post("", status_code=status.HTTP_201_CREATED)
+@router.post(
+    "", status_code=status.HTTP_201_CREATED, dependencies=[Depends(rate_limit("connection"))]
+)
 async def create_connection(
     body: CreateConnectionRequest, conn: ConnDep, user: CurrentUser, settings: SettingsDep
 ) -> ConnectionSummary:
@@ -91,7 +94,7 @@ async def list_connections(conn: ConnDep, user: CurrentUser) -> ConnectionList:
     return ConnectionList(items=[ConnectionSummary.from_record(r) for r in records])
 
 
-@router.post("/{connection_id}/test")
+@router.post("/{connection_id}/test", dependencies=[Depends(rate_limit("connection"))])
 async def test_connection(
     connection_id: uuid.UUID,
     engine: Annotated[AsyncEngine, Depends(get_engine)],
@@ -125,7 +128,7 @@ async def test_connection(
     return ConnectionTestResponse(status="ok", capabilities=caps, warnings=caps.warnings)
 
 
-@router.post("/{connection_id}/explain")
+@router.post("/{connection_id}/explain", dependencies=[Depends(rate_limit("connection"))])
 async def explain(
     connection_id: uuid.UUID,
     body: ExplainRequest,

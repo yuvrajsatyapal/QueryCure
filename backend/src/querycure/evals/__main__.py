@@ -5,6 +5,7 @@ import asyncio
 import datetime as dt
 import json
 import sys
+from pathlib import Path
 
 from querycure.core.config import Settings
 from querycure.evals.cases import EVALS_DIR, load_cases
@@ -32,6 +33,17 @@ def _print(results: list[CaseResult]) -> None:
             print(f"      known baseline failure: {r.expected_failure}")
         if r.error:
             print(f"      error: {r.error}")
+        if r.provenance.get("measurements"):
+            fixture = r.provenance.get("measurement_fixture_sha256")
+            print(
+                f"      measurements: {r.provenance['measurements']}"
+                + (
+                    f" (prerecorded {r.provenance.get('measurement_recorded_on')}, "
+                    f"sha256 {fixture[:12]})"
+                    if fixture
+                    else ""
+                )
+            )
         if r.score:
             for c in r.score.checks:
                 print(f"      {'ok ' if c.passed else 'BAD'} {c.name}: {c.detail}")
@@ -81,6 +93,8 @@ async def _run(args: argparse.Namespace) -> int:
             settings=settings,
             admin_url=_admin_url(settings, args.admin_url),
             cap=cap,
+            measurements=args.measurements,
+            export_dir=args.export_demo,
         )
         results.append(result)
     _print(results)
@@ -94,6 +108,7 @@ async def _run(args: argparse.Namespace) -> int:
                 {
                     "suite": args.suite,
                     "mode": args.mode,
+                    "measurements": args.measurements,
                     "requested_model": model,
                     "run_at": stamp,
                     "cases": [
@@ -107,6 +122,7 @@ async def _run(args: argparse.Namespace) -> int:
                                 for c in (r.score.checks if r.score else [])
                             ],
                             "metrics": r.score.metrics if r.score else None,
+                            "provenance": r.provenance,
                         }
                         for r in results
                     ],
@@ -136,6 +152,18 @@ def main() -> None:
         help="free requests already spent today outside eval recording (e.g. live runs)",
     )
     run.add_argument("--save-results", action="store_true", help="also save replay results")
+    run.add_argument(
+        "--export-demo",
+        type=Path,
+        help="replay mode: also write a demo bundle per passing case into this directory",
+    )
+    run.add_argument(
+        "--measurements",
+        default="fixture",
+        choices=["fixture", "live"],
+        help="Mode C replay: prerecorded measurement fixtures (deterministic, default) or a "
+        "live re-benchmark (environment-dependent; DIVERGED when measurements differ)",
+    )
     args = parser.parse_args()
     sys.exit(asyncio.run(_run(args)))
 

@@ -7,10 +7,17 @@ class QueryCureError(Exception):
     code: ClassVar[str] = "INTERNAL_ERROR"
     status: ClassVar[int] = 500
 
-    def __init__(self, message: str, *, details: list[dict[str, Any]] | None = None) -> None:
+    def __init__(
+        self,
+        message: str,
+        *,
+        details: list[dict[str, Any]] | None = None,
+        headers: dict[str, str] | None = None,
+    ) -> None:
         super().__init__(message)
         self.message = message
         self.details = details or []
+        self.headers = headers  # extra response headers, e.g. Retry-After on a 429
 
     def to_envelope(self, *, request_id: str) -> dict[str, Any]:
         return {
@@ -178,4 +185,11 @@ class LlmQuotaExhaustedError(QueryCureError):
     """No free model capacity left today (ADR-0016); nothing is started."""
 
     code = "LLM_QUOTA_EXHAUSTED"
+    status = 429
+
+
+class RateLimitedError(QueryCureError):
+    """A token bucket is empty (T5.3). Carries Retry-After."""
+
+    code = "RATE_LIMITED"
     status = 429

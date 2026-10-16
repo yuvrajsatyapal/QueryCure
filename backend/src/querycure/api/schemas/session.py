@@ -23,6 +23,7 @@ class SessionResponse(BaseModel):
 class Features(BaseModel):
     live_inspection: bool
     sandbox: bool
+    github_login: bool = False
 
 
 class MeResponse(BaseModel):

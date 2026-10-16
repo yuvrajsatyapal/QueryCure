@@ -23,6 +23,8 @@ dependencies = [
     "sqlglot>=30.22.0",
     "structlog>=26.1.0",
     "uvicorn[standard]>=0.54.0",
+    # Direct use for the GitHub OAuth exchange; already locked as a dependency of openai.
+    "httpx>=0.28.1",
 ]
 
 [build-system]

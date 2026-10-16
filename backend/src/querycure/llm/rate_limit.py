@@ -7,6 +7,7 @@ yet counted: the default limit (45) leaves headroom below the provider's 50/day.
 
 import asyncio
 import time
+import uuid
 from collections import deque
 from collections.abc import Awaitable, Callable
 
@@ -46,22 +47,36 @@ class MinuteRateLimiter:
 
 
 class DailyQuota:
-    def __init__(self, engine: AsyncEngine, limit: int) -> None:
+    """Free requests today (UTC). Without `credential_id`: requests made with the server's own
+    key (runs without a BYOK credential). With it: requests made with that user's key, which
+    has its own provider allowance."""
+
+    def __init__(
+        self, engine: AsyncEngine, limit: int, *, credential_id: uuid.UUID | None = None
+    ) -> None:
         self._engine = engine
         self.limit = limit
+        self.credential_id = credential_id
 
     async def used_today(self) -> int:
         async with self._engine.connect() as conn:
             count = (
                 await conn.execute(
                     text(
-                        "SELECT count(*) FROM agent_executions "
-                        "WHERE created_at >= date_trunc('day', now() AT TIME ZONE 'UTC') "
+                        "SELECT count(*) FROM agent_executions e "
+                        "JOIN investigation_runs r ON r.id = e.run_id "
+                        "WHERE e.created_at >= date_trunc('day', now() AT TIME ZONE 'UTC') "
                         "AT TIME ZONE 'UTC' "
                         # Only requests that went to OpenRouter free models use the allowance.
-                        "AND (requested_model LIKE :free_suffix OR requested_model = :free_router)"
+                        "AND (e.requested_model LIKE :free_suffix "
+                        "     OR e.requested_model = :free_router) "
+                        "AND r.llm_credential_id IS NOT DISTINCT FROM CAST(:cred AS UUID)"
                     ),
-                    {"free_suffix": "%:free", "free_router": FREE_ROUTER},
+                    {
+                        "free_suffix": "%:free",
+                        "free_router": FREE_ROUTER,
+                        "cred": self.credential_id,
+                    },
                 )
             ).scalar_one()
         return int(count)
@@ -80,6 +95,10 @@ class LlmGate:
     def __init__(self, limiter: MinuteRateLimiter, quota: DailyQuota | None = None) -> None:
         self._limiter = limiter
         self._quota = quota
+
+    def with_quota(self, quota: DailyQuota) -> "LlmGate":
+        """Same minute window (one process, one shared limiter), another daily allowance."""
+        return LlmGate(self._limiter, quota)
 
     async def before_call(self) -> None:
         if self._quota is not None:

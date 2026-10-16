@@ -151,6 +151,8 @@ Index: unique `(auth_provider, auth_subject) WHERE deleted_at IS NULL AND auth_p
 `id`, `user_id`, `token_hash TEXT` (SHA-256 of the opaque cookie token), `expires_at`, `ip_hash`, `user_agent`. Index on `token_hash` (unique), `expires_at`.
 
 ### llm_credentials
+*Implemented (migration 0015).* `ciphertext`/`nonce` are NULL exactly when the row is deleted (CHECKs); unique `(user_id, provider) WHERE deleted_at IS NULL`; associated data `llm_credentials:<id>:<user_id>`. `investigation_runs.llm_credential_id` records the key a run uses.
+
 | Column | Type | Notes |
 |---|---|---|
 | user_id | UUID | |
@@ -290,6 +292,9 @@ Unique `(experiment_id, arm, param_set, phase, block)` → idempotent resume. *I
 | idempotency_key / idempotency_request_hash | TEXT | migration 0013: the request's `Idempotency-Key` and the SHA-256 of its `qc-json-v1` body (both or neither) |
 
 Indexes: `(source_run_id, created_at DESC)`; `(status) WHERE status IN ('checking','queued','running','comparing')`; `(replay_run_id)`; unique `(user_id, kind, idempotency_key) WHERE idempotency_key IS NOT NULL` (keys are per user and per operation; a concurrent duplicate fails here and its whole transaction rolls back).
+
+### rate_limit_buckets and user_uploads
+*Implemented (migration 0014).* `rate_limit_buckets(bucket_key UNIQUE, tokens, refilled_at)`: one token bucket per limit and subject (user id or SHA-256 of the client address); mutable for `qc_app`, deletable by `qc_retention`. `user_uploads(user_id, artifact_id, kind)`, unique per `(user_id, artifact_id)`, append-only for `qc_app`: who uploaded which content-addressed artifact.
 
 ### jobs
 | Column | Type | Notes |

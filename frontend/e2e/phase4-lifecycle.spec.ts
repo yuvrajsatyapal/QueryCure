@@ -14,6 +14,7 @@ test("lifecycle - approve, audit, report, verify, replay the experiment", async 
   await page.getByLabel("Title").fill(`E2E lifecycle ${Date.now()}`);
   await page.getByRole("button", { name: "Start investigation" }).click();
   await expect(page).toHaveURL(/\/app\/investigations\/[0-9a-f-]{36}$/, { timeout: 30_000 });
+  const investigationUrl = page.url();
 
   const card = page.getByRole("region", { name: "Approval required" });
   await expect(card).toBeVisible({ timeout: 60_000 });
@@ -59,4 +60,21 @@ test("lifecycle - approve, audit, report, verify, replay the experiment", async 
   await page.getByRole("link", { name: "Open the replay run's report" }).click();
   await expect(page.getByRole("article", { name: "Final report" })).toBeVisible({ timeout: 15_000 });
   await expect(page.getByText(/experiment replay · run 2/)).toBeVisible();
+
+  // Run history (Phase 5): the investigation lists both runs; the replay links to its source.
+  await page.goto(investigationUrl);
+  const picker = page.getByRole("navigation", { name: "Runs of this investigation" });
+  await expect(picker.getByText("Runs (2)")).toBeVisible({ timeout: 15_000 });
+  await picker.getByRole("button", { name: /^#2 Experiment replay of run #1/ }).click();
+  await expect(page).toHaveURL(/\?run=[0-9a-f-]{36}$/);
+  await expect(page.getByText(/run 2 · Experiment replay of run #1/)).toBeVisible();
+  await expect(picker.getByRole("link", { name: "Open this run's report" })).toBeVisible();
+  await page.getByRole("button", { name: "Go to run #1 (original run)" }).click();
+  await expect(page.getByText(/run 1 · Original run/)).toBeVisible({ timeout: 15_000 });
+
+  // Phone width: the picker and run view wrap instead of scrolling the page sideways.
+  await page.setViewportSize({ width: 375, height: 812 });
+  await expect(picker).toBeVisible();
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  expect(overflow).toBeLessThanOrEqual(0);
 });

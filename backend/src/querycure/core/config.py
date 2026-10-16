@@ -1,7 +1,7 @@
 import base64
 import binascii
 from enum import StrEnum
-from typing import Literal, Self
+from typing import Literal, Self, TypedDict
 
 from pydantic import AliasChoices, Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -30,6 +30,14 @@ def is_free_model(model: str) -> bool:
     return model == FREE_ROUTER or (model.endswith(":free") and "/" in model)
 
 
+class EngineSettings(TypedDict):
+    pool_size: int
+    max_overflow: int
+    pool_timeout: float
+    statement_timeout_ms: int
+    idle_in_transaction_timeout_ms: int
+
+
 class Settings(BaseSettings):
     """Env vars from DEPLOYMENT.md §6. Secrets are SecretStr and never printed."""
 
@@ -43,6 +51,10 @@ class Settings(BaseSettings):
     # Owner role, used only by Alembic. The app itself connects as the restricted qc_app role.
     database_migration_url: SecretStr | None = Field(
         default=None, validation_alias=_env("DATABASE_MIGRATION_URL")
+    )
+    # The qc_retention role (DELETE only), for `python -m querycure.ops retention`.
+    database_retention_url: SecretStr | None = Field(
+        default=None, validation_alias=_env("DATABASE_RETENTION_URL")
     )
     # Mode C sandbox server (SECURITY §8). The admin role only creates/drops databases and
     # builds templates; candidate SQL runs as qc_bench with SANDBOX_BENCH_PASSWORD.
@@ -130,6 +142,41 @@ class Settings(BaseSettings):
     cors_origins: list[str] = Field(default_factory=list, validation_alias=_env("CORS_ORIGINS"))
     cookie_domain: str | None = Field(default=None, validation_alias=_env("COOKIE_DOMAIN"))
     log_level: str = Field(default="INFO", validation_alias=_env("LOG_LEVEL"))
+    # Operations (Phase 5). The metrics endpoint is open locally and needs this token
+    # elsewhere; without it the endpoint answers 404 outside the local profile.
+    metrics_token: SecretStr | None = Field(default=None, validation_alias=_env("METRICS_TOKEN"))
+    db_pool_size: int = Field(default=5, ge=1, le=50, validation_alias=_env("DB_POOL_SIZE"))
+    db_max_overflow: int = Field(default=5, ge=0, le=50, validation_alias=_env("DB_MAX_OVERFLOW"))
+    db_pool_timeout_seconds: float = Field(
+        default=10.0, gt=0, validation_alias=_env("DB_POOL_TIMEOUT_SECONDS")
+    )
+    # Server-side limits on the app's own metadata connections (not the target or sandbox,
+    # which have their own): no metadata query should take a minute or hold a transaction.
+    db_statement_timeout_ms: int = Field(
+        default=60_000, ge=1000, validation_alias=_env("DB_STATEMENT_TIMEOUT_MS")
+    )
+    db_idle_in_transaction_timeout_ms: int = Field(
+        default=120_000, ge=1000, validation_alias=_env("DB_IDLE_IN_TRANSACTION_TIMEOUT_MS")
+    )
+    # SIGTERM: in-flight jobs get this long to finish before they are abandoned to lease
+    # expiry (and resumed from their checkpoint by the next worker).
+    worker_shutdown_grace_seconds: float = Field(
+        default=20.0, ge=0, le=300, validation_alias=_env("WORKER_SHUTDOWN_GRACE_SECONDS")
+    )
+    # GitHub OAuth (T5.1). Sign-in is offered only when both are set.
+    github_client_id: str | None = Field(default=None, validation_alias=_env("GITHUB_CLIENT_ID"))
+    github_client_secret: SecretStr | None = Field(
+        default=None, validation_alias=_env("GITHUB_CLIENT_SECRET")
+    )
+    # Public URLs: the OAuth callback is registered against the API, and sign-in returns the
+    # browser to the web app. Must be HTTPS outside the local profile.
+    public_api_url: str | None = Field(default=None, validation_alias=_env("PUBLIC_API_URL"))
+    web_base_url: str | None = Field(default=None, validation_alias=_env("WEB_BASE_URL"))
+    # Number of reverse proxies that append to X-Forwarded-For (rate limits use the client
+    # address). 0 = ignore the header: a client can put anything there.
+    trusted_proxy_hops: int = Field(
+        default=0, ge=0, le=5, validation_alias=_env("TRUSTED_PROXY_HOPS")
+    )
     session_ttl_seconds: int = Field(
         default=30 * 24 * 3600, ge=300, validation_alias=_env("SESSION_TTL_SECONDS")
     )
@@ -179,6 +226,9 @@ class Settings(BaseSettings):
             self.allow_private_targets = local
         if self.feature_sandbox is None:
             self.feature_sandbox = local
+        if local:
+            self.public_api_url = self.public_api_url or "http://localhost:8000"
+            self.web_base_url = self.web_base_url or "http://localhost:3000"
         if self.worker_concurrency is None:
             self.worker_concurrency = 2 if local else 1
         if self.worker_heartbeat_seconds * 2 >= self.worker_lease_seconds:
@@ -190,4 +240,29 @@ class Settings(BaseSettings):
                 raise ValueError("ALLOW_PRIVATE_TARGETS must be false in the demo profile")
             if self.master_key is None:
                 raise ValueError("QC_MASTER_KEY is required in the demo profile")
+            if self.llm_provider == "openrouter" and self.openrouter_api_key is not None:
+                # The demo is BYOK only (DEPLOYMENT §1): a shared server key would be spent by
+                # anonymous visitors.
+                raise ValueError("OPENROUTER_API_KEY must not be set in the demo profile (BYOK)")
+            if self.github_client_id is not None:
+                for name, url in (("PUBLIC_API_URL", self.public_api_url),
+                                  ("WEB_BASE_URL", self.web_base_url)):  # fmt: skip
+                    if url is None or not url.startswith("https://"):
+                        raise ValueError(f"{name} must be an https:// URL for GitHub sign-in")
+        if (self.github_client_id is None) != (self.github_client_secret is None):
+            raise ValueError("GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET must be set together")
         return self
+
+    @property
+    def github_login_enabled(self) -> bool:
+        return self.github_client_id is not None and self.github_client_secret is not None
+
+    def engine_options(self) -> "EngineSettings":
+        """Keyword arguments for `db.engine.make_engine` (pool and server-side timeouts)."""
+        return {
+            "pool_size": self.db_pool_size,
+            "max_overflow": self.db_max_overflow,
+            "pool_timeout": self.db_pool_timeout_seconds,
+            "statement_timeout_ms": self.db_statement_timeout_ms,
+            "idle_in_transaction_timeout_ms": self.db_idle_in_transaction_timeout_ms,
+        }

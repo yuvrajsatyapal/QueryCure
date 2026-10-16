@@ -11,6 +11,7 @@ const events: RunEvent[] = [
   { runId: "run-1", seq: 3, ts: "2026-10-12T10:00:02.000Z", type: "error", payload: { node: "index_strategist", code: "AGENT_FAILED", message: "no output" } },
 ] as RunEvent[];
 
+vi.mock("next/navigation", () => ({ useRouter: () => ({ replace: vi.fn(), push: vi.fn() }) }));
 vi.mock("@/lib/events/useRunEvents", () => ({ useRunEvents: () => ({ events, live: true }) }));
 vi.mock("@/lib/api/investigations", () => ({
   investigationKeys: {

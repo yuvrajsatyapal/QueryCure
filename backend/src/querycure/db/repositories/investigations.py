@@ -23,6 +23,7 @@ class RunInputs(BaseModel):
     connection_id: uuid.UUID | None
     workload_id: str | None
     artifacts: dict[str, str]  # role -> sha256, e.g. "input.query" -> digest
+    llm_credential_id: uuid.UUID | None = None  # BYOK: the user's own key for this run
 
 
 async def get_run_inputs(conn: AsyncConnection, run_id: uuid.UUID) -> RunInputs:
@@ -30,7 +31,7 @@ async def get_run_inputs(conn: AsyncConnection, run_id: uuid.UUID) -> RunInputs:
         await conn.execute(
             text(
                 "SELECT r.id AS run_id, i.id AS investigation_id, i.user_id, i.objective, i.modes, "
-                "i.connection_id, i.workload_id FROM investigation_runs r "
+                "i.connection_id, i.workload_id, r.llm_credential_id FROM investigation_runs r "
                 "JOIN investigations i ON i.id = r.investigation_id WHERE r.id = :id"
             ),
             {"id": run_id},
@@ -177,8 +178,11 @@ async def runs_of(conn: AsyncConnection, investigation_id: uuid.UUID) -> list[An
         text(
             "SELECT r.id, r.investigation_id, r.run_number, r.kind, r.status, r.outcome, "
             "r.created_at, r.started_at, r.finished_at, r.budget, r.usage, r.llm_provider, "
-            "r.llm_model, r.error, r.last_event_seq, r.cancel_requested_at "
+            "r.llm_model, r.error, r.last_event_seq, r.cancel_requested_at, r.parent_run_id, "
+            "r.finalized_at IS NOT NULL AS finalized, a.id AS replay_attempt_id, "
+            "a.status AS replay_status, a.source_experiment_id AS replay_source_experiment_id "
             "FROM investigation_runs r "
+            "LEFT JOIN replay_attempts a ON a.replay_run_id = r.id AND a.deleted_at IS NULL "
             "WHERE r.investigation_id = :id AND r.deleted_at IS NULL ORDER BY r.run_number"
         ),
         {"id": investigation_id},
@@ -192,8 +196,11 @@ async def get_run_row(conn: AsyncConnection, *, user_id: uuid.UUID, run_id: uuid
             text(
                 "SELECT r.id, r.investigation_id, r.run_number, r.kind, r.status, r.outcome, "
                 "r.created_at, r.started_at, r.finished_at, r.budget, r.usage, r.llm_provider, "
-                "r.llm_model, r.error, r.last_event_seq, r.cancel_requested_at "
+                "r.llm_model, r.error, r.last_event_seq, r.cancel_requested_at, r.parent_run_id, "
+                "r.finalized_at IS NOT NULL AS finalized, a.id AS replay_attempt_id, "
+                "a.status AS replay_status, a.source_experiment_id AS replay_source_experiment_id "
                 "FROM investigation_runs r JOIN investigations i ON i.id = r.investigation_id "
+                "LEFT JOIN replay_attempts a ON a.replay_run_id = r.id AND a.deleted_at IS NULL "
                 "WHERE r.id = :run_id AND i.user_id = :user_id "
                 "AND r.deleted_at IS NULL AND i.deleted_at IS NULL"
             ),
@@ -325,4 +332,16 @@ async def count_active_runs_in(conn: AsyncConnection, investigation_id: uuid.UUI
                 {"inv": investigation_id},
             )
         ).scalar_one()
+    )
+
+
+async def set_run_credential(
+    conn: AsyncConnection, run_id: uuid.UUID, credential_id: uuid.UUID | None
+) -> None:
+    """BYOK: the credential the worker resolves for this run (None = the server's key)."""
+    if credential_id is None:
+        return
+    await conn.execute(
+        text("UPDATE investigation_runs SET llm_credential_id = :c WHERE id = :id"),
+        {"c": credential_id, "id": run_id},
     )

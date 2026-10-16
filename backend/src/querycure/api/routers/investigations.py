@@ -8,11 +8,12 @@ import hashlib
 import uuid
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Header, Query, Response, status
+from fastapi import APIRouter, Header, Query, Request, Response, status
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncConnection
 
 from querycure.api.deps import ConnDep, CurrentUser, EngineDep, SettingsDep
+from querycure.api.rate_limit import enforce
 from querycure.api.schemas.investigations import (
     CreateInvestigationRequest,
     CreateInvestigationResponse,
@@ -22,12 +23,14 @@ from querycure.api.schemas.investigations import (
     ReinvestigateRequest,
     RunSummary,
     run_detail,
+    run_summary,
 )
 from querycure.core.config import Profile, Settings
 from querycure.core.errors import (
     ApprovalRequiredError,
     BadRequestError,
     ConcurrencyLimitError,
+    ConfigurationError,
     FeatureDisabledError,
     IdempotencyConflictError,
     InvalidStateError,
@@ -36,6 +39,8 @@ from querycure.core.errors import (
     ValidationFailedError,
 )
 from querycure.db.repositories import investigations as repo
+from querycure.db.repositories import llm_credentials as creds
+from querycure.db.repositories import uploads
 from querycure.db.repositories.connections import get_connection
 from querycure.domain.budgets import CONCURRENT_RUNS_PER_USER, default_budget
 from querycure.domain.runs import ACTIVE_STATUSES, ExecutionMode
@@ -43,7 +48,7 @@ from querycure.domain.users import User
 from querycure.events.emitter import emit
 from querycure.events.types import EventType
 from querycure.jobs import queue
-from querycure.llm.credentials import resolve_api_key
+from querycure.llm.credentials import allowed_byok_providers, resolve_api_key
 from querycure.llm.rate_limit import DailyQuota
 from querycure.replay import artifact_store as store
 from querycure.replay.canonical import canonical_json
@@ -70,8 +75,6 @@ async def _check(
         _check_sandbox(body, settings)
     elif body.pre_authorize_demo_sandbox:
         raise _invalid("pre_authorize_demo_sandbox", "only applies to sandbox benchmarking")
-    if body.llm is not None and body.llm.credential_id is not None:
-        raise FeatureDisabledError("Bring-your-own-key credentials arrive in Phase 5.")
     if body.query is None and body.plan_artifact_sha256 is None:
         raise _invalid("query", "provide a query, an uploaded plan, or both")
     if body.query is not None:
@@ -103,7 +106,12 @@ async def _check(
         if sha is None:
             continue
         artifact = await store.get_artifact(conn, sha)
-        if artifact is None or artifact.kind not in kinds:
+        # Only the user's own uploads count: a digest alone is not a capability (SECURITY §5).
+        if (
+            artifact is None
+            or artifact.kind not in kinds
+            or not await uploads.uploaded_by(conn, user_id=user.id, artifact_id=artifact.id)
+        ):
             raise _invalid(field, "no uploaded artifact of the right kind has this digest")
 
 
@@ -143,9 +151,7 @@ async def _detail(
     inv = await repo.get_investigation(conn, user_id=user.id, investigation_id=investigation_id)
     if inv is None:
         raise NotFoundError("Investigation not found.")
-    runs = [
-        RunSummary.model_validate(r, from_attributes=True) for r in await repo.runs_of(conn, inv.id)
-    ]
+    runs = [run_summary(r) for r in await repo.runs_of(conn, inv.id)]
     latest = next((r for r in runs if r.id == inv.latest_run_id), None)
     return InvestigationDetail(
         id=inv.id,
@@ -243,6 +249,7 @@ async def create_investigation(
     engine: EngineDep,
     user: CurrentUser,
     settings: SettingsDep,
+    request: Request,
     idempotency_key: Annotated[str | None, Header()] = None,
 ) -> CreateInvestigationResponse:
     key = request_hash = None
@@ -256,10 +263,19 @@ async def create_investigation(
             replayed = await _replay(conn, user, key, request_hash)
         if replayed is not None:
             return replayed
+    await enforce(
+        "run_create", request=request, engine=engine, settings=settings, user_id=str(user.id)
+    )
     try:
         async with engine.begin() as conn:
             await _check(conn, body, user, settings)
+            credential_id = await _resolve_llm(
+                conn, user, settings, body.llm.credential_id if body.llm else None
+            )
+            if credential_id is not None:
+                await _check_llm(engine, settings, credential_id)
             run_id = await _create(conn, body, user, settings, key, request_hash)
+            await repo.set_run_credential(conn, run_id, credential_id)
             return await _response(conn, user, run_id)
     except IntegrityError:
         # A concurrent request with the same key won the unique index: answer like it did.
@@ -363,14 +379,41 @@ async def restore_investigation(
     return await _detail(conn, user, investigation_id)
 
 
-async def _check_llm(engine: Any, settings: Settings) -> None:
-    """Free-model availability before a new LLM run (ADR-0016): a configured key and capacity
-    left today. The stub provider is offline and always available."""
+async def _resolve_llm(
+    conn: AsyncConnection, user: User, settings: Settings, credential_id: uuid.UUID | None
+) -> uuid.UUID | None:
+    """Which key a new run uses (T5.2): the named credential (must be the user's own), else
+    the user's saved key for the configured provider, else the server key (local profile
+    only). The public demo has no shared key, so it needs the user's own."""
+    if settings.llm_provider == "stub":
+        return None
+    if credential_id is not None:
+        own = await creds.get_active(conn, user_id=user.id, credential_id=credential_id)
+        if own is None:
+            raise NotFoundError("Model key not found.")
+        if own.provider not in allowed_byok_providers(settings):
+            raise FeatureDisabledError("This key's provider is not allowed (free models only).")
+        return own.id
+    if settings.llm_provider in allowed_byok_providers(settings):
+        saved = await creds.get_active(conn, user_id=user.id, provider=settings.llm_provider)
+        if saved is not None:
+            return saved.id
+    if settings.profile is not Profile.LOCAL:
+        raise ConfigurationError(
+            "The public demo has no shared model key: add your own OpenRouter key in Settings."
+        )
+    return None
+
+
+async def _check_llm(engine: Any, settings: Settings, credential_id: uuid.UUID | None) -> None:
+    """Free-model availability before a new LLM run (ADR-0016): a key and capacity left today
+    (the user's own allowance for a BYOK key). The stub provider is offline."""
     if settings.llm_provider == "stub":
         return
-    resolve_api_key(settings, settings.llm_provider)  # ConfigurationError (503) when missing
+    if credential_id is None:
+        resolve_api_key(settings, settings.llm_provider)  # ConfigurationError (503) when missing
     if settings.llm_provider == "openrouter":
-        quota = DailyQuota(engine, settings.llm_daily_request_limit)
+        quota = DailyQuota(engine, settings.llm_daily_request_limit, credential_id=credential_id)
         if await quota.used_today() >= quota.limit:
             raise LlmQuotaExhaustedError(
                 "Today's free model requests are used up; try again after 00:00 UTC."
@@ -384,6 +427,7 @@ async def reinvestigate(
     engine: EngineDep,
     user: CurrentUser,
     settings: SettingsDep,
+    request: Request,
     idempotency_key: Annotated[str | None, Header()] = None,
 ) -> CreateInvestigationResponse:
     """New `reinvestigation` run on the same inputs, with its own budget and provenance and a
@@ -401,7 +445,19 @@ async def reinvestigate(
             replayed = await _replay(conn, user, key, request_hash)
         if replayed is not None:
             return replayed
-    await _check_llm(engine, settings)
+    async with engine.connect() as conn:
+        # Ownership first: another user's investigation is a 404 whatever the configuration.
+        if (
+            await repo.get_investigation(conn, user_id=user.id, investigation_id=investigation_id)
+            is None
+        ):
+            raise NotFoundError("Investigation not found.")
+    await enforce(
+        "run_create", request=request, engine=engine, settings=settings, user_id=str(user.id)
+    )
+    async with engine.connect() as conn:
+        credential_id = await _resolve_llm(conn, user, settings, None)
+    await _check_llm(engine, settings, credential_id)
     async with engine.begin() as conn:
         inv = await repo.get_investigation(conn, user_id=user.id, investigation_id=investigation_id)
         if inv is None:
@@ -421,6 +477,7 @@ async def reinvestigate(
             idempotency_key=key,
             request_hash=request_hash,
         )
+        await repo.set_run_credential(conn, run_id, credential_id)
         await emit(conn, run_id, EventType.RUN_STATUS_CHANGED, {"from": None, "to": "queued"})
         await queue.enqueue(
             conn, kind="run_start", run_id=run_id, payload={}, dedupe_key=f"run_start:{run_id}"

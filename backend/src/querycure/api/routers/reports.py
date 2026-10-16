@@ -10,12 +10,13 @@ import json
 import uuid
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Header, Query, Response, status
+from fastapi import APIRouter, Depends, Header, Query, Request, Response, status
 from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine
 
 from querycure.api.deps import ConnDep, CurrentUser, EngineDep, SettingsDep
+from querycure.api.rate_limit import enforce, rate_limit
 from querycure.api.schemas.replay import (
     ExperimentReplayRequest,
     ManifestOut,
@@ -192,7 +193,7 @@ async def run_manifest(run_id: uuid.UUID, conn: ConnDep, user: CurrentUser) -> M
     )
 
 
-@router.post("/runs/{run_id}/replay/report")
+@router.post("/runs/{run_id}/replay/report", dependencies=[Depends(rate_limit("report_replay"))])
 async def replay_report(
     run_id: uuid.UUID,
     engine: EngineDep,
@@ -338,6 +339,7 @@ async def replay_experiment(
     engine: EngineDep,
     user: CurrentUser,
     settings: SettingsDep,
+    request: Request,
     idempotency_key: Annotated[str | None, Header()] = None,
 ) -> ReplayAttemptOut:
     """`confirm_ddl` is the user's confirmation of the exact SQL: it becomes the replay run's
@@ -361,6 +363,10 @@ async def replay_experiment(
         if existing is not None:
             log.info("experiment_replay_idempotent_hit", replay_attempt_id=str(existing.id))
             return _replay_answer(existing)
+    await enforce(
+        "experiment_replay", request=request, engine=engine, settings=settings,
+        user_id=str(user.id),
+    )  # fmt: skip
     try:
         async with engine.begin() as conn:
             if (

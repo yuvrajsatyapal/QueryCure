@@ -122,9 +122,9 @@ libpq's error text names the host and user, so it is never returned or logged. T
 ### 5.4 Public demo stance
 Mode B is **disabled by default** on the public demo (`FEATURE_LIVE_INSPECTION_PUBLIC=false`). Enabling it requires: SSRF guard, `verify-full` TLS, rate limits, and per-user connection caps. See [CURRENT_PHASE open decisions](../planning/CURRENT_PHASE.md#open-decisions).
 
-### Upload digests as capabilities (Phase 2 trade-off)
+### Upload digests are not capabilities (closed in Phase 5)
 
-`/inspect/plan` and `/inspect/schema` store content-addressed artifacts without an owner. `POST /investigations` accepts their digests, after which they become readable through the new run. Naming a digest therefore requires having seen it (it is shown only to the uploader) or having the content (a SHA-256 cannot be guessed). Planned hardening: per-user upload records, so a digest is accepted only from the user who uploaded it.
+`/inspect/plan` and `/inspect/schema` store content-addressed artifacts without an owner (dedupe, ADR-0010) and record the uploader in `user_uploads`. `POST /investigations` accepts a digest only from a user who uploaded it; anyone else gets the same 422 as for an unknown digest, so the check also reveals nothing about which digests exist (`tests/security/test_api_hardening.py`).
 
 ## 5b. Phase 4 controls (implemented)
 - **Sealing:** after `finalize_run`, the emitter accepts only lifecycle events, `link()` and every content repository refuse the run (`RUN_FINALIZED`), and `verification_results` / `investigation_reports` / `replay_manifests` are append-only for `qc_app` (grant tests).
@@ -133,6 +133,19 @@ Mode B is **disabled by default** on the public demo (`FEATURE_LIVE_INSPECTION_P
 - **Re-investigation needs consent** (`confirm_new_llm_run`) and free capacity; replays never start one.
 - **Authorization:** every Phase 4 endpoint is user-scoped (404 tests for reports, manifests, attempts, verifications, experiments, investigations).
 - **Exports** carry digests and run IDs only; reports contain no connection details or keys (they are built from records that never held them).
+
+## 5c. Phase 5 controls (implemented)
+
+| Control | Implementation | Test |
+|---|---|---|
+| Rate limits (T13) | Postgres token buckets per user and per client-address hash (`api/rate_limit.py`); demo limits much stricter (`domain/limits.py`); row lock per bucket, so concurrent requests cannot both take the last token | `test_api_hardening.py` (429 + Retry-After, spoofed `X-Forwarded-For` ignored, 12 concurrent requests take exactly 3 tokens) |
+| Logout / revocation (T14) | `POST /auth/logout` soft-deletes the session row and clears both cookies; needs CSRF | a copied cookie is 401 after logout |
+| GitHub OAuth (T14) | Authorization-code flow with `state` (constant-time check) and PKCE S256 in a 10-minute HttpOnly, path-scoped cookie; only `read:user`; the provider token is used once and never stored; `return_to` limited to relative paths; session rotated on sign-in (old token revoked) | `test_github_oauth.py` (mocked provider) |
+| Account linking | First sign-in converts the anonymous row (data stays); a later sign-in on another device moves the anonymous user's data to the account and re-encrypts its keys for the account (AAD binds ciphertext to the user) before wiping them | `test_github_oauth.py` |
+| BYOK (T6) | AES-256-GCM with row/user AAD (ADR-0012); hint-only responses; key validated as one printable token and never echoed in validation errors (`SecretStr`); delete wipes ciphertext; paid models and non-OpenRouter providers refused while `LLM_FREE_ONLY` is on; the worker decrypts per run and a removed key stops the run before any provider call; no server fallback model for BYOK runs | `test_byok_api.py` |
+| Cross-user access (T7) | Every documented route with a path parameter is called as another user with real IDs: 404 (or the demo's 403 `FEATURE_DISABLED` for live inspection), no IDs or titles in the body, nothing changed. Found and fixed: `reinvestigate` checked model configuration before ownership (503 instead of 404) | `test_api_hardening.py::test_no_route_exposes_or_acts_on_another_users_resources` |
+| Response headers | nosniff, `Referrer-Policy: no-referrer`, `X-Frame-Options: DENY`, `frame-ancestors 'none'`, `Cache-Control: no-store`, HSTS outside local; no interactive docs page on the demo | `test_api_hardening.py` |
+| Replay idempotency | `Idempotency-Key` on experiment replay, scoped per user and operation; concurrent duplicates converge through a unique index | `test_experiment_replay_idempotency.py` |
 
 ## 6. Prompt injection
 

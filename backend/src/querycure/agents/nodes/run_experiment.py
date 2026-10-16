@@ -38,6 +38,7 @@ from querycure.benchmark.engine import (
     State,
     run_replicated,
 )
+from querycure.benchmark.measurement_fixtures import MeasureFn
 from querycure.benchmark.schedule import derive_seed
 from querycure.core.errors import QueryCureError, RunCancelledError, SandboxUnavailableError
 from querycure.core.logging import get_logger
@@ -93,7 +94,9 @@ class DbHooks:
         engine: AsyncEngine,
         run_id: uuid.UUID,
         experiment_id: uuid.UUID,
+        provenance: str = "measured",
     ) -> None:
+        self._provenance = provenance
         self._loop = loop
         self._engine = engine
         self._run_id = run_id
@@ -166,7 +169,7 @@ class DbHooks:
                         "index_size_bytes": record.index_size_bytes,
                         "index_build_ns": record.index_build_ns,
                         "build_error": record.build_error,
-                        "provenance": "measured",
+                        "provenance": self._provenance,
                     },
                 )
 
@@ -266,7 +269,7 @@ def result_evidence(run_id: uuid.UUID, result_sha: str, result: ExperimentResult
                     f"n={s.baseline.n}/{s.candidate.n}"
                 ),
                 data=data,
-                provenance="measured",
+                provenance=result.provenance,
             )
         )
     measured = {(m.arm, m.param_set): m for m in result.measurements}
@@ -299,7 +302,7 @@ def result_evidence(run_id: uuid.UUID, result_sha: str, result: ExperimentResult
                         "rows": cand.fingerprint.rows,
                         "baseline_rows": base.fingerprint.rows,
                     },
-                    provenance="measured",
+                    provenance=result.provenance,
                 )
             )
     return items
@@ -371,7 +374,9 @@ async def run_experiment(state: InvestigationState, runtime: Runtime[RunContext]
             conn, ctx.run_id, [c.id for c in candidates if c.id], "benchmarked"
         )
     candidate_ids = [c.id for c in candidates if c.id is not None]
-    if ctx.sandbox is None:
+    measure: MeasureFn = ctx.measure or run_replicated
+    provenance = getattr(measure, "provenance", "measured")
+    if ctx.sandbox is None and ctx.measure is None:
         return await _fail(
             ctx,
             experiment_id,
@@ -421,14 +426,14 @@ async def run_experiment(state: InvestigationState, runtime: Runtime[RunContext]
         if index > 0:
             sync(create_replicate(cfg, index))
         current["experiment_id"] = cfg.experiment_id
-        return DbHooks(loop, ctx.db(), ctx.run_id, cfg.experiment_id)
+        return DbHooks(loop, ctx.db(), ctx.run_id, cfg.experiment_id, provenance=provenance)
 
     def on_result(cfg: ExperimentConfig, index: int, result: ExperimentResult) -> None:
         sync(_record_result(ctx, cfg.experiment_id, result, by_key, primary=index == 0))
 
     try:
         run = await asyncio.to_thread(
-            run_replicated, config, approved, provisioner=ctx.sandbox, hooks_for=hooks_for,
+            measure, config, approved, provisioner=ctx.sandbox, hooks_for=hooks_for,
             options=options, on_result=on_result,
         )  # fmt: skip
     except RunCancelledError:

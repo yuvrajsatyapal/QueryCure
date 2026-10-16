@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 from querycure.agents.services import InspectorFactory
 from querycure.agents.state import InvestigationState
 from querycure.benchmark.engine import EngineOptions
+from querycure.benchmark.measurement_fixtures import MeasureFn
 from querycure.core.errors import BudgetExhaustedError, RunCancelledError
 from querycure.core.logging import get_logger
 from querycure.domain.investigation import NodeError, RunBudget
@@ -71,6 +72,9 @@ class RunContext:
     # Mode C (Phase 3): None when the sandbox is not configured for this process.
     sandbox: SandboxProvisioner | None = None
     engine_options: EngineOptions = field(default_factory=EngineOptions)
+    # Measurement seam (benchmark.measurement_fixtures): None = the live engine. Evals pass a
+    # capturing source (record mode) or a prerecorded fixture source (deterministic replay).
+    measure: MeasureFn | None = None
 
     async def before_llm_call(self) -> None:
         """Run budget first, then the provider's free-tier limits."""

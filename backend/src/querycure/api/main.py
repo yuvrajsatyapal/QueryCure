@@ -1,5 +1,7 @@
+import asyncio
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from typing import Any
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -10,14 +12,18 @@ from querycure.api.middleware import (
     CsrfMiddleware,
     MaxBodySizeMiddleware,
     RequestIdMiddleware,
+    SecurityHeadersMiddleware,
     install_error_handlers,
 )
 from querycure.api.routers import (
     artifacts,
+    auth,
     connections,
+    demo,
     health,
     inspect,
     investigations,
+    metrics,
     optimization,
     reports,
     runs,
@@ -27,7 +33,7 @@ from querycure.api.routers import (
 from querycure.api.routers import (
     settings as settings_router,
 )
-from querycure.core.config import Settings
+from querycure.core.config import Profile, Settings, WorkerMode
 from querycure.core.logging import configure_logging
 from querycure.db.engine import make_engine
 
@@ -42,12 +48,27 @@ def create_app(settings: Settings | None = None, engine: AsyncEngine | None = No
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         if owns_engine and settings.database_url is not None:
-            app.state.engine = make_engine(settings.database_url.get_secret_value())
+            app.state.engine = make_engine(
+                settings.database_url.get_secret_value(),
+                **settings.engine_options(),
+            )
+        embedded: tuple[Any, asyncio.Task[None]] | None = None
+        if settings.worker_mode is WorkerMode.EMBEDDED and app.state.engine is not None:
+            # Single-container demo (DEPLOYMENT §1): the job loop runs in this process.
+            from querycure.worker.__main__ import build_worker, serve
+
+            worker, sandbox = build_worker(app.state.engine, settings)
+            embedded = (worker, asyncio.create_task(serve(worker, app.state.engine, sandbox)))
         try:
             yield
         finally:
+            if embedded is not None:
+                await embedded[0].stop()  # drains in-flight jobs for the configured grace
+                await embedded[1]
             if app.state.event_hub is not None:
                 await app.state.event_hub.close()
+            if getattr(app.state, "oauth_http", None) is not None:
+                await app.state.oauth_http.aclose()
             if owns_engine and app.state.engine is not None:
                 await app.state.engine.dispose()
 
@@ -55,7 +76,9 @@ def create_app(settings: Settings | None = None, engine: AsyncEngine | None = No
         title="QueryCure",
         version=__version__,
         openapi_url=f"{API_PREFIX}/openapi.json",
-        docs_url=f"{API_PREFIX}/docs",
+        # The interactive docs page is a local-development convenience; the public demo
+        # keeps only the machine-readable schema.
+        docs_url=f"{API_PREFIX}/docs" if settings.profile is Profile.LOCAL else None,
         redoc_url=None,
         lifespan=lifespan,
     )
@@ -63,7 +86,8 @@ def create_app(settings: Settings | None = None, engine: AsyncEngine | None = No
     app.state.engine = engine
     app.state.event_hub = None
     install_error_handlers(app)
-    # Starlette runs the last-added middleware first: body limit → CORS → request id → CSRF.
+    # Starlette runs the last-added middleware first:
+    # security headers → body limit → CORS → request id → CSRF.
     app.add_middleware(CsrfMiddleware)
     app.add_middleware(RequestIdMiddleware)
     app.add_middleware(
@@ -76,8 +100,12 @@ def create_app(settings: Settings | None = None, engine: AsyncEngine | None = No
         expose_headers=["X-Request-ID"],
     )
     app.add_middleware(MaxBodySizeMiddleware)
+    app.add_middleware(SecurityHeadersMiddleware, hsts=settings.profile is not Profile.LOCAL)
     app.include_router(health.router, prefix=API_PREFIX)
+    app.include_router(metrics.router, prefix=API_PREFIX)
+    app.include_router(demo.router, prefix=API_PREFIX)
     app.include_router(session.router, prefix=API_PREFIX)
+    app.include_router(auth.router, prefix=API_PREFIX)
     app.include_router(connections.router, prefix=API_PREFIX)
     app.include_router(inspect.router, prefix=API_PREFIX)
     app.include_router(workloads.router, prefix=API_PREFIX)

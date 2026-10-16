@@ -41,6 +41,61 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/auth/github/callback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Github Callback */
+        get: operations["github_callback_api_v1_auth_github_callback_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/github/login": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Github Login */
+        get: operations["github_login_api_v1_auth_github_login_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/logout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Logout
+         * @description Revokes the session server-side and clears both cookies. Needs the CSRF token like any
+         *     mutation, so another site cannot sign a user out. Idempotent.
+         */
+        post: operations["logout_api_v1_auth_logout_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/connections": {
         parameters: {
             query?: never;
@@ -121,6 +176,57 @@ export interface paths {
         put?: never;
         /** Test Connection */
         post: operations["test_connection_api_v1_connections__connection_id__test_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/demo/gallery": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Gallery */
+        get: operations["gallery_api_v1_demo_gallery_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/demo/gallery/{slug}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Demo Detail */
+        get: operations["demo_detail_api_v1_demo_gallery__slug__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/demo/gallery/{slug}/verification": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Demo Verification */
+        get: operations["demo_verification_api_v1_demo_gallery__slug__verification_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -730,6 +836,49 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/settings/llm-credentials": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Llm Credentials */
+        get: operations["list_llm_credentials_api_v1_settings_llm_credentials_get"];
+        put?: never;
+        /**
+         * Add Llm Credential
+         * @description Stores the user's own key encrypted (ADR-0012), replacing any earlier key for the same
+         *     provider. The response, logs and errors show only the last 4 characters.
+         */
+        post: operations["add_llm_credential_api_v1_settings_llm_credentials_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/settings/llm-credentials/{credential_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete Llm Credential
+         * @description Soft-deletes the row and wipes the ciphertext in the same statement. Runs that were
+         *     started with it stop at their next resume with CONFIGURATION_ERROR.
+         */
+        delete: operations["delete_llm_credential_api_v1_settings_llm_credentials__credential_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/settings/models": {
         parameters: {
             query?: never;
@@ -739,7 +888,8 @@ export interface paths {
         };
         /**
          * Models
-         * @description Which provider/model runs use, and whether a key is configured. Never the key.
+         * @description Which provider/model runs use, and whether a key exists (the user's own, or the local
+         *     profile's server key). Never the key.
          */
         get: operations["models_api_v1_settings_models_get"];
         put?: never;
@@ -771,6 +921,22 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** AddLlmCredentialRequest */
+        AddLlmCredentialRequest: {
+            /**
+             * Api Key
+             * Format: password
+             */
+            api_key: string;
+            /** Default Model */
+            default_model?: string | null;
+            /**
+             * Provider
+             * @default openrouter
+             * @enum {string}
+             */
+            provider: "openrouter" | "gemini";
+        };
         /**
          * ApprovalCandidate
          * @description Exactly what the human sees and approves (SECURITY §6.6).
@@ -1188,6 +1354,184 @@ export interface components {
             /** Schema Name */
             schema_name: string | null;
         };
+        /** DemoArtifactRef */
+        DemoArtifactRef: {
+            /** Kind */
+            kind: string;
+            /** Role */
+            role: string;
+            /** Sha256 */
+            sha256: string;
+        };
+        /** DemoBenchmark */
+        DemoBenchmark: {
+            /** Arms */
+            arms: components["schemas"]["DemoBenchmarkArm"][];
+            /** Baseline Query */
+            baseline_query: string;
+            /** Engine Version */
+            engine_version: string;
+            /** Environment */
+            environment: {
+                [key: string]: unknown;
+            };
+            /** Id */
+            id: string;
+            /** Label */
+            label: string;
+            /**
+             * Provenance
+             * @default prerecorded
+             * @constant
+             */
+            provenance: "prerecorded";
+            /** Recorded On */
+            recorded_on: string;
+            /** Source Note */
+            source_note: string;
+            /** Stats */
+            stats: components["schemas"]["DemoBenchmarkStat"][];
+            /** Workload Id */
+            workload_id: string;
+        };
+        /** DemoBenchmarkArm */
+        DemoBenchmarkArm: {
+            /** Arm */
+            arm: string;
+            /** Ddl */
+            ddl: string[];
+            /** Gate */
+            gate: number | null;
+            /** Kind */
+            kind: string;
+            /** Query */
+            query: string | null;
+            /** Reasons */
+            reasons: {
+                [key: string]: string;
+            }[];
+            /** Verdict */
+            verdict: string;
+        };
+        /** DemoBenchmarkStat */
+        DemoBenchmarkStat: {
+            /** Arm */
+            arm: string;
+            /** Baseline Median Ms */
+            baseline_median_ms: number;
+            /** Candidate Median Ms */
+            candidate_median_ms: number;
+            /** Ci High */
+            ci_high: number;
+            /** Ci Low */
+            ci_low: number;
+            /** N */
+            n: number;
+            /** Param Set */
+            param_set: string;
+            /** Speedup */
+            speedup: number;
+        };
+        /** DemoCheck */
+        DemoCheck: {
+            /** Detail */
+            detail: string;
+            /** Name */
+            name: string;
+            /** Passed */
+            passed: boolean;
+        };
+        /** DemoDetail */
+        DemoDetail: {
+            /** Artifacts */
+            artifacts: components["schemas"]["DemoArtifactRef"][];
+            /** Label */
+            label: string;
+            /** Manifest Sha256 */
+            manifest_sha256: string;
+            /** Measurements Recorded On */
+            measurements_recorded_on: string | null;
+            /** Model */
+            model: string;
+            /** Outcome */
+            outcome: string | null;
+            /** Plans */
+            plans: components["schemas"]["RunPlan"][];
+            /**
+             * Provenance
+             * @default prerecorded
+             * @constant
+             */
+            provenance: "prerecorded";
+            /** Recorded At */
+            recorded_at: string | null;
+            /** Report */
+            report: {
+                [key: string]: unknown;
+            };
+            /** Report Json Sha256 */
+            report_json_sha256: string;
+            /** Report Md Sha256 */
+            report_md_sha256: string;
+            /** Run Id */
+            run_id: string;
+            /** Slug */
+            slug: string;
+            /** Source */
+            source: {
+                [key: string]: unknown;
+            };
+            /** Summary */
+            summary: string;
+            /** Title */
+            title: string;
+        };
+        /** DemoGallery */
+        DemoGallery: {
+            /** Benchmarks */
+            benchmarks: components["schemas"]["DemoBenchmark"][];
+            /** Items */
+            items: components["schemas"]["DemoItem"][];
+        };
+        /** DemoItem */
+        DemoItem: {
+            /** Label */
+            label: string;
+            /** Measurements Recorded On */
+            measurements_recorded_on: string | null;
+            /** Model */
+            model: string;
+            /** Outcome */
+            outcome: string | null;
+            /**
+             * Provenance
+             * @default prerecorded
+             * @constant
+             */
+            provenance: "prerecorded";
+            /** Recorded At */
+            recorded_at: string | null;
+            /** Slug */
+            slug: string;
+            /** Summary */
+            summary: string;
+            /** Title */
+            title: string;
+        };
+        /** DemoVerification */
+        DemoVerification: {
+            /** Checks */
+            checks: components["schemas"]["DemoCheck"][];
+            /** Scope */
+            scope: string;
+            /** Slug */
+            slug: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "consistent" | "mismatch";
+        };
         /** Evidence */
         Evidence: {
             /** Artifact Sha256 */
@@ -1401,6 +1745,11 @@ export interface components {
         };
         /** Features */
         Features: {
+            /**
+             * Github Login
+             * @default false
+             */
+            github_login: boolean;
             /** Live Inspection */
             live_inspection: boolean;
             /** Sandbox */
@@ -1593,6 +1942,32 @@ export interface components {
             credential_id?: string | null;
             /** Model */
             model?: string | null;
+        };
+        /** LlmCredentialList */
+        LlmCredentialList: {
+            /** Items */
+            items: components["schemas"]["LlmCredentialOut"][];
+        };
+        /** LlmCredentialOut */
+        LlmCredentialOut: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Default Model */
+            default_model: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Key Hint */
+            key_hint: string;
+            /** Last Used At */
+            last_used_at: string | null;
+            /** Provider */
+            provider: string;
         };
         /** ManifestOut */
         ManifestOut: {
@@ -2215,6 +2590,11 @@ export interface components {
             created_at: string;
             /** Error Code */
             error_code: string | null;
+            /**
+             * Finalized
+             * @default false
+             */
+            finalized: boolean;
             /** Finished At */
             finished_at: string | null;
             /**
@@ -2237,6 +2617,9 @@ export interface components {
             llm_provider: string | null;
             /** Outcome */
             outcome: string | null;
+            /** Parent Run Id */
+            parent_run_id?: string | null;
+            replay?: components["schemas"]["RunReplayLink"] | null;
             /** Run Number */
             run_number: number;
             /** Started At */
@@ -2293,6 +2676,21 @@ export interface components {
             /** Items */
             items: components["schemas"]["RunPlan"][];
         };
+        /**
+         * RunReplayLink
+         * @description An `experiment_replay` run's attempt: what it replays and how the comparison ended.
+         */
+        RunReplayLink: {
+            /**
+             * Attempt Id
+             * Format: uuid
+             */
+            attempt_id: string;
+            /** Source Experiment Id */
+            source_experiment_id: string | null;
+            /** Status */
+            status: string;
+        };
         /** RunSummary */
         RunSummary: {
             /**
@@ -2300,6 +2698,11 @@ export interface components {
              * Format: date-time
              */
             created_at: string;
+            /**
+             * Finalized
+             * @default false
+             */
+            finalized: boolean;
             /** Finished At */
             finished_at: string | null;
             /**
@@ -2316,6 +2719,9 @@ export interface components {
             kind: string;
             /** Outcome */
             outcome: string | null;
+            /** Parent Run Id */
+            parent_run_id?: string | null;
+            replay?: components["schemas"]["RunReplayLink"] | null;
             /** Run Number */
             run_number: number;
             /** Started At */
@@ -2626,6 +3032,88 @@ export interface operations {
             };
         };
     };
+    github_callback_api_v1_auth_github_callback_get: {
+        parameters: {
+            query?: {
+                code?: string | null;
+                state?: string | null;
+                error?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    github_login_api_v1_auth_github_login_get: {
+        parameters: {
+            query?: {
+                return_to?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    logout_api_v1_auth_logout_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     list_connections_api_v1_connections_get: {
         parameters: {
             query?: never;
@@ -2794,6 +3282,88 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ConnectionTestResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    gallery_api_v1_demo_gallery_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DemoGallery"];
+                };
+            };
+        };
+    };
+    demo_detail_api_v1_demo_gallery__slug__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DemoDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    demo_verification_api_v1_demo_gallery__slug__verification_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DemoVerification"];
                 };
             };
             /** @description Validation Error */
@@ -3877,6 +4447,88 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SessionResponse"];
+                };
+            };
+        };
+    };
+    list_llm_credentials_api_v1_settings_llm_credentials_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LlmCredentialList"];
+                };
+            };
+        };
+    };
+    add_llm_credential_api_v1_settings_llm_credentials_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AddLlmCredentialRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LlmCredentialOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_llm_credential_api_v1_settings_llm_credentials__credential_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                credential_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

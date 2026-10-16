@@ -2,8 +2,12 @@
 
 A heartbeat task runs beside every handler. If it finds the lease gone (another worker
 reclaimed the job after this one stalled), the handler is cancelled so the job never runs
-twice in parallel. On stop(), in-flight handlers are cancelled and their jobs are left
+twice in parallel. On stop() (SIGTERM), in-flight handlers get `shutdown_grace_seconds` to
+finish (still heartbeating); after that they are cancelled and their jobs are left
 `running`: the lease expires and another worker resumes them from the last checkpoint.
+
+Every log line written while a job runs carries `job_id`, `job_kind`, `run_id` and `attempt`
+(structlog contextvars), including lines from the graph, the engine and the LLM layer.
 """
 
 import asyncio
@@ -13,6 +17,7 @@ from collections.abc import Awaitable, Callable, Coroutine, Mapping
 from dataclasses import dataclass
 from typing import Any
 
+import structlog
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from querycure.core.logging import get_logger
@@ -38,6 +43,7 @@ class WorkerTimings:
     lease_seconds: int = 60
     heartbeat_seconds: float = 20.0
     poll_seconds: float = 1.0
+    shutdown_grace_seconds: float = 0.0  # the process sets WORKER_SHUTDOWN_GRACE_SECONDS
 
 
 class Worker:
@@ -100,6 +106,18 @@ class Worker:
             )
 
     async def _execute(self, job: Job) -> None:
+        structlog.contextvars.bind_contextvars(
+            job_id=str(job.id),
+            job_kind=job.kind,
+            run_id=str(job.run_id) if job.run_id else None,
+            attempt=job.attempts,
+        )
+        try:
+            await self._execute_bound(job)
+        finally:
+            structlog.contextvars.unbind_contextvars("job_id", "job_kind", "run_id", "attempt")
+
+    async def _execute_bound(self, job: Job) -> None:
         bound = log.bind(job_id=str(job.id), kind=job.kind, attempt=job.attempts)
         handler = self._handlers.get(job.kind)
         if handler is None:
@@ -112,6 +130,11 @@ class Worker:
         stop_wait = asyncio.create_task(self._stopping.wait())
         try:
             await asyncio.wait({work, stop_wait}, return_when=asyncio.FIRST_COMPLETED)
+            if not work.done() and self._timings.shutdown_grace_seconds > 0:
+                # Stopping: give the job a bounded chance to reach a terminal state, still
+                # heartbeating so the lease does not expire under it.
+                bound.info("job_draining", grace_seconds=self._timings.shutdown_grace_seconds)
+                await asyncio.wait({work}, timeout=self._timings.shutdown_grace_seconds)
         finally:
             beat.cancel()
             stop_wait.cancel()

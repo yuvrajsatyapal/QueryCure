@@ -5,10 +5,13 @@ the configured free OpenRouter model (ADR-0016), saves what it returned, and sto
 when the request cap or the free quota runs out.
 """
 
+import datetime as dt
+import hashlib
 import json
+import platform
 import secrets
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Literal
 
@@ -17,11 +20,19 @@ from alembic import command
 from alembic.config import Config
 from sqlalchemy import text
 
+from querycure.agents.prompts import PROMPT_VERSIONS
 from querycure.agents.run import RunServices, execute_run
 from querycure.agents.runtime import LlmClients
+from querycure.benchmark.measurement_fixtures import (
+    CapturingMeasure,
+    FixtureMeasure,
+    MeasurementFixture,
+)
 from querycure.core.config import Settings, is_free_model
 from querycure.core.errors import BudgetExhaustedError, ConfigurationError
 from querycure.db.engine import make_engine
+from querycure.demo.export import export_bundle
+from querycure.demo.gallery import BundleSource, DemoBundle
 from querycure.domain.budgets import default_budget
 from querycure.evals.cases import EVALS_DIR, EvalCase
 from querycure.evals.recording import (
@@ -32,7 +43,7 @@ from querycure.evals.recording import (
     ReplayClient,
     model_slug,
 )
-from querycure.evals.scoring import Score, observe, score
+from querycure.evals.scoring import SCORING_VERSION, Score, observe, score
 from querycure.jobs.handlers import build_sandbox
 from querycure.llm.openrouter import OpenRouterClient
 from querycure.llm.rate_limit import LlmGate, MinuteRateLimiter
@@ -42,6 +53,10 @@ from querycure.replay import artifact_store as store
 from querycure.sql.ddl import parse_ddl
 
 Mode = Literal["replay", "record"]
+# Mode C measurement source in replay mode: "fixture" feeds the measurements captured when the
+# case was recorded (deterministic, benchmark-free); "live" re-benchmarks in the sandbox and
+# can only end DIVERGED once measurements differ (ADR-0022 §10).
+Measurements = Literal["fixture", "live"]
 BACKEND = Path(__file__).resolve().parents[3]
 NAMESPACE = uuid.UUID("7c1f8f8e-2c4b-4f0e-9a51-6f1d2a3b4c5d")
 # Evals spend scarce free requests: fewer tool turns per analyst than a normal run.
@@ -57,6 +72,9 @@ class CaseResult:
     score: Score | None
     error: str | None
     model: str = ""
+    # What this result was produced from: model, recording, measurement source and fixture
+    # digest, prompt and scoring versions (recorded in results JSON).
+    provenance: dict[str, Any] = field(default_factory=dict)
 
     @property
     def passed(self) -> bool:
@@ -131,6 +149,14 @@ def _ids(case: EvalCase) -> tuple[uuid.UUID, uuid.UUID]:
 
 def recording_path(case: EvalCase, model: str, root: Path | None = None) -> Path:
     return (root or EVALS_DIR / "recordings") / case.id / f"{model_slug(model)}.json"
+
+
+def measurement_fixture_path(case: EvalCase, model: str, root: Path | None = None) -> Path:
+    return (root or EVALS_DIR / "fixtures" / "measurements") / case.id / f"{model_slug(model)}.json"
+
+
+def _file_sha256(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
 def _db_url(admin_url: str, name: str) -> str:
@@ -217,6 +243,9 @@ async def run_case(
     cap: RequestCap | None,
     recordings_dir: Path | None = None,
     live_client: ChatClient | None = None,  # tests: a fake standing in for OpenRouter
+    measurements: Measurements = "fixture",
+    fixtures_dir: Path | None = None,
+    export_dir: Path | None = None,  # demo bundles: deterministic replays only
 ) -> CaseResult:
     name = f"qc_eval_{case.id[:30]}_{secrets.token_hex(4)}"
     with psycopg.connect(admin_url, autocommit=True) as admin:
@@ -228,13 +257,46 @@ async def run_case(
         recording = Recording(case_id=case.id, model=model)
         client: ChatClient
         gate: LlmGate | None = None
+        measure: CapturingMeasure | FixtureMeasure | None = None
+        use_fixture = mode == "replay" and case.workload is not None and measurements == "fixture"
+        provenance: dict[str, Any] = {
+            "model": model,
+            "mode": mode,
+            "measurements": (
+                None if case.workload is None else "live" if mode == "record" else measurements
+            ),
+            "prompt_versions": PROMPT_VERSIONS,
+            "scoring_version": SCORING_VERSION,
+        }
         if mode == "replay":
             path = recording_path(case, model, recordings_dir)
             if not path.exists():
                 return CaseResult(
-                    case, None, f"no recording for {case.id} with {model}", model=model
-                )
-            client = ReplayClient(Recording.load(path))
+                    case, None, f"no recording for {case.id} with {model}", model=model,
+                    provenance=provenance,
+                )  # fmt: skip
+            loaded = Recording.load(path)
+            provenance["recording_sha256"] = _file_sha256(path)
+            provenance["recorded_at"] = loaded.recorded_at
+            if use_fixture:
+                fixture_file = measurement_fixture_path(case, model, fixtures_dir)
+                if not fixture_file.exists():
+                    return CaseResult(
+                        case, None,
+                        f"no measurement fixture for {case.id} with {model}: re-record the case "
+                        "(record mode captures one), or pass --measurements live",
+                        model=model, provenance=provenance,
+                    )  # fmt: skip
+                fixture = MeasurementFixture.model_validate_json(fixture_file.read_text())
+                if fixture.case_id != case.id or fixture.model != model:
+                    return CaseResult(
+                        case, None, "measurement fixture belongs to another case or model",
+                        model=model, provenance=provenance,
+                    )  # fmt: skip
+                provenance["measurement_fixture_sha256"] = fixture.digest()
+                provenance["measurement_recorded_on"] = fixture.recorded_on
+                measure = FixtureMeasure(fixture)
+            client = ReplayClient(loaded, exact_only=use_fixture)
         else:
             if live_client is None:
                 if settings.openrouter_api_key is None:
@@ -256,6 +318,8 @@ async def run_case(
         def clients(_: Any) -> LlmClients:
             return LlmClients(primary=client)
 
+        if mode == "record" and case.workload is not None:
+            measure = CapturingMeasure()
         sandbox = build_sandbox(settings) if case.workload else None
         if case.workload and sandbox is None:
             return CaseResult(
@@ -272,6 +336,7 @@ async def run_case(
             llm_gate=gate,
             checkpoint_role="qc_app",
             sandbox=sandbox,
+            measure=measure,
         )
         error = None
         try:
@@ -288,6 +353,8 @@ async def run_case(
         try:
             async with engine.connect() as conn:
                 seen = await observe(conn, run_id)
+                if export_dir is not None and error is None and mode == "replay":
+                    await _export_demo(conn, run_id, case, provenance, export_dir)
         finally:
             await engine.dispose()
         truncated = [
@@ -298,15 +365,91 @@ async def run_case(
                 for marker in ("eval request cap", "free model allowance", "free model requests")
             )
         ]
+        if isinstance(measure, FixtureMeasure) and error is None:
+            if measure.mismatch is not None:
+                # Even if the graph recorded the experiment as failed and finished: not a pass.
+                error = f"measurement fixture mismatch: {measure.mismatch}; re-record this case"
+            elif measure.unused_rounds():
+                error = (
+                    f"measurement fixture mismatch: {measure.unused_rounds()} recorded round(s) "
+                    "were never measured; re-record this case"
+                )
         if error is None and truncated:
             # Cut short by our cap or the free quota: not the model's behaviour, never recorded.
             error = f"stopped early ({truncated[0][:80]}): not recorded, rerun later"
         if mode == "record" and error is None:
             recording.save(recording_path(case, model, recordings_dir))
-        return CaseResult(case, score(case, seen), error, model=model)
+            if isinstance(measure, CapturingMeasure):
+                _save_fixture(case, model, measure, fixtures_dir)
+        return CaseResult(case, score(case, seen), error, model=model, provenance=provenance)
     finally:
         with psycopg.connect(admin_url, autocommit=True) as admin:
             admin.execute(f'DROP DATABASE IF EXISTS "{name}" WITH (FORCE)')
+
+
+def _save_fixture(case: EvalCase, model: str, measure: CapturingMeasure, root: Path | None) -> None:
+    """The measurements this recording's prompts embed, kept so replay is deterministic.
+    A recording that ran no complete experiment gets no fixture (an old one is removed, since
+    it would describe another recording)."""
+    path = measurement_fixture_path(case, model, root)
+    fixture = measure.fixture(
+        case_id=case.id,
+        model=model,
+        recorded_on=dt.datetime.now(dt.UTC).date().isoformat(),
+        source_note=(
+            f"Measured live in the local sandbox while recording ({platform.system()} "
+            f"{platform.machine()}); replayed as prerecorded evidence, not a new measurement"
+        ),
+    )
+    if fixture is None:
+        path.unlink(missing_ok=True)
+        return
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(fixture.model_dump_json(indent=1) + "\n")
+
+
+async def _export_demo(
+    conn: Any, run_id: uuid.UUID, case: EvalCase, provenance: dict[str, Any], out: Path
+) -> None:
+    """A sealed, labelled demo bundle from this deterministic replay (demo.gallery)."""
+    if case.workload is not None and provenance.get("measurements") != "fixture":
+        raise ConfigurationError("demo bundles come only from fixture replays (deterministic)")
+    measured = provenance.get("measurement_recorded_on")
+    label = (
+        f"Prerecorded demonstration. Agent answers recorded from {provenance['model']} on "
+        f"{provenance.get('recorded_at')}"
+        + (
+            f"; benchmark measurements recorded in a local Docker sandbox on {measured}"
+            if measured
+            else "; no benchmark (offline analysis)"
+        )
+        + ". Shown from stored records: not a live run, not your database."
+    )
+    bundle = await export_bundle(
+        conn,
+        run_id,
+        slug=case.id.replace("_", "-"),
+        title=case.id.replace("_", " ").capitalize(),
+        summary=" ".join((case.description or "").split()),
+        label=label,
+        source=BundleSource(
+            eval_case=case.id,
+            model=provenance["model"],
+            recorded_at=provenance.get("recorded_at"),
+            measurements_recorded_on=measured,
+            recording_sha256=provenance.get("recording_sha256"),
+            measurement_fixture_sha256=provenance.get("measurement_fixture_sha256"),
+            prompt_versions=provenance["prompt_versions"],
+            scoring_version=provenance["scoring_version"],
+        ),
+    )
+    if bundle is not None:
+        _write_bundle(out, bundle)
+
+
+def _write_bundle(out: Path, bundle: DemoBundle) -> None:
+    out.mkdir(parents=True, exist_ok=True)
+    (out / f"{bundle.slug}.json").write_text(bundle.model_dump_json(indent=1) + "\n")
 
 
 def check_model(model: str, settings: Settings) -> None:

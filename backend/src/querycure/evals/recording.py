@@ -122,12 +122,20 @@ def _keys(text: str) -> frozenset[str]:
 class ReplayClient:
     """Serves recorded responses in order per prompt; never touches the network."""
 
-    def __init__(self, recording: Recording, provider: str = "openrouter") -> None:
+    def __init__(
+        self, recording: Recording, provider: str = "openrouter", *, exact_only: bool = False
+    ) -> None:
+        """`exact_only`: no same-agent fallback for live-measurement prompts. Used with
+        prerecorded measurement fixtures, where those prompts are deterministic too, so any
+        mismatch means the prompts changed (re-record), never a measurement divergence."""
         self.provider = provider
         self.model = recording.model
         self._queues = {k: list(v) for k, v in recording.entries.items()}
+        self._exact_only = exact_only
 
     def _live_fallback(self, messages: Sequence[ChatMessage]) -> dict[str, Any] | None:
+        if self._exact_only:
+            return None
         system = messages[0].content if messages else ""
         user = "\n".join(m.content for m in messages[1:])
         for marker, needs, keys in _LIVE_PROMPTS:
@@ -144,7 +152,7 @@ class ReplayClient:
         entry = queue.pop(0) if queue else self._live_fallback(messages)
         if entry is None:
             system = messages[0].content if messages else ""
-            if any(marker in system for marker, _, _ in _LIVE_PROMPTS):
+            if not self._exact_only and any(marker in system for marker, _, _ in _LIVE_PROMPTS):
                 left = sorted(_keys(q[0]["text"]) for q in self._queues.values() if q)
                 raise LiveDivergenceError(
                     f"live measurements took a path the recording lacks ({system[:40]!r}; "

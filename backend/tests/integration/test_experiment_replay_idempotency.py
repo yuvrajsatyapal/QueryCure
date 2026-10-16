@@ -24,7 +24,9 @@ pytestmark = pytest.mark.integration
 
 
 async def _client(app: Any) -> httpx.AsyncClient:
-    client = httpx.AsyncClient(transport=httpx.ASGITransport(app=app, raise_app_exceptions=False), base_url="http://test")
+    client = httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app, raise_app_exceptions=False), base_url="http://test"
+    )
     await client.post("/api/v1/session")
     client.headers["X-CSRF-Token"] = client.cookies["qc_csrf"]
     return client
@@ -175,7 +177,9 @@ async def test_retries_and_concurrent_duplicates_create_one_replay(
     provisioner: SandboxProvisioner,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    _, experiment_id = await finalized_sandbox_run(api, app_engine, migrated_db, provisioner)
+    source_run, experiment_id = await finalized_sandbox_run(
+        api, app_engine, migrated_db, provisioner
+    )
 
     # 1. A crash between creating the replay run and committing (here: the job insert fails)
     #    rolls everything back; the retry with the same key then succeeds exactly once.
@@ -202,13 +206,25 @@ async def test_retries_and_concurrent_duplicates_create_one_replay(
     attempt_ids = {r.json()["id"] for r in responses}
     assert len(attempt_ids) == 1
     assert _counts(owner, experiment_id) == (1, 1, 1)
+    # The run history links the replay to the run it replays (Phase 5 run picker).
+    investigation_id = (await api.get(f"/api/v1/runs/{source_run}")).json()["investigation_id"]
+    runs = (await api.get(f"/api/v1/investigations/{investigation_id}")).json()["runs"]
+    by_kind = {r["kind"]: r for r in runs}
+    assert by_kind["initial"]["finalized"] is True
+    assert by_kind["initial"]["replay"] is None
+    replay_run = by_kind["experiment_replay"]
+    assert replay_run["parent_run_id"] == source_run
+    assert replay_run["replay"]["attempt_id"] in attempt_ids
+    assert replay_run["replay"]["source_experiment_id"] == experiment_id
+    assert replay_run["replay"]["status"] == "queued"
 
     # 3. A later retry returns the original even though that replay now occupies a run slot:
     #    fill the user's remaining slot so a *new* replay would be refused with 429.
-    owner.execute(
-        "UPDATE investigation_runs SET status = 'running' WHERE id = ("
-        "SELECT id FROM investigation_runs WHERE kind = 'initial' LIMIT 1)"
+    filler = await api.post(
+        "/api/v1/investigations",
+        json={"title": "filler", "objective": "o", "modes": ["offline"], "query": "SELECT 1"},
     )
+    assert filler.status_code == 202, filler.text
     later = await _replay(api, experiment_id, key)
     assert later.status_code == 202
     assert later.json()["id"] in attempt_ids

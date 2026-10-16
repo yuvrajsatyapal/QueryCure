@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { ErrorNotice } from "@/components/common/ErrorNotice";
 import { NodeDetails } from "@/components/plan/NodeDetails";
@@ -24,6 +25,7 @@ import { TournamentPanel } from "@/components/tournament/TournamentPanel";
 import { useRunEvents } from "@/lib/events/useRunEvents";
 import { BudgetMeter } from "./BudgetMeter";
 import { FindingsPanel } from "./FindingsPanel";
+import { RunPicker, runKindLabel, runRelation } from "./RunPicker";
 import { Timeline } from "./Timeline";
 
 type Tab = "plan" | "findings" | "tournament" | "report";
@@ -31,8 +33,10 @@ const ACTIVE = new Set(["queued", "running", "awaiting_approval", "cancelling"])
 const tabClass = (active: boolean) =>
   `rounded-md px-3 py-1.5 text-sm ${active ? "bg-accent-tint font-medium text-ink" : "text-muted hover:text-ink"}`;
 
-export function InvestigationView({ id }: { id: string }) {
+/** `requestedRunId` comes from `?run=` so a selected run (an older run, a replay) is linkable. */
+export function InvestigationView({ id, requestedRunId }: { id: string; requestedRunId?: string }) {
   const client = useQueryClient();
+  const router = useRouter();
   const [tab, setTab] = useState<Tab>("findings");
   const [view, setView] = useState<"tree" | "graph">("tree");
   const [planSha, setPlanSha] = useState<string | null>(null);
@@ -40,7 +44,18 @@ export function InvestigationView({ id }: { id: string }) {
   const [evidence, setEvidence] = useState<EvidenceDetail | null>(null);
 
   const investigation = useQuery({ queryKey: investigationKeys.detail(id), queryFn: ({ signal }) => getInvestigation(id, signal) });
-  const runId = investigation.data?.latestRun?.id ?? null;
+  const runs = investigation.data?.runs ?? [];
+  const requested = requestedRunId ? runs.find((x) => x.id === requestedRunId) : undefined;
+  const missingRun = Boolean(requestedRunId && investigation.data && !requested);
+  const runId = requested?.id ?? investigation.data?.latestRun?.id ?? null;
+  const summary = runs.find((x) => x.id === runId);
+  const parent = summary?.parentRunId ? runs.find((x) => x.id === summary.parentRunId) : undefined;
+  function selectRun(next: string) {
+    setPlanSha(null);
+    setSelected(null);
+    setEvidence(null);
+    router.replace(`/app/investigations/${id}?run=${next}`, { scroll: false });
+  }
   const run = useQuery({ queryKey: investigationKeys.run(runId ?? ""), queryFn: ({ signal }) => getRun(runId ?? "", signal), enabled: runId !== null });
   const findings = useQuery({ queryKey: investigationKeys.findings(runId ?? ""), queryFn: ({ signal }) => getFindings(runId ?? "", signal), enabled: runId !== null });
   const plans = useQuery({ queryKey: investigationKeys.plans(runId ?? ""), queryFn: ({ signal }) => getRunPlans(runId ?? "", signal), enabled: runId !== null });
@@ -84,10 +99,22 @@ export function InvestigationView({ id }: { id: string }) {
         <div>
           <p className="font-mono text-xs uppercase tracking-wider text-muted">
             Investigation · run {r?.runNumber ?? "…"}
+            {summary ? ` · ${runKindLabel(summary.kind)}` : null}
+            {summary && runRelation(summary, runs) ? ` ${runRelation(summary, runs)}` : null}
           </p>
           <h1 className="text-2xl font-semibold">{investigation.data.title}</h1>
           <p className="text-sm text-muted">{investigation.data.objective}</p>
+          {parent ? (
+            <button type="button" onClick={() => selectRun(parent.id)} className="mt-1 text-sm text-link">
+              Go to run #{parent.runNumber} ({runKindLabel(parent.kind).toLowerCase()})
+            </button>
+          ) : null}
         </div>
+        {missingRun ? (
+          <p role="status" className="rounded-md border border-border bg-surface-2 p-3 text-sm">
+            That run is not part of this investigation (it may have been deleted). Showing run {r?.runNumber ?? "…"} instead.
+          </p>
+        ) : null}
         <div role="tablist" aria-label="Results" className="flex gap-2">
           <button role="tab" aria-selected={tab === "findings"} className={tabClass(tab === "findings")} onClick={() => setTab("findings")}>
             Findings
@@ -153,6 +180,7 @@ export function InvestigationView({ id }: { id: string }) {
         )}
       </section>
       <aside aria-label="Run" className="flex min-w-0 flex-col gap-4">
+        <RunPicker runs={runs} selectedId={runId} onSelect={selectRun} />
         <div className="flex items-center justify-between gap-2">
           <p className="text-sm">
             Status: <span className="font-medium">{r?.status ?? "…"}</span>

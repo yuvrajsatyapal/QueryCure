@@ -48,6 +48,14 @@ class CreateInvestigationRequest(Strict):
     pre_authorize_demo_sandbox: bool = False
 
 
+class RunReplayLink(BaseModel):
+    """An `experiment_replay` run's attempt: what it replays and how the comparison ended."""
+
+    attempt_id: uuid.UUID
+    status: str
+    source_experiment_id: uuid.UUID | None
+
+
 class RunSummary(BaseModel):
     id: uuid.UUID
     investigation_id: uuid.UUID
@@ -58,6 +66,11 @@ class RunSummary(BaseModel):
     created_at: dt.datetime
     started_at: dt.datetime | None
     finished_at: dt.datetime | None
+    # Run relationships for history navigation (Phase 5): the run a replay or
+    # re-investigation derives from, whether a sealed report exists, and the replay attempt.
+    parent_run_id: uuid.UUID | None = None
+    finalized: bool = False
+    replay: RunReplayLink | None = None
 
 
 class RunDetail(RunSummary):
@@ -154,6 +167,36 @@ def run_detail(row: Any) -> RunDetail:
         error_code=error.get("code"),
         last_event_seq=row.last_event_seq,
         cancel_requested_at=row.cancel_requested_at,
+        parent_run_id=row.parent_run_id,
+        finalized=row.finalized,
+        replay=_replay_link(row),
+    )
+
+
+def _replay_link(row: Any) -> RunReplayLink | None:
+    if row.replay_attempt_id is None:
+        return None
+    return RunReplayLink(
+        attempt_id=row.replay_attempt_id,
+        status=row.replay_status,
+        source_experiment_id=row.replay_source_experiment_id,
+    )
+
+
+def run_summary(row: Any) -> RunSummary:
+    return RunSummary(
+        id=row.id,
+        investigation_id=row.investigation_id,
+        run_number=row.run_number,
+        kind=row.kind,
+        status=row.status,
+        outcome=row.outcome,
+        created_at=row.created_at,
+        started_at=row.started_at,
+        finished_at=row.finished_at,
+        parent_run_id=row.parent_run_id,
+        finalized=row.finalized,
+        replay=_replay_link(row),
     )
 
 

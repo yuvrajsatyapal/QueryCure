@@ -19,6 +19,7 @@ from querycure.agents.runtime import LlmClients, RunContext
 from querycure.agents.services import GatewayInspectorFactory
 from querycure.agents.state import InvestigationState
 from querycure.benchmark.engine import EngineOptions
+from querycure.benchmark.measurement_fixtures import MeasureFn
 from querycure.core.config import Settings
 from querycure.core.errors import ConfigurationError
 from querycure.core.logging import get_logger
@@ -27,9 +28,9 @@ from querycure.db.repositories.runs import get_run_status
 from querycure.domain.investigation import RunBudget
 from querycure.domain.runs import TERMINAL_STATUSES, RunStatus
 from querycure.events.emitter import RunEventSink, change_status
-from querycure.llm.credentials import resolve_api_key
+from querycure.llm.credentials import UserCredential, resolve_api_key, resolve_user_credential
 from querycure.llm.providers import build_client
-from querycure.llm.rate_limit import LlmGate
+from querycure.llm.rate_limit import DailyQuota, LlmGate
 from querycure.llm.structured import RetryPolicy
 from querycure.llm.stub import StubClient
 from querycure.replay.finalize import Conclusion, finalize_run
@@ -58,6 +59,15 @@ def env_clients(settings: Settings) -> ClientsFactory:
     return make
 
 
+def user_clients(settings: Settings, credential: UserCredential) -> LlmClients:
+    """BYOK clients: the user's provider, key and (free) model; no server fallback model."""
+    return LlmClients(
+        primary=build_client(
+            credential.provider, credential.model, credential.api_key, settings=settings
+        )
+    )
+
+
 @dataclass
 class RunServices:
     engine: AsyncEngine
@@ -68,6 +78,7 @@ class RunServices:
     checkpoint_role: str | None = None  # tests only
     sandbox: SandboxProvisioner | None = None  # Mode C; None when not configured
     engine_options: EngineOptions | None = None
+    measure: MeasureFn | None = None  # evals only: capture or prerecorded fixture (R19)
 
 
 async def fail_run(engine: AsyncEngine, run_id: uuid.UUID, error: dict[str, Any]) -> None:
@@ -140,8 +151,28 @@ async def execute_run(
                 text("SELECT budget FROM investigation_runs WHERE id = :id"), {"id": run_id}
             )
         ).scalar_one()
+    gate = services.llm_gate
     try:
-        clients = services.clients(inputs)
+        if inputs.llm_credential_id is not None:
+            # BYOK: the user's own key, decrypted for this run only, with its own allowance.
+            async with engine.begin() as conn:
+                credential = await resolve_user_credential(
+                    conn,
+                    services.settings,
+                    user_id=inputs.user_id,
+                    credential_id=inputs.llm_credential_id,
+                )
+            clients = user_clients(services.settings, credential)
+            if gate is not None:
+                gate = gate.with_quota(
+                    DailyQuota(
+                        engine,
+                        services.settings.llm_daily_request_limit,
+                        credential_id=credential.credential_id,
+                    )
+                )
+        else:
+            clients = services.clients(inputs)
     except ConfigurationError as exc:
         await fail_run(engine, run_id, {"code": exc.code, "message": exc.message})
         return
@@ -159,11 +190,12 @@ async def execute_run(
         engine=engine,
         inspectors=GatewayInspectorFactory(engine, services.settings, inputs.user_id),
         llm=clients,
-        llm_gate=services.llm_gate,
+        llm_gate=gate,
         llm_retry=RetryPolicy(call_timeout_seconds=services.settings.llm_call_timeout_seconds),
         llm_slots=asyncio.Semaphore(services.settings.llm_max_concurrency),
         sandbox=services.sandbox,
         engine_options=services.engine_options or EngineOptions(),
+        measure=services.measure,
     )
     config: RunnableConfig = {"configurable": {"thread_id": str(run_id)}}
     async with open_checkpointer(services.checkpoint_url, role=services.checkpoint_role) as saver:
