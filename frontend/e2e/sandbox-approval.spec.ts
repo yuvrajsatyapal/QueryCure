@@ -25,7 +25,7 @@ test("sandbox - approve the candidate SQL, then see the benchmarked tournament",
   await expect(card).toBeHidden({ timeout: 15_000 });
   const timeline = page.getByRole("region", { name: "Agent timeline" });
   await expect(timeline.getByText("Approval approved")).toBeVisible({ timeout: 15_000 });
-  await expect(timeline.getByText(/Run completed/)).toBeVisible({ timeout: 90_000 });
+  await expect(timeline.getByText(/Run completed/).first()).toBeVisible({ timeout: 90_000 });
 
   await page.getByRole("tab", { name: "Tournament" }).click();
   const table = page.getByRole("table", { name: "Optimization tournament" });

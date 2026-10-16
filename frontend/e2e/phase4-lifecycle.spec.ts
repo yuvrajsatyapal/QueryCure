@@ -20,8 +20,8 @@ test("lifecycle - approve, audit, report, verify, replay the experiment", async 
   await expect(card).toBeVisible({ timeout: 60_000 });
   await card.getByRole("button", { name: "Approve and run" }).click();
   const timeline = page.getByRole("region", { name: "Agent timeline" });
-  await expect(timeline.getByText(/Run completed/)).toBeVisible({ timeout: 120_000 });
-  await expect(timeline.getByText(/Audit:/)).toBeVisible();
+  await expect(timeline.getByText(/Run completed/).first()).toBeVisible({ timeout: 120_000 });
+  await expect(timeline.getByText(/Audit:/).first()).toBeVisible();
 
   // Benchmark Auditor and plan diff in the tournament.
   await page.getByRole("tab", { name: "Tournament" }).click();

@@ -18,7 +18,7 @@ test("investigation - start from an uploaded plan, follow the timeline, open cit
   await expect(page).toHaveURL(/\/app\/investigations\/[0-9a-f-]{36}$/, { timeout: 30_000 });
   const timeline = page.getByRole("region", { name: "Agent timeline" });
   await expect(timeline.getByText("intake started")).toBeVisible({ timeout: 30_000 });
-  await expect(timeline.getByText(/Run completed/)).toBeVisible({ timeout: 60_000 });
+  await expect(timeline.getByText(/Run completed/).first()).toBeVisible({ timeout: 60_000 });
 
   // The stub's hypothesis cites the Seq Scan plan node it found in the evidence block.
   await expect(page.getByText(/Stub hypothesis/)).toBeVisible();
