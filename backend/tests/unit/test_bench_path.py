@@ -27,3 +27,22 @@ def test_unknown_bench_path_is_refused(monkeypatch: pytest.MonkeyPatch) -> None:
 
     with pytest.raises(ValidationError):
         Settings(_env_file=None)  # type: ignore[call-arg]
+
+
+def test_the_checkpointer_uses_the_direct_endpoint_not_the_pooler() -> None:
+    from unittest.mock import MagicMock
+
+    from pydantic import SecretStr
+
+    from querycure.jobs.handlers import build_services
+
+    pooled = "postgresql://qc_app:pw@ep-x-pooler.c-4.aws.neon.tech/db"
+    direct = "postgresql://qc_app:pw@ep-x.c-4.aws.neon.tech/db"
+    settings = Settings(
+        _env_file=None, database_url=SecretStr(pooled), database_url_direct=SecretStr(direct),
+        llm_provider="stub", feature_sandbox=False,
+    )  # fmt: skip
+
+    services = build_services(MagicMock(), settings)
+
+    assert services.checkpoint_url == direct

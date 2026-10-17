@@ -11,6 +11,8 @@
 
 - [x] **Google sign-in.** Second OAuth provider on the shared flow (`auth/google.py`, `auth/oauth.py`, provider-parameterised `api/routers/auth.py`); `features.google_login`; `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`; scopes `openid profile`, no email stored; no migration. Tests: `test_google_oauth.py`, config unit tests; ADR-0013 amended. Verified: ruff, mypy, 743 unit, 579 integration + security, frontend lint/typecheck/85 tests/build.
 
+- [x] **Neon PgBouncer compatibility (2026-10-17, [ADR-0025](../engineering/adr/ADR-0025-pgbouncer-compatible-metadata-connections.md)).** Pooled endpoints get per-transaction timeouts instead of rejected startup options; LISTEN and the checkpointer use `DATABASE_URL_DIRECT`; settings validate the URL pair; `qc_app` / `qc_retention` privileges pinned by a security test. Verified live against Neon (readiness, job claim, LISTEN/NOTIFY, checkpointer).
+
 ## Completed
 
 - [x] Repository inspected (was empty).

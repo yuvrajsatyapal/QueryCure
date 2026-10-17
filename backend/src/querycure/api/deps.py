@@ -77,13 +77,23 @@ async def stream_user(
     return user
 
 
+def listen_url(settings: Settings, engine: AsyncEngine) -> str:
+    """LISTEN needs a session-level connection, so it never goes through the pooler. Tests that
+    inject an engine without a configured URL fall back to the engine's own."""
+    return settings.direct_database_url() or engine.url.set(
+        drivername="postgresql"
+    ).render_as_string(hide_password=False)
+
+
 def get_event_hub(
-    request: Request, engine: Annotated[AsyncEngine, Depends(get_engine)]
+    request: Request,
+    engine: Annotated[AsyncEngine, Depends(get_engine)],
+    settings: Annotated[Settings, Depends(get_settings)],
 ) -> EventHub:
     hub: EventHub | None = request.app.state.event_hub
     if hub is None:
-        # LISTEN needs no table privileges; a plain psycopg connection from the same URL.
-        url = engine.url.set(drivername="postgresql").render_as_string(hide_password=False)
+        # LISTEN needs no table privileges; a plain psycopg connection.
+        url = listen_url(settings, engine)
 
         async def connect() -> psycopg.AsyncConnection:
             return await psycopg.AsyncConnection.connect(url, autocommit=True)

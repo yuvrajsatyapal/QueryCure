@@ -50,7 +50,8 @@ def engine_options(settings: Settings) -> EngineOptions:
 
 
 def build_services(engine: AsyncEngine, settings: Settings) -> RunServices:
-    if settings.database_url is None:
+    checkpoint_url = settings.direct_database_url()
+    if settings.database_url is None or checkpoint_url is None:
         raise ValueError("DATABASE_URL is required")
     sandbox = build_sandbox(settings)
     if sandbox is not None:
@@ -60,7 +61,7 @@ def build_services(engine: AsyncEngine, settings: Settings) -> RunServices:
         engine_options=engine_options(settings),
         engine=engine,
         settings=settings,
-        checkpoint_url=settings.database_url.get_secret_value(),
+        checkpoint_url=checkpoint_url,  # startup search_path: direct endpoint only
         clients=env_clients(settings),
         # Free-tier limits apply to OpenRouter only; the offline stub makes no requests.
         llm_gate=LlmGate(

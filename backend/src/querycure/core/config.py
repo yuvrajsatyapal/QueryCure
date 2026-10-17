@@ -6,6 +6,8 @@ from typing import Literal, Self, TypedDict
 from pydantic import AliasChoices, Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from querycure.db.engine import is_pooled_url
+
 
 class Profile(StrEnum):
     LOCAL = "local"
@@ -207,6 +209,25 @@ class Settings(BaseSettings):
         return value
 
     @model_validator(mode="after")
+    def _pooled_url_needs_a_direct_url(self) -> Self:
+        # PgBouncer transaction mode cannot carry LISTEN or the LangGraph checkpointer's
+        # startup `search_path`, so those must use a direct (unpooled) endpoint.
+        if self.database_url_direct is not None and is_pooled_url(
+            self.database_url_direct.get_secret_value()
+        ):
+            raise ValueError("DATABASE_URL_DIRECT must be a direct endpoint, not a pooled one")
+        if (
+            self.database_url is not None
+            and is_pooled_url(self.database_url.get_secret_value())
+            and self.database_url_direct is None
+        ):
+            raise ValueError(
+                "DATABASE_URL points at a pooled endpoint: DATABASE_URL_DIRECT is required "
+                "(LISTEN/NOTIFY and the checkpointer need an unpooled connection)"
+            )
+        return self
+
+    @model_validator(mode="after")
     def _free_models_only(self) -> Self:
         if self.llm_provider == "stub":
             # Offline canned responses for UI tests: free by construction, local only.
@@ -274,6 +295,11 @@ class Settings(BaseSettings):
     @property
     def google_login_enabled(self) -> bool:
         return self.google_client_id is not None and self.google_client_secret is not None
+
+    def direct_database_url(self) -> str | None:
+        """Unpooled endpoint for LISTEN and the checkpointer; the single URL when not pooled."""
+        url = self.database_url_direct or self.database_url
+        return url.get_secret_value() if url is not None else None
 
     def engine_options(self) -> "EngineSettings":
         """Keyword arguments for `db.engine.make_engine` (pool and server-side timeouts)."""

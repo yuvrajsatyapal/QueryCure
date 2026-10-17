@@ -99,3 +99,50 @@ def test_google_login_needs_https_public_urls_outside_local() -> None:
             public_api_url="http://api.example.com",
             web_base_url="https://app.example.com",
         )
+
+
+POOLED = "postgresql://qc_app:pw@ep-x-pooler.c-4.aws.neon.tech/db"
+DIRECT = "postgresql://qc_app:pw@ep-x.c-4.aws.neon.tech/db"
+
+
+def test_a_pooled_database_url_requires_a_direct_url_for_listen() -> None:
+    with pytest.raises(ValidationError, match="DATABASE_URL_DIRECT"):
+        Settings(_env_file=None, database_url=POOLED)
+
+
+def test_a_pooled_database_url_with_a_direct_url_is_accepted() -> None:
+    settings = Settings(_env_file=None, database_url=POOLED, database_url_direct=DIRECT)
+
+    assert settings.direct_database_url() == DIRECT
+
+
+def test_the_direct_url_must_not_be_a_pooled_endpoint() -> None:
+    with pytest.raises(ValidationError, match="not a pooled"):
+        Settings(_env_file=None, database_url=DIRECT, database_url_direct=POOLED)
+
+
+def test_direct_url_falls_back_to_database_url_for_a_single_endpoint_setup() -> None:
+    settings = Settings(_env_file=None, database_url=DIRECT)
+
+    assert settings.direct_database_url() == DIRECT
+
+
+def test_listen_url_prefers_the_direct_endpoint() -> None:
+    from sqlalchemy.ext.asyncio import create_async_engine
+
+    from querycure.api.deps import listen_url
+
+    settings = Settings(_env_file=None, database_url=POOLED, database_url_direct=DIRECT)
+    engine = create_async_engine(POOLED.replace("postgresql://", "postgresql+psycopg://"))
+
+    assert listen_url(settings, engine) == DIRECT
+
+
+def test_listen_url_falls_back_to_the_engine_url_when_none_is_configured() -> None:
+    from sqlalchemy.ext.asyncio import create_async_engine
+
+    from querycure.api.deps import listen_url
+
+    engine = create_async_engine("postgresql+psycopg://u:pw@127.0.0.1:5432/d")
+
+    assert listen_url(Settings(_env_file=None), engine) == "postgresql://u:pw@127.0.0.1:5432/d"
