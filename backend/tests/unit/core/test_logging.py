@@ -42,6 +42,19 @@ def test_sensitive_keys_are_redacted(key: str) -> None:
     assert "hunter2" not in json.dumps(out)
 
 
+def test_token_counts_stay_readable() -> None:
+    out = emit(input_tokens=2684, output_tokens=310, total_tokens=2994)
+
+    assert (out["input_tokens"], out["output_tokens"], out["total_tokens"]) == (2684, 310, 2994)
+
+
+@pytest.mark.parametrize("value", ["sk-live-abc", 1.5, True, None, [1]])
+def test_token_count_keys_still_redact_anything_but_an_int(value: object) -> None:
+    out = emit(input_tokens=value)
+
+    assert out["input_tokens"] == "[REDACTED]"
+
+
 def test_nested_sensitive_keys_are_redacted() -> None:
     out = emit(conn={"host": "db", "password": "hunter2"}, items=[{"token": "t0k"}])
 

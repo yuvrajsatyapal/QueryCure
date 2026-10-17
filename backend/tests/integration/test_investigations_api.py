@@ -137,6 +137,9 @@ async def test_create_queues_a_run_with_inputs_and_a_job(
         ({"workload_id": "nope"}, 422, "VALIDATION_ERROR"),
         # BYOK (Phase 5): a credential that is not the caller's own is a 404.
         ({"llm": {"credential_id": str(uuid.uuid4())}}, 404, "NOT_FOUND"),
+        # The worker picks the model (LLM_MODEL or the key's default); a per-run model used to
+        # be accepted and silently ignored.
+        ({"llm": {"model": "nvidia/nemotron-3-super-120b-a12b:free"}}, 422, "VALIDATION_ERROR"),
         ({"unexpected": 1}, 422, "VALIDATION_ERROR"),
         ({"title": ""}, 422, "VALIDATION_ERROR"),
     ],

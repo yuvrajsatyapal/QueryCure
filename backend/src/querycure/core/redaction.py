@@ -10,6 +10,9 @@ _SENSITIVE_KEY = re.compile(
     r"pass(word)?|secret|token|api_?key|authorization|dsn|master_?key|cookie|credential",
     re.IGNORECASE,
 )
+# LLM usage counts contain "token" but are not secrets. Exempt only these exact keys, and only
+# when the value is a plain int, so a misnamed field carrying a string still gets masked.
+_TOKEN_COUNT_KEY = re.compile(r"(input|output|total|prompt|completion)_tokens", re.IGNORECASE)
 # user:password@ inside any URL-ish connection string; keeps scheme, user and host readable.
 _URL_PASSWORD = re.compile(
     r"(?P<prefix>[a-z][a-z0-9+.-]*://[^:/@\s]+:)(?P<secret>[^@\s]+)(?=@)", re.I
@@ -35,13 +38,17 @@ def redact_value(value: Any) -> Any:
     if isinstance(value, str):
         return redact_text(value)
     if isinstance(value, Mapping):
-        return {
-            k: REDACTED if isinstance(k, str) and _SENSITIVE_KEY.search(k) else redact_value(v)
-            for k, v in value.items()
-        }
+        return {k: _redact_item(k, v) for k, v in value.items()}
     if isinstance(value, list | tuple):
         return [redact_value(v) for v in value]
     return value
+
+
+def _redact_item(key: object, value: Any) -> Any:
+    if not isinstance(key, str) or not _SENSITIVE_KEY.search(key):
+        return redact_value(value)
+    is_count = type(value) is int  # bool is an int subclass; reject it explicitly
+    return value if is_count and _TOKEN_COUNT_KEY.fullmatch(key) else REDACTED
 
 
 def redaction_processor(

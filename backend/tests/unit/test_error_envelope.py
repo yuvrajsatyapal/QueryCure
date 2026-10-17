@@ -1,6 +1,9 @@
+import psycopg
+import pytest
 from fastapi import APIRouter
 from fastapi.testclient import TestClient
 from pydantic import BaseModel
+from sqlalchemy import exc as sa_exc
 
 from querycure.api.main import create_app
 from querycure.core.config import Settings
@@ -22,6 +25,20 @@ def client() -> TestClient:
     @router.get("/boom-crash")
     async def boom_crash() -> None:
         raise RuntimeError("postgresql://u:hunter2@h/db exploded")
+
+    @router.get("/boom-db-down")
+    async def boom_db_down() -> None:
+        orig = psycopg.OperationalError("connection to 10.0.0.1 failed: password hunter2")
+        raise sa_exc.OperationalError("SELECT 1", {}, orig)
+
+    @router.get("/boom-pool")
+    async def boom_pool() -> None:
+        raise sa_exc.TimeoutError("QueuePool limit of size 5 overflow 5 reached")
+
+    @router.get("/boom-statement")
+    async def boom_statement() -> None:
+        orig = psycopg.errors.QueryCanceled("canceling statement due to statement timeout")
+        raise sa_exc.OperationalError("SELECT hunter2", {}, orig)
 
     @router.post("/echo")
     async def echo(body: Body) -> Body:
@@ -68,3 +85,21 @@ def test_unexpected_errors_are_generic_and_leak_nothing() -> None:
     assert r.json()["error"]["code"] == "INTERNAL_ERROR"
     assert "hunter2" not in r.text
     assert "exploded" not in r.text
+
+
+@pytest.mark.parametrize("path", ["boom-db-down", "boom-pool"])
+def test_an_unreachable_database_is_a_retryable_503(path: str) -> None:
+    r = client().get(f"/api/v1/test/{path}")
+
+    assert r.status_code == 503
+    assert r.json()["error"]["code"] == "SERVICE_UNAVAILABLE"
+    assert "hunter2" not in r.text
+    assert "10.0.0.1" not in r.text
+
+
+def test_statement_errors_with_a_sqlstate_stay_internal_errors() -> None:
+    r = client().get("/api/v1/test/boom-statement")
+
+    assert r.status_code == 500
+    assert r.json()["error"]["code"] == "INTERNAL_ERROR"
+    assert "hunter2" not in r.text

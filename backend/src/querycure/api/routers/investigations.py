@@ -75,6 +75,13 @@ async def _check(
         _check_sandbox(body, settings)
     elif body.pre_authorize_demo_sandbox:
         raise _invalid("pre_authorize_demo_sandbox", "only applies to sandbox benchmarking")
+    if body.llm is not None and body.llm.model is not None:
+        # The worker takes the model from LLM_MODEL or the key's default model; accepting a
+        # per-run model it would then ignore misleads the caller.
+        raise _invalid(
+            "llm.model",
+            "per-run model selection is not supported; set the default model on your key",
+        )
     if body.query is None and body.plan_artifact_sha256 is None:
         raise _invalid("query", "provide a query, an uploaded plan, or both")
     if body.query is not None:

@@ -4,6 +4,7 @@ import structlog
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from sqlalchemy import exc as sa_exc
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
@@ -196,5 +197,23 @@ def install_error_handlers(app: FastAPI) -> None:
 
     @app.exception_handler(Exception)
     async def unexpected_error(request: Request, exc: Exception) -> JSONResponse:
+        if _database_unreachable(exc):
+            log.warning("database_unavailable", exc_info=exc, path=request.url.path)
+            return _plain_error(
+                request,
+                503,
+                "SERVICE_UNAVAILABLE",
+                "The database is unavailable; try again shortly.",
+            )
         log.error("unhandled_error", exc_info=exc, path=request.url.path)
         return _plain_error(request, 500, "INTERNAL_ERROR", "Internal error.")
+
+
+def _database_unreachable(exc: Exception) -> bool:
+    """Connection-level failures (no SQLSTATE: refused, DNS, TLS, dropped) and pool exhaustion
+    are retryable outages, not bugs. Statement errors carry a SQLSTATE and stay 500."""
+    if isinstance(exc, sa_exc.TimeoutError):
+        return True
+    if isinstance(exc, sa_exc.OperationalError | sa_exc.InterfaceError):
+        return exc.connection_invalidated or getattr(exc.orig, "sqlstate", None) is None
+    return False
