@@ -63,14 +63,19 @@ def build_services(engine: AsyncEngine, settings: Settings) -> RunServices:
         settings=settings,
         checkpoint_url=checkpoint_url,  # startup search_path: direct endpoint only
         clients=env_clients(settings),
-        # Free-tier limits apply to OpenRouter only; the offline stub makes no requests.
-        llm_gate=LlmGate(
-            MinuteRateLimiter(settings.llm_requests_per_minute),
-            DailyQuota(engine, settings.llm_daily_request_limit),
-        )
-        if settings.llm_provider == "openrouter"
-        else None,
+        llm_gate=llm_gate(engine, settings),
     )
+
+
+def llm_gate(engine: AsyncEngine, settings: Settings) -> LlmGate | None:
+    """Free-tier limits. The daily quota counts OpenRouter free model ids only; Groq enforces
+    its own daily limit, whose 429 stops the run (ADR-0027). The offline stub sends nothing."""
+    minute = MinuteRateLimiter(settings.llm_requests_per_minute)
+    if settings.llm_provider == "openrouter":
+        return LlmGate(minute, DailyQuota(engine, settings.llm_daily_request_limit))
+    if settings.llm_provider == "groq":
+        return LlmGate(minute)
+    return None
 
 
 def replay_handler(services: RunServices) -> Handler:

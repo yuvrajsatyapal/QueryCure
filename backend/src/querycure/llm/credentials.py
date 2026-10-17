@@ -10,9 +10,23 @@ from querycure.core.crypto import DecryptionError, SecretBox
 from querycure.core.errors import ConfigurationError
 from querycure.db.repositories import llm_credentials as creds
 
-Provider = Literal["gemini", "openrouter"]
+Provider = Literal["gemini", "openrouter", "groq"]
 
-_ENV_NAMES: dict[Provider, str] = {"gemini": "GEMINI_API_KEY", "openrouter": "OPENROUTER_API_KEY"}
+_ENV_NAMES: dict[Provider, str] = {
+    "gemini": "GEMINI_API_KEY",
+    "openrouter": "OPENROUTER_API_KEY",
+    "groq": "GROQ_API_KEY",
+}
+
+
+def server_key(settings: Settings, provider: Provider) -> SecretStr | None:
+    """The env key for a provider, whether or not this profile may use it."""
+    keys = {
+        "gemini": settings.gemini_api_key,
+        "openrouter": settings.openrouter_api_key,
+        "groq": settings.groq_api_key,
+    }
+    return keys[provider]
 
 
 def resolve_api_key(settings: Settings, provider: Provider) -> SecretStr:
@@ -21,7 +35,7 @@ def resolve_api_key(settings: Settings, provider: Provider) -> SecretStr:
         raise ConfigurationError(
             "The public demo has no shared model key: add your own OpenRouter key in Settings."
         )
-    key = settings.gemini_api_key if provider == "gemini" else settings.openrouter_api_key
+    key = server_key(settings, provider)
     if key is None or not key.get_secret_value():
         raise ConfigurationError(f"{_ENV_NAMES[provider]} is not set for the local profile.")
     return key

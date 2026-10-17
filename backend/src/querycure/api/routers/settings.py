@@ -14,7 +14,7 @@ from querycure.core.config import Profile, is_free_model
 from querycure.core.errors import FeatureDisabledError, NotFoundError, ValidationFailedError
 from querycure.core.logging import get_logger
 from querycure.db.repositories import llm_credentials as creds
-from querycure.llm.credentials import allowed_byok_providers, secret_box
+from querycure.llm.credentials import allowed_byok_providers, secret_box, server_key
 
 router = APIRouter(prefix="/settings", tags=["settings"])
 log = get_logger(__name__)
@@ -25,11 +25,7 @@ async def models(settings: SettingsDep, conn: ConnDep, user: CurrentUser) -> Mod
     """Which provider/model runs use, and whether a key exists (the user's own, or the local
     profile's server key). Never the key."""
     own = await creds.get_active(conn, user_id=user.id, provider=settings.llm_provider)
-    key = (
-        settings.gemini_api_key
-        if settings.llm_provider == "gemini"
-        else settings.openrouter_api_key
-    )
+    key = None if settings.llm_provider == "stub" else server_key(settings, settings.llm_provider)
     server = settings.profile is Profile.LOCAL and (
         settings.llm_provider == "stub" or (key is not None and bool(key.get_secret_value()))
     )

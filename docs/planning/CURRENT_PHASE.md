@@ -23,6 +23,7 @@
   - Verified: ruff, mypy, 837 unit, 607 integration + security, smoke evals 5/5 (one case re-recorded), frontend lint/typecheck/89 tests/build, e2e 14/14.
   - Real-model smoke run on local metadata: `verified_recommendation`, 7/7 valid calls, no stale-statistics hypothesis, report replay `verified`.
   - **Open:** the Mode C eval recordings (`orders_sandbox_composite_index`, `rewrite_trap_sandbox`) must be re-recorded, because the O3 context text changed and today's free quota ran out. CI "Eval Mode C" fails until then.
+- [x] **Groq provider (2026-10-17, [ADR-0027](../engineering/adr/ADR-0027-groq-provider-trusted-free-plan.md)).** `LLM_PROVIDER=groq` with a local-profile `GROQ_API_KEY` (`llm/groq.py`, OpenAI-compatible JSON mode). Allowed while `LLM_FREE_ONLY` is on by trusting the key to be on Groq's free plan (owner decision; Groq reports no cost). Per-day 429 stops the run; the minute limiter applies; the OpenRouter daily count does not. Refused in the demo profile; no BYOK, no UI change. Tests: `tests/unit/llm/test_groq.py`. Verified: ruff, mypy, 850 unit, 607 integration + security. Not verified live: no Groq request has been made.
 
 ## Completed
 

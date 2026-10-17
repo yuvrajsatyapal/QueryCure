@@ -42,7 +42,7 @@ class PaidUsageError(Exception):
     reported a non-zero (or no) cost."""
 
 
-def _classify(exc: openai.APIError) -> Exception:
+def classify_api_error(exc: openai.APIError) -> Exception:
     """Map SDK errors onto the LangChain classes llm.structured already classifies."""
     message = str(exc).lower()
     if isinstance(exc, openai.RateLimitError):
@@ -66,7 +66,7 @@ def _classify(exc: openai.APIError) -> Exception:
     return ModelInvalidRequestError("provider rejected the request")
 
 
-def _message(m: ChatMessage) -> ChatCompletionMessageParam:
+def to_openai_message(m: ChatMessage) -> ChatCompletionMessageParam:
     if m.role == "system":
         return {"role": "system", "content": m.content}
     if m.role == "assistant":
@@ -111,7 +111,7 @@ class OpenRouterClient:
         try:
             response = await self._client.chat.completions.create(
                 model=self.model,
-                messages=[_message(m) for m in messages],
+                messages=[to_openai_message(m) for m in messages],
                 response_format={"type": "json_object"},
                 temperature=0,
                 extra_body={
@@ -121,7 +121,7 @@ class OpenRouterClient:
                 },
             )
         except openai.APIError as exc:
-            raise _classify(exc) from None
+            raise classify_api_error(exc) from None
         raw = response.model_dump()
         usage = raw.get("usage") or {}
         cost = usage.get("cost")

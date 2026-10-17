@@ -106,9 +106,11 @@ class Settings(BaseSettings):
     openrouter_api_key: SecretStr | None = Field(
         default=None, validation_alias=_env("OPENROUTER_API_KEY")
     )
+    groq_api_key: SecretStr | None = Field(default=None, validation_alias=_env("GROQ_API_KEY"))
     # ADR-0016: free OpenRouter models only, by default and for every run unless an operator
-    # explicitly turns LLM_FREE_ONLY off. Nothing ever falls back to a paid model.
-    llm_provider: Literal["gemini", "openrouter", "stub"] = Field(
+    # explicitly turns LLM_FREE_ONLY off. Nothing ever falls back to a paid model. Groq is
+    # allowed too, trusted to be on its free plan (ADR-0027).
+    llm_provider: Literal["gemini", "openrouter", "groq", "stub"] = Field(
         default="openrouter", validation_alias=_env("LLM_PROVIDER")
     )
     # Pinned from the Phase 2 free-model benchmark (evals/results, PHASE_2_REPORT).
@@ -141,6 +143,9 @@ class Settings(BaseSettings):
     )
     openrouter_base_url: str = Field(
         default="https://openrouter.ai/api/v1", validation_alias=_env("OPENROUTER_BASE_URL")
+    )
+    groq_base_url: str = Field(
+        default="https://api.groq.com/openai/v1", validation_alias=_env("GROQ_BASE_URL")
     )
     sse_heartbeat_seconds: float = Field(
         default=15.0, gt=0, validation_alias=_env("SSE_HEARTBEAT_SECONDS")
@@ -244,11 +249,13 @@ class Settings(BaseSettings):
             if self.profile is not Profile.LOCAL:
                 raise ValueError("LLM_PROVIDER=stub is only allowed in the local profile")
             return self
-        if not self.llm_free_only:
+        if not self.llm_free_only or self.llm_provider == "groq":
+            # Groq reports no cost, so its model ids say nothing about price: the policy rests
+            # on the key being on Groq's free plan, which has no billing (ADR-0027).
             return self
         if self.llm_provider != "openrouter":
             raise ValueError(
-                "LLM_FREE_ONLY requires LLM_PROVIDER=openrouter: only free OpenRouter models "
+                "LLM_FREE_ONLY requires LLM_PROVIDER=openrouter or groq: only free models "
                 "are allowed"
             )
         for name, model in (
@@ -287,6 +294,8 @@ class Settings(BaseSettings):
                 # The demo is BYOK only (DEPLOYMENT §1): a shared server key would be spent by
                 # anonymous visitors.
                 raise ValueError("OPENROUTER_API_KEY must not be set in the demo profile (BYOK)")
+            if self.groq_api_key is not None:
+                raise ValueError("GROQ_API_KEY must not be set in the demo profile (BYOK)")
             if self.github_client_id is not None or self.google_client_id is not None:
                 for name, url in (("PUBLIC_API_URL", self.public_api_url),
                                   ("WEB_BASE_URL", self.web_base_url)):  # fmt: skip

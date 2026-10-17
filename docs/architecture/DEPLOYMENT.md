@@ -199,8 +199,9 @@ Migrations run as a separate release step before new API instances start; migrat
 | `DB_STATEMENT_TIMEOUT_MS` / `DB_IDLE_IN_TRANSACTION_TIMEOUT_MS` | server-side limits on the app's metadata connections (60 s / 120 s) |
 | `WORKER_SHUTDOWN_GRACE_SECONDS` | drain time on SIGTERM (default 20) |
 | `DATABASE_RETENTION_URL` | `qc_retention` role for `python -m querycure.ops retention` |
-| `GEMINI_API_KEY`, `OPENROUTER_API_KEY` | local-profile fallback only; ignored in demo |
+| `GEMINI_API_KEY`, `OPENROUTER_API_KEY`, `GROQ_API_KEY` | local-profile fallback only; ignored in demo (`OPENROUTER_API_KEY` and `GROQ_API_KEY` are refused there) |
 | `LLM_PROVIDER` / `LLM_MODEL` / `LLM_FALLBACK_MODEL` | default `openrouter` / `nvidia/nemotron-3-super-120b-a12b:free` (pinned by the Phase 2 benchmark) / none; must be free models while `LLM_FREE_ONLY` is on ([ADR-0016](../engineering/adr/ADR-0016-free-openrouter-models-only.md)); the eval-chosen model is pinned with `LLM_MODEL` |
 | `LLM_FREE_ONLY` | default `true`: refuse non-free models at startup, refuse a non-free model id in the OpenRouter client before any request is sent, and stop a run on any non-zero-cost response |
 | `LLM_REQUESTS_PER_MINUTE` / `LLM_DAILY_REQUEST_LIMIT` / `LLM_MAX_CONCURRENCY` | free-tier limits: 16 / 45 / 1 by default (OpenRouter free tier: ~20/min, 50/day without credits) |
 | `OPENROUTER_BASE_URL` | default `https://openrouter.ai/api/v1` |
+| `GROQ_BASE_URL` | default `https://api.groq.com/openai/v1`; `LLM_PROVIDER=groq` is allowed while `LLM_FREE_ONLY` is on by trusting the key to be on Groq's free plan ([ADR-0027](../engineering/adr/ADR-0027-groq-provider-trusted-free-plan.md)) |

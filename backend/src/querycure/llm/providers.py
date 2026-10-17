@@ -1,4 +1,4 @@
-"""LangChain-backed ChatClients for Gemini and OpenRouter, in JSON mode.
+"""ChatClients for Gemini (LangChain), OpenRouter and Groq (OpenAI SDK), in JSON mode.
 
 Provider-side retries are disabled (max_retries=0): llm.structured owns the retry policy so
 backoff, fallback and budget checks happen in one place.
@@ -13,6 +13,7 @@ from pydantic import SecretStr
 
 from querycure.core.config import Settings
 from querycure.llm.credentials import Provider
+from querycure.llm.groq import GroqClient
 from querycure.llm.openrouter import OpenRouterClient
 from querycure.llm.types import ChatClient, ChatMessage, RawCompletion
 
@@ -62,6 +63,13 @@ def build_client(
             model=model,
             base_url=settings.openrouter_base_url,
             free_only=settings.llm_free_only,
+            timeout_seconds=settings.llm_call_timeout_seconds,
+        )
+    if provider == "groq":
+        return GroqClient(
+            api_key=api_key,
+            model=model,
+            base_url=settings.groq_base_url,
             timeout_seconds=settings.llm_call_timeout_seconds,
         )
     chat_model: BaseChatModel
