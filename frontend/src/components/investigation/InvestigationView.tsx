@@ -193,7 +193,11 @@ export function InvestigationView({ id, requestedRunId }: { id: string; requeste
             </button>
           ) : null}
         </div>
-        {r?.errorCode ? <p className="text-sm text-rejected">Stopped: {r.errorCode}</p> : null}
+        {r?.errorCode ? (
+          <p className="text-sm text-rejected">
+            {r.status === "completed" ? "Problem" : "Stopped"}: {r.errorMessage ?? r.errorCode}
+          </p>
+        ) : null}
         {r && !ACTIVE.has(r.status) ? (
           <Link href={`/app/replay/${r.id}`} className="text-sm text-link">
             Reproducibility & replay

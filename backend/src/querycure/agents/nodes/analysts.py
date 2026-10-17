@@ -120,6 +120,7 @@ def make_analyst(agent: AgentName, *, tools: Mapping[str, Tool] | None = None) -
                     prompt_version=prompt.PROMPT_VERSION,
                     messages=messages,
                     tools=allowlist,
+                    query_sql=sql,
                 )
         except AgentFailedError as exc:
             error = NodeError(node=agent, code=exc.code, message=exc.message, recoverable=True)

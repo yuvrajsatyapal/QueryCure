@@ -143,6 +143,8 @@ Error messages never include credentials, DSNs, or raw driver errors (driver err
 - `GET /runs/{id}/candidates|approvals|experiments` and `GET /experiments/{id}` are user-scoped (404 otherwise). Experiment detail returns the stored config, environment, `ExperimentResult` and the raw blocks (integer-ns samples, plan digests). `ExperimentSummary` carries `replicate` (0 = the approved experiment) and, on replicate 0 of a noisy round, `replication` (the `ReplicationResult`: per-candidate `verified_with_noise_warning` / `verified` / `inconclusive`, the CI range across experiments, and the experiment IDs; ADR-0019).
 - `POST /approvals/{id}/decision`: `approve` | `decline` | `partial` (a non-empty subset of the offered candidate ids, else 422). Only a `pending` request is decided; a repeat returns the first decision (202); an expired one is 409 `INVALID_STATE`. The transaction records the decision, adds the wait to `waiting_seconds`, moves the run `awaiting_approval → queued`, emits `approval.decided` and queues `run_resume`.
 
+**Run errors (ADR-0026).** `RunDetail.error_code` comes with `error_message`, a fixed, user-facing reason written by QueryCure (never provider text or credentials). `MODEL_UNAVAILABLE` on a completed run means no model call produced usable output; the message lists the attempts by cause.
+
 **`llm.model` (2026-10-17 audit).** Per-run model selection is not implemented: the worker uses `LLM_MODEL` (or the BYOK key's default model). A request carrying `llm.model` is refused with 422 `VALIDATION_ERROR` (field `llm.model`) instead of being accepted and ignored.
 
 Implemented in T2.11. Phase 2 rules for `POST /investigations`:

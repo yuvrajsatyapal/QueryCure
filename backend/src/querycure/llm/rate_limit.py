@@ -18,6 +18,8 @@ from querycure.core.config import FREE_ROUTER
 from querycure.core.errors import BudgetExhaustedError
 
 WINDOW_SECONDS = 60.0
+# Failure codes of attempts that never reached the provider, so used no free allowance.
+NOT_DISPATCHED_CODES = ("LLM_CONNECTION_ERROR",)
 
 
 class MinuteRateLimiter:
@@ -70,12 +72,15 @@ class DailyQuota:
                         # Only requests that went to OpenRouter free models use the allowance.
                         "AND (e.requested_model LIKE :free_suffix "
                         "     OR e.requested_model = :free_router) "
-                        "AND r.llm_credential_id IS NOT DISTINCT FROM CAST(:cred AS UUID)"
+                        "AND r.llm_credential_id IS NOT DISTINCT FROM CAST(:cred AS UUID) "
+                        # A refused connection never reached the provider (E2E audit O6).
+                        "AND coalesce(e.error->>'code', '') <> ALL(CAST(:local AS TEXT[]))"
                     ),
                     {
                         "free_suffix": "%:free",
                         "free_router": FREE_ROUTER,
                         "cred": self.credential_id,
+                        "local": list(NOT_DISPATCHED_CODES),
                     },
                 )
             ).scalar_one()

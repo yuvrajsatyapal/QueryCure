@@ -19,6 +19,7 @@ from langgraph.runtime import Runtime
 
 from querycure.agents.agent_runner import AgentFailedError, run_agent
 from querycure.agents.citations import CitationReport
+from querycure.agents.claims import ActionRef, claim_context, index_columns
 from querycure.agents.fencing import Fence
 from querycure.agents.nodes.optimization_engineer import baseline_sql
 from querycure.agents.nodes.run_experiment import experiment_id_for
@@ -66,6 +67,21 @@ def candidate_lines(inputs: AuditInputs, assessment: AuditAssessment) -> list[st
     return lines
 
 
+def audit_actions(inputs: AuditInputs, assessment: AuditAssessment) -> list[ActionRef]:
+    """What each arm changes and whether it stands verified after the deterministic checks:
+    the narrative may only recommend a change that does (ADR-0026)."""
+    verdicts = {a.arm: a.verdict for a in assessment.candidates}
+    return [
+        ActionRef(
+            arm=arm.arm,
+            kind=arm.kind,
+            columns=frozenset().union(*(index_columns(d) for d in arm.ddl)),
+            verified=verdicts.get(arm.arm) in VERIFIED_VERDICTS,
+        )
+        for arm in inputs.config.candidates
+    ]
+
+
 def apply_concerns(
     assessment: AuditAssessment, concerns: list[AuditConcern]
 ) -> list[CandidateAudit]:
@@ -98,11 +114,18 @@ async def _narrative(
 ) -> AuditNarrative:
     sql = await baseline_sql(ctx, state) or inputs.config.baseline_query
     async with ctx.db().connect() as conn:
-        evidence = [e for e in await list_evidence(conn, ctx.run_id) if e.kind in _AUDITED_KINDS]
+        everything = await list_evidence(conn, ctx.run_id)
+    evidence = [e for e in everything if e.kind in _AUDITED_KINDS]
     arms = frozenset(c.arm for c in assessment.candidates)
+    claims = claim_context(
+        everything,
+        query_sql=sql,
+        actions=audit_actions(inputs, assessment),
+        verdicts={a.arm: a.verdict for a in assessment.candidates},
+    )
 
     def judge(output: AuditNarrative, kinds: Any) -> tuple[AuditNarrative, CitationReport]:
-        return judge_audit(output, kinds, arms)
+        return judge_audit(output, kinds, arms, claims)
 
     result = await run_agent(
         ctx,

@@ -20,6 +20,7 @@ from querycure.core.errors import QueryCureError
 from querycure.domain.investigation import Evidence
 from querycure.domain.runs import ExecutionMode
 from querycure.evidence.builders import (
+    StatsOrigin,
     context_summary,
     declared_schema_evidence,
     plan_evidence,
@@ -50,30 +51,33 @@ def _tool_error(run_id: uuid.UUID, step: str, exc: QueryCureError) -> Evidence:
 
 def _opener(
     ctx: RunContext, state: InvestigationState
-) -> AbstractAsyncContextManager[Inspector] | None:
-    """Mode B: the user's connection. Mode C only: a throwaway clone of the demo workload."""
+) -> tuple[AbstractAsyncContextManager[Inspector], StatsOrigin] | None:
+    """Mode B: the user's connection. Mode C only: a throwaway clone of the demo workload,
+    whose cumulative statistics counters were reset by cloning (E2E audit O3)."""
     modes = state.get("modes", [])
     if ExecutionMode.LIVE_INSPECTION.value in modes:
         if ctx.inspectors is None or state.get("connection_id") is None:
             return None
-        return ctx.inspectors.open(uuid.UUID(str(state["connection_id"])))
+        return ctx.inspectors.open(uuid.UUID(str(state["connection_id"]))), "live"
     workload = state.get("workload_id")
     if ExecutionMode.SANDBOX_BENCHMARK.value in modes and workload:
         if ctx.context_inspector is not None:
             opened: AbstractAsyncContextManager[Inspector] = ctx.context_inspector(
                 workload, ctx.run_id
             )
-            return opened
+            return opened, "sandbox_clone"
         if ctx.sandbox is not None:
-            return sandbox_inspector(ctx.sandbox, workload_id=workload, run_id=ctx.run_id)
+            clone = sandbox_inspector(ctx.sandbox, workload_id=workload, run_id=ctx.run_id)
+            return clone, "sandbox_clone"
     return None
 
 
 async def _live(ctx: RunContext, state: InvestigationState, sql: str) -> tuple[list[Evidence], Any]:
     engine = ctx.db()
-    opener = _opener(ctx, state)
-    if opener is None:
+    opened = _opener(ctx, state)
+    if opened is None:
         return [], None
+    opener, origin = opened
     query = state.get("query") or {}
     tables = [TableRef.model_validate(t) for t in query.get("tables", [])]
     items: list[Evidence] = []
@@ -112,7 +116,7 @@ async def _live(ctx: RunContext, state: InvestigationState, sql: str) -> tuple[l
                             role="context.schema_snapshot",
                             produced_by=NODE,
                         )
-                    items += schema_evidence(ctx.run_id, snap_art.sha256, snapshot)
+                    items += schema_evidence(ctx.run_id, snap_art.sha256, snapshot, origin=origin)
                 except QueryCureError as exc:
                     items.append(_tool_error(ctx.run_id, "schema_snapshot", exc))
     except QueryCureError as exc:

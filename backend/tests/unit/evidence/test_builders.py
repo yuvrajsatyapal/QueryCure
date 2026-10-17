@@ -1,10 +1,12 @@
 """Deterministic evidence (T2.6): stable IDs, summaries from data, no LLM involved."""
 
+import datetime as dt
 import json
 import uuid
 from pathlib import Path
 
 from querycure.connectors.models import ColumnStats, IndexInfo, SchemaSnapshot, TableStats
+from querycure.domain.investigation import Evidence
 from querycure.evidence.builders import (
     context_summary,
     declared_schema_evidence,
@@ -193,3 +195,92 @@ def test_long_values_never_break_the_summary_limit() -> None:
 
     for e in plan_evidence(RUN, "f" * 64, tree, compute_metrics(tree), provenance="imported"):
         assert len(e.summary) <= 300
+
+
+# --- O3 (E2E audit 2026-10-17): planner statistics vs cumulative counters ---
+
+
+def _table(**overrides: object) -> TableStats:
+    # The run-2 sandbox clone of orders_ecommerce@v1:sf=0.1: planner statistics were copied
+    # from the template (reltuples, pg_stats), cumulative counters were reset by cloning.
+    base: dict[str, object] = {
+        "schema_name": "public", "name": "orders", "kind": "r", "estimated_rows": 100_000.0,
+        "pages": 875, "total_bytes": 9_469_952, "n_live_tup": 0, "n_dead_tup": 0,
+        "n_mod_since_analyze": 0, "seq_scan": 0, "idx_scan": 0, "last_analyze": None,
+        "last_autoanalyze": None,
+    }  # fmt: skip
+    base.update(overrides)
+    return TableStats.model_validate(base)
+
+
+def _column(name: str, analyzed: bool = True) -> ColumnStats:
+    return ColumnStats(
+        schema_name="public", table_name="orders", name=name, data_type="bigint",
+        not_null=True, position=1, null_frac=0.0 if analyzed else None,
+        n_distinct=-1.0 if analyzed else None, avg_width=8 if analyzed else None,
+        correlation=0.01 if analyzed else None,
+    )  # fmt: skip
+
+
+def _snapshot(table: TableStats, analyzed: bool = True) -> SchemaSnapshot:
+    cols = [_column(n, analyzed) for n in ("id", "customer_id", "status", "total", "created_at")]
+    return SchemaSnapshot(tables=[table], columns=cols, indexes=[], unresolved=[])
+
+
+def _table_stat(items: list[Evidence]) -> Evidence:
+    return next(e for e in items if e.kind == "table_stat")
+
+
+def test_clone_counters_are_marked_reset_and_never_read_as_never_analyzed() -> None:
+    ev = _table_stat(schema_evidence(RUN, "d" * 64, _snapshot(_table()), origin="sandbox_clone"))
+
+    assert "never" not in ev.summary
+    assert "seq scans" not in ev.summary
+    assert "reset" in ev.summary
+    assert "sandbox clone" in ev.summary
+    assert "planner statistics present (5 columns)" in ev.summary
+    assert ev.data["planner_stats"] == "present"
+    assert ev.data["counters"] == "reset_by_clone"
+    assert ev.data["freshness"] == "unknown"
+    assert ev.data["stats_origin"] == "sandbox_clone"
+
+
+def test_live_table_with_recorded_analyze_keeps_its_summary() -> None:
+    when = dt.datetime(2026, 10, 1, tzinfo=dt.UTC)
+    table = _table(n_live_tup=100_000, seq_scan=12, idx_scan=3, last_analyze=when)
+    ev = _table_stat(schema_evidence(RUN, "d" * 64, _snapshot(table)))
+
+    assert ev.summary == (
+        "Table public.orders: ~100,000 rows, 9.0 MiB, 12 seq scans / 3 index scans; "
+        "last analyzed 2026-10-01"
+    )
+    assert ev.data["counters"] == "live"
+    assert ev.data["freshness"] == "not_stale"
+
+
+def test_live_table_without_analyze_time_but_with_planner_stats_is_ambiguous() -> None:
+    table = _table(n_live_tup=100_000, seq_scan=12, idx_scan=3)
+    ev = _table_stat(schema_evidence(RUN, "d" * 64, _snapshot(table)))
+
+    assert "never" not in ev.summary
+    assert "no analyze recorded" in ev.summary
+    assert "planner statistics present" in ev.summary
+    assert ev.data["freshness"] == "unknown"
+
+
+def test_table_without_planner_statistics_is_never_analyzed() -> None:
+    table = _table(estimated_rows=None, n_live_tup=100_000)
+    ev = _table_stat(schema_evidence(RUN, "d" * 64, _snapshot(table, analyzed=False)))
+
+    assert "never analyzed" in ev.summary
+    assert ev.data["planner_stats"] == "absent"
+    assert ev.data["freshness"] == "never_analyzed"
+
+
+def test_many_changes_since_analyze_mark_statistics_stale() -> None:
+    when = dt.datetime(2026, 10, 1, tzinfo=dt.UTC)
+    table = _table(n_live_tup=100_000, n_mod_since_analyze=40_000, last_analyze=when)
+    ev = _table_stat(schema_evidence(RUN, "d" * 64, _snapshot(table)))
+
+    assert ev.data["freshness"] == "stale"
+    assert "40,000 rows changed since" in ev.summary

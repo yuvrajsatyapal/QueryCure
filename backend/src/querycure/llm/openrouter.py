@@ -32,6 +32,11 @@ class FreeQuotaExhaustedError(Exception):
     """The free tier's daily allowance (or credits) is used up: stop, never pay instead."""
 
 
+class ModelUnavailableError(Exception):
+    """The provider has no endpoint for this model (removed, renamed, or none honours
+    `response_format`): retrying the same model cannot help, a fallback model might."""
+
+
 class PaidUsageError(Exception):
     """Free-only mode met a non-free model id (refused before dispatch) or a response that
     reported a non-zero (or no) cost."""
@@ -46,6 +51,8 @@ def _classify(exc: openai.APIError) -> Exception:
         return ModelRateLimitError("rate limited")
     if isinstance(exc, openai.APIStatusError) and exc.status_code == 402:
         return FreeQuotaExhaustedError("payment required")
+    if isinstance(exc, openai.NotFoundError) or "no endpoints found" in message:
+        return ModelUnavailableError("model unavailable")
     if isinstance(exc, openai.APITimeoutError):
         return ModelTimeoutError("provider timeout")
     if isinstance(exc, openai.APIConnectionError):

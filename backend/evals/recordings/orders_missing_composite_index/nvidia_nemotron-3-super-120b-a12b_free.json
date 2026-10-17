@@ -2,70 +2,52 @@
   "schema_version": 1,
   "case": "orders_missing_composite_index",
   "model": "nvidia/nemotron-3-super-120b-a12b:free",
-  "recorded_at": "2026-10-12",
+  "recorded_at": "2026-10-17",
   "provenance": "recorded",
   "entries": {
-    "1d3e5921390c1d3362d93a48889c2385abff1c4b1d86bc7daa519f42f266d5fc": [
+    "186fbfe4318d24cb9553fbd3176c40b4a5f1fca63ea72b22171c136177f0ce30": [
       {
         "text": "{\"action\": \"call_tool\", \"tool\": \"estimate_index_size\", \"args\": {\"table\": \"orders\", \"columns\": [\"customer_id\", \"created_at\"]}}",
         "served_model": "nvidia/nemotron-3-super-120b-a12b:free",
         "served_by": "Nvidia",
-        "input_tokens": 2066,
-        "output_tokens": 319
-      }
-    ],
-    "1e19108c6e17ed0607c7158467cafae21ace82065fb50f670a17f7f1a2605b03": [
-      {
-        "text": "{\"action\": \"call_tool\", \"tool\": \"get_column_stats\", \"args\": {\"table\": \"orders\", \"column\": \"customer_id\"}}",
-        "served_model": "nvidia/nemotron-3-super-120b-a12b:free",
-        "served_by": "Nvidia",
-        "input_tokens": 2168,
-        "output_tokens": 682
+        "input_tokens": 2087,
+        "output_tokens": 385
       }
     ],
     "466f47cf1d0c32298dcf79c254f131c5fdfa788d3c1b18948cd60aae01fd2307": [
       {
-        "text": "{\"agents\": [\"query_analyst\", \"index_strategist\"]}",
+        "text": "{\"agents\": [\"query_analyzer\", \"index_strategist\"], \"focus\": [\"Seq Scan on orders (ev_7b679c2f8b76) accounts for 62.6 ms (91.1% runtime) and filters customer_id = 1024, removing 989,988 rows.\", \"Gather Merge node (ev_64e1c95e824b) overestimates rows by 433.3x (est 8,666 vs actual 20).\", \"Sort node (ev_0c61a3d3753e) overestimates rows by 270.8x and performs top-N heapsort on created_at DESC.\", \"No index on customer_id or created_at; only orders_total_idx on total (ev_54218f8fb7de).\"], \"rationale\": \"The query_analyzer will examine the plan nodes indicated by the evidence IDs to identify why the query is slow, focusing on the expensive Seq Scan, row estimate errors in Gather Merge and Sort, and the LIMIT/ordering. The index_strategist will assess existing indexes versus the query's predicates (customer_id) and ordering (created_at) to determine if a suitable index is missing.\"}",
         "served_model": "nvidia/nemotron-3-super-120b-a12b:free",
         "served_by": "Nvidia",
-        "input_tokens": 1115,
-        "output_tokens": 1819
+        "input_tokens": 1109,
+        "output_tokens": 1982
       }
     ],
-    "a13f6f9d8790b12d8a1e6a0ff5b4652624b97fd2c257a9eee07b3d6bbc52437b": [
+    "7d20ce6bf9250bb91152e6cdd4d801da6d1770a503bec538dc444dd479fe64aa": [
       {
-        "text": "{\"agents\": [\"query_analyzer\", \"index_strategist\"], \"focus\": [\"Seq Scan on orders with filter (customer_id = 1024) removed 989,988 rows (ev_7b679c2f8b76)\", \"Gather Merge overestimates rows 433x (est 8,666 vs actual 20) (ev_64e1c95e824b)\", \"Sort overestimates rows 270x (est 4,333 vs actual 16) (ev_0c61a3d3753e)\", \"No index on customer_id or created_at to support filter and order; plan shows Seq Scan as hottest node (ev_5ca0d4478525)\"], \"rationale\": \"The query is slow because it performs a sequential scan on the orders table, applying a filter on customer_id that removes 989,988 rows (ev_7b679c2f8b76), and there is no index on customer_id or created_at to support the filter and ORDER BY created_at DESC (ev_5ca0d4478525 shows the Seq Scan as the hottest node). The executor also overestimates row counts in the Gather Merge (433x) and Sort (270x) nodes (ev_64e1c95e824b, ev_0c61a3d3753e), leading to inefficient parallel work and unnecessary sorting. Adding an index on (customer_id, created_at DESC) would allow an index scan that directly retrieves the needed rows in order, eliminating the sequential scan and excessive sorting.\"}",
+        "text": "{\"action\": \"final\", \"analysis\": {\"summary\": \"The query is slow because it performs a sequential scan of the entire orders table, applying a filter on customer_id that discards ~989k rows, and lacks an index on customer_id to avoid the scan. Although a sort is required for ORDER BY created_at DESC, its cost is minor; the main bottleneck is the scan. Misestimates in parallel gather and sort nodes stem from missing statistics but do not drive the runtime.\", \"findings\": [{\"title\": \"Seq Scan on orders consumes 91% of runtime\", \"detail\": \"Seq Scan node (ev_7b679c2f8b76) accounts for 62.6 ms self (91.1% of total 68.7 ms), scanning the whole table and applying filter customer_id = 1024, which removes 989,988 rows.\", \"severity\": \"high\", \"evidence_ids\": [\"ev_7b679c2f8b76\", \"ev_5ca0d4478525\"]}, {\"title\": \"Missing index on customer_id forces full table scan\", \"detail\": \"No index exists on customer_id (or created_at); only index on total (ev_54218f8fb7de) is present, so the planner cannot use an index to locate rows for customer_id = 1024, resulting in the sequential scan.\", \"severity\": \"high\", \"evidence_ids\": [\"ev_54218f8fb7de\"]}, {\"title\": \"Sort overestimates rows but uses cheap top-N heapsort\", \"detail\": \"Sort node (ev_0c61a3d3753e) estimates 4,333 rows vs actual 16 rows per loop (270.8x overestimate) yet only costs 0.5 ms (0.8% runtime) because it performs a top-N heapsort limited by LIMIT 20.\", \"severity\": \"low\", \"evidence_ids\": [\"ev_0c61a3d3753e\", \"ev_e0228e1a57af\"]}, {\"title\": \"Gather Merge overestimates rows due to lack of statistics\", \"detail\": \"Gather Merge node (ev_64e1c95e824b) estimates 8,666 rows vs actual 20 (433.3x overestimate), adding 5.6 ms overhead, but this overestimate stems from missing column statistics, not from the actual work.\", \"severity\": \"low\", \"evidence_ids\": [\"ev_64e1c95e824b\"]}]}}",
         "served_model": "nvidia/nemotron-3-super-120b-a12b:free",
         "served_by": "Nvidia",
-        "input_tokens": 1191,
-        "output_tokens": 1721
+        "input_tokens": 2126,
+        "output_tokens": 1843
       }
     ],
-    "b3b201d16f84de549f2a5d8877941174cd8c0a2e06b7c0ba085a6e6e4a5f1acb": [
+    "8b7bd706ed5ee8cee85295ebd538c3fc3410aaee29b8a1db81031fd5a84af2d4": [
       {
-        "text": "{\"action\": \"final\", \"analysis\": {\"summary\": \"The query is slow because it performs a sequential scan of the whole orders table to find a few rows for a specific customer, then sorts them, due to missing indexes on customer_id and created_at. Poor selectivity estimates exacerbate the problem by causing the planner to overestimate work in parallel gather and sort nodes.\", \"findings\": [{\"title\": \"Seq Scan on orders is the dominant cost\", \"detail\": \"The Seq Scan node consumes 62.6 ms (91.1% of total runtime) and removes 989,988 rows via the filter customer_id = 1024, showing that the entire table is scanned to return only a few rows.\", \"severity\": \"high\", \"evidence_ids\": [\"ev_5ca0d4478525\", \"ev_7b679c2f8b76\"]}, {\"title\": \"No supporting index for filter or order\", \"detail\": \"The only existing index is orders_total_idx on column total; there is no index on customer_id or created_at, forcing a sequential scan and a separate sort operation.\", \"severity\": \"high\", \"evidence_ids\": [\"ev_5f74e00064da\", \"ev_5ca0d4478525\", \"ev_0a5b05535215\", \"ev_5fb580f455d0\"]}, {\"title\": \"Severe overestimation in Gather Merge and Sort due to bad selectivity estimates\", \"detail\": \"Gather Merge estimates 8,666 rows but sees only 20 (433\u00d7 overestimate). Sort estimates 4,333 rows but sees 16 per loop (270\u00d7 overestimate). These errors stem from the planner\u2019s overestimate of rows matching customer_id = 1024.\", \"severity\": \"medium\", \"evidence_ids\": [\"ev_64e1c95e824b\", \"ev_0c61a3d3753e\", \"ev_7b679c2f8b76\"]}, {\"title\": \"LIMIT 20 cannot stop early without matching index\", \"detail\": \"Because there is no index on (customer_id, created_at), the executor must read and sort all rows that satisfy the filter before applying the LIMIT, as shown by the Sort node using a top\u2011N heapsort but still overestimating input size.\", \"severity\": \"medium\", \"evidence_ids\": [\"ev_e0228e1a57af\", \"ev_0c61a3d3753e\", \"ev_7b679c2f8b76\"]}]}}",
+        "text": "{\"hypotheses\": [{\"statement\": \"The query is slow because it performs a sequential scan on the orders table due to a missing index on customer_id, which accounts for 91% of runtime.\", \"category\": \"missing_index\", \"supporting_evidence\": [\"ev_7b679c2f8b76\", \"ev_54218f8fb7de\", \"ev_5f74e00064da\", \"ev_5ca0d4478525\"], \"contradicting_evidence\": [], \"confidence\": \"high\", \"uncertainty_notes\": \"It is unknown how index maintenance would affect write workloads, whether a composite index on (customer_id, created_at) would be more beneficial than a single-column index, or if table size or query patterns may change over time.\", \"verification_method\": \"explain_compare\"}], \"summary\": \"The query is slow because it performs a sequential scan on the orders table due to a missing index on customer_id, which accounts for 91% of runtime. Adding an appropriate index would likely eliminate the scan and improve performance.\", \"no_action_evidence\": []}",
         "served_model": "nvidia/nemotron-3-super-120b-a12b:free",
         "served_by": "Nvidia",
-        "input_tokens": 2111,
-        "output_tokens": 1952
+        "input_tokens": 2223,
+        "output_tokens": 1170
       }
     ],
-    "c59d92976edc8a998fa7f08be48edb5421d68d77e30051efb4dc639dd24f17e3": [
+    "fbb923d3d11f62855c7e3f627d230b0c149169cf9d69cedcab8b8104ddd05937": [
       {
-        "text": "{\"action\": \"final\", \"analysis\": {\"summary\": \"The query performs a sequential scan because no index supports the filter on customer_id and the ordering by created_at. Adding an index on (customer_id, created_at DESC) could allow an index scan that satisfies both the filter and the order, eliminating the sort and the scan. The existing index on total is not useful for this query. The size of the proposed index cannot be estimated without column statistics.\", \"findings\": [{\"title\": \"Missing index causing sequential scan\", \"detail\": \"The plan shows a Seq Scan on orders with filter (customer_id = 1024) removing 989,988 rows (ev_7b679c2f8b76) and is the hottest node (ev_5ca0d4478525). The query references customer_id and created_at (ev_0a5b05535215) and orders by created_at DESC (ev_5fb580f455d0) with LIMIT 20 (ev_e0228e1a57af). No index exists on these columns; the only index is on total (ev_54218f8fb7de).\", \"severity\": \"high\", \"evidence_ids\": [\"ev_5ca0d4478525\", \"ev_7b679c2f8b76\", \"ev_0a5b05535215\", \"ev_5fb580f455d0\", \"ev_e0228e1a57af\", \"ev_54218f8fb7de\"]}, {\"title\": \"Existing index is unused for this query\", \"detail\": \"The only declared index is orders_total_idx on orders (total) (ev_54218f8fb7de). The query does not reference the total column, and the plan uses a sequential scan instead of any index scan (ev_5ca0d4478525), indicating this index is not helpful for the current query.\", \"severity\": \"low\", \"evidence_ids\": [\"ev_54218f8fb7de\", \"ev_5ca0d4478525\"]}, {\"title\": \"Proposed index size cannot be estimated\", \"detail\": \"An index on (customer_id, created_at DESC) would match the filter and ordering, allowing index-only retrieval of the first 20 rows. However, estimate_index_size returned that the width of column customer_id is unknown (07af915fe0200cf4), and column statistics for orders.customer_id are unavailable (1d430fb14e5a294f). Without these statistics, the index size cannot be estimated.\", \"severity\": \"info\", \"evidence_ids\": [\"07af915fe0200cf4\", \"1d430fb14e5a294f\", \"ev_0a5b05535215\", \"ev_5fb580f455d0\", \"ev_e0228e1a57af\"]}]}}",
+        "text": "{\"action\": \"final\", \"analysis\": {\"summary\": \"The query is slow because it performs a sequential scan on orders to filter by customer_id, removing almost all rows, and then sorts the few matching rows. No index supports the filter or the ordering. An index on (customer_id, created_at) could satisfy both the equality filter and the ORDER BY, eliminating the sort and drastically reducing rows scanned, but its size cannot be determined without column widths.\", \"findings\": [{\"title\": \"Sequential scan dominates runtime\", \"detail\": \"Seq Scan on orders accounts for 62.6 ms (91.1% of runtime) and filters customer_id = 1024, removing 989,988 rows.\", \"severity\": \"high\", \"evidence_ids\": [\"ev_7b679c2f8b76\"]}, {\"title\": \"No supporting index exists\", \"detail\": \"Only index present is orders_total_idx on column total; there is no index on customer_id or created_at.\", \"severity\": \"high\", \"evidence_ids\": [\"ev_54218f8fb7de\", \"ev_5f74e00064da\"]}, {\"title\": \"Index could serve filter and order together\", \"detail\": \"An index on (customer_id, created_at) with equality column first and sort column second could be used to locate rows for customer_id = 1024 and return them already sorted by created_at DESC, avoiding the separate Sort node.\", \"severity\": \"medium\", \"evidence_ids\": [\"ev_0a5b05535215\", \"ev_5fb580f455d0\", \"ev_0c61a3d3753e\"]}, {\"title\": \"Index size unknown due to missing column width\", \"detail\": \"estimate_index_size reports width of column customer_id is unknown, so the size of the proposed index cannot be determined.\", \"severity\": \"low\", \"evidence_ids\": [\"ev_d9101ce15aac2e71\"]}, {\"title\": \"Existing index unused for this query\", \"detail\": \"The orders_total_idx on total is not referenced in the query filter, ordering, or SELECT list, so it provides no benefit.\", \"severity\": \"low\", \"evidence_ids\": [\"ev_54218f8fb7de\"]}]}}",
         "served_model": "nvidia/nemotron-3-super-120b-a12b:free",
         "served_by": "Nvidia",
-        "input_tokens": 2278,
-        "output_tokens": 1638
-      }
-    ],
-    "c7f920425eb2cdc092de42f6861cb45c33ccc38c0350c8d9de15f47146197594": [
-      {
-        "text": "{\"hypotheses\": [{\"statement\": \"The query is slow because there is no index on the filter column customer_id and the ordering column created_at, forcing a sequential scan that reads almost the whole table and discards 989,988 rows before returning only 20 rows.\", \"category\": \"missing_index\", \"supporting_evidence\": [\"ev_5ca0d4478525\", \"ev_7b679c2f8b76\", \"ev_0a5b05535215\", \"ev_5fb580f455d0\", \"ev_e0228e1a57af\", \"ev_54218f8fb7de\", \"ev_5f74e00064da\"], \"contradicting_evidence\": [], \"confidence\": \"high\", \"uncertainty_notes\": \"The exact performance gain from adding the index cannot be known without benchmarking, but the index would allow the planner to avoid the sequential scan and sort.\", \"verification_method\": \"explain_compare\"}, {\"statement\": \"The planner severely overestimates the number of rows matching customer_id = 1024 due to missing or stale statistics, causing excessive work in Gather Merge and Sort nodes.\", \"category\": \"cardinality_misestimate\", \"supporting_evidence\": [\"ev_64e1c95e824b\", \"ev_0c61a3d3753e\", \"ev_7b679c2f8b76\", \"ev_5ca0d4478525\"], \"contradicting_evidence\": [], \"confidence\": \"medium\", \"uncertainty_notes\": \"It is unknown whether the statistics are simply absent or outdated; checking pg_stats would clarify.\", \"verification_method\": \"stats_refresh\"}, {\"statement\": \"Without an index that matches both the filter and the ORDER BY, the executor must sort all qualifying rows before applying the LIMIT, leading to unnecessary sort work.\", \"category\": \"inefficient_sort\", \"supporting_evidence\": [\"ev_e0228e1a57af\", \"ev_0c61a3d3753e\", \"ev_5ca0d4478525\", \"ev_7b679c2f8b76\", \"ev_5fb580f455d0\"], \"contradicting_evidence\": [], \"confidence\": \"medium\", \"uncertainty_notes\": \"The precise reduction in sort cost after creating the appropriate index is unknown without testing.\", \"verification_method\": \"explain_compare\"}], \"summary\": \"The dominant issue is a missing index on (customer_id, created_at) causing a costly sequential scan and overestimation. Adding such an index should allow index-only retrieval of the first 20 rows, eliminating the seq scan and sort. Statistics may also be stale, contributing to poor planner estimates.\", \"no_action_evidence\": []}",
-        "served_model": "nvidia/nemotron-3-super-120b-a12b:free",
-        "served_by": "Nvidia",
-        "input_tokens": 2476,
-        "output_tokens": 2551
+        "input_tokens": 2189,
+        "output_tokens": 1464
       }
     ]
   }

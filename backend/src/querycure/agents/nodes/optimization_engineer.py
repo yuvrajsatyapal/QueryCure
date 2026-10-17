@@ -14,6 +14,7 @@ from langgraph.runtime import Runtime
 from querycure.agents.agent_runner import AgentFailedError, run_agent
 from querycure.agents.candidates import judge_candidates, rejection_lines, to_candidates
 from querycure.agents.citations import CitationReport
+from querycure.agents.claims import claim_context
 from querycure.agents.fencing import Fence
 from querycure.agents.outputs import CandidateSet
 from querycure.agents.prompts import optimization_engineer as prompts
@@ -71,12 +72,18 @@ async def optimization_engineer(
     seen = {c.sql_sha256 for c in earlier if c.round < round}
     keys = {h.key for h in hypotheses}
     cap = ctx.guard.budget.candidates_per_round
+    claims = claim_context(evidence, query_sql=sql)
 
     def judge(
         output: CandidateSet, kinds: Mapping[str, str]
     ) -> tuple[CandidateSet, CitationReport]:
         return judge_candidates(
-            output, baseline=sql, hypothesis_keys=keys, seen_digests=seen, max_candidates=cap
+            output,
+            baseline=sql,
+            hypothesis_keys=keys,
+            seen_digests=seen,
+            max_candidates=cap,
+            claims=claims,
         )
 
     try:

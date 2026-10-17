@@ -576,3 +576,24 @@ async def test_daily_quota_counts_only_free_openrouter_requests(
         )
 
     assert await quota.used_today() == before + 1
+
+
+async def test_daily_quota_ignores_attempts_that_never_reached_the_provider(
+    app_engine: AsyncEngine, owner: psycopg.Connection
+) -> None:
+    # E2E audit O6: 12 connection-refused attempts used 12 of the 45 free requests.
+    from querycure.llm.rate_limit import DailyQuota
+
+    run_id = await create_run(app_engine)
+    quota = DailyQuota(app_engine, limit=1000)
+    before = await quota.used_today()
+    for code in ("LLM_CONNECTION_ERROR", "LLM_TIMEOUT", "LLM_INVALID_OUTPUT", None):
+        owner.execute(
+            "INSERT INTO agent_executions (run_id, agent, node, invocation_key, attempt, "
+            "prompt_version, model, requested_model, status, error) VALUES (%s, 'qa', 'qa', "
+            "%s, 1, 'p@1', 'm', 'nvidia/nemotron-3-super-120b-a12b:free', 'failed', "
+            "CAST(%s AS JSONB))",
+            (run_id, str(uuid.uuid4()), None if code is None else json.dumps({"code": code})),
+        )
+
+    assert await quota.used_today() == before + 3

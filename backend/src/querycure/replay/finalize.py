@@ -48,6 +48,9 @@ class Conclusion:
     materiality: dict[str, Any] | None = None
     no_action_evidence: list[str] = field(default_factory=list)
     error: dict[str, Any] | None = None
+    # ADR-0026: sentences of the AI summary removed for contradicting final verdicts. Only
+    # written when something was removed; report-builder@1 does not read it.
+    narrative_check: dict[str, Any] | None = None
 
 
 @dataclass(frozen=True)
@@ -235,6 +238,11 @@ async def finalize_run(
                 "no_action_evidence": sorted(conclusion.no_action_evidence),
                 "usage": run.usage,
                 "error": conclusion.error,
+                **(
+                    {"narrative_check": conclusion.narrative_check}
+                    if conclusion.narrative_check
+                    else {}
+                ),
             }
         ),
     )

@@ -146,3 +146,15 @@ def test_listen_url_falls_back_to_the_engine_url_when_none_is_configured() -> No
     engine = create_async_engine("postgresql+psycopg://u:pw@127.0.0.1:5432/d")
 
     assert listen_url(Settings(_env_file=None), engine) == "postgresql://u:pw@127.0.0.1:5432/d"
+
+
+def test_an_empty_fallback_model_means_no_fallback(monkeypatch: pytest.MonkeyPatch) -> None:
+    # .env.example ships `LLM_FALLBACK_MODEL=` (ADR-0026): empty must not fail the free guard.
+    monkeypatch.setenv("LLM_FALLBACK_MODEL", "")
+    assert Settings(_env_file=None).llm_fallback_model is None
+
+
+def test_a_non_free_fallback_model_is_still_refused(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("LLM_FALLBACK_MODEL", "openai/gpt-5")
+    with pytest.raises(ValueError, match="LLM_FALLBACK_MODEL"):
+        Settings(_env_file=None)

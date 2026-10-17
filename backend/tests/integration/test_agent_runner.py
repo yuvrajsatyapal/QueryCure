@@ -207,7 +207,7 @@ async def test_provider_outage_fails_the_agent_but_records_the_calls(
     with pytest.raises(AgentFailedError) as info:
         await invoke(ctx, client)
 
-    assert info.value.details == [{"code": "LLM_UNAVAILABLE"}]
+    assert info.value.details == [{"code": "LLM_UNAVAILABLE", "cause": "LLM_RATE_LIMITED"}]
     rows = executions(owner, ctx.run_id)
     assert [r[1] for r in rows] == ["failed"] * 4
     assert {r[5] for r in rows} == {"LLM_RATE_LIMITED"}

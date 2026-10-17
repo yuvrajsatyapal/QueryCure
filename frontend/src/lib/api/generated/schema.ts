@@ -2633,6 +2633,8 @@ export interface components {
             created_at: string;
             /** Error Code */
             error_code: string | null;
+            /** Error Message */
+            error_message?: string | null;
             /**
              * Finalized
              * @default false

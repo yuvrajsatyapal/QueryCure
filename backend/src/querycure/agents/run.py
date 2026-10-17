@@ -31,7 +31,7 @@ from querycure.events.emitter import RunEventSink, change_status
 from querycure.llm.credentials import UserCredential, resolve_api_key, resolve_user_credential
 from querycure.llm.providers import build_client
 from querycure.llm.rate_limit import DailyQuota, LlmGate
-from querycure.llm.structured import RetryPolicy
+from querycure.llm.structured import ModelHealth, RetryPolicy
 from querycure.llm.stub import StubClient
 from querycure.replay.finalize import Conclusion, finalize_run
 from querycure.sandbox.provisioner import SandboxProvisioner
@@ -193,6 +193,7 @@ async def execute_run(
         llm=clients,
         llm_gate=gate,
         llm_retry=RetryPolicy(call_timeout_seconds=services.settings.llm_call_timeout_seconds),
+        llm_health=ModelHealth(threshold=services.settings.llm_circuit_threshold),
         llm_slots=asyncio.Semaphore(services.settings.llm_max_concurrency),
         sandbox=services.sandbox,
         engine_options=services.engine_options or EngineOptions(),

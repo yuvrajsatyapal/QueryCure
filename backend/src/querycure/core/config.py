@@ -135,6 +135,10 @@ class Settings(BaseSettings):
     llm_fallback_model: str | None = Field(
         default=None, validation_alias=_env("LLM_FALLBACK_MODEL")
     )
+    # Consecutive failed logical calls before a model is skipped for the rest of a run.
+    llm_circuit_threshold: int = Field(
+        default=2, ge=1, le=10, validation_alias=_env("LLM_CIRCUIT_THRESHOLD")
+    )
     openrouter_base_url: str = Field(
         default="https://openrouter.ai/api/v1", validation_alias=_env("OPENROUTER_BASE_URL")
     )
@@ -193,6 +197,12 @@ class Settings(BaseSettings):
     @classmethod
     def _blank_secret_is_unset(cls, value: object) -> object:
         # An empty env var must not become an empty secret (e.g. an empty bearer token).
+        return None if isinstance(value, str) and not value.strip() else value
+
+    @field_validator("llm_fallback_model", mode="before")
+    @classmethod
+    def _blank_fallback_is_unset(cls, value: object) -> object:
+        # `.env.example` ships `LLM_FALLBACK_MODEL=`: empty means no fallback (ADR-0026).
         return None if isinstance(value, str) and not value.strip() else value
 
     @field_validator("master_key")

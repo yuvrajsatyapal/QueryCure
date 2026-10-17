@@ -10,6 +10,7 @@ import uuid
 from collections.abc import Collection, Mapping
 
 from querycure.agents.citations import CitationReport
+from querycure.agents.claims import ClaimContext, filter_text
 from querycure.agents.outputs import CandidateDraft, CandidateSet
 from querycure.benchmark.engine import sql_digest
 from querycure.core.errors import QueryCureError
@@ -38,9 +39,20 @@ def judge_candidates(
     hypothesis_keys: Collection[str],
     seen_digests: Collection[str],
     max_candidates: int,
+    claims: ClaimContext | None = None,
 ) -> tuple[CandidateSet, CitationReport]:
     kept: list[CandidateDraft] = []
     problems: list[str] = []
+    claim_problems: list[str] = []
+
+    def ground(text: str) -> str:
+        # Prose only: the SQL decides what is measured, the benchmark decides the verdict.
+        if claims is None or not text:
+            return text
+        out = filter_text(text, claims)
+        claim_problems.extend(out.problems)
+        return out.text
+
     removed = 0
     digests = set(seen_digests)
     for index, draft in enumerate(output.candidates):
@@ -80,15 +92,20 @@ def judge_candidates(
                     "addresses_hypotheses": valid_keys,
                     "ddl": arm.ddl,
                     "query": arm.query,
-                    "expected_benefit": clean_text(draft.expected_benefit, 500),
-                    "risks": [clean_text(r, 200) for r in draft.risks],
+                    "expected_benefit": ground(clean_text(draft.expected_benefit, 500)),
+                    "risks": [g for r in draft.risks if (g := ground(clean_text(r, 200)))],
                 }
             )
         )
+    summary = ground(output.summary)
     report = CitationReport(
-        total=len(output.candidates), removed=removed, stripped_ids=0, problems=problems
+        total=len(output.candidates),
+        removed=removed,
+        stripped_ids=0,
+        problems=problems,
+        claim_problems=claim_problems,
     )
-    return output.model_copy(update={"candidates": kept}), report
+    return output.model_copy(update={"candidates": kept, "summary": summary}), report
 
 
 def to_candidates(

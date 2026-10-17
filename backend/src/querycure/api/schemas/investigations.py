@@ -79,6 +79,8 @@ class RunDetail(RunSummary):
     llm_provider: str | None
     llm_model: str | None
     error_code: str | None
+    # A safe, user-facing reason (never provider text or credentials), e.g. MODEL_UNAVAILABLE.
+    error_message: str | None = None
     last_event_seq: int
     cancel_requested_at: dt.datetime | None
 
@@ -165,6 +167,7 @@ def run_detail(row: Any) -> RunDetail:
         llm_provider=row.llm_provider,
         llm_model=row.llm_model,
         error_code=error.get("code"),
+        error_message=error.get("message"),
         last_event_seq=row.last_event_seq,
         cancel_requested_at=row.cancel_requested_at,
         parent_run_id=row.parent_run_id,

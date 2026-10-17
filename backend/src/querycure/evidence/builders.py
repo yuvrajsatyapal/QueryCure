@@ -6,8 +6,9 @@ is also in `data`. Untrusted names pass through `quote_ident` / `clean_text`.
 
 import uuid
 from collections.abc import Sequence
+from typing import Literal
 
-from querycure.connectors.models import SchemaSnapshot
+from querycure.connectors.models import SchemaSnapshot, TableStats
 from querycure.domain.investigation import Evidence, EvidenceKind, JsonScalar, Provenance
 from querycure.evidence.ids import evidence_id
 from querycure.evidence.sanitize import clean_text, qualified, quote_ident
@@ -223,23 +224,98 @@ def _size(total_bytes: int) -> str:
     return f"{total_bytes / (1024 * 1024):,.1f} MiB"
 
 
+StatsOrigin = Literal["live", "sandbox_clone"]
+# PostgreSQL's autovacuum analyze trigger with default settings (50 rows + 10% of the table):
+# beyond it the planner statistics lag the data.
+ANALYZE_BASE_THRESHOLD = 50
+ANALYZE_SCALE_FACTOR = 0.1
+
+
+def _freshness(t: TableStats, analyzed_columns: int, counters: str) -> str:
+    """never_analyzed / stale / not_stale / unknown, from planner stats and live counters only.
+
+    `pg_stats` rows exist only after ANALYZE, so their absence means never analyzed. Usage
+    counters (`pg_stat_*`) are reset by cloning or `pg_stat_reset()`: without a recorded
+    analyze time they cannot tell how fresh the statistics are."""
+    if analyzed_columns == 0:
+        return "never_analyzed"
+    if counters != "live" or (t.last_analyze or t.last_autoanalyze) is None:
+        return "unknown"
+    if t.n_mod_since_analyze is None:
+        return "unknown"
+    rows = max(t.estimated_rows or 0.0, float(t.n_live_tup or 0))
+    limit = ANALYZE_BASE_THRESHOLD + ANALYZE_SCALE_FACTOR * rows
+    return "stale" if t.n_mod_since_analyze > limit else "not_stale"
+
+
+def _table_summary(t: TableStats, analyzed_columns: int, counters: str, freshness: str) -> str:
+    head = f"Table {qualified(t.schema_name, t.name)}: ~{_count(t.estimated_rows)} rows, "
+    head += _size(t.total_bytes)
+    planner = (
+        f"planner statistics present ({analyzed_columns} columns)"
+        if analyzed_columns
+        else "never analyzed: no planner column statistics"
+    )
+    if counters == "reset_by_clone":
+        return (
+            f"{head}; {planner}; usage counters (scans, last analyze, row changes) were reset "
+            "when the sandbox clone was created and are not evidence"
+        )
+    scans = (
+        f"{t.seq_scan if t.seq_scan is not None else '?'} seq scans / "
+        f"{t.idx_scan if t.idx_scan is not None else '?'} index scans"
+    )
+    analyzed = t.last_analyze or t.last_autoanalyze
+    if analyzed is not None:
+        text = f"{head}, {scans}; last analyzed {analyzed.date().isoformat()}"
+        if freshness == "stale":
+            text += f"; {t.n_mod_since_analyze:,} rows changed since, statistics behind the data"
+        return text
+    if analyzed_columns:
+        return (
+            f"{head}, {scans}; no analyze recorded in cumulative statistics (counters may have "
+            f"been reset); {planner}"
+        )
+    return f"{head}, {scans}; {planner}"
+
+
 def schema_evidence(
-    run_id: uuid.UUID, artifact_sha256: str, snapshot: SchemaSnapshot
+    run_id: uuid.UUID,
+    artifact_sha256: str,
+    snapshot: SchemaSnapshot,
+    *,
+    origin: StatsOrigin = "live",
 ) -> list[Evidence]:
+    """`origin="sandbox_clone"`: planner statistics were copied from the template, cumulative
+    counters were reset by CREATE DATABASE ... TEMPLATE (E2E audit O3)."""
     items: list[Evidence] = []
+    analyzed_by_table: dict[tuple[str, str], int] = {}
+    for c in snapshot.columns:
+        key = (c.schema_name, c.table_name)
+        analyzed_by_table[key] = analyzed_by_table.get(key, 0) + (c.null_frac is not None)
     for i, t in enumerate(snapshot.tables):
         analyzed = t.last_analyze or t.last_autoanalyze
-        when = analyzed.date().isoformat() if analyzed else "never"
+        analyzed_columns = analyzed_by_table.get((t.schema_name, t.name), 0)
+        live_counters = any(
+            v is not None for v in (t.seq_scan, t.idx_scan, t.n_live_tup, t.n_mod_since_analyze)
+        )
+        counters = (
+            "reset_by_clone"
+            if origin == "sandbox_clone"
+            else ("live" if live_counters else "unavailable")
+        )
+        freshness = _freshness(t, analyzed_columns, counters)
+        if analyzed_columns:
+            planner_stats = "present"
+        else:
+            planner_stats = "row_estimate_only" if t.estimated_rows is not None else "absent"
         items.append(
             _ev(
                 run_id,
                 "table_stat",
                 artifact_sha256,
                 f"/tables/{i}",
-                f"Table {qualified(t.schema_name, t.name)}: ~{_count(t.estimated_rows)} rows, "
-                f"{_size(t.total_bytes)}, {t.seq_scan if t.seq_scan is not None else '?'} seq "
-                f"scans / {t.idx_scan if t.idx_scan is not None else '?'} index scans; "
-                f"last analyzed {when}",
+                _table_summary(t, analyzed_columns, counters, freshness),
                 {
                     "table": qualified(t.schema_name, t.name),
                     "estimated_rows": t.estimated_rows,
@@ -250,6 +326,11 @@ def schema_evidence(
                     "seq_scan": t.seq_scan,
                     "idx_scan": t.idx_scan,
                     "last_analyze": analyzed.isoformat() if analyzed else None,
+                    "stats_origin": origin,
+                    "planner_stats": planner_stats,
+                    "analyzed_columns": analyzed_columns,
+                    "counters": counters,
+                    "freshness": freshness,
                 },
                 "measured",
             )

@@ -11,12 +11,13 @@ import signal
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine
 
-from querycure.core.config import Settings
+from querycure.core.config import FREE_ROUTER, Settings
 from querycure.core.errors import ConfigurationError
 from querycure.core.logging import configure_logging, get_logger
 from querycure.db.engine import make_engine
 from querycure.jobs.approvals import expire_approvals
 from querycure.jobs.handlers import build_handlers, build_services, dead_job_handler
+from querycure.llm.models import model_warning
 from querycure.sandbox.provisioner import SandboxBusyError, SandboxProvisioner
 from querycure.worker.runner import Worker, WorkerTimings
 
@@ -123,6 +124,14 @@ async def serve(worker: Worker, engine: AsyncEngine, sandbox: SandboxProvisioner
 async def main() -> None:
     settings = Settings()
     configure_logging(level=settings.log_level)
+    if settings.llm_provider != "stub":
+        for role, model in (
+            ("primary", settings.llm_model),
+            ("fallback", settings.llm_fallback_model),
+        ):
+            warning = model_warning(model) if model else None
+            if warning and not (role == "fallback" and model == FREE_ROUTER):
+                log.warning("llm_model_untested", role=role, model=model, detail=warning)
     if settings.database_url is None:
         raise ConfigurationError("DATABASE_URL is required for the worker")
     engine = make_engine(settings.database_url.get_secret_value(), **settings.engine_options())

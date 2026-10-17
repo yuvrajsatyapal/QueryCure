@@ -8,7 +8,7 @@ gets one retry with the problems listed; after that the remainder is accepted an
 
 import re
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from querycure.evidence.sanitize import clean_text
 from querycure.llm.types import ChatMessage
@@ -44,6 +44,11 @@ class CitationReport:
     removed: int
     stripped_ids: int
     problems: list[str]
+    # Deterministic grounding (agents/claims.py, ADR-0026): sentences or claims removed because
+    # they contradict recorded evidence. Never part of the retry decision: the check is
+    # deterministic, so a retry would only spend calls on the same filter.
+    claims_removed: int = 0
+    claim_problems: list[str] = field(default_factory=list)
 
     @property
     def removed_fraction(self) -> float:

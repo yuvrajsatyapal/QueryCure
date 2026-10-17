@@ -113,3 +113,18 @@ async def insert_tool_execution(
             "error": json.dumps(error) if error is not None else None,
         },
     )
+
+
+async def call_outcomes(conn: AsyncConnection, run_id: uuid.UUID) -> dict[str, int]:
+    """Provider calls of a run by outcome: `succeeded`, `tool_call`, or the error code of a
+    failed / invalid call (`LLM_TIMEOUT`, `LLM_INVALID_OUTPUT`, `UNCITED_CLAIMS`, ...)."""
+    rows = await conn.execute(
+        text(
+            "SELECT CASE WHEN status IN ('succeeded', 'tool_call') THEN status "
+            "WHEN status = 'invalid_output' THEN coalesce(error->>'code', 'LLM_INVALID_OUTPUT') "
+            "ELSE coalesce(error->>'code', 'LLM_ERROR') END AS outcome, count(*) AS n "
+            "FROM agent_executions WHERE run_id = :id GROUP BY 1"
+        ),
+        {"id": run_id},
+    )
+    return {r.outcome: int(r.n) for r in rows}

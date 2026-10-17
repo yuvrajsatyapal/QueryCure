@@ -17,6 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncConnection
 
 from querycure.agents.agent_runner import AgentFailedError, run_agent
 from querycure.agents.citations import CitationReport
+from querycure.agents.claims import claim_context
 from querycure.agents.fencing import Fence
 from querycure.agents.outputs import HypothesisSet, judge_hypotheses
 from querycure.agents.prompts import supervisor as prompts
@@ -186,6 +187,18 @@ async def synthesize_hypotheses(
             "materiality": materiality.model_dump(),
         }
 
+    async with engine.connect() as conn:
+        sha = state.get("query_sql_sha256")
+        artifact = await get_artifact(conn, sha) if sha else None
+    claims = claim_context(
+        evidence, query_sql=artifact.content.decode() if artifact is not None else None
+    )
+
+    def judge(
+        output: HypothesisSet, kinds: Mapping[str, str]
+    ) -> tuple[HypothesisSet, CitationReport]:
+        return judge_hypotheses(output, kinds, claims)
+
     try:
         result = await run_agent(
             ctx,
@@ -200,7 +213,7 @@ async def synthesize_hypotheses(
                 fence=Fence(),
             ),
             output_type=HypothesisSet,
-            judge=judge_hypotheses,
+            judge=judge,
         )
     except AgentFailedError as exc:
         error = NodeError(node=SYNTHESIS_NODE, code=exc.code, message=exc.message, recoverable=True)

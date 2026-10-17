@@ -13,6 +13,16 @@
 
 - [x] **Neon PgBouncer compatibility (2026-10-17, [ADR-0025](../engineering/adr/ADR-0025-pgbouncer-compatible-metadata-connections.md)).** Pooled endpoints get per-transaction timeouts instead of rejected startup options; LISTEN and the checkpointer use `DATABASE_URL_DIRECT`; settings validate the URL pair; `qc_app` / `qc_retention` privileges pinned by a security test. Verified live against Neon (readiness, job claim, LISTEN/NOTIFY, checkpointer).
 - [x] **End-to-end AI investigation and functional audit (2026-10-17, [report](../reports/E2E_AUDIT_2026-10-17.md)).** Real OpenRouter runs from the web UI against Neon metadata and the local Docker sandbox. `openrouter/free` ended inconclusive (invalid output and timeouts); a pinned free model reached `verified_recommendation` (composite index 2.95×, noise warning, 3 experiments). Report replay verified; experiment replay honestly inconclusive. Fixed: eval CLI refuses non-local admin URLs; e2e pinned to local Docker; budget meters poll while a run is active; `llm.model` refused instead of ignored; DB outage → 503; mobile header; dashboard copy; replay duplicate key; token counts readable in logs. Open items O1–O11 in the report (O1 default model, O2 narrative vs verdicts first). Verified: ruff, mypy, 767 unit, 603 integration + security, evals 5/5 + 2/2, frontend lint/typecheck/88 tests/build, e2e 14/14.
+- [x] **AI reliability and evidence-integrity hardening (2026-10-17, [ADR-0026](../engineering/adr/ADR-0026-deterministic-claim-grounding-and-model-reliability.md), [report](../reports/AI_RELIABILITY_HARDENING_2026-10-17.md)).** Fixes audit O1, O2, O3, O6 and O7.
+  - Deterministic claim grounding (`claims@1`) runs at every LLM prose boundary and again against final verdicts.
+  - Statistics provenance separates planner statistics from counters reset by cloning.
+  - Timeouts are retried once; a bounded free fallback also covers invalid output; a per-run model circuit breaker skips failing models.
+  - Pinned default model, startup warning for untested models, one-request probe CLI.
+  - Run-level `MODEL_UNAVAILABLE` with `error_message`; the quota excludes undispatched attempts.
+  - No report-builder change.
+  - Verified: ruff, mypy, 837 unit, 607 integration + security, smoke evals 5/5 (one case re-recorded), frontend lint/typecheck/89 tests/build, e2e 14/14.
+  - Real-model smoke run on local metadata: `verified_recommendation`, 7/7 valid calls, no stale-statistics hypothesis, report replay `verified`.
+  - **Open:** the Mode C eval recordings (`orders_sandbox_composite_index`, `rewrite_trap_sandbox`) must be re-recorded, because the O3 context text changed and today's free quota ran out. CI "Eval Mode C" fails until then.
 
 ## Completed
 

@@ -16,6 +16,7 @@ from typing import Any
 from pydantic import BaseModel, ValidationError
 
 from querycure.agents.citations import CitationReport, feedback_message
+from querycure.agents.claims import claim_context
 from querycure.agents.fencing import Fence
 from querycure.agents.outputs import AgentAnalysis, AgentTurn, ToolCallTurn, judge_analysis
 from querycure.agents.runtime import RunContext, ToolAllowanceLike
@@ -38,6 +39,7 @@ from querycure.replay.artifact_store import get_artifact, link, store_json
 log = get_logger(__name__)
 
 OUTPUT_SCHEMA_VERSION = 1
+MAX_CLAIM_PROBLEMS = 40
 
 type Judge[T] = Callable[[T, Mapping[str, str]], tuple[T, CitationReport]]
 
@@ -64,12 +66,29 @@ class _Row:
 
 
 def _report_dict(report: CitationReport) -> dict[str, Any]:
-    return {
+    out: dict[str, Any] = {
         "total": report.total,
         "removed": report.removed,
         "stripped_ids": report.stripped_ids,
         "problems": report.problems,
     }
+    if report.claim_problems or report.claims_removed:
+        # ADR-0026: what the deterministic grounding removed, kept with the output.
+        out["claim_check"] = {
+            "removed_claims": report.claims_removed,
+            "problems": report.claim_problems[:MAX_CLAIM_PROBLEMS],
+        }
+    return out
+
+
+def _log_grounding(agent: str, report: CitationReport) -> None:
+    if report.claim_problems:
+        log.warning(
+            "agent_claims_ungrounded",
+            agent=agent,
+            removed_claims=report.claims_removed,
+            problems=len(report.claim_problems),
+        )
 
 
 async def run_agent[T: BaseModel](
@@ -115,6 +134,7 @@ async def run_agent[T: BaseModel](
                     policy=ctx.llm_retry,
                     before_call=ctx.before_llm_call,
                     after_call=record_call,
+                    health=ctx.llm_health,
                 )
             cleaned, report = judge(result.value, kinds)
             if report.needs_retry and citation_attempt == 0:
@@ -132,13 +152,15 @@ async def run_agent[T: BaseModel](
                     removed=report.removed,
                     total=report.total,
                 )
+            _log_grounding(agent, report)
             accepted = cleaned
             break
     except LLMError as exc:
         await _persist(ctx, agent, node, invocation_key, prompt_version, attempt, rows, None)
         _stop_on_policy(exc)
         raise AgentFailedError(
-            f"The {agent} agent did not produce usable output.", details=[{"code": exc.code}]
+            f"The {agent} agent did not produce usable output.",
+            details=[{"code": exc.code, "cause": exc.cause}],
         ) from None
     except BaseException:
         # Budget exhaustion or cancellation: keep the record of calls already made.
@@ -370,6 +392,7 @@ async def run_tool_agent(
     prompt_version: str,
     messages: Sequence[ChatMessage],
     tools: Mapping[str, Tool],
+    query_sql: str | None = None,
 ) -> AgentResult[AgentAnalysis]:
     """A tool-using analyst: JSON turns of `call_tool` or `final` (AGENT_SYSTEM §2, §5).
 
@@ -423,6 +446,7 @@ async def run_tool_agent(
                     policy=ctx.llm_retry,
                     before_call=ctx.before_llm_call,
                     after_call=on_call,
+                    health=ctx.llm_health,
                 )
             row = pending.pop()
             step = result.value.root
@@ -453,8 +477,10 @@ async def run_tool_agent(
                 continue
 
             async with engine.connect() as conn:
-                kinds = {e.id: e.kind for e in await list_evidence(conn, ctx.run_id)}
-            cleaned, report = judge_analysis(step.analysis, kinds)
+                evidence = await list_evidence(conn, ctx.run_id)
+            kinds = {e.id: e.kind for e in evidence}
+            claims = claim_context(evidence, query_sql=query_sql)
+            cleaned, report = judge_analysis(step.analysis, kinds, claims)
             if report.needs_retry and not citation_retry_used:
                 citation_retry_used = True
                 row.status = "invalid_output"
@@ -477,6 +503,7 @@ async def run_tool_agent(
                 log.warning(
                     "agent_claims_dropped", agent=agent, removed=report.removed, total=report.total
                 )
+            _log_grounding(agent, report)
             stored = await _store_final(
                 ctx,
                 agent=agent,
@@ -504,7 +531,8 @@ async def run_tool_agent(
     except LLMError as exc:
         _stop_on_policy(exc)
         raise AgentFailedError(
-            f"The {agent} agent did not produce usable output.", details=[{"code": exc.code}]
+            f"The {agent} agent did not produce usable output.",
+            details=[{"code": exc.code, "cause": exc.cause}],
         ) from None
     raise AgentFailedError(
         f"The {agent} agent did not finish within {MAX_TOOL_AGENT_TURNS} turns.",

@@ -16,10 +16,15 @@ from pydantic import BaseModel, Field
 
 from querycure.core.errors import BudgetExhaustedError
 from querycure.core.logging import configure_logging
+from querycure.llm.openrouter import FreeQuotaExhaustedError, ModelUnavailableError
 from querycure.llm.structured import (
     InvalidStructuredOutputError,
+    LLMCircuitOpenError,
+    LLMModelUnavailableError,
+    LLMQuotaExhaustedError,
     LLMRequestError,
     LLMUnavailableError,
+    ModelHealth,
     RetryPolicy,
     call_structured,
 )
@@ -141,7 +146,7 @@ async def test_rate_limits_back_off_exponentially_then_succeed() -> None:
 
 async def test_backoff_is_capped_at_thirty_seconds() -> None:
     policy = RetryPolicy(max_retries=6, jitter_seconds=0.0)
-    client = Scripted([ModelTimeoutError("t")] * 6 + [GOOD])
+    client = Scripted([ModelRateLimitError("429")] * 6 + [GOOD])
     sleeps = Sleeps()
 
     await call_structured(client, PROMPT, Verdict, policy=policy, sleep=sleeps)
@@ -239,3 +244,113 @@ async def test_logs_never_contain_prompt_or_output_text() -> None:
     assert "secret_column" not in buf.getvalue()
     assert "You are an analyst" not in buf.getvalue()
     assert {line["event"] for line in lines} >= {"llm_call"}
+
+
+# --- reliability hardening (E2E audit O1/O5, ADR-0026) ---
+
+
+async def test_timeouts_are_retried_only_once() -> None:
+    client = Scripted([ModelTimeoutError("t"), TimeoutError(), GOOD])
+
+    with pytest.raises(LLMUnavailableError) as info:
+        await run(client)
+
+    assert len(client.calls) == 2  # a model that hung twice is not given a third chance
+    assert info.value.cause == "LLM_TIMEOUT"
+
+
+async def test_unavailable_error_keeps_the_last_cause() -> None:
+    client = Scripted([ModelRateLimitError("429")] * 4)
+
+    with pytest.raises(LLMUnavailableError) as info:
+        await run(client)
+
+    assert info.value.cause == "LLM_RATE_LIMITED"
+
+
+async def test_unknown_model_is_not_retried_and_goes_to_the_fallback() -> None:
+    primary = Scripted([ModelUnavailableError("no endpoints"), GOOD], model="primary")
+    fallback = Scripted([GOOD], model="fallback:free")
+
+    result = await run(primary, fallback=fallback)
+
+    assert len(primary.calls) == 1
+    assert result.model == "fallback:free"  # type: ignore[attr-defined]
+    assert result.calls[0].error_code == "LLM_MODEL_UNAVAILABLE"  # type: ignore[attr-defined]
+
+
+async def test_unknown_model_without_fallback_is_a_distinct_error() -> None:
+    with pytest.raises(LLMModelUnavailableError) as info:
+        await run(Scripted([ModelUnavailableError("no endpoints")]))
+    assert info.value.code == "LLM_MODEL_UNAVAILABLE"
+
+
+async def test_invalid_output_after_repair_tries_the_fallback_once() -> None:
+    primary = Scripted(["nope", "still nope"], model="primary")
+    fallback = Scripted([GOOD], model="fallback:free")
+
+    result = await run(primary, fallback=fallback)
+
+    assert result.model == "fallback:free"  # type: ignore[attr-defined]
+    assert [r.status for r in result.calls] == [  # type: ignore[attr-defined]
+        "invalid_output", "invalid_output", "succeeded",
+    ]  # fmt: skip
+
+
+async def test_fallback_failure_is_final_no_ping_pong() -> None:
+    primary = Scripted(["nope", "still nope"], model="primary")
+    fallback = Scripted(["bad", "worse"], model="fallback:free")
+
+    with pytest.raises(InvalidStructuredOutputError):
+        await run(primary, fallback=fallback)
+
+    assert len(primary.calls) == 2
+    assert len(fallback.calls) == 2
+
+
+async def test_quota_exhaustion_never_reaches_the_fallback() -> None:
+    fallback = Scripted([GOOD], model="fallback:free")
+
+    with pytest.raises(LLMQuotaExhaustedError):
+        await run(Scripted([FreeQuotaExhaustedError("daily")]), fallback=fallback)
+
+    assert fallback.calls == []
+
+
+async def test_circuit_opens_after_repeated_failures_and_skips_the_model() -> None:
+    health = ModelHealth(threshold=2)
+    for _ in range(2):
+        with pytest.raises(InvalidStructuredOutputError):
+            await run(Scripted(["x", "y"], model="m"), health=health)
+
+    untouched = Scripted([GOOD], model="m")
+    with pytest.raises(LLMCircuitOpenError) as info:
+        await run(untouched, health=health)
+
+    assert untouched.calls == []
+    assert info.value.code == "LLM_CIRCUIT_OPEN"
+    assert info.value.calls == []
+
+
+async def test_open_circuit_on_the_primary_goes_straight_to_the_fallback() -> None:
+    health = ModelHealth(threshold=1)
+    with pytest.raises(InvalidStructuredOutputError):
+        await run(Scripted(["x", "y"], model="m"), health=health)
+
+    primary = Scripted([GOOD], model="m")
+    fallback = Scripted([GOOD], model="fallback:free")
+    result = await run(primary, fallback=fallback, health=health)
+
+    assert primary.calls == []
+    assert result.model == "fallback:free"  # type: ignore[attr-defined]
+
+
+async def test_a_success_closes_the_circuit_count() -> None:
+    health = ModelHealth(threshold=2)
+    with pytest.raises(InvalidStructuredOutputError):
+        await run(Scripted(["x", "y"], model="m"), health=health)
+    await run(Scripted([GOOD], model="m"), health=health)
+    with pytest.raises(InvalidStructuredOutputError):
+        await run(Scripted(["x", "y"], model="m"), health=health)
+
+    assert not health.is_open("m")

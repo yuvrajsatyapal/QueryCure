@@ -44,11 +44,11 @@ def final_citing_last_result(messages: Sequence[ChatMessage]) -> str:
         {
             "action": "final",
             "analysis": {
-                "summary": "The sequential scan dominates.",
+                "summary": "Reading orders dominates.",
                 "findings": [
                     {
-                        "title": "Sequential scan dominates runtime",
-                        "detail": "Most of the time is spent scanning orders.",
+                        "title": "Reading orders dominates runtime",
+                        "detail": "Most of the time is spent reading orders.",
                         "severity": "high",
                         "evidence_ids": cited,
                     }
@@ -80,7 +80,7 @@ async def test_query_analyzer_uses_a_tool_and_cites_its_result(
 
     update = await query_analyzer_node(state, Runtime(context=run.ctx))
 
-    assert [f["title"] for f in update["findings"]] == ["Sequential scan dominates runtime"]
+    assert [f["title"] for f in update["findings"]] == ["Reading orders dominates runtime"]
     second_prompt = client.calls[1][-2].content  # tool result before the schema instruction
     assert "kind=tool_result" in second_prompt
     assert "Seq Scan on orders" in second_prompt

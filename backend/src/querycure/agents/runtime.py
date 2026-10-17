@@ -19,7 +19,7 @@ from querycure.core.logging import get_logger
 from querycure.domain.investigation import NodeError, RunBudget
 from querycure.events.types import EventType
 from querycure.llm.rate_limit import LlmGate
-from querycure.llm.structured import RetryPolicy
+from querycure.llm.structured import ModelHealth, RetryPolicy
 from querycure.llm.types import ChatClient
 from querycure.sandbox.provisioner import SandboxProvisioner
 
@@ -65,6 +65,8 @@ class RunContext:
     inspectors: InspectorFactory | None = None
     llm: "LlmClients | None" = None
     llm_retry: RetryPolicy = field(default_factory=RetryPolicy)
+    # Per-run circuit breaker: a model that failed repeatedly is not called again (ADR-0026).
+    llm_health: ModelHealth = field(default_factory=ModelHealth)
     # Free-tier minute window + daily quota, shared by every run in the process (ADR-0016).
     llm_gate: LlmGate | None = None
     # Per-run cap on concurrent LLM calls across parallel branches (AGENT_SYSTEM §6).

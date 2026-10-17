@@ -25,7 +25,11 @@ from pydantic import BaseModel, ValidationError
 
 from querycure.core.errors import QueryCureError
 from querycure.core.logging import get_logger
-from querycure.llm.openrouter import FreeQuotaExhaustedError, PaidUsageError
+from querycure.llm.openrouter import (
+    FreeQuotaExhaustedError,
+    ModelUnavailableError,
+    PaidUsageError,
+)
 from querycure.llm.types import CallRecord, CallStatus, ChatClient, ChatMessage, RawCompletion
 
 log = get_logger(__name__)
@@ -47,6 +51,9 @@ MAX_REPAIR_ERRORS = 20
 @dataclass(frozen=True)
 class RetryPolicy:
     max_retries: int = 3
+    # A model that ran into the full call timeout tends to do it again: one retry only, so a
+    # hanging free model costs at most two timeouts per logical call (E2E audit O1).
+    max_timeout_retries: int = 1
     backoff_base: float = 2.0
     max_delay_seconds: float = 30.0
     jitter_seconds: float = 1.0
@@ -58,9 +65,13 @@ class LLMError(QueryCureError):
     code = "LLM_ERROR"
     status = 502
 
-    def __init__(self, message: str, *, calls: Sequence[CallRecord] = ()) -> None:
+    def __init__(
+        self, message: str, *, calls: Sequence[CallRecord] = (), cause: str | None = None
+    ) -> None:
         super().__init__(message)
         self.calls = list(calls)
+        # The transport code behind a generic failure (LLM_TIMEOUT, LLM_RATE_LIMITED, ...).
+        self.cause = cause
 
 
 class LLMUnavailableError(LLMError):
@@ -75,6 +86,44 @@ class LLMRequestError(LLMError):
 
 class LLMAuthFailedError(LLMRequestError):
     code = "LLM_AUTH_FAILED"
+
+
+class LLMModelUnavailableError(LLMRequestError):
+    """The provider has no endpoint for this model: not retried, but a fallback may help."""
+
+    code = "LLM_MODEL_UNAVAILABLE"
+
+
+class LLMCircuitOpenError(LLMUnavailableError):
+    """Every configured model failed repeatedly in this run: no further call is made."""
+
+    code = "LLM_CIRCUIT_OPEN"
+
+
+class ModelHealth:
+    """Per-run circuit breaker over models (E2E audit O1).
+
+    After `threshold` consecutive failed logical calls (transport exhausted, invalid structured
+    output after repair, or an unknown model, which trips at once) a model is skipped for the
+    rest of the run: later agents go straight to the fallback, or fail fast without spending
+    calls, wall-clock time and the daily free allowance on a model that already proved
+    incompatible. A success resets the count. In memory only: a resumed run starts fresh."""
+
+    def __init__(self, threshold: int = 2) -> None:
+        self.threshold = threshold
+        self._failures: dict[str, int] = {}
+
+    def is_open(self, model: str) -> bool:
+        return self._failures.get(model, 0) >= self.threshold
+
+    def failure(self, model: str, *, immediate: bool = False) -> None:
+        count = self.threshold if immediate else self._failures.get(model, 0) + 1
+        self._failures[model] = count
+        if count == self.threshold:
+            log.warning("llm_circuit_open", model=model, failures=count)
+
+    def success(self, model: str) -> None:
+        self._failures.pop(model, None)
 
 
 class InvalidStructuredOutputError(LLMError):
@@ -189,7 +238,7 @@ class _Caller:
         self, client: ChatClient, messages: Sequence[ChatMessage]
     ) -> tuple[RawCompletion, float]:
         """One logical completion with transient-error retries on this client."""
-        retry = 0
+        retry = timeouts = 0
         while True:
             if self.before_call is not None:
                 await self.before_call()
@@ -212,6 +261,20 @@ class _Caller:
                     )
                 )
                 raise stop("The free model allowance is not available.", calls=self.calls) from None
+            except ModelUnavailableError:
+                await self.record(
+                    CallRecord(
+                        provider=client.provider,
+                        model=client.model,
+                        requested_model=client.model,
+                        status="failed",
+                        latency_ms=int((time.monotonic() - started) * 1000),
+                        error_code=LLMModelUnavailableError.code,
+                    )
+                )
+                raise LLMModelUnavailableError(
+                    "The model is not available from the provider.", calls=self.calls
+                ) from None
             except (ModelError, TimeoutError) as exc:
                 code, retryable = _classify(exc)
                 await self.record(
@@ -231,9 +294,10 @@ class _Caller:
                     raise error(
                         "The model provider rejected the request.", calls=self.calls
                     ) from None
-                if retry >= self.policy.max_retries:
+                timeouts += code == "LLM_TIMEOUT"
+                if retry >= self.policy.max_retries or timeouts > self.policy.max_timeout_retries:
                     raise LLMUnavailableError(
-                        "The model provider is unavailable.", calls=self.calls
+                        "The model provider is unavailable.", calls=self.calls, cause=code
                     ) from None
                 retry += 1
                 await self.sleep(self._delay(retry))
@@ -250,21 +314,50 @@ async def call_structured[T: BaseModel](
     after_call: RecordHook | None = None,
     sleep: Sleep = asyncio.sleep,
     rng: random.Random | None = None,
+    health: ModelHealth | None = None,
 ) -> StructuredResult[T]:
+    """Primary, then at most one fallback model (bounded, never paid, ADR-0016/0026).
+
+    The fallback gets one full attempt (its own transient retries and repair) when the primary
+    is unavailable (retries exhausted or unknown model) or still returns invalid structured
+    output after repair. Quota exhaustion, paid usage and rejected keys never reach it. A model
+    whose circuit is open (`health`) is skipped without a call."""
     policy = policy or RetryPolicy()
     caller = _Caller(policy, sleep, rng or random.Random(), before_call, after_call)  # noqa: S311
     conversation = [*messages, _schema_instruction(output)]
-
-    try:
-        completion, started = await caller.complete(client, conversation)
-        active = client
-    except LLMUnavailableError:
-        if fallback is None:
+    clients = [c for c in (client, fallback) if c is not None]
+    if health is not None:
+        clients = [c for c in clients if not health.is_open(c.model)]
+        if not clients:
+            raise LLMCircuitOpenError(
+                "The configured models failed repeatedly in this run; no further call is made.",
+                cause=LLMCircuitOpenError.code,
+            )
+    for index, active in enumerate(clients):
+        if index > 0:
+            log.warning("llm_fallback", provider=active.provider, model=active.model)
+        try:
+            result = await _attempt(caller, active, conversation, output, policy)
+        except (LLMUnavailableError, LLMModelUnavailableError, InvalidStructuredOutputError) as exc:
+            if health is not None:
+                health.failure(active.model, immediate=isinstance(exc, LLMModelUnavailableError))
+            if index + 1 < len(clients):
+                continue
             raise
-        log.warning("llm_fallback", provider=fallback.provider, model=fallback.model)
-        completion, started = await caller.complete(fallback, conversation)
-        active = fallback
+        if health is not None:
+            health.success(active.model)
+        return result
+    raise AssertionError("unreachable")
 
+
+async def _attempt[T: BaseModel](
+    caller: _Caller,
+    active: ChatClient,
+    conversation: list[ChatMessage],
+    output: type[T],
+    policy: RetryPolicy,
+) -> StructuredResult[T]:
+    completion, started = await caller.complete(active, conversation)
     for attempt in range(policy.repair_attempts + 1):
         try:
             value = _parse(completion.text, output)

@@ -39,6 +39,7 @@ vi.mock("@/lib/api/investigations", () => ({
     llmProvider: "openrouter",
     llmModel: "nvidia/nemotron-3-super-120b-a12b:free",
     errorCode: null,
+    errorMessage: null,
   }),
   getFindings: vi.fn().mockResolvedValue({
     hypotheses: [
@@ -121,4 +122,18 @@ test("budget and model are shown, and a running run can be cancelled", async () 
   expect(await screen.findByRole("button", { name: "Cancel run" })).toBeDefined();
   expect(screen.getByRole("meter", { name: "LLM calls" }).getAttribute("aria-valuenow")).toBe("3");
   expect(screen.getByText(/nemotron-3-super-120b-a12b:free via openrouter/)).toBeDefined();
+});
+
+test("a run-level model failure states its reason, not only a code", async () => {
+  const { getRun } = await import("@/lib/api/investigations");
+  vi.mocked(getRun).mockResolvedValueOnce({
+    ...(await vi.mocked(getRun)("run-1")),
+    status: "completed",
+    outcome: "inconclusive",
+    errorCode: "MODEL_UNAVAILABLE",
+    errorMessage: "No model call produced usable output (7 attempt(s): 5 invalid structured output, 2 timeout), so nothing was diagnosed.",
+  });
+  renderWithQuery(<InvestigationView id="inv-1" />);
+
+  expect(await screen.findByText(/Problem: No model call produced usable output/)).toBeDefined();
 });
