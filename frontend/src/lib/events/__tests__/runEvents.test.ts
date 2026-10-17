@@ -1,6 +1,6 @@
 import { expect, test } from "vitest";
 import type { RunEvent } from "@/lib/api/types";
-import { isTerminal, mergeEvents, parseEvent } from "../runEvents";
+import { isTerminal, mergeEvents, parseEvent, runRefetchInterval } from "../runEvents";
 
 const ev = (seq: number, type = "node.started", payload: Record<string, unknown> = {}): RunEvent =>
   ({ runId: "r", seq, ts: "2026-10-12T00:00:00.000Z", type, payload }) as RunEvent;
@@ -29,4 +29,15 @@ test("only terminal status changes close the stream", () => {
   expect(isTerminal(ev(9, "run.status_changed", { to: "completed" }))).toBe(true);
   expect(isTerminal(ev(9, "run.status_changed", { to: "cancelling" }))).toBe(false);
   expect(isTerminal(ev(9, "node.completed", { to: "completed" }))).toBe(false);
+});
+
+test("an active run's usage is polled; a finished or unknown run is not", () => {
+  // No event marks individual LLM calls, so a long agent node (with retries) would otherwise
+  // leave the budget meters frozen until the node completes.
+  for (const status of ["queued", "running", "awaiting_approval", "cancelling"]) {
+    expect(runRefetchInterval(status)).toBe(5000);
+  }
+  for (const status of ["completed", "failed", "cancelled", undefined]) {
+    expect(runRefetchInterval(status)).toBe(false);
+  }
 });

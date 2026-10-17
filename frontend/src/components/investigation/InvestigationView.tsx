@@ -22,6 +22,7 @@ import type { EvidenceDetail } from "@/lib/api/types";
 import { ReportPanel } from "@/components/report/ReportPanel";
 import { ApprovalCard } from "@/components/tournament/ApprovalCard";
 import { TournamentPanel } from "@/components/tournament/TournamentPanel";
+import { runRefetchInterval } from "@/lib/events/runEvents";
 import { useRunEvents } from "@/lib/events/useRunEvents";
 import { BudgetMeter } from "./BudgetMeter";
 import { FindingsPanel } from "./FindingsPanel";
@@ -56,7 +57,7 @@ export function InvestigationView({ id, requestedRunId }: { id: string; requeste
     setEvidence(null);
     router.replace(`/app/investigations/${id}?run=${next}`, { scroll: false });
   }
-  const run = useQuery({ queryKey: investigationKeys.run(runId ?? ""), queryFn: ({ signal }) => getRun(runId ?? "", signal), enabled: runId !== null });
+  const run = useQuery({ queryKey: investigationKeys.run(runId ?? ""), queryFn: ({ signal }) => getRun(runId ?? "", signal), enabled: runId !== null, refetchInterval: (q) => runRefetchInterval(q.state.data?.status) });
   const findings = useQuery({ queryKey: investigationKeys.findings(runId ?? ""), queryFn: ({ signal }) => getFindings(runId ?? "", signal), enabled: runId !== null });
   const plans = useQuery({ queryKey: investigationKeys.plans(runId ?? ""), queryFn: ({ signal }) => getRunPlans(runId ?? "", signal), enabled: runId !== null });
   const sandbox = investigation.data?.modes.includes("sandbox_benchmark") ?? false;

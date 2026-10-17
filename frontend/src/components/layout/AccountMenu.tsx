@@ -37,8 +37,14 @@ export function AccountMenu() {
 
 function SignInLink({ provider, label, returnTo }: { provider: "google" | "github"; label: string; returnTo: string }) {
   return (
-    <a href={`${API_BASE_URL}/api/v1/auth/${provider}/login?return_to=${encodeURIComponent(returnTo)}`} className="whitespace-nowrap text-link">
-      Sign in with {label}
+    <a
+      href={`${API_BASE_URL}/api/v1/auth/${provider}/login?return_to=${encodeURIComponent(returnTo)}`}
+      aria-label={`Sign in with ${label}`}
+      className="whitespace-nowrap text-link"
+    >
+      {/* Phones show only the provider name so the header fits at 375 px. */}
+      <span className="hidden sm:inline">Sign in with </span>
+      {label}
     </a>
   );
 }

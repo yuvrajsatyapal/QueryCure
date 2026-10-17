@@ -1,5 +1,6 @@
 "use client";
 
+import { manifestModelRows } from "@/lib/replay/manifestModels";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -285,12 +286,12 @@ export function ReplayView({ runId }: { runId: string }) {
             </dd>
             <dt className="text-muted">Models</dt>
             <dd>
-              {((m.llm as { agent: string; model: string; promptVersion: string; calls: number }[]) ?? []).map((c) => (
-                <span key={`${c.agent}${c.model}${c.promptVersion}`} className="mr-2 font-mono">
+              {manifestModelRows(m.llm).map((c) => (
+                <span key={c.key} className="mr-2 font-mono">
                   {c.agent} {c.model} {c.promptVersion} ×{c.calls}
                 </span>
               ))}
-              {((m.llm as unknown[]) ?? []).length === 0 ? "none" : null}
+              {manifestModelRows(m.llm).length === 0 ? "none" : null}
             </dd>
             <dt className="text-muted">App</dt>
             <dd className="font-mono">

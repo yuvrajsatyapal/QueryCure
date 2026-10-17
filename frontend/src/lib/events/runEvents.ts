@@ -51,3 +51,12 @@ export function isTerminal(event: RunEvent): boolean {
   const to = (event.payload as { to?: unknown }).to;
   return event.type === "run.status_changed" && typeof to === "string" && TERMINAL.has(to);
 }
+
+const POLLED = new Set(["queued", "running", "awaiting_approval", "cancelling"]);
+const RUN_POLL_MS = 5000;
+
+/** Refetch interval for a run's detail. LLM calls emit no event, so usage meters would sit
+ * frozen through a long agent node; poll while the run is active. */
+export function runRefetchInterval(status: string | undefined): number | false {
+  return status !== undefined && POLLED.has(status) ? RUN_POLL_MS : false;
+}

@@ -8,13 +8,15 @@ import { SideNav } from "./SideNav";
 export function AppShell({ children }: { children: ReactNode }) {
   return (
     <div className="flex min-h-full flex-1 flex-col">
-      <header className="flex h-14 shrink-0 items-center justify-between border-b border-border bg-surface px-4">
-        <Link href="/app" className="text-sm font-semibold tracking-tight text-ink">
+      <header className="flex h-14 shrink-0 items-center justify-between gap-3 border-b border-border bg-surface px-4">
+        <Link href="/app" className="shrink-0 text-sm font-semibold tracking-tight text-ink">
           QueryCure
         </Link>
         <div className="flex min-w-0 items-center gap-3">
           <AccountMenu />
-          <ThemeToggle />
+          <div className="shrink-0">
+            <ThemeToggle />
+          </div>
         </div>
       </header>
       <div className="flex flex-1 flex-col md:flex-row">
