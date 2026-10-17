@@ -77,7 +77,8 @@ Project instructions for Claude Code. Tool-agnostic equivalents live in [AGENTS.
 cd backend && uv run ruff check . && uv run ruff format --check . && uv run mypy src && uv run pytest -q
 uv run pytest tests/integration -q        # needs docker compose up -d metadata-db sandbox-db
 uv run pytest tests/security -q
-uv run python -m querycure.evals run --suite smoke   # recorded fixtures, no LLM cost
+uv run python -m querycure.evals run --suite smoke --model nvidia/nemotron-3-super-120b-a12b:free \
+  --admin-url postgresql://qc_owner:qc_local_dev_only@127.0.0.1:5432/postgres   # recorded fixtures, no LLM cost; local scratch DBs only
 # frontend
 cd frontend && pnpm lint && pnpm typecheck && pnpm test && pnpm build
 docker compose -f ../infra/docker/compose.yaml stop worker   # e2e starts its own host worker (ADR-0020)

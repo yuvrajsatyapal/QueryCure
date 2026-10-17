@@ -6,11 +6,14 @@ import datetime as dt
 import json
 import sys
 from pathlib import Path
+from urllib.parse import urlsplit
 
 from querycure.core.config import Settings
 from querycure.evals.cases import EVALS_DIR, load_cases
 from querycure.evals.recording import model_slug
 from querycure.evals.runner import CaseResult, QuotaLedger, RequestCap, check_model, run_case
+
+_LOCAL_HOSTS = frozenset({"127.0.0.1", "localhost", "::1"})
 
 
 def _admin_url(settings: Settings, override: str | None) -> str:
@@ -18,7 +21,15 @@ def _admin_url(settings: Settings, override: str | None) -> str:
         return override
     if settings.database_migration_url is None:
         raise SystemExit("Set DATABASE_MIGRATION_URL (owner role) or pass --admin-url.")
-    base, _, _ = settings.database_migration_url.get_secret_value().rpartition("/")
+    owner = settings.database_migration_url.get_secret_value()
+    # Evals CREATE and DROP scratch databases: never do that implicitly on a hosted server
+    # (e.g. Neon) just because .env points the app there.
+    if urlsplit(owner).hostname not in _LOCAL_HOSTS:
+        raise SystemExit(
+            "DATABASE_MIGRATION_URL is not a local server; pass --admin-url to choose where "
+            "eval scratch databases are created."
+        )
+    base, _, _ = owner.partition("?")[0].rpartition("/")
     return f"{base}/postgres"
 
 
