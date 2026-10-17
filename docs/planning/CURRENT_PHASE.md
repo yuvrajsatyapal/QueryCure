@@ -4,7 +4,7 @@
 |---|---|
 | Phase | **5 — Production polish** (authorized by the owner 2026-10-16). Phase 1: [PHASE_1_REPORT](reports/PHASE_1_REPORT.md); Phase 2: [PHASE_2_REPORT](reports/PHASE_2_REPORT.md); Phase 3: [PHASE_3_REPORT](reports/PHASE_3_REPORT.md); Phase 4 owner-reviewed 2026-10-16: [PHASE_4_REPORT](reports/PHASE_4_REPORT.md) |
 | Status | **Phase 5 implementation complete and verified locally (2026-10-16); not publicly deployed; awaiting owner review** ([PHASE_5_REPORT](reports/PHASE_5_REPORT.md)). Exit criterion "deployed" not met by design (needs owner approval, domain, accounts) |
-| Last updated | 2026-10-16 |
+| Last updated | 2026-10-17 |
 | Application code | Phases 1–3 (API, metadata DB, parsing, inspection gateway, artifact store, six demo workloads, multi-agent graph, approval gate, sandbox benchmark engine `bench@2`, tournament, web workspace) plus Phase 4: Benchmark Auditor (deterministic checks + downgrade-only review), atomic finalization with versioned reports (`report-builder@1`, `report-md@1`), report replay, experiment replay with statistical comparison, re-investigation start, plan diff; migrations 0001–0012; web app adds Report tab, report and replay pages, lineage drawer, audit panel and plan diff |
 
 ## Post-Phase-5 addition (2026-10-16)
@@ -12,6 +12,7 @@
 - [x] **Google sign-in.** Second OAuth provider on the shared flow (`auth/google.py`, `auth/oauth.py`, provider-parameterised `api/routers/auth.py`); `features.google_login`; `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`; scopes `openid profile`, no email stored; no migration. Tests: `test_google_oauth.py`, config unit tests; ADR-0013 amended. Verified: ruff, mypy, 743 unit, 579 integration + security, frontend lint/typecheck/85 tests/build.
 
 - [x] **Neon PgBouncer compatibility (2026-10-17, [ADR-0025](../engineering/adr/ADR-0025-pgbouncer-compatible-metadata-connections.md)).** Pooled endpoints get per-transaction timeouts instead of rejected startup options; LISTEN and the checkpointer use `DATABASE_URL_DIRECT`; settings validate the URL pair; `qc_app` / `qc_retention` privileges pinned by a security test. Verified live against Neon (readiness, job claim, LISTEN/NOTIFY, checkpointer).
+- [x] **End-to-end AI investigation and functional audit (2026-10-17, [report](../reports/E2E_AUDIT_2026-10-17.md)).** Real OpenRouter runs from the web UI against Neon metadata and the local Docker sandbox. `openrouter/free` ended inconclusive (invalid output and timeouts); a pinned free model reached `verified_recommendation` (composite index 2.95×, noise warning, 3 experiments). Report replay verified; experiment replay honestly inconclusive. Fixed: eval CLI refuses non-local admin URLs; e2e pinned to local Docker; budget meters poll while a run is active; `llm.model` refused instead of ignored; DB outage → 503; mobile header; dashboard copy; replay duplicate key; token counts readable in logs. Open items O1–O11 in the report (O1 default model, O2 narrative vs verdicts first). Verified: ruff, mypy, 767 unit, 603 integration + security, evals 5/5 + 2/2, frontend lint/typecheck/88 tests/build, e2e 14/14.
 
 ## Completed
 
