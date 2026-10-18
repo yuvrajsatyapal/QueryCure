@@ -44,6 +44,30 @@
     - test real OAuth on a deployed origin;
     - surface the transport floor and claim removals in `report-builder@2`.
 
+- [x] **Final backend deployment readiness (2026-10-18, [report](../reports/FINAL_BACKEND_DEPLOYMENT_READINESS_2026-10-18.md)).**
+  - **Credential:** the owner rotated the Neon `qc_app` password. Pooled and direct connect with the new one, and the old one is refused ("password authentication failed") on both. A redacted scan found it in no Git object or repo file. A stale plaintext `env.bak` outside the repo still needs deleting (owner).
+  - **Neon migrated 0015 → 0016** as `neondb_owner`, approved by the owner:
+    - objects and grants verified as each role;
+    - 10 table fingerprints identical before and after;
+    - `verify-integrity` (read-only): 94/94 artifacts and 9/9 reports `verified`.
+  - **Worker on Neon:** the checkout's API and worker ran for about 45 s (no jobs pending, so none ran):
+    - `/readyz` `ok/current`;
+    - heartbeat row with a digest equal to the checkout's, and `qc_workers_alive 1`;
+    - SIGTERM exit in 1.5 s with `stopped_at` set.
+  - **New:** `python -m querycure.ops verify-integrity` (read-only restore check). Runbooks in DEPLOYMENT: §4c Neon PITR validation on a child branch, §4d credential rotation. DEPLOYMENT §4 now lists the real CI workflows (no deploy workflow exists). [OAUTH_VERIFICATION_CHECKLIST](../engineering/OAUTH_VERIFICATION_CHECKLIST.md). A guard test keeps tests from reading `backend/.env`.
+  - **Verified locally:**
+    - ruff, format, mypy; 1116 unit; 490 integration + security;
+    - evals 5/5 + 2/2 with 0 real requests;
+    - frontend lint, typecheck, 89 tests, build;
+    - e2e 14/14 ×3; demo probe 17/17.
+  - **Open:**
+    - **F1:** an intermittent SSE pool-checkout 500, seen in 1 of 3 e2e runs, root cause unknown;
+    - host and domain (D1, D5);
+    - real OAuth on a deployed origin;
+    - alerting;
+    - a Neon PITR check;
+    - `report-builder@2`.
+
 ## Completed
 
 - [x] Repository inspected (was empty).
@@ -397,6 +421,11 @@ Decisions taken without changing any frozen contract (recorded for the owner):
 4. ~~Wait for the owner's go-ahead before starting Phase 4~~: Phase 4 done (2026-10-13).
 5. ~~Owner: confirm D9~~: approved 2026-10-16, `m = 1.25` kept ([ADR-0023](../engineering/adr/ADR-0023-d9-experiment-replay-equivalence-margin.md)).
 6. Wait for the owner's authorization before starting Phase 5. Owner's carried-forward Phase 5 priorities: (a) Idempotency-Key on `POST /experiments/{id}/replay`; (b) reliable deterministic/offline Mode C eval fixtures (R19); (c) run picker and replay navigation; (d) remaining deployment and security hardening.
+7. **Current (2026-10-18):**
+   - Owner: decide D1 and D5, then provision the host;
+   - owner: delete the stale `env.bak`;
+   - engineering: investigate F1 (the intermittent SSE pool-checkout 500);
+   - then work through the deployment checklist in [FINAL_BACKEND_DEPLOYMENT_READINESS §9](../reports/FINAL_BACKEND_DEPLOYMENT_READINESS_2026-10-18.md), including real OAuth and the demo probe on the deployed origin.
 
 ## Pending real-model evaluations
 

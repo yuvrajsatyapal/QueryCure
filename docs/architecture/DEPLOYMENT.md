@@ -134,21 +134,24 @@ Prices, quotas and policies change: verify them on the day you deploy. This revi
 
 ## 4. CI/CD (GitHub Actions)
 
+Two workflows exist (checked 2026-10-18). Earlier drafts of this section listed separate `integration.yml`, `evals-smoke.yml`, `e2e.yml` and `deploy.yml` files; those were never created. Their jobs live in `ci.yml`, and there is **no deploy workflow**.
+
 | Workflow | Trigger | Jobs |
 |---|---|---|
-| `ci.yml` | PR, push | backend: ruff, mypy, unit tests; frontend: lint, typecheck, vitest, build |
-| `integration.yml` | PR (backend paths) | service containers `postgres:17` ×2 → integration + security tests |
-| `evals-smoke.yml` | PR (agents paths) | recorded-fixture eval suite (no LLM cost) |
-| `e2e.yml` | PR to `main`, nightly | Playwright against compose stack, LLM calls stubbed |
-| `deploy.yml` | push to `main` | migrations (`alembic upgrade head`) → API image deploy → Vercel deploy |
-| `audit.yml` | weekly | `pip-audit`, `pnpm audit` |
+| `ci.yml` | push to `main`, every PR | **Backend** (Python 3.12 and 3.13): ruff, format check, `mypy`, unit tests. **Backend integration** (`postgres:17` service containers): integration + security tests, eval smoke (recorded), eval Mode C (recorded + prerecorded fixtures, no sandbox). **Frontend:** lint, typecheck, Vitest, build, plus a build of both demo-profile images. **End-to-end:** Playwright with the stub LLM |
+| `audit.yml` | Mondays 06:17 UTC, manual, and PR/push touching a lockfile | `pip-audit` (backend runtime deps), `pnpm audit --prod --audit-level high` |
 
-Migrations run as a separate release step before new API instances start; migrations must be backward-compatible with the previous app version (expand → migrate → contract).
+Deployment is manual (§4b) until a host is chosen. Migrations run as a separate release step before new API instances start; migrations must be backward-compatible with the previous app version (expand → migrate → contract).
 
 ## 4b. Release procedure (Phase 5)
 
 1. **CI green** on the commit: lint, types, unit, integration, security, evals (smoke + Mode C fixtures), e2e (including axe), and image builds.
-2. **Migrate first** (expand → migrate → contract): run the image once with `alembic upgrade head` and `DATABASE_MIGRATION_URL` (owner role). Migrations 0013–0015 only add tables, columns and indexes, so the previous app version keeps working against the new schema.
+2. **Migrate first** (expand → migrate → contract): run the image once with `alembic upgrade head` and `DATABASE_MIGRATION_URL` (owner role). Migrations 0013–0016 only add tables, columns and indexes, so the previous app version keeps working against the new schema. Before migrating a hosted database:
+   - confirm with a read-only session that no job is pending or running and no lease is live;
+   - fingerprint the core tables;
+   - check `alembic history -r <current>:head` lists only the expected revisions.
+
+   After migrating, re-fingerprint (it must be identical), check grants with `has_table_privilege` as each role, and confirm `/readyz` reports `current`. This procedure took Neon from 0015 to 0016 on 2026-10-18 ([report](../reports/FINAL_BACKEND_DEPLOYMENT_READINESS_2026-10-18.md)).
 3. **Deploy the API/worker image**, then wait for `GET /api/v1/readyz` to return 200 (`database: ok`, `migrations: current`). Liveness is `GET /api/v1/healthz`.
 4. **Deploy the web app** with `NEXT_PUBLIC_API_BASE_URL` pointing at the API's public origin.
 5. **Smoke check:** `/me` (profile, features), the demo gallery, one digest verification, `/internal/metrics` with the token.
@@ -198,6 +201,35 @@ Separately, the `QC_MASTER_KEY` and its version. There is no other state: the sa
 - **Fidelity:** identical row counts and schema version. Grants were intact (`qc_app` can INSERT but not UPDATE artifacts; `qc_retention` can DELETE sessions), and the `langgraph` schema was present.
 - **Integrity:** 714/714 artifacts re-verified by digest, and 43/43 sealed reports replayed `verified`, identical to the source. Verification took 1.5 s.
 - **Not covered:** a Neon PITR restore (it needs the owner's console), restore time at production size, and decrypting BYOK rows (the local DB had none; key-binding behaviour is covered by `test_crypto.py` and `test_byok_api.py`).
+
+The drill's two integrity checks are now one read-only command: `python -m querycure.ops verify-integrity [--url-env NAME]`. It runs in a single `READ ONLY` transaction and writes no `replay_attempts` rows. The DSN comes from the named environment variable (default `DATABASE_URL_DIRECT`), never from argv. Exit codes: 0 means everything verified, 1 means failures were found (IDs are listed), 2 means it was not configured. On 2026-10-18 it reported, against Neon (read-only, after migration 0016), 94/94 artifacts and 9/9 sealed reports `verified`.
+
+### Validating a Neon point-in-time restore (procedure; not yet performed)
+
+Never restore over, reset or truncate the live branch. All steps touch only a new child branch.
+
+1. **Create the branch.** In the Neon console, go to Branches → Create branch. Set the parent to the production branch, choose "Past data" at the target timestamp, and name it `pitr-check-YYYYMMDD`. Neon gives the branch its own compute endpoint (a different host).
+2. **Credentials on the branch.** SQL-created roles and their passwords live in the restored catalog, so expect a branch from **before** a password rotation to accept the **old** password (not yet observed; confirm on the first check), including the `qc_app` password exposed before 2026-10-18. Use the branch only from the operator's machine, never expose it publicly, and delete it when done (step 6). If it must live longer, rotate `qc_app` on the branch too.
+3. **Point a separate env file at it.** Do not edit `backend/.env`. Export `PITR_URL=postgresql://qc_app:…@<branch-endpoint>/neondb?sslmode=require` (direct host, not `-pooler`) in a shell, then run `uv run python -m querycure.ops verify-integrity --url-env PITR_URL`. It must exit 0.
+4. **Check the schema.** Run `uv run alembic current` with `DATABASE_MIGRATION_URL` set to the branch's owner DSN in that shell only. If it is older than head, migrating the **branch** is allowed. It never touches the parent.
+5. **Optional staging API.** Start the API locally with `DATABASE_URL` and `DATABASE_URL_DIRECT` set to the branch, plus `/readyz`. Do not start a worker on it: the branch can hold jobs that were in flight at the restore point, and a worker would run them.
+6. **Delete the branch.** Record the timestamp, the counts from `verify-integrity` and the elapsed time in the ops log.
+
+## 4d. Credential rotation (runbook, 2026-10-18)
+
+The app role `qc_app` was rotated on 2026-10-18 after its password appeared in an AI-assistant session transcript (never in Git, logs or reports).
+
+1. **Generate the password locally**, e.g. `python3 -c "import secrets;print(secrets.token_urlsafe(32))"`, in your own terminal. Never paste it into a chat or ticket.
+2. **Set it** in the Neon SQL editor: `ALTER ROLE qc_app WITH PASSWORD '…';`. The roles were created in SQL (see `.env.example`), not in the Neon console.
+3. **Update every holder in the same change.** Both `DATABASE_URL` (pooled) and `DATABASE_URL_DIRECT` carry the same role, so both must change. Today the only holder is the operator's `backend/.env`: there is no hosted deployment, no GitHub secret and no Vercel project. After a deployment, add the host's secret store here.
+4. **Restart** every API and worker process. Settings are read once at startup, and existing sessions stay authenticated until they close.
+5. **Verify without printing secrets:**
+   - pooled and direct both connect as `qc_app`;
+   - the old password fails with "password authentication failed" on both endpoints;
+   - `/readyz` returns 200.
+6. **Remove stale copies:** `.env` backups and scratch copies.
+
+`QC_MASTER_KEY` is a different kind of secret. Replacing it makes stored BYOK keys and connection passwords undecryptable; key rotation uses `QC_MASTER_KEY_VERSION` (SECURITY) and is never done as part of a database-password rotation.
 
 ## 5. Operational limitations
 
