@@ -206,3 +206,57 @@ async def test_stop_cancels_in_flight_work_and_leaves_lease_to_expire(
 
     # Not failed, not completed: another worker reclaims it after the lease expires.
     assert _status(owner, job_id) == "running"
+
+
+async def test_two_workers_never_run_one_job_twice(
+    app_engine: AsyncEngine, owner: psycopg.Connection
+) -> None:
+    """Duplicate delivery: two worker processes (two slots each) compete for 20 jobs; each job
+    runs exactly once (FOR UPDATE SKIP LOCKED claims, ADR-0004)."""
+    runs: list[uuid.UUID] = []
+
+    async def handler(job: Job) -> None:
+        runs.append(job.id)
+        await asyncio.sleep(0.01)
+
+    ids = [await _enqueue(app_engine) for _ in range(20)]
+    workers = [
+        Worker(app_engine, {"run_start": handler}, worker_id=f"w{i}", concurrency=2, timings=FAST)
+        for i in range(2)
+    ]
+    tasks = [asyncio.create_task(w.run()) for w in workers]
+    await _until(lambda: all(_status(owner, j) == "done" for j in ids), limit=15)
+    for w in workers:
+        await w.stop()
+    await asyncio.gather(*tasks)
+
+    assert sorted(runs) == sorted(ids)
+
+
+async def test_worker_survives_the_metadata_database_dropping_its_connections(
+    app_engine: AsyncEngine, owner: psycopg.Connection
+) -> None:
+    """Metadata DB interruption: every server connection of the worker is terminated (as a
+    restart or failover would). The claim loop logs and keeps polling, the pool reconnects
+    (pre-ping), and a job enqueued afterwards still runs."""
+    done: list[uuid.UUID] = []
+
+    async def handler(job: Job) -> None:
+        done.append(job.id)
+
+    worker = Worker(app_engine, {"run_start": handler}, worker_id="w-db", timings=FAST)
+    task = asyncio.create_task(worker.run())
+    await asyncio.sleep(0.2)  # the pool holds live connections now
+    killed = owner.execute(
+        "SELECT count(*) FROM (SELECT pg_terminate_backend(pid) FROM pg_stat_activity "
+        "WHERE datname = current_database() AND pid <> pg_backend_pid()) t"
+    ).fetchone()
+    assert killed is not None
+    assert killed[0] >= 1
+    await asyncio.sleep(0.3)
+    job_id = await _enqueue(app_engine)
+    await _until(lambda: _status(owner, job_id) == "done", limit=10)
+    await worker.stop()
+    await task
+
+    assert done == [job_id]
