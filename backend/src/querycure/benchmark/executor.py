@@ -70,6 +70,16 @@ class ArmRunner:
         if not self.conn.closed:
             self.conn.cancel_safe(timeout=2.0)
 
+    def round_trips(self, count: int) -> list[int]:
+        """`count` timed `SELECT 1` round trips on this connection: the transport and harness
+        part of every sample (BENCHMARK_ENGINE §4 step 7). Never mixed into samples."""
+        out: list[int] = []
+        for _ in range(count):
+            start = time.perf_counter_ns()
+            self.conn.execute("SELECT 1").fetchone()
+            out.append(time.perf_counter_ns() - start)
+        return out
+
     def unique_keys(self) -> dict[str, list[list[str]]]:
         """Unique/primary key columns per public table, for ORDER BY totality."""
         rows = self.conn.execute(

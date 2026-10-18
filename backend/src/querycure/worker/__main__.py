@@ -134,6 +134,15 @@ async def main() -> None:
                 log.warning("llm_model_untested", role=role, model=model, detail=warning)
     if settings.database_url is None:
         raise ConfigurationError("DATABASE_URL is required for the worker")
+    if settings.sandbox_admin_url is not None and settings.bench_path == "docker-relay":
+        # Measured 2026-10-18 (BENCHMARK_ENGINE §12): the relay adds a 0.3-0.46 ms round trip
+        # to every sample, compresses sub-ms speed-ups toward 1 and halves verdict stability.
+        log.warning(
+            "benchmark_path_relay",
+            detail="benchmarks run through the host relay: sub-millisecond arms are mostly "
+            "transport; run the worker container (QC_BENCH_PATH=docker-network) for evidence "
+            "you intend to rely on",
+        )
     engine = make_engine(settings.database_url.get_secret_value(), **settings.engine_options())
     worker, sandbox = build_worker(engine, settings)
     loop = asyncio.get_running_loop()

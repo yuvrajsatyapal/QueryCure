@@ -103,7 +103,8 @@ For each param set:
 3. **Interleaved measurement**: build a schedule of blocks; each block runs every arm `block_size` times; arm order within each block is shuffled with `Random(seed)`. Blocks repeat until `measured_runs` per arm. Interleaving prevents slow drift (thermal, background autovacuum) from systematically favouring whichever arm ran later.
 4. **Timing**: wall-clock around execute+fetch with `time.perf_counter_ns()` on the worker, using a dedicated connection per arm with prepared statement disabled (`prepare_threshold=None`) so plan caching is consistent; rows are streamed in chunks of 1,000 (libpq chunked-rows mode, `cursor.stream(size=1000)`) into the fingerprint hasher (fetch cost counts — the user pays it too). Each execution runs in a `READ ONLY` transaction opened **before** the timer starts, because BEGIN is harness overhead. *Changed from the plan:* a server-side cursor costs a DECLARE plus one FETCH round trip per batch. Streaming keeps memory bounded with a single round trip, and on the local Docker relay it roughly halved the per-sample floor (≈ 1.1 ms → ≈ 0.55 ms).
 5. **Plan capture**: after timing, one `EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON)` per arm × param set, stored as artifact. Kept separate from timing because `ANALYZE` instrumentation adds overhead.
-6. **Cancellation check** between every block; long queries bounded by `statement_timeout`. A timeout counts as a failed sample (`timeout` reason), not as `query_timeout_ms`.
+6. **Transport floor** (diagnostic, [ADR-0029](../engineering/adr/ADR-0029-transport-floor-and-benchmark-repeatability.md)): 25 bare `SELECT 1` round trips on the baseline connection before warm-up and 25 after measurement, outside every timed sample. Recorded as `ExperimentResult.transport_floor` (median, IQR, both windows, `share_of_fastest_arm`, `transport_dominated` at ≥ 0.5). Nothing is subtracted, and no statistic or verdict reads it.
+7. **Cancellation check** between every block; long queries bounded by `statement_timeout`. A timeout counts as a failed sample (`timeout` reason), not as `query_timeout_ms`.
 
 ## 5. Correctness checks
 
@@ -228,6 +229,7 @@ Until F-47 ships, the Index Strategist provides a qualitative write-overhead cla
 - Single-session measurement; no concurrency, lock, or connection-pool effects.
 - Synthetic or user-provisioned sandbox data; distribution may differ from production — and the planner's choices depend on statistics derived from that data.
 - Sandbox hardware/config ≠ production; ratios transfer better than absolute times, but neither is guaranteed.
+- **Measurement path** ([ADR-0029](../engineering/adr/ADR-0029-transport-floor-and-benchmark-repeatability.md)): through the host relay, every sample carries a 0.3–0.46 ms round trip. For sub-millisecond arms this compresses speed-ups toward 1: the same index measured 5.9× through the relay and 13.8× in-network. It also halves single-experiment verification (8/20 vs 16/20). Results record the path (`container_runtime`) and the transport floor. Rely on in-network (`docker-network`) results.
 - Docker on macOS adds virtualization noise; CV gate exists for this reason. Measured block-to-block variation is large: block ratios for a neutral index on a ~4 ms scan ranged 0.54–1.57. Block corroboration and the noise screen's block check are therefore probabilistic protections, strongest with many blocks ([ADR-0019](../engineering/adr/ADR-0019-noise-warning-verification-and-corroborated-regression.md) residual risks).
 - The clean `verified` gate has no block check. A tight bias tied to one arm in most blocks would be verified; this is a limit of single-experiment inference, accepted as documented (D13, [ADR-0021](../engineering/adr/ADR-0021-d13-clean-verification-block-agreement.md): 0 of 2,250 real experiments below `min_effect` were verified on the development host).
 - `verified_with_noise_warning` means three same-environment experiments agree. A disturbance that is systematic and repeats in every run on the same host cannot be excluded.
@@ -254,3 +256,14 @@ Deterministic generators (`workloads/registry.py`, seeded, versioned; workload I
 | `index_regression` | Low-selectivity predicate where an index scan is slower than seq scan for one param set | candidate `rejected: regression` |
 
 These double as the eval suite's ground truth ([TESTING_STRATEGY.md](../engineering/TESTING_STRATEGY.md)).
+
+## 12. Repeatability (measured 2026-10-18)
+
+`python -m querycure.benchmark.repeatability --sandbox-url <local> --sessions N [--replicated] [--path docker-network]` runs the same deterministic experiment as N independent sessions on `orders_ecommerce@v1:sf=0.1:seed=42`, with a real-effect arm (composite index) and a null arm (an unused index). It refuses non-local sandboxes and touches no metadata DB or LLM. Run it inside the worker container (`docker compose run --rm --no-deps worker python -m …`) for the in-network path. Raw data: `docs/reports/data/benchmark-repeatability-2026-10-18/`.
+
+| 20 sessions each | Single experiment: real index `verified` | With replicates: real index verified or noise-warned | Null index | Transport floor (median) |
+|---|---|---|---|---|
+| relay | 8/20 (before), 9/20 (after) | 18/20 | 20/20 `inconclusive` | 0.35 ms, 53–127% of the fastest arm |
+| in-network | 16/20 (before), 13/20 (after) | 19/20 | 20/20 `inconclusive` | 0.072 ms, 29–54% |
+
+"Before" and "after" differ only by the diagnostic. Their spread is batch-to-batch variation on a shared laptop, not an effect of the change.

@@ -1721,6 +1721,7 @@ export interface components {
             stats: components["schemas"]["SpeedupStats"][];
             /** Tournament */
             tournament: components["schemas"]["TournamentEntry"][];
+            transport_floor?: components["schemas"]["TransportFloor"] | null;
             /** Verdicts */
             verdicts: components["schemas"]["RuleVerdict"][];
             /** Winner */
@@ -2893,6 +2894,29 @@ export interface components {
              * @enum {string}
              */
             verdict: "verified" | "rejected" | "inconclusive";
+        };
+        /**
+         * TransportFloor
+         * @description Round trips of a bare `SELECT 1` on the baseline arm's connection, before warm-up and
+         *     after measurement (BENCHMARK_ENGINE §4 step 7). It is the part of every timed sample that
+         *     is network, relay and driver rather than query. Diagnostic only: samples, statistics and
+         *     verdicts never use it, and nothing is subtracted.
+         */
+        TransportFloor: {
+            /** After Median Ns */
+            after_median_ns: number | null;
+            /** Before Median Ns */
+            before_median_ns: number | null;
+            /** Iqr Ns */
+            iqr_ns: number;
+            /** Median Ns */
+            median_ns: number;
+            /** Samples */
+            samples: number;
+            /** Share Of Fastest Arm */
+            share_of_fastest_arm: number | null;
+            /** Transport Dominated */
+            transport_dominated: boolean;
         };
         /**
          * UserKind

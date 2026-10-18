@@ -2195,6 +2195,16 @@
             "title": "Tournament",
             "type": "array"
           },
+          "transport_floor": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TransportFloor"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "verdicts": {
             "items": {
               "$ref": "#/components/schemas/RuleVerdict"
@@ -5912,6 +5922,72 @@
           "primary_ci_low"
         ],
         "title": "TournamentEntry",
+        "type": "object"
+      },
+      "TransportFloor": {
+        "additionalProperties": false,
+        "description": "Round trips of a bare `SELECT 1` on the baseline arm's connection, before warm-up and\nafter measurement (BENCHMARK_ENGINE \u00a74 step 7). It is the part of every timed sample that\nis network, relay and driver rather than query. Diagnostic only: samples, statistics and\nverdicts never use it, and nothing is subtracted.",
+        "properties": {
+          "after_median_ns": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "After Median Ns"
+          },
+          "before_median_ns": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Before Median Ns"
+          },
+          "iqr_ns": {
+            "title": "Iqr Ns",
+            "type": "number"
+          },
+          "median_ns": {
+            "title": "Median Ns",
+            "type": "number"
+          },
+          "samples": {
+            "title": "Samples",
+            "type": "integer"
+          },
+          "share_of_fastest_arm": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Share Of Fastest Arm"
+          },
+          "transport_dominated": {
+            "title": "Transport Dominated",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "samples",
+          "before_median_ns",
+          "after_median_ns",
+          "median_ns",
+          "iqr_ns",
+          "share_of_fastest_arm",
+          "transport_dominated"
+        ],
+        "title": "TransportFloor",
         "type": "object"
       },
       "UserKind": {

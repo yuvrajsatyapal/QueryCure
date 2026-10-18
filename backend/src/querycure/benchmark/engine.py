@@ -59,6 +59,8 @@ from querycure.domain.benchmark import (
     ReplicationResult,
     RuleVerdict,
     SpeedupStats,
+    TransportFloor,
+    transport_floor,
 )
 from querycure.replay.canonical import canonical_json, to_canonical
 from querycure.replay.digest import digest
@@ -69,6 +71,7 @@ from querycure.workloads.registry import WorkloadRef
 
 log = get_logger(__name__)
 INCONSISTENT = "inconsistent"
+FLOOR_SAMPLES = 25  # per window (before warm-up, after measurement); about 2-20 ms in total
 Phase = Literal["build", "measure", "plan"]
 State = Literal[
     "provisioning", "building", "warming", "measuring", "capturing_plans", "checking", "scoring"
@@ -347,6 +350,7 @@ def score(
     env_digest: str,
     engine_version: str = ENGINE_VERSION,
     total: bool | None = None,
+    floor_samples: tuple[Sequence[int], Sequence[int]] | None = None,
 ) -> ExperimentResult:
     """Correctness → stats → gates → tournament, from persisted rows only (resumable).
 
@@ -400,6 +404,12 @@ def score(
             )
         )
     table, winner = rank(contenders)
+    floor: TransportFloor | None = None
+    if floor_samples is not None and (floor_samples[0] or floor_samples[1]):
+        medians = [m.median_ns for s in stats for m in (s.baseline, s.candidate) if m.median_ns > 0]
+        floor = transport_floor(
+            before=floor_samples[0], after=floor_samples[1], arm_medians_ns=medians
+        )
     return ExperimentResult(
         schema_version=RESULT_SCHEMA[engine_version],  # type: ignore[arg-type]
         engine_version=engine_version,
@@ -413,6 +423,7 @@ def score(
         winner=winner,
         order_is_total=total,
         noise_screens=screens if RESULT_SCHEMA[engine_version] == 2 else None,
+        transport_floor=floor,
     )
 
 
@@ -533,7 +544,12 @@ def _measure(
         return arm.query if arm is not None and arm.query else config.baseline_query
 
     params = {p.name: list(p.values) for p in config.param_sets}
+    floor_before: list[int] = []
+    floor_after: list[int] = []
     if len(active) > 1:
+        # Transport floor (diagnostic): round trips on the baseline connection, outside every
+        # timed sample, once before warm-up and once after measurement.
+        floor_before = by_arm[BASELINE_ARM][1].round_trips(FLOOR_SAMPLES)
         hooks.progress("warming")
         for name in active:
             for ps in config.param_sets:
@@ -582,6 +598,7 @@ def _measure(
                 hooks.persist(record)
                 done[record.key] = record
 
+        floor_after = by_arm[BASELINE_ARM][1].round_trips(FLOOR_SAMPLES)
         hooks.progress("capturing_plans")
         for name in active:
             for ps in config.param_sets:
@@ -612,6 +629,7 @@ def _measure(
         unique_keys=unique_keys,
         env_digest=env_digest,
         engine_version=engine_version,
+        floor_samples=(floor_before, floor_after),
     )
 
 

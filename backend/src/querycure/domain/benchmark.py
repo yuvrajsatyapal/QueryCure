@@ -1,7 +1,9 @@
 """Experiment models (BENCHMARK_ENGINE §1). Configs and results are stored as qc-json-v1
 artifacts, so every field is always present and raw samples are integer nanoseconds."""
 
+import statistics
 import uuid
+from collections.abc import Sequence
 from typing import Any, Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -186,6 +188,52 @@ class TournamentEntry(Frozen):
     primary_ci_low: float | None
 
 
+# A floor at or above half the fastest arm's median means the measurement is mostly transport
+# and harness: speed-ups are compressed toward 1 and sub-ms dispersion is mostly network.
+TRANSPORT_DOMINATED_SHARE = 0.5
+
+
+class TransportFloor(Frozen):
+    """Round trips of a bare `SELECT 1` on the baseline arm's connection, before warm-up and
+    after measurement (BENCHMARK_ENGINE §4 step 7). It is the part of every timed sample that
+    is network, relay and driver rather than query. Diagnostic only: samples, statistics and
+    verdicts never use it, and nothing is subtracted."""
+
+    samples: int
+    before_median_ns: float | None
+    after_median_ns: float | None
+    median_ns: float
+    iqr_ns: float
+    share_of_fastest_arm: float | None
+    transport_dominated: bool
+
+
+def transport_floor(
+    *, before: Sequence[int], after: Sequence[int], arm_medians_ns: Sequence[float]
+) -> TransportFloor:
+    both = [*before, *after]
+    if not both:
+        raise ValueError("a transport floor needs at least one sample")
+    ordered = sorted(both)
+    q1, _, q3 = (
+        statistics.quantiles(ordered, n=4, method="inclusive")
+        if len(ordered) >= 2
+        else (ordered[0],) * 3
+    )
+    median = float(statistics.median(ordered))
+    fastest = min((m for m in arm_medians_ns if m > 0), default=None)
+    share = median / fastest if fastest else None
+    return TransportFloor(
+        samples=len(both),
+        before_median_ns=float(statistics.median(before)) if before else None,
+        after_median_ns=float(statistics.median(after)) if after else None,
+        median_ns=median,
+        iqr_ns=float(q3 - q1),
+        share_of_fastest_arm=round(share, 4) if share is not None else None,
+        transport_dominated=share is not None and share >= TRANSPORT_DOMINATED_SHARE,
+    )
+
+
 class ExperimentResult(Frozen):
     schema_version: Literal[1, 2] = 2
     experiment_id: uuid.UUID
@@ -202,6 +250,9 @@ class ExperimentResult(Frozen):
     # Schema 2 (bench@2) only. None on schema-1 results and then omitted, so a stored bench@1
     # result re-serializes to its original bytes and digest (ADR-0019 § Compatibility).
     noise_screens: list[NoiseScreen] | None = Field(default=None, exclude_if=lambda v: v is None)
+    # Recorded since 2026-10-18 beside bench@2 (ADR-0029); omitted when None, so every stored
+    # result re-serializes to its original bytes.
+    transport_floor: TransportFloor | None = Field(default=None, exclude_if=lambda v: v is None)
 
     @model_validator(mode="before")
     @classmethod

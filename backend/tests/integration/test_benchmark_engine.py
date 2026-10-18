@@ -9,12 +9,14 @@ import threading
 import pytest
 
 from querycure.benchmark.engine import (
+    FLOOR_SAMPLES,
     ApprovalMismatchError,
     ApprovedExperiment,
     run_experiment,
+    score,
 )
 from querycure.core.errors import RunCancelledError, SandboxPolicyError
-from querycure.domain.benchmark import CandidateArm
+from querycure.domain.benchmark import TRANSPORT_DOMINATED_SHARE, CandidateArm
 from querycure.sandbox.provisioner import SandboxProvisioner
 from tests.integration.engine_helpers import (
     MemoryHooks,
@@ -64,6 +66,36 @@ def test_composite_index_is_verified_and_everything_is_cleaned_up(
     plans = [r for r in hooks.records if r.phase == "plan"]
     assert all(r.plan is not None and r.buffers is not None for r in plans)
     assert clone_names() == []
+
+
+def test_transport_floor_is_recorded_beside_and_never_inside_the_samples(
+    provisioner: SandboxProvisioner,
+) -> None:
+    """BENCHMARK_ENGINE §4 step 7: the floor is diagnostic. Re-scoring the same persisted
+    rows without it yields identical statistics and verdicts."""
+    cfg = _cfg()
+    hooks = MemoryHooks()
+
+    result = run_experiment(cfg, approve_all(cfg), provisioner=provisioner, hooks=hooks)
+
+    floor = result.transport_floor
+    assert floor is not None
+    assert floor.samples == 2 * FLOOR_SAMPLES
+    assert floor.before_median_ns is not None
+    assert floor.before_median_ns > 0
+    assert floor.after_median_ns is not None
+    assert floor.after_median_ns > 0
+    fastest = min(m.median_ns for s in result.stats for m in (s.baseline, s.candidate))
+    assert floor.share_of_fastest_arm == pytest.approx(floor.median_ns / fastest, rel=1e-3)
+    assert floor.transport_dominated == (floor.share_of_fastest_arm >= TRANSPORT_DOMINATED_SHARE)
+    # Samples are still exactly measured_runs per arm and param set: no round trip leaked in.
+    assert all(len(m.latencies_ns) == 30 for m in result.measurements)
+    builds = {b.arm: b for b in result.builds}
+    rescored = score(cfg, builds, hooks.records, unique_keys={}, env_digest="x",
+                     total=result.order_is_total)  # fmt: skip
+    assert rescored.transport_floor is None
+    assert rescored.stats == result.stats
+    assert rescored.verdicts == result.verdicts
 
 
 def test_unapproved_arm_executes_nothing(provisioner: SandboxProvisioner) -> None:
