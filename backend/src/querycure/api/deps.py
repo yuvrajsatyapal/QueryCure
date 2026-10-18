@@ -1,6 +1,6 @@
 import hashlib
 from collections.abc import AsyncIterator
-from typing import Annotated
+from typing import Annotated, Any
 
 import psycopg
 from fastapi import Depends, Request
@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine
 
 from querycure.core.config import Settings
 from querycure.core.errors import QueryCureError, UnauthenticatedError
+from querycure.db.engine import CONNECT_TIMEOUT_SECONDS, KEEPALIVE
 from querycure.db.repositories import sessions
 from querycure.domain.users import User
 from querycure.events.hub import EventHub
@@ -96,7 +97,9 @@ def get_event_hub(
         url = listen_url(settings, engine)
 
         async def connect() -> psycopg.AsyncConnection:
-            return await psycopg.AsyncConnection.connect(url, autocommit=True)
+            # Keepalives: a half-open LISTEN connection would silently stop live updates.
+            libpq: dict[str, Any] = {"connect_timeout": CONNECT_TIMEOUT_SECONDS, **KEEPALIVE}
+            return await psycopg.AsyncConnection.connect(url, autocommit=True, **libpq)
 
         hub = EventHub(connect)
         request.app.state.event_hub = hub

@@ -13,6 +13,8 @@ from langgraph.checkpoint.serde.jsonplus import JsonPlusSerializer
 from psycopg.rows import dict_row
 from psycopg_pool import AsyncConnectionPool
 
+from querycure.db.engine import CONNECT_TIMEOUT_SECONDS, KEEPALIVE
+
 POOL_MAX_SIZE = 4
 
 
@@ -36,6 +38,8 @@ async def open_checkpointer(
             "prepare_threshold": 0,
             "row_factory": dict_row,
             "options": options,
+            "connect_timeout": CONNECT_TIMEOUT_SECONDS,
+            **KEEPALIVE,
         },
     ) as pool:
         yield AsyncPostgresSaver(pool, serde=strict_serializer())  # type: ignore[arg-type]

@@ -25,6 +25,7 @@ from querycure.worker.runner import Worker, WorkerTimings
 log = get_logger(__name__)
 APPROVAL_SWEEP_SECONDS = 60.0
 MAINTENANCE_SECONDS = 300.0
+TEARDOWN_SECONDS = 20.0  # after the worker loop ends: sweepers, presence row, pool disposal
 
 
 async def sweep_approvals(engine: AsyncEngine, stop: asyncio.Event) -> None:
@@ -113,6 +114,7 @@ async def serve(
     *,
     identity: WorkerIdentity | None = None,
     heartbeat_seconds: float | None = None,
+    teardown_seconds: float = TEARDOWN_SECONDS,
 ) -> None:
     """The worker loop plus its sweepers and presence row; returns after `worker.stop()` and
     a drained loop."""
@@ -136,10 +138,17 @@ async def serve(
         await worker.run()
     finally:
         stop.set()
-        await asyncio.gather(*background, return_exceptions=True)
+        # Bounded: a sweeper stuck on a dead connection must not keep the process alive
+        # after SIGTERM (2026-10-18). Leftovers are cancelled; leases expire as designed.
+        _, pending = await asyncio.wait(background, timeout=teardown_seconds)
+        if pending:
+            log.error("worker_teardown_timeout", pending=len(pending), seconds=teardown_seconds)
+            for task in pending:
+                task.cancel()
+            await asyncio.gather(*pending, return_exceptions=True)
         if identity is not None:
             try:
-                await mark_stopped(engine, identity)
+                await asyncio.wait_for(mark_stopped(engine, identity), teardown_seconds)
             except Exception:
                 log.warning("worker_mark_stopped_failed", exc_info=True)
 
@@ -181,7 +190,10 @@ async def main() -> None:
             ),
         )
     finally:
-        await engine.dispose()
+        try:
+            await asyncio.wait_for(engine.dispose(), TEARDOWN_SECONDS)
+        except TimeoutError:
+            log.error("worker_dispose_timeout", seconds=TEARDOWN_SECONDS)
 
 
 if __name__ == "__main__":

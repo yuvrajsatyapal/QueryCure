@@ -158,3 +158,29 @@ def test_a_non_free_fallback_model_is_still_refused(monkeypatch: pytest.MonkeyPa
     monkeypatch.setenv("LLM_FALLBACK_MODEL", "openai/gpt-5")
     with pytest.raises(ValueError, match="LLM_FALLBACK_MODEL"):
         Settings(_env_file=None)
+
+
+@pytest.mark.parametrize(
+    "field",
+    [
+        "SANDBOX_ADMIN_URL", "SANDBOX_BENCH_PASSWORD", "DATABASE_URL_DIRECT",
+        "DATABASE_MIGRATION_URL", "DATABASE_RETENTION_URL", "OPENROUTER_API_KEY",
+        "GEMINI_API_KEY", "GROQ_API_KEY",
+    ],
+)  # fmt: skip
+def test_blank_optional_secrets_and_urls_are_unset(
+    field: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # 2026-10-18: SANDBOX_ADMIN_URL= became an empty URL, so the worker dialled the default
+    # Unix socket instead of running without a sandbox.
+    monkeypatch.setenv(field, "  ")
+    settings = Settings(_env_file=None)
+    assert getattr(settings, field.lower()) is None
+
+
+def test_a_blank_master_key_still_fails_closed_in_the_demo_profile(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("QC_MASTER_KEY", "")
+    with pytest.raises(ValueError, match="QC_MASTER_KEY"):
+        Settings(_env_file=None, profile="demo", allow_private_targets=False)

@@ -3,7 +3,12 @@ no startup parameters at all; direct endpoints keep the server-enforced startup 
 
 import pytest
 
-from querycure.db.engine import connect_args_for, is_pooled_url, resolve_timeout_scope
+from querycure.db.engine import (
+    CONNECT_TIMEOUT_SECONDS,
+    connect_args_for,
+    is_pooled_url,
+    resolve_timeout_scope,
+)
 
 POOLED = "postgresql://qc_app:pw@ep-example-123456-pooler.c-4.us-east-2.aws.neon.tech/db"
 DIRECT = "postgresql://qc_app:pw@ep-example-123456.c-4.us-east-2.aws.neon.tech/db"
@@ -43,3 +48,18 @@ def test_direct_connections_keep_server_enforced_startup_timeouts() -> None:
 def test_no_timeouts_means_no_options_in_either_scope() -> None:
     assert "options" not in connect_args_for("session", None, None)
     assert "options" not in connect_args_for("transaction", None, None)
+
+
+@pytest.mark.parametrize("scope", ["session", "transaction"])
+def test_every_connection_detects_a_dead_peer(scope: str) -> None:
+    """2026-10-18: a worker connected to Neon kept a half-open TCP connection after the
+    compute suspended; with no keepalive settings macOS waits ~2 h before probing, so an
+    await (and shutdown) hung. libpq's own keepalives notice a dead peer in about a minute,
+    and connect_timeout bounds a connection attempt. Both are client-side, so PgBouncer
+    accepts them."""
+    args = connect_args_for(scope, None, None)  # type: ignore[arg-type]
+
+    assert args["connect_timeout"] == CONNECT_TIMEOUT_SECONDS
+    assert args["keepalives"] == 1
+    probe = args["keepalives_idle"] + args["keepalives_interval"] * args["keepalives_count"]
+    assert probe <= 90

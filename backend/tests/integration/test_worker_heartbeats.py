@@ -157,3 +157,29 @@ async def test_retention_removes_long_gone_workers_only(
 def test_app_cannot_delete_heartbeats(as_app: psycopg.Connection) -> None:
     with pytest.raises(psycopg.errors.InsufficientPrivilege):
         as_app.execute("DELETE FROM worker_heartbeats")
+
+
+async def test_teardown_is_bounded_when_a_sweeper_hangs(
+    app_engine: AsyncEngine, owner: psycopg.Connection, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """2026-10-18: an idle worker connected to Neon stopped polling on SIGTERM but never
+    exited: its teardown awaited background work with no deadline. A hung sweeper (here one
+    that ignores the stop signal) is now cancelled after `teardown_seconds`."""
+    from querycure.worker import __main__ as worker_main
+
+    async def hung(_engine: AsyncEngine, _stop: asyncio.Event) -> None:
+        await asyncio.Event().wait()  # never returns on its own
+
+    monkeypatch.setattr(worker_main, "sweep_approvals", hung)
+    me = _identity()
+    worker = Worker(
+        app_engine, {}, worker_id=me.worker_id,
+        timings=WorkerTimings(lease_seconds=4, heartbeat_seconds=0.05, poll_seconds=0.05),
+    )  # fmt: skip
+    task = asyncio.create_task(
+        worker_main.serve(worker, app_engine, None, identity=me, teardown_seconds=0.5)
+    )
+    await asyncio.sleep(0.2)
+    await worker.stop()
+    await asyncio.wait_for(task, 5)  # returned: the hung sweeper was cancelled
+    assert _row(owner, me.worker_id)[3] is not None  # still marked stopped

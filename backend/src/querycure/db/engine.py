@@ -10,6 +10,14 @@ _ROLE = re.compile(r"^[a-z_][a-z0-9_]*$")
 
 TimeoutScope = Literal["auto", "session", "transaction"]
 
+# Client-side libpq settings for every metadata connection (2026-10-18). Without keepalive
+# settings the OS default (2 h idle on macOS) applied, so an await on a connection left
+# half-open by a suspended Neon compute or a sleeping host hung, and so did worker shutdown.
+# A dead peer is now noticed after ~30 s idle + 3 x 10 s probes; a connect attempt is bounded.
+CONNECT_TIMEOUT_SECONDS = 10
+KEEPALIVE = {"keepalives": 1, "keepalives_idle": 30, "keepalives_interval": 10,
+             "keepalives_count": 3}  # fmt: skip
+
 
 def is_pooled_url(url: str) -> bool:
     """Neon marks its PgBouncer endpoints with `-pooler` in the first host label."""
@@ -30,8 +38,9 @@ def connect_args_for(
 ) -> dict[str, Any]:
     """Transaction mode PgBouncer rejects any startup `options`, and a server connection is
     shared between clients, so a pooled engine sends none and disables prepared statements."""
+    base: dict[str, Any] = {"connect_timeout": CONNECT_TIMEOUT_SECONDS, **KEEPALIVE}
     if scope == "transaction":
-        return {"prepare_threshold": None}
+        return {**base, "prepare_threshold": None}
     options = " ".join(
         f"-c {name}={int(value)}"
         for name, value in (
@@ -40,7 +49,7 @@ def connect_args_for(
         )
         if value is not None
     )
-    return {"options": options} if options else {}
+    return {**base, "options": options} if options else base
 
 
 def async_url(url: str) -> str:

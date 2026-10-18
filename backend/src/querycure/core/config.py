@@ -198,10 +198,27 @@ class Settings(BaseSettings):
         default=30 * 24 * 3600, ge=300, validation_alias=_env("SESSION_TTL_SECONDS")
     )
 
-    @field_validator("metrics_token", "github_client_secret", "google_client_secret", mode="before")
+    @field_validator(
+        "metrics_token",
+        "github_client_secret",
+        "google_client_secret",
+        "database_url",
+        "database_url_direct",
+        "database_migration_url",
+        "database_retention_url",
+        "sandbox_admin_url",
+        "sandbox_bench_password",
+        "master_key",
+        "gemini_api_key",
+        "openrouter_api_key",
+        "groq_api_key",
+        mode="before",
+    )
     @classmethod
     def _blank_secret_is_unset(cls, value: object) -> object:
-        # An empty env var must not become an empty secret (e.g. an empty bearer token).
+        # An empty env var must not become an empty secret (e.g. an empty bearer token) or an
+        # empty URL (`SANDBOX_ADMIN_URL=` dialled the default Unix socket, 2026-10-18). A blank
+        # QC_MASTER_KEY is then "missing", which the demo profile still refuses.
         return None if isinstance(value, str) and not value.strip() else value
 
     @field_validator("llm_fallback_model", mode="before")
