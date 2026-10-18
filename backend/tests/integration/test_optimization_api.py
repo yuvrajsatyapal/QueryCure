@@ -1,5 +1,6 @@
 """Candidates, approvals and experiments API (T3.10/T3.12) as qc_app, through the real app."""
 
+import asyncio
 import hashlib
 import json
 import uuid
@@ -196,6 +197,31 @@ async def test_approval_flow_partial_decision_resumes_the_run(
     )
     assert again.status_code == 202
     assert again.json()["status"] == "partially_approved"  # the first decision stands
+
+
+async def test_concurrent_decisions_record_one_decision_and_one_resume(
+    api: httpx.AsyncClient, owner: psycopg.Connection
+) -> None:
+    """A double click or two tabs: concurrent approve/decline requests serialize on the
+    approval row; exactly one decision, one `approval.decided` event and one resume job."""
+    run_id = (await _create(api))["run"]["id"]
+    approval_id = _pending_approval(owner, run_id)
+
+    url = f"/api/v1/approvals/{approval_id}/decision"
+    replies = await asyncio.gather(
+        *(api.post(url, json={"decision": d}) for d in ["approve", "decline"] * 4)
+    )
+
+    assert all(r.status_code in (202, 409) for r in replies), [r.text for r in replies]
+    statuses = {r.json()["status"] for r in replies if r.status_code == 202}
+    assert len(statuses) == 1  # every success reports the same, single decision
+    counts = owner.execute(
+        "SELECT (SELECT count(*) FROM jobs WHERE run_id = %s AND kind = 'run_resume'), "
+        "(SELECT count(*) FROM investigation_events WHERE run_id = %s "
+        "AND type = 'approval.decided')",
+        (run_id, run_id),
+    ).fetchone()
+    assert counts == (1, 1)
 
 
 @pytest.mark.parametrize(
