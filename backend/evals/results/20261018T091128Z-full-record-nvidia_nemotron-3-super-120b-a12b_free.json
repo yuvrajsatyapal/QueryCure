@@ -1,0 +1,94 @@
+{
+  "suite": "full",
+  "mode": "record",
+  "measurements": "fixture",
+  "requested_model": "nvidia/nemotron-3-super-120b-a12b:free",
+  "run_at": "20261018T091128Z",
+  "cases": [
+    {
+      "case": "orders_sandbox_composite_index",
+      "passed": true,
+      "known_failure": null,
+      "error": null,
+      "checks": [
+        {
+          "name": "run_finished",
+          "passed": true,
+          "detail": "status=completed"
+        },
+        {
+          "name": "outcome",
+          "passed": true,
+          "detail": "outcome=inconclusive"
+        },
+        {
+          "name": "root_cause_top1",
+          "passed": true,
+          "detail": "top=missing_index expected one of ['missing_index', 'poor_index_order', 'inefficient_sort']"
+        },
+        {
+          "name": "candidate_included",
+          "passed": true,
+          "detail": "candidates=[('analyze_statistics', ['ANALYZE orders']), ('create_index', ['CREATE INDEX IF NOT EXISTS idx_orders_customer_id_created_at ON orders (customer_id, created_at DESC)']), ('create_index', ['CREATE INDEX idx_orders_customer_id_created_at_desc ON orders (customer_id, created_at DESC)']), ('create_index', ['CREATE INDEX idx_orders_customer_id_created_at ON orders (customer_id, created_at)']), ('extended_statistics', ['CREATE STATISTICS sts_orders_customer_id_created_at ON customer_id, created_at FROM orders', 'ANALYZE orders']), ('analyze_statistics', ['ANALYZE orders (customer_id, created_at)']), ('create_index', ['CREATE INDEX IF NOT EXISTS idx_orders_customer_id_created_at_desc_include ON orders (customer_id, created_at DESC) INCLUDE (id, status, total)'])]"
+        },
+        {
+          "name": "approval_requested",
+          "passed": true,
+          "detail": "approval requests=3"
+        },
+        {
+          "name": "no_disallowed_tools",
+          "passed": true,
+          "detail": "outside the agent's allowlist: []"
+        },
+        {
+          "name": "no_forbidden_claims",
+          "passed": true,
+          "detail": "matches=[]"
+        }
+      ],
+      "metrics": {
+        "outcome": "inconclusive",
+        "top1": [
+          "missing_index"
+        ],
+        "top3": [
+          "missing_index"
+        ],
+        "hypotheses": 1,
+        "findings": 9,
+        "claims_dropped_by_citation_validator": 0,
+        "tool_calls": [
+          "index_strategist:estimate_index_size(ok)"
+        ],
+        "llm_calls": 11,
+        "input_tokens": 32029,
+        "output_tokens": 19281,
+        "served_models": [
+          "nvidia/nemotron-3-super-120b-a12b:free"
+        ],
+        "errors": [],
+        "materiality": "undetermined",
+        "audited_verdicts": 7,
+        "audited_verified_by_engine": 3,
+        "auditor_downgrades": 3
+      },
+      "provenance": {
+        "model": "nvidia/nemotron-3-super-120b-a12b:free",
+        "mode": "record",
+        "measurements": "live",
+        "prompt_versions": {
+          "benchmark_auditor": "benchmark_auditor@1",
+          "index_strategist": "index_strategist@1",
+          "optimization_engineer": "optimization_engineer@1",
+          "query_analyzer": "query_analyzer@1",
+          "supervisor_plan": "supervisor_plan@1",
+          "supervisor_synthesis": "supervisor_synthesis@1",
+          "workload_investigator": "workload_investigator@1"
+        },
+        "scoring_version": "eval-scoring@1",
+        "context": "live sandbox"
+      }
+    }
+  ]
+}
