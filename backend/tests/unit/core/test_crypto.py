@@ -88,3 +88,13 @@ def test_from_base64_key() -> None:
     box = SecretBox.from_base64(base64.b64encode(raw).decode(), version=3)
 
     assert box.current_version == 3
+
+
+def test_a_restore_with_another_master_key_fails_closed() -> None:
+    """DEPLOYMENT §4c: a backup restored without the master key that sealed it (same key
+    version, different key bytes) must raise, never return plaintext or garbage."""
+    aad = secret_aad(table="llm_credentials", row_id="r1", user_id="u1")
+    sealed = make_box().encrypt("sk-or-v1-abc", aad=aad)
+
+    with pytest.raises(DecryptionError):
+        make_box().decrypt(sealed, aad=aad)

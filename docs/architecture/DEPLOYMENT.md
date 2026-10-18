@@ -160,9 +160,44 @@ Migrations run as a separate release step before new API instances start; migrat
 - After the grace period, jobs are abandoned to lease expiry (≤ `WORKER_LEASE_SECONDS`), and the next worker resumes them from their LangGraph checkpoint.
 - Every 5 minutes the worker logs `stuck_work_detected` (expired leases, active runs with no job) and drops orphaned sandbox clones.
 
-**Backups:** use the metadata DB provider's point-in-time restore (Neon free tier: a short window). Demo data is disposable by design. Losing `QC_MASTER_KEY` makes stored BYOK keys undecryptable (users re-enter them); it must persist across deploys, but it never protects evidence or reports.
+**Backups:** see §4c. Demo data is disposable by design. Losing `QC_MASTER_KEY` makes stored BYOK keys and connection passwords undecryptable (users re-enter them). It must persist across deploys, but it never protects evidence or reports.
 
-**Retention:** schedule `python -m querycure.ops retention` with `DATABASE_RETENTION_URL` (the `qc_retention` role) daily. It deletes long-expired sessions, idle rate-limit buckets and wiped credential rows, never evidence.
+## 4c. Backup and disaster recovery (runbook, 2026-10-18)
+
+**What must survive.** Everything lives in the metadata DB:
+- investigations, events and checkpoints (schema `langgraph`);
+- content-addressed artifacts, including sealed reports and manifests;
+- users, sessions and encrypted credentials.
+
+Separately, the `QC_MASTER_KEY` and its version. There is no other state: the sandbox is disposable and rebuilds templates on demand.
+
+**Backups**
+- **Neon (hosted):** rely on point-in-time restore within the plan's window. Restore into a **new branch** and point a staging API at it to check it. Never restore over, truncate or reset the live branch.
+- **Off-provider copy:** `pg_dump -Fc` with the owner role (`DATABASE_MIGRATION_URL`, direct host) to encrypted storage. It holds ciphertext only. The master key never goes into the same place.
+- **`QC_MASTER_KEY`:** keep it in the host's secret store and in a second, offline secret store. A restore without the key that sealed the rows recovers everything except BYOK keys and connection passwords. Those fail closed: decryption raises an error and never returns plaintext. Users re-enter them.
+
+**Restore procedure**
+1. Create an empty database (or a Neon branch).
+2. `pg_restore --exit-on-error -d <new> <dump>` as the owner. Grants and the `langgraph` schema come with it, provided the `qc_app` and `qc_retention` roles exist (`infra/docker/metadata-init/01-roles.sh` or the Neon SQL in `.env.example`).
+3. `alembic current` must equal the code's head. If the dump is older, run `alembic upgrade head` (migrations are forward-only in practice; downgrades refuse when data would be lost).
+4. Verify before switching traffic:
+   - `/readyz` reports `ok` and `current`;
+   - every artifact re-reads through the digest-checking store;
+   - sealed reports replay `verified` (`replay.report_replay.verify_report`; the drill below scripts both checks);
+   - `/internal/metrics` shows `qc_runs_terminal_unsealed` at 0 and no expired leases.
+5. Point `DATABASE_URL` and `DATABASE_URL_DIRECT` at it and restart the API and workers. Check `qc_workers_alive` and each worker's `source_digest`.
+
+**After a restore**
+- **Workers:** in-flight jobs resume from their LangGraph checkpoint once their lease expires. A run whose checkpoint postdates the backup restarts from the last checkpoint in the backup, and benchmark blocks resume at the first missing block.
+- **Partial finalization:** finalization is one transaction (`test_finalize.py`: a fault after any step leaves nothing visible), so a backup never holds a half-sealed run. `qc_runs_terminal_unsealed` lists terminal runs without a manifest. Dead-lettered runs are finalized with a partial report.
+- **Retention and deletion:** `python -m querycure.ops retention` (as `qc_retention`) removes expired sessions, idle rate-limit buckets, wiped credentials and stale worker rows. Evidence is never swept. A restore can bring back rows that retention or a user deletion had removed, so run retention once after restoring.
+
+**Drill (2026-10-18, local Docker only, never Neon).**
+- **Source:** local metadata DB, schema 0016, 20 MB: 70 runs (43 sealed), 714 artifacts, 3,269 events.
+- **Timing:** `pg_dump -Fc` 0.34 s (1.27 MB) and `pg_restore` into an isolated database 0.39 s.
+- **Fidelity:** identical row counts and schema version. Grants were intact (`qc_app` can INSERT but not UPDATE artifacts; `qc_retention` can DELETE sessions), and the `langgraph` schema was present.
+- **Integrity:** 714/714 artifacts re-verified by digest, and 43/43 sealed reports replayed `verified`, identical to the source. Verification took 1.5 s.
+- **Not covered:** a Neon PITR restore (it needs the owner's console), restore time at production size, and decrypting BYOK rows (the local DB had none; key-binding behaviour is covered by `test_crypto.py` and `test_byok_api.py`).
 
 ## 5. Operational limitations
 
