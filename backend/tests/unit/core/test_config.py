@@ -66,11 +66,11 @@ def test_secrets_are_not_in_repr() -> None:
 
 def test_heartbeat_must_fit_twice_inside_the_lease() -> None:
     with pytest.raises(ValueError, match="WORKER_HEARTBEAT_SECONDS"):
-        Settings(worker_lease_seconds=30, worker_heartbeat_seconds=15)
+        Settings(_env_file=None, worker_lease_seconds=30, worker_heartbeat_seconds=15)
 
 
 def test_worker_timing_defaults_are_consistent() -> None:
-    settings = Settings()
+    settings = Settings(_env_file=None)
 
     assert settings.worker_heartbeat_seconds * 2 < settings.worker_lease_seconds
 
