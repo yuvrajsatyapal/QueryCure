@@ -13,7 +13,7 @@ import pytest
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from querycure.agents.candidates import to_candidates
-from querycure.agents.claims import CHECKER_VERSION
+from querycure.agents.claims_v2 import CHECKER_VERSION
 from querycure.agents.nodes.write_report import _reconcile_summary, model_failure
 from querycure.agents.outputs import CandidateDraft, CandidateSet
 from querycure.agents.runtime import RunContext

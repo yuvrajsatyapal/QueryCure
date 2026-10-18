@@ -14,7 +14,7 @@ from langgraph.runtime import Runtime
 from querycure.agents.agent_runner import AgentFailedError, run_agent
 from querycure.agents.candidates import judge_candidates, rejection_lines, to_candidates
 from querycure.agents.citations import CitationReport
-from querycure.agents.claims import claim_context
+from querycure.agents.claims_v2 import claim_context
 from querycure.agents.fencing import Fence
 from querycure.agents.outputs import CandidateSet
 from querycure.agents.prompts import optimization_engineer as prompts

@@ -19,7 +19,7 @@ from langgraph.runtime import Runtime
 
 from querycure.agents.agent_runner import AgentFailedError, run_agent
 from querycure.agents.citations import CitationReport
-from querycure.agents.claims import ActionRef, claim_context, index_columns
+from querycure.agents.claims_v2 import ActionRef, claim_context, index_columns, plan_node_types
 from querycure.agents.fencing import Fence
 from querycure.agents.nodes.optimization_engineer import baseline_sql
 from querycure.agents.nodes.run_experiment import experiment_id_for
@@ -82,6 +82,27 @@ def audit_actions(inputs: AuditInputs, assessment: AuditAssessment) -> list[Acti
     ]
 
 
+def candidate_plans(inputs: AuditInputs) -> dict[str, frozenset[str]]:
+    """Scan types of each arm's own measured plans, so a claim about the baseline plan is
+    never supported by a candidate's plan, or the reverse (claims@2)."""
+    out: dict[str, set[str]] = {}
+    for (arm, _), tree in inputs.plans.items():
+        out.setdefault(arm, set()).update(plan_node_types([n.node_type for n in tree.nodes]))
+    return {arm: frozenset(types) for arm, types in out.items()}
+
+
+def replication_ranges(inputs: AuditInputs) -> dict[str, tuple[float, float]]:
+    """The range the report shows for a replicated arm (smallest lower to largest upper bound
+    across its experiments): a stored interval of that arm only."""
+    if inputs.replication is None:
+        return {}
+    return {
+        v.arm: (round(v.ci_low, 3), round(v.ci_high, 3))
+        for v in inputs.replication.verdicts
+        if v.ci_low is not None and v.ci_high is not None
+    }
+
+
 def apply_concerns(
     assessment: AuditAssessment, concerns: list[AuditConcern]
 ) -> list[CandidateAudit]:
@@ -122,6 +143,8 @@ async def _narrative(
         query_sql=sql,
         actions=audit_actions(inputs, assessment),
         verdicts={a.arm: a.verdict for a in assessment.candidates},
+        candidate_plans=candidate_plans(inputs),
+        replication_ranges=replication_ranges(inputs),
     )
 
     def judge(output: AuditNarrative, kinds: Any) -> tuple[AuditNarrative, CitationReport]:

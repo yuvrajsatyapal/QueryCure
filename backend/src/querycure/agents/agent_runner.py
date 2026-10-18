@@ -16,7 +16,7 @@ from typing import Any
 from pydantic import BaseModel, ValidationError
 
 from querycure.agents.citations import CitationReport, feedback_message
-from querycure.agents.claims import claim_context
+from querycure.agents.claims_v2 import CHECKER_VERSION, claim_context
 from querycure.agents.fencing import Fence
 from querycure.agents.outputs import AgentAnalysis, AgentTurn, ToolCallTurn, judge_analysis
 from querycure.agents.runtime import RunContext, ToolAllowanceLike
@@ -75,6 +75,7 @@ def _report_dict(report: CitationReport) -> dict[str, Any]:
     if report.claim_problems or report.claims_removed:
         # ADR-0026: what the deterministic grounding removed, kept with the output.
         out["claim_check"] = {
+            "checker": CHECKER_VERSION,
             "removed_claims": report.claims_removed,
             "problems": report.claim_problems[:MAX_CLAIM_PROBLEMS],
         }

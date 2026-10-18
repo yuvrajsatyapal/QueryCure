@@ -3,7 +3,7 @@
 import uuid
 
 from querycure.agents.candidates import judge_candidates
-from querycure.agents.claims import ActionRef, claim_context, index_columns
+from querycure.agents.claims_v2 import ActionRef, claim_context, index_columns
 from querycure.agents.nodes.write_report import model_failure
 from querycure.agents.outputs import (
     AgentAnalysis,

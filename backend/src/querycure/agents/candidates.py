@@ -10,7 +10,7 @@ import uuid
 from collections.abc import Collection, Mapping
 
 from querycure.agents.citations import CitationReport
-from querycure.agents.claims import ClaimContext, filter_text
+from querycure.agents.claims_v2 import ClaimContext, filter_text
 from querycure.agents.outputs import CandidateDraft, CandidateSet
 from querycure.benchmark.engine import sql_digest
 from querycure.core.errors import QueryCureError

@@ -11,7 +11,7 @@ from typing import Annotated, Any, Literal
 from pydantic import BaseModel, ConfigDict, Field, RootModel
 
 from querycure.agents.citations import CitationReport, Claim, judge_claims
-from querycure.agents.claims import ClaimContext, Mode, filter_text
+from querycure.agents.claims_v2 import ClaimContext, Mode, filter_text
 from querycure.domain.investigation import (
     Confidence,
     HypothesisCategory,

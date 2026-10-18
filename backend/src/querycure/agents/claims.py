@@ -1,4 +1,7 @@
-"""Deterministic grounding of AI-written prose against recorded evidence (ADR-0026).
+"""Deterministic grounding of AI-written prose against recorded evidence (ADR-0026), `claims@1`.
+
+Frozen on 2026-10-18: new runs use `claims@2` (agents/claims_v2.py, ADR-0028), which reuses these
+rules on attributed contexts. Do not change behaviour here; add a new checker version instead.
 
 Citations prove that a claim points at evidence; they do not prove the claim agrees with it.
 This module checks the claim kinds that the 2026-10-17 audit found contradicting evidence,

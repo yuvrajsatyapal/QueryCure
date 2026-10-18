@@ -17,7 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncConnection
 
 from querycure.agents.agent_runner import AgentFailedError, run_agent
 from querycure.agents.citations import CitationReport
-from querycure.agents.claims import claim_context
+from querycure.agents.claims_v2 import claim_context
 from querycure.agents.fencing import Fence
 from querycure.agents.outputs import HypothesisSet, judge_hypotheses
 from querycure.agents.prompts import supervisor as prompts

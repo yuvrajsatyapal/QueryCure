@@ -18,7 +18,7 @@ from langgraph.runtime import Runtime
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncConnection
 
-from querycure.agents.claims import CHECKER_VERSION, action_refs, claim_context, filter_text
+from querycure.agents.claims_v2 import CHECKER_VERSION, action_refs, claim_context, filter_text
 from querycure.agents.runtime import REPORT_NODE, RunContext, guarded
 from querycure.agents.state import InvestigationState
 from querycure.core.logging import get_logger
