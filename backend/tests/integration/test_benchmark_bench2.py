@@ -187,11 +187,18 @@ def test_win_from_an_arm_specific_disturbance_is_not_noise_verified(
 ) -> None:
     """Misleadingly narrow CI, benefit side: the baseline is delayed by 3 ms in half the blocks,
     so a useless index looks faster with a CI above min_effect. Dispersion stops it at gate 4b,
-    and the noise screen refuses it (the effect is absent in the spared blocks)."""
-    cfg = _cfg("no_benefit", USELESS)
+    and the noise screen refuses it (the effect is absent in the spared blocks).
+
+    Both refusing checks are probabilistic. The index is never used (a Seq Scan either way,
+    speed-up 0.997 measured on 400 interleaved pairs), so a spared block reaches min_effect
+    only by chance. With the default 6 blocks of 5 only 3 blocks were spared, and CI runners
+    passed all three by chance in 2 of about 10 runs. 20 blocks of 2 leave 10 spared blocks:
+    even at a 0.4 chance per block, all 10 pass with probability 0.4^10 < 0.02%."""
+    cfg = _cfg("no_benefit", USELESS, measured_runs=40, block_size=2)
+    spared = {b for b in range(20) if b % 2 == 0}
 
     run, _ = _replicated(
-        provisioner, cfg, EngineOptions(arm_noise=_late_blocks("baseline", 3.0, spared={0, 2, 4}))
+        provisioner, cfg, EngineOptions(arm_noise=_late_blocks("baseline", 3.0, spared=spared))
     )
 
     first = run.replicates[0].result
@@ -199,7 +206,7 @@ def test_win_from_an_arm_specific_disturbance_is_not_noise_verified(
     assert v.verdict == "inconclusive", v
     if v.gate == 4:
         (screen,) = first.noise_screens
-        assert not screen.eligible
+        assert not screen.eligible, screen.checks
         # Half the baseline samples are undisturbed: Q1 sits in the fast mode, and the spared
         # blocks show no effect. Either check alone refuses the arm.
         assert {"blocks", "separation"} & {c.name for c in screen.checks if not c.passed}
