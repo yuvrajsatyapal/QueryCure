@@ -4,7 +4,7 @@
 |---|---|
 | Phase | **5 — Production polish** (authorized by the owner 2026-10-16). Phase 1: [PHASE_1_REPORT](reports/PHASE_1_REPORT.md); Phase 2: [PHASE_2_REPORT](reports/PHASE_2_REPORT.md); Phase 3: [PHASE_3_REPORT](reports/PHASE_3_REPORT.md); Phase 4 owner-reviewed 2026-10-16: [PHASE_4_REPORT](reports/PHASE_4_REPORT.md) |
 | Status | **Phase 5 implementation complete and verified locally (2026-10-16); not publicly deployed; awaiting owner review** ([PHASE_5_REPORT](reports/PHASE_5_REPORT.md)). Exit criterion "deployed" not met by design (needs owner approval, domain, accounts) |
-| Last updated | 2026-10-17 |
+| Last updated | 2026-10-18 |
 | Application code | Phases 1–3 (API, metadata DB, parsing, inspection gateway, artifact store, six demo workloads, multi-agent graph, approval gate, sandbox benchmark engine `bench@2`, tournament, web workspace) plus Phase 4: Benchmark Auditor (deterministic checks + downgrade-only review), atomic finalization with versioned reports (`report-builder@1`, `report-md@1`), report replay, experiment replay with statistical comparison, re-investigation start, plan diff; migrations 0001–0012; web app adds Report tab, report and replay pages, lineage drawer, audit panel and plan diff |
 
 ## Post-Phase-5 addition (2026-10-16)
@@ -24,6 +24,25 @@
   - Real-model smoke run on local metadata: `verified_recommendation`, 7/7 valid calls, no stale-statistics hypothesis, report replay `verified`.
   - **Open:** the Mode C eval recordings (`orders_sandbox_composite_index`, `rewrite_trap_sandbox`) must be re-recorded, because the O3 context text changed and today's free quota ran out. CI "Eval Mode C" fails until then.
 - [x] **Groq provider (2026-10-17, [ADR-0027](../engineering/adr/ADR-0027-groq-provider-trusted-free-plan.md)).** `LLM_PROVIDER=groq` with a local-profile `GROQ_API_KEY` (`llm/groq.py`, OpenAI-compatible JSON mode). Allowed while `LLM_FREE_ONLY` is on by trusting the key to be on Groq's free plan (owner decision; Groq reports no cost). Per-day 429 stops the run; the minute limiter applies; the OpenRouter daily count does not. Refused in the demo profile; no BYOK, no UI change. Tests: `tests/unit/llm/test_groq.py`. Verified: ruff, mypy, 850 unit, 607 integration + security. Not verified live: no Groq request has been made.
+
+- [x] **Backend production hardening (2026-10-18, [report](../reports/BACKEND_PRODUCTION_HARDENING_2026-10-18.md), [ADR-0028](../engineering/adr/ADR-0028-evidence-specific-claim-grounding.md), [ADR-0029](../engineering/adr/ADR-0029-transport-floor-and-benchmark-repeatability.md)).**
+  - **CI green locally on every job:**
+    - the flaky noise-screen test was redesigned;
+    - both Mode C cases were re-recorded (2/2, 22 real requests plus 13 on a failed contended attempt);
+    - smoke 5/5, 1115 unit, 486 integration + security, frontend 89 tests and build, e2e 14/14.
+  - **`claims@2`:** evidence-specific grounding (subject attribution, typed claims). `claims@1` is frozen.
+  - **Benchmark:** a 20-session repeatability study per path, which showed the relay compresses speed-ups (5.9× vs 13.8×). Each result records a transport floor, and the worker warns on the relay path.
+  - **Worker:** presence rows with a source digest (migration 0016), and failure-diagnosing metrics.
+  - **Shutdown hang fixed:** metadata connections get keepalives and a connect timeout; teardown is bounded.
+  - **Config:** blank settings now mean unset.
+  - **Eval guards:** no overwrite on failure, a quiet-host pre-flight, and a local-only admin URL.
+  - **Demo probe:** 17/17 against the local demo stack.
+  - **DR:** a runbook plus a local restore drill (714/714 artifacts, 43/43 sealed reports verified).
+  - **Open:**
+    - apply migration 0016 to Neon (owner approval), then restart the Neon worker;
+    - rotate the Neon `qc_app` password;
+    - test real OAuth on a deployed origin;
+    - surface the transport floor and claim removals in `report-builder@2`.
 
 ## Completed
 
