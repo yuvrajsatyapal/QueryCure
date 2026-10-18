@@ -39,6 +39,7 @@ from querycure.demo.export import export_bundle
 from querycure.demo.gallery import BundleSource, DemoBundle
 from querycure.domain.budgets import default_budget
 from querycure.evals.cases import EVALS_DIR, EvalCase
+from querycure.evals.preflight import should_save
 from querycure.evals.recording import (
     LiveDivergenceError,
     Recording,
@@ -79,6 +80,7 @@ class CaseResult:
     # What this result was produced from: model, recording, measurement source and fixture
     # digest, prompt and scoring versions (recorded in results JSON).
     provenance: dict[str, Any] = field(default_factory=dict)
+    saved: bool | None = None  # record mode: whether the recording was written
 
     @property
     def passed(self) -> bool:
@@ -251,6 +253,7 @@ async def run_case(
     fixtures_dir: Path | None = None,
     export_dir: Path | None = None,  # demo bundles: deterministic replays only
     capture_context: bool = False,  # fixture replay: read and store the sandbox context once
+    keep_failing: bool = False,  # record: save even a recording that fails its checks
 ) -> CaseResult:
     name = f"qc_eval_{case.id[:30]}_{secrets.token_hex(4)}"
     with psycopg.connect(admin_url, autocommit=True) as admin:
@@ -412,7 +415,17 @@ async def run_case(
         if error is None and truncated:
             # Cut short by our cap or the free quota: not the model's behaviour, never recorded.
             error = f"stopped early ({truncated[0][:80]}): not recorded, rerun later"
+        result_score = score(case, seen)
+        saved: bool | None = None
         if mode == "record" and error is None:
+            # A recording that fails its checks would replace a working one with a failing
+            # one; it is kept only as a declared known failure or on request (2026-10-18).
+            saved = should_save(
+                passed=result_score.passed,
+                expected_failure=case.known_failures.get(model),
+                keep_failing=keep_failing,
+            )
+        if saved:
             recording.save(recording_path(case, model, recordings_dir))
             if isinstance(measure, CapturingMeasure):
                 recorded = context.recorded() if isinstance(context, CapturingContext) else None
@@ -423,7 +436,9 @@ async def run_case(
         if capture_context and error is None and fixture is not None and seen_context:
             path = measurement_fixture_path(case, model, fixtures_dir)
             _write_fixture(path, fixture.model_copy(update={"context": seen_context}))
-        return CaseResult(case, score(case, seen), error, model=model, provenance=provenance)
+        return CaseResult(
+            case, result_score, error, model=model, provenance=provenance, saved=saved
+        )
     finally:
         with psycopg.connect(admin_url, autocommit=True) as admin:
             admin.execute(f'DROP DATABASE IF EXISTS "{name}" WITH (FORCE)')

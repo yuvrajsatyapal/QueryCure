@@ -25,9 +25,26 @@ def test_a_hosted_owner_url_is_refused_without_an_explicit_admin_url() -> None:
         _admin_url(hosted, None)
 
 
-def test_an_explicit_admin_url_is_honoured() -> None:
+@pytest.mark.parametrize(
+    "url",
+    ["postgresql://u:p@127.0.0.1:5432/postgres", "postgresql://u:p@metadata-db:5432/postgres"],
+)
+def test_an_explicit_local_admin_url_is_honoured(url: str) -> None:
     hosted = settings("postgresql://owner:pw@ep-x.aws.neon.tech/neondb")
 
-    assert _admin_url(hosted, "postgresql://u:p@db.ci:5432/postgres") == (
-        "postgresql://u:p@db.ci:5432/postgres"
-    )
+    assert _admin_url(hosted, url) == url
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "postgresql://owner:pw@ep-x-pooler.aws.neon.tech/neondb?sslmode=require",
+        "postgresql://u:p@db.ci:5432/postgres",
+        "postgresql://u:p@10.0.0.5:5432/postgres",
+    ],
+)
+def test_an_explicit_remote_admin_url_is_refused(url: str) -> None:
+    # 2026-10-18: evals CREATE and DROP scratch databases, so even an explicit URL must be a
+    # local server; a typo or a pasted Neon URL must never reach a hosted database.
+    with pytest.raises(SystemExit, match="local"):
+        _admin_url(settings("postgresql://o:p@127.0.0.1/querycure"), url)

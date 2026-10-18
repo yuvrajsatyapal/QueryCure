@@ -5,19 +5,31 @@ import asyncio
 import datetime as dt
 import json
 import sys
+import time
 from pathlib import Path
 from urllib.parse import urlsplit
 
+import psycopg
+
 from querycure.core.config import Settings
 from querycure.evals.cases import EVALS_DIR, load_cases
+from querycure.evals.preflight import FLOOR_SAMPLES, quiet_host
 from querycure.evals.recording import model_slug
 from querycure.evals.runner import CaseResult, QuotaLedger, RequestCap, check_model, run_case
 
 _LOCAL_HOSTS = frozenset({"127.0.0.1", "localhost", "::1"})
+# The compose metadata service, for evals run inside the worker container (ADR-0020).
+_LOCAL_SERVICES = frozenset({"metadata-db"})
 
 
 def _admin_url(settings: Settings, override: str | None) -> str:
     if override:
+        # Evals CREATE and DROP scratch databases: an explicit URL must be local too.
+        if urlsplit(override).hostname not in _LOCAL_HOSTS | _LOCAL_SERVICES:
+            raise SystemExit(
+                "--admin-url must be a local server (127.0.0.1, localhost, ::1 or the compose "
+                "service metadata-db): evals create and drop scratch databases there."
+            )
         return override
     if settings.database_migration_url is None:
         raise SystemExit("Set DATABASE_MIGRATION_URL (owner role) or pass --admin-url.")
@@ -44,6 +56,11 @@ def _print(results: list[CaseResult]) -> None:
             print(f"      known baseline failure: {r.expected_failure}")
         if r.error:
             print(f"      error: {r.error}")
+        if r.saved is False:
+            print(
+                "      not saved: the recorded run failed its checks; the existing recording "
+                "is kept (--keep-failing saves it anyway)"
+            )
         if r.provenance.get("measurements"):
             fixture = r.provenance.get("measurement_fixture_sha256")
             print(
@@ -74,6 +91,20 @@ def _print(results: list[CaseResult]) -> None:
     )
 
 
+def _quiet_sandbox(settings: Settings) -> tuple[bool, str]:
+    """Round trips to the sandbox before any model request (evals/preflight.py)."""
+    if settings.sandbox_admin_url is None:
+        return False, "SANDBOX_ADMIN_URL is not set"
+    with psycopg.connect(settings.sandbox_admin_url.get_secret_value(), connect_timeout=5) as c:
+        c.execute("SELECT 1")
+        samples = []
+        for _ in range(FLOOR_SAMPLES):
+            start = time.perf_counter_ns()
+            c.execute("SELECT 1").fetchone()
+            samples.append(time.perf_counter_ns() - start)
+    return quiet_host(samples, path=settings.bench_path)
+
+
 async def _run(args: argparse.Namespace) -> int:
     settings = Settings()
     model = args.model or settings.llm_model
@@ -92,6 +123,15 @@ async def _run(args: argparse.Namespace) -> int:
                 "LLM_DAILY_REQUEST_LIMIT) is used up; record again after 00:00 UTC."
             )
             return 2
+        if any(c.workload for c in cases) and not args.skip_quiet_check:
+            ok, detail = _quiet_sandbox(settings)
+            print(f"pre-flight: {detail}")
+            if not ok:
+                print(
+                    "Not recording: a contended host makes Mode C benchmarks inconclusive and "
+                    "wastes free requests. Retry when it is quiet (or --skip-quiet-check)."
+                )
+                return 3
         allowed = min(args.max_requests, left)
         cap = RequestCap(allowed, ledger)
         print(f"recording with at most {allowed} free requests ({left} left today)")
@@ -107,6 +147,7 @@ async def _run(args: argparse.Namespace) -> int:
             measurements=args.measurements,
             export_dir=args.export_demo,
             capture_context=args.capture_context,
+            keep_failing=args.keep_failing,
         )
         results.append(result)
     _print(results)
@@ -169,6 +210,17 @@ def main() -> None:
         action="store_true",
         help="fixture replay: read the sandbox context live and, if every prompt still "
         "matches exactly, store it in the measurement fixture (needs the sandbox)",
+    )
+    run.add_argument(
+        "--keep-failing",
+        action="store_true",
+        help="record mode: save a recording even when it fails its checks (replaces the "
+        "existing one)",
+    )
+    run.add_argument(
+        "--skip-quiet-check",
+        action="store_true",
+        help="record mode: skip the sandbox round-trip pre-flight (contended host check)",
     )
     run.add_argument(
         "--export-demo",
