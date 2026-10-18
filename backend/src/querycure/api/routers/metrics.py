@@ -6,6 +6,10 @@ expired leases (stuck jobs), active and finished runs, run duration, replay outc
 finalization failures. OTel export is deferred (it would add dependencies); these are the
 signals the debugging playbook names.
 
+Since 2026-10-18 it also reports live workers (presence rows with their source digest),
+model-call outcomes, the server's free daily allowance, metadata connections and experiment
+failures by code, so a dead worker, an exhausted quota or a failing sandbox shows without logs.
+
 Access: open in the local profile; elsewhere only with `Authorization: Bearer $METRICS_TOKEN`,
 and a 404 (not a 401) without it, so the endpoint's existence is not advertised.
 """
@@ -18,8 +22,9 @@ from fastapi.responses import PlainTextResponse
 from sqlalchemy import text
 
 from querycure.api.deps import EngineDep, SettingsDep
-from querycure.core.config import Profile
+from querycure.core.config import FREE_ROUTER, Profile, Settings
 from querycure.core.errors import NotFoundError
+from querycure.llm.rate_limit import NOT_DISPATCHED_CODES
 
 router = APIRouter(tags=["internal"])
 CONTENT_TYPE = "text/plain; version=0.0.4; charset=utf-8"
@@ -50,6 +55,35 @@ _QUERIES: dict[str, str] = {
         "('completed', 'failed', 'cancelled') AND finalized_at IS NULL "
         "AND created_at > now() - interval '30 days'"
     ),
+    "workers": (
+        "SELECT worker_id, source_digest, COALESCE(bench_path, 'none') AS bench_path, "
+        "EXTRACT(EPOCH FROM now() - last_seen_at) AS age, stopped_at IS NOT NULL AS stopped "
+        "FROM worker_heartbeats WHERE deleted_at IS NULL "
+        "AND last_seen_at > now() - interval '1 day'"
+    ),
+    "llm_calls": (
+        "SELECT status, COALESCE(error->>'code', 'none') AS code, count(*) AS n "
+        "FROM agent_executions WHERE created_at > now() - interval '1 day' "
+        "GROUP BY status, error->>'code'"
+    ),
+    # The server's free allowance (ADR-0016): same rule as DailyQuota for runs without BYOK.
+    "free_today": (
+        "SELECT count(*) AS n FROM agent_executions e "
+        "JOIN investigation_runs r ON r.id = e.run_id "
+        "WHERE e.created_at >= date_trunc('day', now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC' "
+        "AND (e.requested_model LIKE :free_suffix OR e.requested_model = :free_router) "
+        "AND r.llm_credential_id IS NULL "
+        "AND coalesce(e.error->>'code', '') <> ALL(CAST(:local AS TEXT[]))"
+    ),
+    "connections": (
+        "SELECT (SELECT count(*) FROM pg_stat_activity WHERE datname = current_database()) "
+        "AS n, current_setting('max_connections')::int AS max"
+    ),
+    "experiments": (
+        "SELECT status, COALESCE(error->>'code', 'none') AS code, count(*) AS n "
+        "FROM experiments WHERE created_at > now() - interval '7 days' "
+        "GROUP BY status, error->>'code'"
+    ),
     "replays": (
         "SELECT kind, status, COALESCE(failure_code, 'none') AS code, count(*) AS n "
         "FROM replay_attempts GROUP BY kind, status, failure_code"
@@ -66,6 +100,11 @@ def _line(name: str, value: float, **labels: Any) -> str:
     return f"{name}{{{rendered}}} {value:g}" if rendered else f"{name} {value:g}"
 
 
+def _alive_after(settings: Settings) -> float:
+    """Three missed heartbeats mean the worker is gone (crashed, frozen or partitioned)."""
+    return 3 * settings.worker_heartbeat_seconds
+
+
 def _authorized(request: Request, token: str | None, profile: Profile) -> bool:
     if profile is Profile.LOCAL and token is None:
         return True
@@ -80,8 +119,17 @@ async def metrics(request: Request, engine: EngineDep, settings: SettingsDep) ->
     token = settings.metrics_token.get_secret_value() if settings.metrics_token else None
     if not _authorized(request, token, settings.profile):
         raise NotFoundError("Not found.")
+    params = {
+        "local": list(NOT_DISPATCHED_CODES),
+        "free_suffix": "%:free",
+        "free_router": FREE_ROUTER,
+    }
     async with engine.connect() as conn:
-        rows = {name: (await conn.execute(text(sql))).all() for name, sql in _QUERIES.items()}
+        rows = {
+            name: (await conn.execute(text(sql), params if ":local" in sql else {})).all()
+            for name, sql in _QUERIES.items()
+        }
+    alive = [w for w in rows["workers"] if not w.stopped and float(w.age) <= _alive_after(settings)]
     out: list[str] = [
         "# HELP qc_jobs Jobs by kind and status.",
         "# TYPE qc_jobs gauge",
@@ -111,6 +159,46 @@ async def metrics(request: Request, engine: EngineDep, settings: SettingsDep) ->
         "# HELP qc_runs_terminal_unsealed Terminal runs of the last 30 days without a manifest.",
         "# TYPE qc_runs_terminal_unsealed gauge",
         _line("qc_runs_terminal_unsealed", rows["unsealed"][0].n),
+        "# HELP qc_workers_alive Workers seen within 3 heartbeat intervals and not stopped.",
+        "# TYPE qc_workers_alive gauge",
+        _line("qc_workers_alive", len(alive)),
+        "# HELP qc_worker_last_seen_seconds Seconds since each worker's last heartbeat (1 day).",
+        "# TYPE qc_worker_last_seen_seconds gauge",
+        *(
+            _line(
+                "qc_worker_last_seen_seconds",
+                round(float(w.age), 1),
+                worker_id=w.worker_id,
+                source_digest=w.source_digest[:12],
+                bench_path=w.bench_path,
+            )
+            for w in rows["workers"]
+            if not w.stopped
+        ),
+        "# HELP qc_llm_calls_24h Model calls of the last 24 hours by status and error code.",
+        "# TYPE qc_llm_calls_24h gauge",
+        *(
+            _line("qc_llm_calls_24h", r.n, status=r.status, error_code=r.code)
+            for r in rows["llm_calls"]
+        ),
+        "# HELP qc_llm_free_requests_today Server free-model requests used today (UTC).",
+        "# TYPE qc_llm_free_requests_today gauge",
+        _line("qc_llm_free_requests_today", rows["free_today"][0].n),
+        "# HELP qc_llm_daily_request_limit The configured free daily request limit.",
+        "# TYPE qc_llm_daily_request_limit gauge",
+        _line("qc_llm_daily_request_limit", settings.llm_daily_request_limit),
+        "# HELP qc_db_connections Connections to the metadata database (all roles).",
+        "# TYPE qc_db_connections gauge",
+        _line("qc_db_connections", rows["connections"][0].n),
+        "# HELP qc_db_max_connections The server's max_connections.",
+        "# TYPE qc_db_max_connections gauge",
+        _line("qc_db_max_connections", rows["connections"][0].max),
+        "# HELP qc_experiments Experiments of the last 7 days by status and error code.",
+        "# TYPE qc_experiments gauge",
+        *(
+            _line("qc_experiments", r.n, status=r.status, error_code=r.code)
+            for r in rows["experiments"]
+        ),
         "# HELP qc_replay_attempts Replay attempts by kind, status and failure code.",
         "# TYPE qc_replay_attempts gauge",
         *(

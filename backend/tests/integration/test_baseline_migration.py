@@ -48,7 +48,7 @@ def test_standard_columns_and_uuid_defaults(owner: psycopg.Connection) -> None:
 
 def test_updated_at_trigger_sets_timestamp(owner: psycopg.Connection) -> None:
     user_id = owner.execute(
-        "INSERT INTO users (kind, display_name) VALUES ('local', 'dev') RETURNING id"
+        "INSERT INTO users (kind, display_name) VALUES ('anonymous', 'dev') RETURNING id"
     ).fetchone()[0]  # type: ignore[index]
 
     owner.execute("UPDATE users SET display_name = 'renamed' WHERE id = %s", (user_id,))

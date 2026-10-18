@@ -8,8 +8,15 @@ Status: structured logging (Phase 1), events (Phase 2), and **Phase 5 operations
   - `qc_jobs{kind,status}`, `qc_jobs_lease_expired`, `qc_jobs_retried`, `qc_jobs_oldest_pending_seconds`;
   - `qc_runs{status,outcome}`, `qc_run_duration_seconds_{count,sum}`;
   - `qc_runs_terminal_unsealed` (finalization failures);
-  - `qc_replay_attempts{kind,status,failure_code}`.
+  - `qc_replay_attempts{kind,status,failure_code}`;
+  - since 2026-10-18:
+    - `qc_workers_alive` (seen within 3 heartbeat intervals and not stopped) and `qc_worker_last_seen_seconds{worker_id,source_digest,bench_path}`, from `worker_heartbeats`;
+    - `qc_llm_calls_24h{status,error_code}`;
+    - `qc_llm_free_requests_today` and `qc_llm_daily_request_limit` (the server allowance, same rule as `DailyQuota`);
+    - `qc_db_connections` and `qc_db_max_connections`;
+    - `qc_experiments{status,error_code}` (last 7 days).
   It is open in the local profile, and needs `Authorization: Bearer $METRICS_TOKEN` elsewhere (404 otherwise; an empty token counts as unset). In-process counters such as LLM latency histograms are not exported yet; `agent_executions` holds the per-call data.
+- **Worker presence (2026-10-18):** every worker process (standalone or embedded) upserts one `worker_heartbeats` row every `WORKER_HEARTBEAT_SECONDS`. The row holds its `source_digest` (SHA-256 of its installed Python sources, which proves which code it runs) and its bench path. A clean shutdown sets `stopped_at`. The digest is also logged at startup (`worker_identity`). Compare it with `python -c "from querycure.worker.heartbeat import source_digest; print(source_digest())"` in the checkout you meant to deploy.
 - **Stuck work:** every 5 minutes the worker logs `stuck_work_detected {expired_leases, orphaned_runs}` and drops orphaned sandbox clones.
 - **Readiness:** `/readyz` checks the metadata DB and that migrations are at head. Settings fail fast at startup. In the demo profile that includes: a master key is required, no server model key, no private targets, and HTTPS URLs when GitHub sign-in is enabled.
 - **Timeouts and pools:** metadata connections carry server-side `statement_timeout` and `idle_in_transaction_session_timeout` as startup options; pool size, overflow and timeout are configurable.
@@ -93,7 +100,12 @@ The UI timeline is derived from events, not from OTel. For deeper debugging, a d
 | SSE gaps | client `Last-Event-ID`, API logs for LISTEN reconnects, `(run_id, seq)` continuity |
 | Slow API | trace for request_id; metadata DB slow query log (`log_min_duration_statement=200ms` in local) |
 | Mode B failures | `security=true` logs, capability JSON on connection |
+| Nothing is being picked up | `qc_workers_alive` = 0 (no live worker) vs `qc_jobs_oldest_pending_seconds` rising (workers alive but busy or stuck) |
+| Runs end `MODEL_UNAVAILABLE` / quota stop | `qc_llm_calls_24h{error_code}` (rate limited, timeout, invalid output, circuit open); `qc_llm_free_requests_today` vs `qc_llm_daily_request_limit` |
+| Benchmarks failing | `qc_experiments{status="failed",error_code}` (e.g. `SANDBOX_UNAVAILABLE`, `SANDBOX_BUSY`); worker `benchmark_path_relay` warning; experiment `result.transport_floor` |
+| Connection exhaustion | `qc_db_connections` vs `qc_db_max_connections`; pool timeouts in API logs (503 `SERVICE_UNAVAILABLE`) |
+| Replay failing | `qc_replay_attempts{status="failed",failure_code}` |
 
 ## 8. Alerting (demo, minimal)
 
-Uptime check on `/readyz`; log-based alert on `level=error` rate spike; daily check of `qc_job_lease_expired_total`. No paging — this is a portfolio deployment.
+Uptime check on `/readyz`; log-based alert on `level=error` rate spike; daily check of `qc_jobs_lease_expired`, `qc_workers_alive` (alert at 0 while jobs are pending) and `qc_llm_free_requests_today` against the limit. No paging — this is a portfolio deployment.

@@ -296,6 +296,9 @@ Indexes: `(source_run_id, created_at DESC)`; `(status) WHERE status IN ('checkin
 ### rate_limit_buckets and user_uploads
 *Implemented (migration 0014).* `rate_limit_buckets(bucket_key UNIQUE, tokens, refilled_at)`: one token bucket per limit and subject (user id or SHA-256 of the client address); mutable for `qc_app`, deletable by `qc_retention`. `user_uploads(user_id, artifact_id, kind)`, unique per `(user_id, artifact_id)`, append-only for `qc_app`: who uploaded which content-addressed artifact.
 
+### worker_heartbeats
+*Implemented (migration 0016, 2026-10-18).* One row per worker process: `worker_id` (unique while not deleted), `hostname`, `source_digest` (SHA-256 of the installed Python sources), `bench_path`, `started_at`, `last_seen_at`, `stopped_at`. Upserted every heartbeat interval; set stopped on a clean shutdown. `qc_app`: SELECT/INSERT/UPDATE; `qc_retention`: SELECT/DELETE (rows not seen for 30 days). Bookkeeping, not evidence.
+
 ### jobs
 | Column | Type | Notes |
 |---|---|---|
@@ -348,6 +351,7 @@ Every user-facing row is reachable from `users.id` via `investigations.user_id` 
 | Connection passwords | Deleted immediately on connection delete (ciphertext nulled, not soft) | repository |
 | BYOK keys | Deleted immediately on removal | repository |
 | Sessions | until `expires_at` + 1 day | sweep |
+| Worker presence rows | 30 days after `last_seen_at` | `python -m querycure.ops retention` (as `qc_retention`) |
 
 ## 7. Status transitions & idempotency
 

@@ -19,6 +19,7 @@ from querycure.jobs.approvals import expire_approvals
 from querycure.jobs.handlers import build_handlers, build_services, dead_job_handler
 from querycure.llm.models import model_warning
 from querycure.sandbox.provisioner import SandboxBusyError, SandboxProvisioner
+from querycure.worker.heartbeat import WorkerIdentity, heartbeat_loop, identity, mark_stopped
 from querycure.worker.runner import Worker, WorkerTimings
 
 log = get_logger(__name__)
@@ -105,8 +106,16 @@ def build_worker(
     return worker, services.sandbox
 
 
-async def serve(worker: Worker, engine: AsyncEngine, sandbox: SandboxProvisioner | None) -> None:
-    """The worker loop plus its sweepers; returns after `worker.stop()` and a drained loop."""
+async def serve(
+    worker: Worker,
+    engine: AsyncEngine,
+    sandbox: SandboxProvisioner | None,
+    *,
+    identity: WorkerIdentity | None = None,
+    heartbeat_seconds: float | None = None,
+) -> None:
+    """The worker loop plus its sweepers and presence row; returns after `worker.stop()` and
+    a drained loop."""
     if sandbox is not None:
         await asyncio.to_thread(cleanup_sandbox, sandbox)
     stop = asyncio.Event()
@@ -114,11 +123,25 @@ async def serve(worker: Worker, engine: AsyncEngine, sandbox: SandboxProvisioner
         asyncio.create_task(sweep_approvals(engine, stop)),
         asyncio.create_task(maintenance(engine, sandbox, stop)),
     ]
+    if identity is not None:
+        interval = heartbeat_seconds or worker.timings.heartbeat_seconds
+        background.append(asyncio.create_task(heartbeat_loop(engine, identity, stop, interval)))
+        log.info(
+            "worker_identity",
+            worker_id=identity.worker_id,
+            source_digest=identity.source_digest,
+            bench_path=identity.bench_path,
+        )
     try:
         await worker.run()
     finally:
         stop.set()
         await asyncio.gather(*background, return_exceptions=True)
+        if identity is not None:
+            try:
+                await mark_stopped(engine, identity)
+            except Exception:
+                log.warning("worker_mark_stopped_failed", exc_info=True)
 
 
 async def main() -> None:
@@ -149,7 +172,14 @@ async def main() -> None:
     for sig in (signal.SIGTERM, signal.SIGINT):
         loop.add_signal_handler(sig, lambda: asyncio.ensure_future(worker.stop()))
     try:
-        await serve(worker, engine, sandbox)
+        await serve(
+            worker,
+            engine,
+            sandbox,
+            identity=identity(
+                worker.worker_id, bench_path=settings.bench_path if sandbox else None
+            ),
+        )
     finally:
         await engine.dispose()
 

@@ -67,6 +67,10 @@ class Worker:
         self._on_dead = on_dead
         self._stopping = asyncio.Event()
 
+    @property
+    def timings(self) -> WorkerTimings:
+        return self._timings
+
     async def run(self) -> None:
         log.info("worker_started", worker_id=self.worker_id, concurrency=self._concurrency)
         async with asyncio.TaskGroup() as group:

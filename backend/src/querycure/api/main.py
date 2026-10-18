@@ -56,9 +56,14 @@ def create_app(settings: Settings | None = None, engine: AsyncEngine | None = No
         if settings.worker_mode is WorkerMode.EMBEDDED and app.state.engine is not None:
             # Single-container demo (DEPLOYMENT §1): the job loop runs in this process.
             from querycure.worker.__main__ import build_worker, serve
+            from querycure.worker.heartbeat import identity
 
             worker, sandbox = build_worker(app.state.engine, settings)
-            embedded = (worker, asyncio.create_task(serve(worker, app.state.engine, sandbox)))
+            me = identity(worker.worker_id, bench_path=settings.bench_path if sandbox else None)
+            embedded = (
+                worker,
+                asyncio.create_task(serve(worker, app.state.engine, sandbox, identity=me)),
+            )
         try:
             yield
         finally:
