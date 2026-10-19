@@ -1,4 +1,6 @@
+import { Icon } from "@/components/ui/Icon";
 import type { Finding, FindingsResponse } from "@/lib/api/types";
+import type { StepMatch } from "@/lib/investigation/links";
 import { ClaimBadge } from "./ClaimBadge";
 import { EvidenceChip } from "./EvidenceChip";
 
@@ -9,15 +11,37 @@ const AGENT_LABEL: Record<string, string> = {
   supervisor: "Supervisor",
 };
 
+/** Jumps to the trace row that recorded this claim; says so when no event carries its key. */
+function ShowStep({ match, onShowStep }: { match: StepMatch; onShowStep: (spanId: string) => void }) {
+  if (match.status === "missing") {
+    return (
+      <span className="ml-auto text-xs text-muted" title="No trace event carries this key (an older run, or events still loading).">
+        Step not recorded
+      </span>
+    );
+  }
+  return (
+    <button type="button" onClick={() => onShowStep(match.spanId)} className="qc-btn-ghost ml-auto px-2 py-0.5 text-xs">
+      <Icon name="node" size={12} />
+      Show step{match.matches > 1 ? ` (1 of ${match.matches})` : ""}
+    </button>
+  );
+}
+
 export function FindingsPanel({
   data,
   onEvidence,
   activeEvidence,
+  stepFor,
+  onShowStep,
 }: {
   data: FindingsResponse | undefined;
   onEvidence: (id: string) => void;
   activeEvidence: string | null;
+  stepFor?: (key: string) => StepMatch;
+  onShowStep?: (spanId: string) => void;
 }) {
+  const step = (key: string) => (stepFor && onShowStep ? <ShowStep match={stepFor(key)} onShowStep={onShowStep} /> : null);
   if (!data || (data.hypotheses.length === 0 && data.findings.length === 0)) {
     return <p className="qc-panel p-6 text-muted">No findings yet.</p>;
   }
@@ -43,6 +67,7 @@ export function FindingsPanel({
                   <span className="font-mono text-xs text-muted">#{h.rank}</span>
                   <span className="font-mono text-xs">{h.category}</span>
                   <ClaimBadge confidence={h.confidence} />
+                  {step(h.key)}
                 </div>
                 <p className="mt-2">{h.statement}</p>
                 <div className="mt-2 flex flex-wrap items-center gap-1 text-xs text-muted">
@@ -68,9 +93,12 @@ export function FindingsPanel({
             <ul className="flex flex-col gap-2">
               {findings.map((f) => (
                 <li key={f.key} className="rounded-md border border-border bg-surface p-3">
-                  <p className="font-medium">
-                    {f.title} <span className="font-mono text-[11px] text-muted">({f.severity})</span>
-                  </p>
+                  <div className="flex flex-wrap items-start gap-2">
+                    <p className="font-medium">
+                      {f.title} <span className="font-mono text-[11px] text-muted">({f.severity})</span>
+                    </p>
+                    {step(f.key)}
+                  </div>
                   <p className="text-sm">{f.detail}</p>
                   <div className="mt-1 flex flex-wrap gap-1">{chips(f.evidenceIds)}</div>
                 </li>

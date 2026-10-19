@@ -77,14 +77,29 @@ Three resizable panels:
 - **Diff mode:** two plans side by side; nodes matched structurally; changed node types highlighted, metric deltas shown; summary "Seq Scan → Index Scan on orders; Sort removed".
 - **Empty:** "No plan yet — paste EXPLAIN (FORMAT JSON) output or run an investigation."
 
-### 3.6 Multi-agent investigation timeline (right panel / expandable)
-Implemented as a LangSmith-style **trace** ([ADR-0030](../engineering/adr/ADR-0030-linear-langsmith-ui-direction.md); DESIGN_SYSTEM §5 "Trace").
-- Span tree: lifecycle events on the run, one row per graph node, tool calls and log events (summaries, findings, hypotheses, candidates, approvals, verdicts, errors) nested under the node of their agent. Parallel analysts are separate sibling nodes.
-- Each row: status or kind glyph, mono name, evidence count, latency waterfall bar, duration (log events show their offset from the run start). Running spans tick live.
-- Detail on demand: clicking a row expands type, agent, status, start, latency, evidence chips (open the evidence) and the raw events. Chevrons collapse a node's children.
-- Toolbar: Hide/Show logs, Collapse/Expand all. Header: live indicator, node, tool-call and error counts, elapsed time.
-- An `error` closes its node as failed; spans still open when the run ends read "did not finish".
-- Not yet: retry "attempt n" labels, redacted tool arguments (the events do not carry them), Errors/Approvals filter chips.
+### 3.6 Investigation page: split trace, evidence navigation, header
+
+Implemented as a LangSmith-style **split trace** ([ADR-0030](../engineering/adr/ADR-0030-linear-langsmith-ui-direction.md); DESIGN_SYSTEM §5 "Trace"). Frontend only: everything shown comes from run events and existing endpoints; nothing is inferred or filled in.
+
+**Header (sticky).** Breadcrumb, title, run status pill, run selector dropdown (all runs of the investigation, newest first, kind, relation, status, report link), compact usage meters (LLM calls, tokens, tool calls against the run budget, from `GET /runs/{id}`), model, Replay / Cancel. Sticks to the top of the viewport with an opaque background and a bottom hairline; content scrolls beneath it and never under it (the trace column offsets by the header height). The objective and notices sit below the sticky part.
+
+**Split layout.** Left: the step tree (region "Agent timeline"). Right: details of the selection (region "Selection details").
+- The tree's first row is the **run**. Selecting it (the default) shows the run results tabs: Findings · Plan · Tournament · Report.
+- Selecting any other row shows **step details** with tabs:
+  - **Input:** what started the step as recorded in its start event (node, agent, attempt; tool name and calling agent). Prompts are not recorded (only a prompt version, server-side). Tool arguments are stored redacted on the server and not exposed to the browser. Each gap is stated, never filled in.
+  - **Output:** what the step recorded: status, latency, evidence produced, and the log events nested under it (findings, hypotheses, summaries, candidates, verdicts, errors). Raw model output is stored server-side as an artifact and not exposed here. For a log event, its recorded payload fields.
+  - **Metadata:** span kind, id, agent, status, start/end, latency, attempt, event sequence numbers, raw events (collapsed).
+  - **Evidence:** every evidence ID the step recorded, each resolved on demand to kind, summary and provenance; plan-node evidence offers "Show in plan". Unresolvable IDs say so.
+  - "Back to run results" returns to the run row.
+- Below 1280px the tree stacks above the details.
+- Parallel analysts are sibling steps under the run, as emitted; no lanes are drawn.
+
+**Tree keyboard model** (WAI-ARIA tree, roving focus, selection follows focus): ↑/↓ previous/next visible row; → expands, or moves to the first child; ← collapses, or moves to the parent; Home/End first/last row. Clicking a chevron toggles; clicking a row selects. Log rows can be hidden; Collapse/Expand all. Selecting a row inside a collapsed node (from elsewhere) reveals it.
+
+**Evidence navigation** (pure logic in `lib/investigation/links.ts`, unit-tested):
+- A finding or hypothesis offers **"Show step"**, which selects the trace row of its `finding.created` / `hypothesis.created` event (matched by key). If no event carries the key (older run, events still loading), the control says "Step not recorded". If several match, it selects the first and says how many.
+- Opening evidence that cites a plan node selects that node in the Plan tab (tree view). If the cited plan is not among this run's plans, or the node ID is absent from it, a notice says so and stays on the current view. Evidence that fails to load shows an error with its ID.
+- Plan nodes show **"Cited by"**: findings and hypotheses whose evidence resolves to that node, and the tree table shows a citation count per node. Evidence is resolved per ID through `GET /runs/{id}/evidence/{evidence_id}` (immutable, cached); while resolving, the count reads as pending; failures are counted and reported, not hidden.
 
 ### 3.7 Optimization tournament (tab)
 - Table: candidate (kind icon, short SQL), addresses (hypothesis links), VerdictPill, speedup median + SpeedupBar (CI), regression check per param set, index size, build time, write overhead (or "unmeasured").

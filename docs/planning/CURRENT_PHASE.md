@@ -77,6 +77,14 @@
   - **Docs:** DESIGN_SYSTEM and UI_UX §3.6 updated. e2e assertions moved to the new wording.
   - **Verified:** frontend lint, typecheck, 95 unit tests (incl. 4 trace-builder + 2 trace-view), build; e2e 14/14 (axe clean in light and dark). Contrast computed per token: all text tokens ≥ 5.1:1, `--faint` (≈ 2.8:1) restricted to icons.
 
+- [x] **UI Pass 1: split trace, evidence navigation, investigation header (2026-10-19, UI_UX §3.6, owner-approved).** Frontend only; no API or schema change.
+  - **Split trace:** step tree (WAI-ARIA tree, keyboard model) beside the selection; the run row shows the results tabs, any step shows Input · Output · Metadata · Evidence. Only recorded data is shown; prompts, redacted tool arguments and raw model output are stated as unavailable. Parallel analysts stay sibling steps.
+  - **Evidence navigation** (`lib/investigation/links.ts`, TDD): finding/hypothesis → trace step by event key (missing and multiple matches named); plan-node evidence → Plan tab node (plan or node absent, load failure reported); plan nodes list "Cited by" with pending and failed counts.
+  - **Header:** run selector dropdown, compact usage meters from real run usage/budget, sticky from `md` up.
+  - **Fix found in browser verification:** `write_report` (no `node.completed` by design) now closes on `run.concluded` / `report.ready` instead of reading "did not finish".
+  - **Correction to the redesign entry above:** its "axe clean in light and dark" was only true for dark. With dark as the fixed default, `emulateMedia` no longer switched themes. The e2e now applies the theme class (`e2e/theme.ts`), and light mode passes too.
+  - **Verified:** lint, typecheck, 111 unit tests, build, e2e 14/14 against local Docker (the investigation e2e now also checks Cited by, Show step, tree keys and axe in both themes). Browser check on a local stub-model run at 398px and 1366px.
+
 ## Completed
 
 - [x] Repository inspected (was empty).

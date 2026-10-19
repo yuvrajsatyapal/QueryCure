@@ -83,3 +83,18 @@ test("flattenTrace lists visible rows with depth and skips collapsed children", 
   ]);
   expect(flattenTrace(trace, new Set([node.id])).map((r) => r.span.name)).toEqual(["query_analyzer"]);
 });
+
+test("write_report, which never emits node.completed, is closed by the run's conclusion events", () => {
+  seq = 0;
+  const trace = buildTrace(
+    [
+      ev("node.started", { node: "write_report", agent: null, attempt: 1 }, 1),
+      ev("run.concluded", { finalStatus: "completed", outcome: "verified_recommendation" }, 2),
+      ev("report.ready", {}, 3),
+    ],
+    { active: false },
+  );
+  const report = trace.children.find((c) => c.name === "write_report")!;
+  expect(report).toMatchObject({ status: "ok", durationMs: 1000 });
+  expect(report.endTs).toBe(new Date(Date.UTC(2026, 9, 12, 10, 0, 2)).toISOString());
+});

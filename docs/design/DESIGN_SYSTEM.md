@@ -106,7 +106,10 @@ Shared Tailwind utilities in `globals.css` (`@utility`): `qc-btn-primary`, `qc-b
 | **SpeedupBar** | Horizontal CI interval around 1.0× reference line; point = median ratio. |
 | **PlanNode** (React Flow) | Node type (mono), relation, est vs actual rows with error ratio badge (≥10× highlighted `--inconclusive`), self-time bar. Hottest node gets the accent border (only one). |
 | **StatusPill** | Tinted pill: status icon + word, tone from the run-status table. Used in page headers and the approval card. |
-| **Trace** (LangSmith-style) | Span tree built client-side from run events (`lib/events/trace.ts`): run → graph nodes → tool calls and log events. Each row: chevron (collapse children), glyph (status or kind), mono name, evidence count, latency waterfall, duration. Clicking a row expands details (type, agent, status, start, latency, evidence chips, raw events). Toolbar: Hide/Show logs, Collapse/Expand all; header: live dot, node/tool/error counts, elapsed. |
+| **Trace** (LangSmith-style split) | Left: span tree built client-side from run events (`lib/events/trace.ts`), a WAI-ARIA `tree` with roving focus (↑/↓, →/←, Home/End; selection follows focus). The first row is the run. Each row: chevron (pointer only), glyph (status or kind), mono name, evidence count, latency waterfall, duration. Right: run results tabs when the run row is selected, otherwise **StepDetails** with Input · Output · Metadata · Evidence, where data the browser does not have (prompts, redacted tool arguments, raw model output) is stated in a dashed "unavailable" row, never filled in. |
+| **RunSelector** | Header dropdown wrapping the run list; trigger text is the run meta (`run 2 · Experiment replay of run #1`); a single run is a plain label. Closes on select, Escape (focus returns), outside click. |
+| **Usage meters** | Three compact meters (LLM calls, tokens, tool calls) against the run budget from `GET /runs/{id}`; bar turns `--inconclusive` at 80%. |
+| **Cited by** | In plan node details: findings and hypotheses whose evidence resolves to the node, with pending and failed resolutions stated; the tree table shows `cited by N`. |
 | **InvestigationRow** | Linear-style 44px list row: status icon, run number, title, mode tags, outcome (≥ xl), compact age (`14h`). |
 | **ApprovalCard** | `--approval` border with an inset left bar, hand icon, "Waiting on you" pill; exact SQL, target sandbox, risk list, Approve selected / Decline. Primary button is the only accent on screen while pending. |
 | **EmptyState** | One sentence of what's missing + one primary action + optional demo link. |
@@ -119,7 +122,7 @@ Shared Tailwind utilities in `globals.css` (`@utility`): `qc-btn-primary`, `qc-b
 ## 7. Layout rules (dashboard & workspace)
 
 - App shell (Linear): fixed 240px sidebar on `--sidebar` (brand + theme toggle, "New investigation", grouped nav with active state, Settings and account at the bottom). Below `md` the sidebar is a drawer behind a 48px top bar. No global top bar on desktop: each page header carries its breadcrumb, title, status pill and actions. Content max width none for the workspace and investigation (tools), 1152px for dashboard and history.
-- Investigation page: header (breadcrumb, title, status pill, run meta, objective, actions), then the approval card when pending, then two columns: results with underlined tabs (Findings · Plan · Tournament · Report) and a 380–460px right column (run picker, trace, budget).
+- Investigation page (UI_UX §3.6): a header sticky from `md` up (breadcrumb, title, status pill, run selector, model, usage meters, actions; static on phones, where it is too tall to pin), then objective and notices, the approval card when pending, and the split trace: a 340–420px tree column (sticky below the header on ≥ 1280) and the selection details. Below 1280 the tree stacks above the details at up to 60vh.
 - Information density: tables at 32px row height; no card grids for primary data — use tables.
 - Asymmetry over symmetry: summary rows use varied widths (e.g. `1.4fr 1fr 0.8fr`), not three identical cards.
 

@@ -1,5 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
+import { applyTheme } from "./theme";
 
 /** T5.10: axe (WCAG 2.1 A/AA rules) on the core pages, keyboard focus, reduced motion. */
 const PAGES: [string, string][] = [
@@ -19,7 +20,7 @@ for (const [path, heading] of PAGES) {
     else await expect(page.getByRole("navigation", { name: "Main" })).toBeVisible({ timeout: 30_000 });
     await page.waitForLoadState("networkidle");
     for (const scheme of ["light", "dark"] as const) {
-      await page.emulateMedia({ colorScheme: scheme });
+      await applyTheme(page, scheme);
       const result = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]).analyze();
       const summary = result.violations.map((v) => `${v.id} (${v.impact}): ${v.nodes.map((n) => n.target.join(" ")).slice(0, 3).join(" | ")}`);
       expect(summary, `${path} in ${scheme} mode`).toEqual([]);

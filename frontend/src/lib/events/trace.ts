@@ -25,6 +25,9 @@ export interface Span {
 type Payload = Record<string, unknown>;
 
 const RUN_LEVEL = new Set(["run.status_changed", "run.concluded", "report.ready", "replay.status_changed", "replay.compared"]);
+// write_report seals the event log and emits no node.completed; the run's conclusion is its end.
+const REPORT_NODE = "write_report";
+const CONCLUSION = new Set(["run.concluded", "report.ready"]);
 
 const str = (v: unknown): string | null => (typeof v === "string" && v ? v : null);
 const ids = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : []);
@@ -119,6 +122,11 @@ export function buildTrace(events: RunEvent[], { active }: { active: boolean }):
         log.evidenceIds = ids(p.evidenceIds);
         if (RUN_LEVEL.has(event.type)) {
           root.children.push(log);
+          const report = CONCLUSION.has(event.type) ? latest(openNodes, (n) => n.name === REPORT_NODE) : undefined;
+          if (report) {
+            close(report, event, undefined, "ok");
+            remove(openNodes, report);
+          }
           break;
         }
         const parent =

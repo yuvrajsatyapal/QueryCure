@@ -63,17 +63,24 @@ test("lifecycle - approve, audit, report, verify, replay the experiment", async 
 
   // Run history (Phase 5): the investigation lists both runs; the replay links to its source.
   await page.goto(investigationUrl);
+  // The run list lives in the header's run selector (UI_UX §3.6): open it first.
   const picker = page.getByRole("navigation", { name: "Runs of this investigation" });
-  await expect(picker.getByText("Runs (2)")).toBeVisible({ timeout: 15_000 });
+  const runSelector = (name: RegExp) => page.getByRole("button", { name });
+  // Without ?run= the page shows the investigation's latest run, the original.
+  await runSelector(/^run 1 · Original run/).click({ timeout: 15_000 });
+  await expect(picker.getByText("Runs (2)")).toBeVisible();
   await picker.getByRole("button", { name: /^#2 Experiment replay of run #1/ }).click();
   await expect(page).toHaveURL(/\?run=[0-9a-f-]{36}$/);
   await expect(page.getByText(/run 2 · Experiment replay of run #1/)).toBeVisible();
+  await runSelector(/^run 2 · Experiment replay of run #1/).click();
   await expect(picker.getByRole("link", { name: "Open this run's report" })).toBeVisible();
+  await page.keyboard.press("Escape");
   await page.getByRole("button", { name: "Go to run #1 (original run)" }).click();
   await expect(page.getByText(/run 1 · Original run/)).toBeVisible({ timeout: 15_000 });
 
   // Phone width: the picker and run view wrap instead of scrolling the page sideways.
   await page.setViewportSize({ width: 375, height: 812 });
+  await runSelector(/^run 1 · Original run/).click();
   await expect(picker).toBeVisible();
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   expect(overflow).toBeLessThanOrEqual(0);

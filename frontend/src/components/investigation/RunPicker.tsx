@@ -40,15 +40,17 @@ export function RunPicker({
   runs,
   selectedId,
   onSelect,
+  className = "qc-panel p-3",
 }: {
   runs: RunSummary[];
   selectedId: string | null;
   onSelect: (runId: string) => void;
+  className?: string;
 }) {
   if (runs.length < 2) return null;
   const newestFirst = [...runs].sort((a, b) => b.runNumber - a.runNumber);
   return (
-    <nav aria-label="Runs of this investigation" className="qc-panel p-3">
+    <nav aria-label="Runs of this investigation" className={className}>
       <p className="mb-2 qc-eyebrow">Runs ({runs.length})</p>
       <ul className="flex flex-col gap-1">
         {newestFirst.map((run) => {

@@ -33,11 +33,14 @@ export function PlanTreeTable({
   metrics,
   onSelect,
   selectedId,
+  citationCounts,
 }: {
   plan: PlanTree;
   metrics: NodeMetrics[];
   onSelect?: (nodeId: number) => void;
   selectedId?: number | null;
+  /** Findings + hypotheses citing each node (UI_UX §3.6); omitted when not computed. */
+  citationCounts?: ReadonlyMap<number, number>;
 }) {
   const [collapsed, setCollapsed] = useState<Set<number>>(new Set());
   const [focusId, setFocusId] = useState<number>(plan.root.id);
@@ -136,6 +139,11 @@ export function PlanTreeTable({
                     {hottest ? (
                       <span className="ml-2 rounded-sm border border-accent px-1 font-mono text-[11px] uppercase tracking-wider text-accent">
                         hottest
+                      </span>
+                    ) : null}
+                    {citationCounts?.get(row.node.id) ? (
+                      <span className="ml-2 rounded-full border border-border px-1.5 font-sans text-[11px] whitespace-nowrap text-muted">
+                        cited by {citationCounts.get(row.node.id)}
                       </span>
                     ) : null}
                     {m?.sortSpilled ? (

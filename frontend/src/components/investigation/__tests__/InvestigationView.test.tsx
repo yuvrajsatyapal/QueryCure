@@ -9,6 +9,13 @@ const events: RunEvent[] = [
   { runId: "run-1", seq: 1, ts: "2026-10-12T10:00:00.000Z", type: "run.status_changed", payload: { from: null, to: "queued" } },
   { runId: "run-1", seq: 2, ts: "2026-10-12T10:00:01.000Z", type: "agent.summary", payload: { agent: "query_analyzer", text: "Seq Scan dominates." } },
   { runId: "run-1", seq: 3, ts: "2026-10-12T10:00:02.000Z", type: "error", payload: { node: "index_strategist", code: "AGENT_FAILED", message: "no output" } },
+  {
+    runId: "run-1",
+    seq: 4,
+    ts: "2026-10-12T10:00:03.000Z",
+    type: "finding.created",
+    payload: { key: "fd_1", agent: "query_analyzer", title: "Seq Scan dominates", evidenceIds: ["ev_aaaaaaaaaaaa"] },
+  },
 ] as RunEvent[];
 
 vi.mock("next/navigation", () => ({ useRouter: () => ({ replace: vi.fn(), push: vi.fn() }) }));
@@ -136,4 +143,59 @@ test("a run-level model failure states its reason, not only a code", async () =>
   renderWithQuery(<InvestigationView id="inv-1" />);
 
   expect(await screen.findByText(/Problem: No model call produced usable output/)).toBeDefined();
+});
+
+test("a finding's Show step selects the trace row that recorded it and opens its details", async () => {
+  const user = userEvent.setup();
+  renderWithQuery(<InvestigationView id="inv-1" />);
+
+  const findingsPanel = await screen.findByRole("region", { name: "Selection details" });
+  // hy_1 has no hypothesis.created event in this run: said, not guessed.
+  expect(await within(findingsPanel).findByText("Step not recorded")).toBeDefined();
+  await user.click(within(findingsPanel).getByRole("button", { name: "Show step" }));
+
+  const row = within(screen.getByRole("tree", { name: "Run steps" })).getByRole("treeitem", { name: /Finding: Seq Scan dominates/ });
+  expect(row.getAttribute("aria-selected")).toBe("true");
+  const details = screen.getByRole("region", { name: "Selection details" });
+  expect(within(details).getByRole("button", { name: "Back to run results" })).toBeDefined();
+  expect(within(details).getByRole("tab", { name: "Input" }).getAttribute("aria-selected")).toBe("true");
+});
+
+test("a plan node lists the findings and hypotheses whose evidence cites it", async () => {
+  const user = userEvent.setup();
+  renderWithQuery(<InvestigationView id="inv-1" />);
+
+  const [chip] = await screen.findAllByRole("button", { name: "Evidence ev_aaaaaaaaaaaa" });
+  await user.click(chip!);
+  const cited = await screen.findByRole("region", { name: "Cited by" });
+  expect(await within(cited).findByText("Cited by (2)")).toBeDefined();
+  expect(within(cited).getByRole("button", { name: "Seq Scan dominates" })).toBeDefined();
+  expect(within(cited).getByRole("button", { name: /composite index on \(customer_id, created_at\)/ })).toBeDefined();
+  expect(within(screen.getByRole("treegrid")).getByText("cited by 2")).toBeDefined();
+});
+
+test("evidence citing a plan this run does not have is reported, and the view stays put", async () => {
+  const { getEvidence } = await import("@/lib/api/investigations");
+  const user = userEvent.setup();
+  renderWithQuery(<InvestigationView id="inv-1" />);
+  const [chip] = await screen.findAllByRole("button", { name: "Evidence ev_aaaaaaaaaaaa" });
+
+  vi.mocked(getEvidence).mockResolvedValueOnce({
+    ...(await vi.mocked(getEvidence)("run-1", "ev_aaaaaaaaaaaa")),
+    artifact: { sha256: "otherPlan", kind: "plan_analyze" },
+  });
+  await user.click(chip!);
+  expect(await screen.findByText(/cites a plan that is not available for this run/)).toBeDefined();
+  expect(screen.getByRole("tab", { name: "Findings" }).getAttribute("aria-selected")).toBe("true");
+});
+
+test("evidence that fails to load is reported with its ID", async () => {
+  const { getEvidence } = await import("@/lib/api/investigations");
+  const user = userEvent.setup();
+  renderWithQuery(<InvestigationView id="inv-1" />);
+  const [chip] = await screen.findAllByRole("button", { name: "Evidence ev_aaaaaaaaaaaa" });
+
+  vi.mocked(getEvidence).mockRejectedValueOnce(new Error("network down"));
+  await user.click(chip!);
+  expect(await screen.findByText(/Evidence ev_aaaaaaaaaaaa could not be loaded/)).toBeDefined();
 });

@@ -1,6 +1,8 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
+import { applyTheme } from "./theme";
 
 const PLAN = readFileSync(join(__dirname, "orders-plan.json"), "utf8");
 
@@ -30,4 +32,29 @@ test("investigation - start from an uploaded plan, follow the timeline, open cit
   await expect(selected).toHaveCount(1);
   await expect(selected).toContainText("Seq Scan");
   await expect(page.getByLabel("Selected evidence")).toContainText("Seq Scan on orders");
+  // Pass 1 (UI_UX §3.6): the cited node names the claims that cite it.
+  await expect(page.getByRole("region", { name: "Cited by" }).getByRole("button", { name: /Stub hypothesis/ })).toBeVisible({ timeout: 15_000 });
+
+  // A finding's "Show step" selects the trace row that recorded it; the details pane follows.
+  await page.getByRole("tab", { name: "Findings" }).click();
+  await page.getByRole("button", { name: /^Show step/ }).first().click();
+  const tree = page.getByRole("tree", { name: "Run steps" });
+  const selectedRow = tree.locator('[role="treeitem"][aria-selected="true"]');
+  await expect(selectedRow).toHaveCount(1);
+  await expect(page.getByRole("region", { name: "Selection details" }).getByRole("button", { name: "Back to run results" })).toBeVisible();
+
+  // Keyboard: Home selects the run row, ArrowDown the next one, and the run row shows results again.
+  await selectedRow.focus();
+  await page.keyboard.press("Home");
+  await expect(tree.getByRole("treeitem", { name: /^Run #1/ })).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByRole("tab", { name: "Findings" })).toBeVisible();
+  await page.keyboard.press("ArrowDown");
+  await expect(tree.getByRole("treeitem", { name: /^Run #1/ })).toHaveAttribute("aria-selected", "false");
+
+  for (const scheme of ["light", "dark"] as const) {
+    await applyTheme(page, scheme);
+    const result = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]).analyze();
+    const summary = result.violations.map((v) => `${v.id} (${v.impact}): ${v.nodes.map((n) => n.target.join(" ")).slice(0, 3).join(" | ")}`);
+    expect(summary, `investigation page in ${scheme} mode`).toEqual([]);
+  }
 });
