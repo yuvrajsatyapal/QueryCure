@@ -47,7 +47,7 @@ export function DemoDetailView({ slug }: { slug: string }) {
         ) : null}
         <ErrorNotice error={verification.error} />
       </section>
-      <ReportView report={d.report as unknown as ReportV1} />
+      <ReportView report={d.report as unknown as ReportV1} toc />
       {plan ? (
         <section aria-label="Plan explorer" className="flex flex-col gap-2">
           <h2 className="font-medium">Execution plan ({plan.role === "context.plan" ? "sandbox EXPLAIN" : "uploaded"})</h2>

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
-import { cleanup, screen } from "@testing-library/react";
+import { cleanup, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { renderWithQuery } from "@/test/render";
 
@@ -46,7 +46,8 @@ test("pages load with the cursor returned by the previous page", async () => {
   renderWithQuery(<HistoryView />);
 
   expect(await screen.findByText("Investigation 2")).toBeDefined();
-  expect(screen.getAllByText("unverified recommendations")).toHaveLength(2);
+  // Scoped to the rows: the Outcome filter also lists "unverified recommendations".
+  expect(within(screen.getByRole("region", { name: "October 2026" })).getAllByText("unverified recommendations")).toHaveLength(2);
   await user.click(screen.getByRole("button", { name: "Load more" }));
 
   expect(await screen.findByText("Investigation 3")).toBeDefined();
@@ -90,4 +91,33 @@ test("filters are sent to the API", async () => {
       status: "failed",
     }),
   );
+});
+
+test("the outcome filter is sent to the API, and Clear filters resets every filter", async () => {
+  vi.mocked(listInvestigations).mockResolvedValue({ items: [], nextCursor: null });
+  const user = userEvent.setup();
+  renderWithQuery(<HistoryView />);
+
+  await user.selectOptions(screen.getByLabelText("Outcome"), "no_action_needed");
+  await user.selectOptions(screen.getByLabelText("Status"), "completed");
+  await vi.waitFor(() =>
+    expect(vi.mocked(listInvestigations).mock.calls.at(-1)?.[0]).toMatchObject({ outcome: "no_action_needed", status: "completed" }),
+  );
+  expect(await screen.findByText(/match these filters/)).toBeDefined();
+
+  await user.click(screen.getByRole("button", { name: "Clear filters" }));
+  await vi.waitFor(() => {
+    const last = vi.mocked(listInvestigations).mock.calls.at(-1)?.[0];
+    expect(last?.outcome).toBeUndefined();
+    expect(last?.status).toBeUndefined();
+  });
+  expect(screen.queryByRole("button", { name: "Clear filters" })).toBeNull();
+});
+
+test("rows are grouped under a heading for their creation month, with the order stated", async () => {
+  vi.mocked(listInvestigations).mockResolvedValue({ items: [item(1), item(2)], nextCursor: "c" });
+  renderWithQuery(<HistoryView />);
+  const group = await screen.findByRole("region", { name: "October 2026" });
+  expect(group.querySelectorAll("li")).toHaveLength(2);
+  expect(screen.getByText(/2 shown · more available · newest first/)).toBeDefined();
 });

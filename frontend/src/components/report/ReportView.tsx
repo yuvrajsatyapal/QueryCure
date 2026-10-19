@@ -1,9 +1,11 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
+import { Icon, type IconName } from "@/components/ui/Icon";
 import type { LineageSource } from "@/components/lineage/LineageDrawer";
 import { VerdictBadge } from "@/components/tournament/VerdictBadge";
 import { OUTCOME_LABEL, REASON_TEXT, VERDICT_EXPLANATION, ms, x } from "@/lib/report/labels";
+import { reportSections, sectionId, type ReportSection } from "@/lib/report/sections";
 import type { CandidateAudit, Measurement, ReportRound, ReportV1 } from "@/lib/report/types";
 
 type Why = (source: LineageSource) => void;
@@ -38,12 +40,83 @@ function AiLabel() {
   return <span className="rounded border border-hypothesis px-1 font-mono text-[10px] text-hypothesis">AI-written</span>;
 }
 
-function Section({ title, children }: { title: string; children: ReactNode }) {
+/** Model-written prose, set apart from measured and recorded values (UI_UX §3.11). */
+function AiBlock({ children, className = "" }: { children: ReactNode; className?: string }) {
   return (
-    <section aria-label={title} className="flex flex-col gap-2">
-      <h2 className="text-lg font-semibold">{title}</h2>
+    <div className={`border-l-2 border-hypothesis/60 pl-3 ${className}`}>
+      <AiLabel /> {children}
+    </div>
+  );
+}
+
+const CALLOUT: Record<"info" | "warning" | "neutral", { icon: IconName; box: string; iconClass: string }> = {
+  info: { icon: "flask", box: "border-border bg-surface-2", iconClass: "text-accent" },
+  warning: { icon: "alert", box: "border-inconclusive/40 bg-inconclusive/10 text-inconclusive", iconClass: "text-inconclusive" },
+  neutral: { icon: "bot", box: "border-border-strong bg-surface", iconClass: "text-muted" },
+};
+
+function Callout({ tone, children }: { tone: keyof typeof CALLOUT; children: ReactNode }) {
+  const c = CALLOUT[tone];
+  return (
+    <p role="note" className={`flex items-start gap-2 rounded-md border px-3 py-2 text-sm ${c.box}`}>
+      <Icon name={c.icon} size={14} className={`mt-0.5 ${c.iconClass}`} />
+      <span>{children}</span>
+    </p>
+  );
+}
+
+function Section({ title, n, children }: { title: string; n: number; children: ReactNode }) {
+  return (
+    <section id={sectionId(title)} aria-label={title} className="flex scroll-mt-32 flex-col gap-3 border-t border-border pt-6">
+      <h2 className="flex items-baseline gap-2 text-base font-semibold">
+        <span aria-hidden="true" className="w-5 font-mono text-xs text-muted tabular-nums">
+          {String(n).padStart(2, "0")}
+        </span>
+        {title}
+      </h2>
       {children}
     </section>
+  );
+}
+
+/** Sticky contents list for the sections this report renders; highlights the one in view. */
+function ReportToc({ sections }: { sections: ReportSection[] }) {
+  const [active, setActive] = useState(sections[0]?.id ?? "");
+  useEffect(() => {
+    if (typeof IntersectionObserver === "undefined") return;
+    const io = new IntersectionObserver(
+      (entries) => {
+        const visible = entries.filter((e) => e.isIntersecting).sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
+        if (visible[0]) setActive(visible[0].target.id);
+      },
+      { rootMargin: "-20% 0px -70% 0px" },
+    );
+    for (const s of sections) {
+      const el = document.getElementById(s.id);
+      if (el) io.observe(el);
+    }
+    return () => io.disconnect();
+  }, [sections]);
+  return (
+    <nav aria-label="Report contents" className="sticky top-6 hidden max-h-[calc(100vh-3rem)] overflow-y-auto print:hidden lg:block">
+      <p className="qc-eyebrow mb-2">On this page</p>
+      <ol className="flex flex-col border-l border-border">
+        {sections.map((s, i) => (
+          <li key={s.id}>
+            <a
+              href={`#${s.id}`}
+              aria-current={active === s.id ? "location" : undefined}
+              className={`-ml-px flex gap-2 border-l py-1 pl-3 text-[13px] no-underline ${
+                active === s.id ? "border-accent text-ink" : "border-transparent text-muted hover:text-ink"
+              }`}
+            >
+              <span className="font-mono text-[11px] tabular-nums">{String(i + 1).padStart(2, "0")}</span>
+              {s.title}
+            </a>
+          </li>
+        ))}
+      </ol>
+    </nav>
   );
 }
 
@@ -141,15 +214,13 @@ export function AuditSummary({ audit, onWhy }: { audit: CandidateAudit; onWhy?: 
         ))}
       </ul>
       {audit.concerns.map((c, i) => (
-        <p key={i} className="text-xs">
-          <AiLabel /> concern ({c.severity}): {c.text}{" "}
+        <AiBlock key={i} className="text-xs">
+          concern ({c.severity}): {c.text}{" "}
           <Source provenance="agent claim" evidenceIds={c.evidenceIds} onWhy={onWhy} claim={`Auditor concern: ${c.text}`} />
-        </p>
+        </AiBlock>
       ))}
       {audit.notes ? (
-        <p className="text-xs text-muted">
-          <AiLabel /> {audit.notes}
-        </p>
+        <AiBlock className="text-xs text-muted">{audit.notes}</AiBlock>
       ) : null}
     </div>
   );
@@ -177,9 +248,7 @@ function Round({ rnd, onWhy }: { rnd: ReportRound; onWhy?: Why }) {
             ))}
           </p>
           <Sql lines={c.ddl.length ? c.ddl : c.querySql ? [c.querySql] : []} />
-          <p className="text-xs text-muted">
-            <AiLabel /> Expected benefit: {c.expectedBenefit}
-          </p>
+          <AiBlock className="text-xs text-muted">Expected benefit: {c.expectedBenefit}</AiBlock>
         </div>
       ))}
       {exp ? (
@@ -220,50 +289,50 @@ function Round({ rnd, onWhy }: { rnd: ReportRound; onWhy?: Why }) {
   );
 }
 
-export function ReportView({ report, onWhy }: { report: ReportV1; onWhy?: Why }) {
+export function ReportView({ report, onWhy, toc = false }: { report: ReportV1; onWhy?: Why; toc?: boolean }) {
   const r = report;
   const rec = r.recommendation;
   const benchmarked = r.rounds.some((rnd) => rnd.experiment);
   const prerecorded = r.provenance.measurements.includes("prerecorded");
-  return (
-    <article className="flex max-w-[880px] flex-col gap-6" aria-label="Final report">
-      <header className="flex flex-col gap-2 qc-panel p-4">
+  const sections = reportSections(r);
+  const n = (title: string) => sections.findIndex((s) => s.title === title) + 1;
+  const article = (
+    <article className="flex min-w-0 max-w-[46rem] flex-col gap-6" aria-label="Final report">
+      <header className="flex flex-col gap-3 qc-panel p-5">
         <p className="qc-eyebrow">
           Final report · {r.run.kind.replaceAll("_", " ")} · run {r.run.runNumber}
         </p>
-        <h1 className="text-xl font-semibold">{OUTCOME_LABEL[r.outcome ?? ""] ?? `Run ${r.finalStatus}`}</h1>
-        <p>{r.headline}</p>
+        <h1 className="text-2xl font-semibold tracking-tight">{OUTCOME_LABEL[r.outcome ?? ""] ?? `Run ${r.finalStatus}`}</h1>
+        <p className="text-[15px] leading-relaxed">{r.headline}</p>
+        {rec.candidateKey || rec.status in VERDICT_EXPLANATION ? (
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-border pt-3 text-sm">
+            <VerdictBadge status={rec.status} />
+            {rec.candidateKey ? <span className="font-mono text-xs">{rec.candidateKey}</span> : null}
+            {rec.primaryMeasurement ? (
+              <span className="text-muted">
+                {rec.primaryMeasurement.paramSet}: <span className="font-medium text-ink">{x(rec.primaryMeasurement.speedup)}</span> (
+                {x(rec.primaryMeasurement.ciLow)}–{x(rec.primaryMeasurement.ciHigh)}) · {rec.primaryMeasurement.provenance}
+              </span>
+            ) : null}
+          </div>
+        ) : null}
         {r.recommendation.status in VERDICT_EXPLANATION ? (
           <p className="text-sm text-muted">{VERDICT_EXPLANATION[r.recommendation.status]}</p>
         ) : null}
         {benchmarked ? (
-          <p role="note" className="rounded-md bg-surface-2 p-2 text-sm">
-            Sandbox only: every measurement ran in a disposable copy of a demo database. Nothing was applied to your database.
-          </p>
+          <Callout tone="info">Sandbox only: every measurement ran in a disposable copy of a demo database. Nothing was applied to your database.</Callout>
         ) : null}
-        {prerecorded ? (
-          <p role="note" className="rounded-md border border-inconclusive p-2 text-sm text-inconclusive">
-            Contains prerecorded demo measurements: these are not live results.
-          </p>
-        ) : null}
-        {r.provenance.stubModel ? (
-          <p role="note" className="rounded-md border border-border-strong p-2 text-sm">
-            Agent text came from the offline stub model: canned, not a diagnosis.
-          </p>
-        ) : null}
+        {prerecorded ? <Callout tone="warning">Contains prerecorded demo measurements: these are not live results.</Callout> : null}
+        {r.provenance.stubModel ? <Callout tone="neutral">Agent text came from the offline stub model: canned, not a diagnosis.</Callout> : null}
         {r.partial ? (
-          <p role="note" className="text-sm text-inconclusive">
+          <Callout tone="warning">
             Partial report: the run stopped ({r.stopReason ?? r.finalStatus}). Sections without data are listed under Missing evidence.
-          </p>
+          </Callout>
         ) : null}
-        {r.summary ? (
-          <p className="text-sm">
-            <AiLabel /> {r.summary}
-          </p>
-        ) : null}
+        {r.summary ? <AiBlock className="text-sm">{r.summary}</AiBlock> : null}
       </header>
 
-      <Section title="Query">
+      <Section title="Query" n={n("Query")}>
         {r.query.sql ? <Sql lines={[r.query.sql]} /> : <p className="text-sm text-muted">No query was provided.</p>}
         {r.query.paramSets?.map((p) => (
           <p key={p.name} className="font-mono text-xs">
@@ -273,7 +342,7 @@ export function ReportView({ report, onWhy }: { report: ReportV1; onWhy?: Why })
         ))}
       </Section>
 
-      <Section title="Observed problem">
+      <Section title="Observed problem" n={n("Observed problem")}>
         {r.problem.materiality ? (
           <p className="text-sm">
             Materiality check: <span className="font-medium">{r.problem.materiality.verdict.replaceAll("_", " ")}</span>{" "}
@@ -290,27 +359,29 @@ export function ReportView({ report, onWhy }: { report: ReportV1; onWhy?: Why })
         </ul>
       </Section>
 
-      <Section title="Hypotheses">
+      <Section title="Hypotheses" n={n("Hypotheses")}>
         {r.hypotheses.length === 0 ? <p className="text-sm text-muted">No hypotheses were produced.</p> : null}
         <ol className="flex flex-col gap-2">
           {r.hypotheses.map((h) => (
             <li key={h.key} className="text-sm">
-              <AiLabel /> <span className="font-medium">{h.category.replaceAll("_", " ")}</span> ({h.confidence} confidence): {h.statement}{" "}
-              <Source provenance="agent claim" evidenceIds={h.supportingEvidence} onWhy={onWhy} claim={`Hypothesis: ${h.category}`} />
+              <AiBlock>
+                <span className="font-medium">{h.category.replaceAll("_", " ")}</span> ({h.confidence} confidence): {h.statement}{" "}
+                <Source provenance="agent claim" evidenceIds={h.supportingEvidence} onWhy={onWhy} claim={`Hypothesis: ${h.category}`} />
+              </AiBlock>
             </li>
           ))}
         </ol>
       </Section>
 
       {r.rounds.length ? (
-        <Section title="Optimizations, approvals and benchmarks">
+        <Section title="Optimizations, approvals and benchmarks" n={n("Optimizations, approvals and benchmarks")}>
           {r.rounds.map((rnd) => (
             <Round key={rnd.round} rnd={rnd} onWhy={onWhy} />
           ))}
         </Section>
       ) : null}
 
-      <Section title="Recommendation">
+      <Section title="Recommendation" n={n("Recommendation")}>
         {rec.candidateKey ? (
           <>
             <p className="text-sm">
@@ -345,7 +416,7 @@ export function ReportView({ report, onWhy }: { report: ReportV1; onWhy?: Why })
       </Section>
 
       {r.replay?.comparison ? (
-        <Section title="Experiment replay">
+        <Section title="Experiment replay" n={n("Experiment replay")}>
           <p className="text-sm">
             Re-measured experiment <span className="font-mono">{r.replay.replayOf?.experimentId.slice(0, 8)}</span> with the same configuration and seed, no
             model calls: <span className="font-medium">{r.replay.comparison.status.replaceAll("_", " ")}</span> (
@@ -354,14 +425,14 @@ export function ReportView({ report, onWhy }: { report: ReportV1; onWhy?: Why })
         </Section>
       ) : null}
 
-      <Section title="Limitations">
+      <Section title="Limitations" n={n("Limitations")}>
         <ul className="list-disc pl-5 text-sm">
           {r.limitations.map((l) => (
             <li key={l}>{l}</li>
           ))}
         </ul>
       </Section>
-      <Section title="Next steps">
+      <Section title="Next steps" n={n("Next steps")}>
         <ul className="list-disc pl-5 text-sm">
           {r.nextSteps.map((l) => (
             <li key={l}>{l}</li>
@@ -369,7 +440,7 @@ export function ReportView({ report, onWhy }: { report: ReportV1; onWhy?: Why })
         </ul>
       </Section>
       {r.missing.length ? (
-        <Section title="Missing evidence">
+        <Section title="Missing evidence" n={n("Missing evidence")}>
           <ul className="list-disc pl-5 text-sm">
             {r.missing.map((m) => (
               <li key={m.section}>
@@ -379,7 +450,7 @@ export function ReportView({ report, onWhy }: { report: ReportV1; onWhy?: Why })
           </ul>
         </Section>
       ) : null}
-      <Section title="Provenance and integrity">
+      <Section title="Provenance and integrity" n={n("Provenance and integrity")}>
         <ul className="flex flex-col gap-1 text-xs text-muted">
           {r.provenance.llm.length === 0 ? <li>No language-model calls were made for this run.</li> : null}
           {r.provenance.llm.map((c) => (
@@ -397,5 +468,12 @@ export function ReportView({ report, onWhy }: { report: ReportV1; onWhy?: Why })
         </ul>
       </Section>
     </article>
+  );
+  if (!toc) return article;
+  return (
+    <div className="grid grid-cols-1 gap-10 lg:grid-cols-[minmax(0,46rem)_13rem]">
+      {article}
+      <ReportToc sections={sections} />
+    </div>
   );
 }

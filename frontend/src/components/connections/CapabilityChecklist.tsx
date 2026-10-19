@@ -1,10 +1,13 @@
 import type { TargetCapabilities } from "@/lib/api/types";
 
-function Item({ ok, text }: { ok: boolean; text: string }) {
+/** ok ✓, a limitation ! (warning), or a refusal ✕ (failed): always with the words. */
+function Item({ ok, text, refusal = false }: { ok: boolean; text: string; refusal?: boolean }) {
+  const mark = ok ? "✓" : refusal ? "✕" : "!";
+  const color = ok ? "text-verified" : refusal ? "text-rejected" : "text-inconclusive";
   return (
     <li className="flex items-start gap-2 text-sm">
-      <span aria-hidden className={ok ? "text-verified" : "text-inconclusive"}>
-        {ok ? "✓" : "!"}
+      <span aria-hidden className={`w-3 ${color}`}>
+        {mark}
       </span>
       <span>{text}</span>
     </li>
@@ -16,8 +19,8 @@ export function CapabilityChecklist({ capabilities: c }: { capabilities: TargetC
     <div className="flex flex-col gap-2">
       <p className="font-mono text-xs text-muted">PostgreSQL {c.serverVersion}</p>
       <ul className="flex flex-col gap-1">
-        <Item ok={!c.isSuperuser} text={c.isSuperuser ? "Superuser (refused)" : "Not a superuser"} />
-        <Item ok={!c.canCreateRole} text={c.canCreateRole ? "Can create roles (refused)" : "Cannot create roles"} />
+        <Item refusal ok={!c.isSuperuser} text={c.isSuperuser ? "Superuser (refused)" : "Not a superuser"} />
+        <Item refusal ok={!c.canCreateRole} text={c.canCreateRole ? "Can create roles (refused)" : "Cannot create roles"} />
         <Item ok={c.canReadAllStats} text={c.canReadAllStats ? "Reads all statistics (pg_read_all_stats)" : "Limited statistics access"} />
         <Item
           ok={c.hasPgStatStatements}

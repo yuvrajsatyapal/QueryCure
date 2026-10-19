@@ -266,3 +266,37 @@ test("plan diff summary reads like the design", () => {
   render(<PlanDiffTable diff={diff} />);
   expect(screen.getByText("Seq Scan → Index Scan")).toBeTruthy();
 });
+
+test("the standalone report page links its run, the replay page and the original run, with a contents list", async () => {
+  getReport.mockResolvedValue({
+    reportSchemaVersion: 1,
+    manifestSha256: "f".repeat(64),
+    report: report({
+      run: { id: "run-2", investigationId: "inv-1", runNumber: 2, kind: "experiment_replay", parentRunId: "run-1" },
+      replay: { replayOf: { experimentId: "e".repeat(32), runId: "run-1" }, comparison: null },
+    }),
+  });
+  renderWithQuery(<ReportPanel runId="run-2" standalone />);
+
+  const nav = await screen.findByRole("navigation", { name: "Report navigation" });
+  const href = (name: string | RegExp) => within(nav).getByRole("link", { name }).getAttribute("href");
+  expect(href("Open the run")).toBe("/app/investigations/inv-1?run=run-2");
+  expect(href("Reproducibility & replay")).toBe("/app/replay/run-2");
+  expect(href("Original run's report")).toBe("/app/reports/run-1");
+  // The parent is the original here, so it is not listed twice.
+  expect(within(nav).queryByRole("link", { name: "Parent run" })).toBeNull();
+  expect(screen.getByRole("navigation", { name: "Breadcrumb" }).textContent).toContain("Orders");
+
+  const toc = screen.getByRole("navigation", { name: "Report contents" });
+  const entries = within(toc).getAllByRole("link").map((a) => a.getAttribute("href"));
+  expect(entries[0]).toBe("#report-query");
+  for (const id of entries) expect(document.querySelector(id ?? "")).not.toBeNull();
+});
+
+test("the investigation's Report tab has no contents list or page navigation", async () => {
+  getReport.mockResolvedValue({ reportSchemaVersion: 1, manifestSha256: "f".repeat(64), report: report() });
+  renderWithQuery(<ReportPanel runId="run-1" />);
+  await screen.findByRole("article", { name: "Final report" });
+  expect(screen.queryByRole("navigation", { name: "Report contents" })).toBeNull();
+  expect(screen.queryByRole("navigation", { name: "Report navigation" })).toBeNull();
+});

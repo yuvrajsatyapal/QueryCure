@@ -3,6 +3,7 @@
 import { useState, type FormEvent } from "react";
 import { ErrorNotice } from "@/components/common/ErrorNotice";
 import type { CreateConnectionInput } from "@/lib/api/types";
+import { SettingsSection } from "@/components/ui/SettingsSection";
 
 const REQUIRED: Array<[keyof CreateConnectionInput, string]> = [
   ["name", "Name"],
@@ -23,8 +24,7 @@ const EMPTY: CreateConnectionInput = {
   environment: "development",
 };
 
-const inputClass =
-  "w-full qc-input text-ink focus:border-accent";
+const inputClass = "w-full qc-input";
 
 export function ConnectionForm({ onSubmit }: { onSubmit: (input: CreateConnectionInput) => Promise<void> }) {
   const [values, setValues] = useState<CreateConnectionInput>(EMPTY);
@@ -68,58 +68,70 @@ export function ConnectionForm({ onSubmit }: { onSubmit: (input: CreateConnectio
     </label>
   );
 
-  return (
-    <form onSubmit={submit} noValidate className="flex flex-col gap-3">
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        {field("name", "Name")}
-        {field("host", "Host")}
-        {field("port", "Port", "number")}
-        {field("dbname", "Database")}
-        {field("username", "Username")}
-        {field("password", "Password", "password")}
-        <label className="flex flex-col gap-1 text-sm">
-          <span className="text-muted">TLS</span>
-          <select
-            aria-label="TLS"
-            className={inputClass}
-            value={values.sslmode}
-            onChange={(e) => set("sslmode", e.target.value as CreateConnectionInput["sslmode"])}
-          >
-            <option value="verify-full">verify-full (recommended)</option>
-            <option value="require">require</option>
-            <option value="verify-ca">verify-ca</option>
-            <option value="disable">disable (local only)</option>
-          </select>
-        </label>
-        <label className="flex flex-col gap-1 text-sm">
-          <span className="text-muted">Environment</span>
-          <select
-            aria-label="Environment"
-            className={inputClass}
-            value={values.environment}
-            onChange={(e) => set("environment", e.target.value as CreateConnectionInput["environment"])}
-          >
-            <option value="development">development</option>
-            <option value="staging">staging</option>
-            <option value="production">production (EXPLAIN needs approval)</option>
-          </select>
-        </label>
-      </div>
-      {missing.length > 0 ? (
-        <ul className="text-sm text-rejected">
-          {missing.map((label) => (
-            <li key={label}>{label} is required.</li>
-          ))}
-        </ul>
-      ) : null}
-      <ErrorNotice error={error} />
-      <button
-        type="submit"
-        disabled={saving}
-        className="w-fit qc-btn-primary"
+  const select = <K extends "sslmode" | "environment">(key: K, label: string, options: [string, string][]) => (
+    <label className="flex flex-col gap-1 text-sm">
+      <span className="text-muted">{label}</span>
+      <select
+        aria-label={label}
+        className={inputClass}
+        value={values[key]}
+        onChange={(e) => set(key, e.target.value as CreateConnectionInput[K])}
       >
-        {saving ? "Saving…" : "Save connection"}
-      </button>
+        {options.map(([value, text]) => (
+          <option key={value} value={value}>
+            {text}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+
+  return (
+    <form onSubmit={submit} noValidate className="flex flex-col">
+      <SettingsSection group title="Identity" description="How this connection appears in QueryCure. Production connections need approval before each EXPLAIN.">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          {field("name", "Name")}
+          {select("environment", "Environment", [
+            ["development", "development"],
+            ["staging", "staging"],
+            ["production", "production (EXPLAIN needs approval)"],
+          ])}
+        </div>
+      </SettingsSection>
+      <SettingsSection group title="Server" description="Checked against this deployment's network rules before any connection is made.">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1fr)_7rem]">
+          {field("host", "Host")}
+          {field("port", "Port", "number")}
+        </div>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          {field("dbname", "Database")}
+          {select("sslmode", "TLS", [
+            ["verify-full", "verify-full (recommended)"],
+            ["require", "require"],
+            ["verify-ca", "verify-ca"],
+            ["disable", "disable (local only)"],
+          ])}
+        </div>
+      </SettingsSection>
+      <SettingsSection group title="Credentials" description="Use the restricted read-only role. The password is stored encrypted and never shown again.">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          {field("username", "Username")}
+          {field("password", "Password", "password")}
+        </div>
+      </SettingsSection>
+      <div className="flex flex-col gap-3 border-t border-border pt-5 md:pl-[calc(15rem+2.5rem)]">
+        {missing.length > 0 ? (
+          <ul className="text-sm text-rejected">
+            {missing.map((label) => (
+              <li key={label}>{label} is required.</li>
+            ))}
+          </ul>
+        ) : null}
+        <ErrorNotice error={error} />
+        <button type="submit" disabled={saving} className="w-fit qc-btn-primary">
+          {saving ? "Saving…" : "Save connection"}
+        </button>
+      </div>
     </form>
   );
 }

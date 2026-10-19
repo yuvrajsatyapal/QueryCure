@@ -10,6 +10,7 @@ const PAGES: [string, string][] = [
   ["/app", ""],
   ["/app/investigations/new", ""],
   ["/app/history", ""],
+  ["/app/connections", "Connections"],
   ["/app/settings", "Model key"],
 ];
 

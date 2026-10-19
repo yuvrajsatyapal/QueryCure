@@ -36,7 +36,7 @@ export function createInvestigation(
 }
 
 export function listInvestigations(
-  params: { cursor?: string | null; q?: string; status?: string; limit?: number },
+  params: { cursor?: string | null; q?: string; status?: string; outcome?: string; limit?: number },
   signal?: AbortSignal,
 ): Promise<InvestigationPage> {
   const search = new URLSearchParams();

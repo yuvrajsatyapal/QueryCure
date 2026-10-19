@@ -1,5 +1,5 @@
 import { afterEach, expect, test, vi } from "vitest";
-import { cleanup, screen, waitFor } from "@testing-library/react";
+import { cleanup, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { renderWithQuery } from "@/test/render";
 import { SettingsView } from "../SettingsView";
@@ -47,4 +47,12 @@ test("a saved key can be deleted", async () => {
   await userEvent.click(await screen.findByRole("button", { name: "Delete key" }));
   await waitFor(() => expect(deleteCredential).toHaveBeenCalledWith("c-1"));
   expect(await screen.findByText(/No key saved/)).toBeTruthy();
+});
+
+test("appearance offers the themes as keyboard-operable radios", async () => {
+  renderWithQuery(<SettingsView />);
+  const group = await screen.findByRole("radiogroup", { name: "Theme" });
+  const radios = within(group).getAllByRole("radio");
+  expect(radios.map((r) => (r as HTMLInputElement).value)).toEqual(["dark", "light", "system"]);
+  expect((within(group).getByRole("radio", { name: "Dark" }) as HTMLInputElement).checked).toBe(true);
 });

@@ -7,13 +7,13 @@ GRANT pg_read_all_stats TO querycure_inspector;`;
 
 export function RoleSnippet() {
   return (
-    <details className="rounded-md border border-border bg-surface-2 p-3 text-sm">
+    <details className="rounded-md border border-border bg-surface-2 p-3 text-sm" open>
       <summary className="cursor-pointer font-medium">Create a restricted role for QueryCure</summary>
       <p className="mt-2 text-muted">
         Superuser, CREATEROLE and BYPASSRLS roles are refused. QueryCure only runs plain EXPLAIN and
         catalog reads in read-only sessions.
       </p>
-      <pre tabIndex={0} className="mt-2 overflow-x-auto rounded-md bg-surface p-3 font-mono text-xs">{SQL}</pre>
+      <pre tabIndex={0} className="mt-2 overflow-x-auto rounded-md border border-border bg-surface p-3 font-mono text-xs">{SQL}</pre>
     </details>
   );
 }

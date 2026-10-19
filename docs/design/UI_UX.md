@@ -45,17 +45,16 @@ Every data-driven region implements these states — designed, not defaulted:
 - **Mobile:** single column; steps stack vertically.
 
 ### 3.2 Dashboard (`/app`)
-- **Purpose:** resume work, see outcomes at a glance.
-- **Layout:** top row of three summary panels with varied widths (Active runs · Awaiting approval · Recent outcomes distribution); below, a table of recent investigations (title, mode icons, outcome ClaimBadge, duration, updated).
-- **Interactions:** row click → workspace; approval panel items jump straight to the ApprovalCard.
-- **Empty:** "No investigations yet" + New investigation + demo link.
+- **Purpose:** resume work, see what needs attention.
+- **Counts** (UI Pass 2): Running (`queued` + `running` + `cancelling`), Needs approval (`awaiting_approval`), Completed, Failed, Cancelled. Each comes from `GET /investigations?status=…&limit=100`, which filters on the latest run's status. A count is exact only when the endpoint returns no `next_cursor`; otherwise it reads **"100+"** (or "N+" for a sum that includes a capped status) with a tooltip saying the list endpoint has no total. While anything runs or awaits approval, counts refresh every 10 s.
+- **Below:** "In progress" (running and approval-required investigations) and "Recent investigations" (10 newest), then Get started links.
+- **Empty:** "Nothing investigated yet" + Start an investigation.
 
 ### 3.3 Database connections (`/app/connections`)
-- **Purpose:** register restricted connections and see capabilities.
-- **Layout:** table (name, host, environment badge, purpose, last test, capability icons); "Add connection" sheet with form + collapsible "Create a restricted role" SQL snippet (copyable) explaining required grants.
-- **Test result:** capability checklist (✓ read-only role, ✓ pg_stat_statements, ✗ superuser refused…) with warnings in `--inconclusive`, refusals in `--rejected`.
-- **Validation:** host blocked by SSRF guard → inline error "Private network addresses aren't allowed on this deployment."
-- **Public demo:** page shows feature-disabled explanation and offline alternative.
+- **Purpose:** register restricted read-only connections and see what each one can do.
+- **Layout** (UI Pass 2, settings-section pattern, DESIGN_SYSTEM §5 "SettingsSection"): page header with "Add connection". Connections list as rows: name, `user@host:port/db` (mono), environment tag, TLS mode, last-test status pill (Never tested / Test passed / Test failed / Role refused, words + icon, with the test time), actions Test and Delete (two-step confirm). The test result's capability checklist expands under its row.
+- **Add connection:** sections, each with a label and one-line description on the left and controls on the right: *Read-only role* first (the SQL snippet, open by default, since the role must exist before credentials can be entered), then *Identity* (name, environment), *Server* (host, port, database, TLS), *Credentials* (username, password; stored encrypted, never shown again). Field labels and validation messages are unchanged. Capability refusals (superuser, CREATEROLE) read ✕ in `--rejected`; limitations ! in `--inconclusive`.
+- **Validation:** host blocked by SSRF guard → the API's message inline. **Public demo:** feature-disabled explanation.
 
 ### 3.4 Investigation workspace (`/app/investigations/[id]`) — primary interface
 Three resizable panels:
@@ -115,8 +114,11 @@ Implemented as a LangSmith-style **split trace** ([ADR-0030](../engineering/adr/
 - Plan diff link.
 
 ### 3.9 Investigation history (`/app/history`)
-- Filterable table (outcome, mode, date range, text search on title), cursor pagination ("Load more").
-- Row actions: open, replay, delete (soft, with undo toast for 10 s).
+- **Filters, all server-side** (UI Pass 2): title search, latest-run **status**, latest-run **outcome** (`verified_recommendation`, `unverified_recommendations`, `no_action_needed`, `inconclusive`), with a "Clear filters" action and a result line ("12 shown · more available").
+- **Grouping:** rows grouped by creation day in local time: Today · Yesterday · Earlier this week · Earlier (the last group shows month headings: "October 2026").
+- **Sorting:** newest first, the endpoint's only order; the page says so instead of offering a sort control that would reorder only the loaded page.
+- **Mode filter: not offered.** The list endpoint has no mode parameter, and filtering client-side would silently miss unloaded pages. Mode tags stay on each row.
+- Row actions: open, delete (soft, with Undo). No bulk actions.
 
 ### 3.10 Reproducibility & replay (`/app/replay/[runId]`)
 - Manifest viewer: inputs with hashes (copy), environment, models/prompt versions, event count/digest.
@@ -125,14 +127,21 @@ Implemented as a LangSmith-style **split trace** ([ADR-0030](../engineering/adr/
 - Comparison view for experiment replay: per pair original vs replay verdicts, speedup drift with CI against the equivalence band, absolute latencies side by side (labeled not used for classification), environment diff (all differing fields, including minor ones). Labels follow `comparison_mode`: same-environment results say "Reproduced / Not reproduced"; cross-environment results say "Consistent across environments / Conclusion differs across environments" under a banner, and never use the word "reproduced".
 - Reports in an unsupported schema version display the stored Markdown with an "archived format" banner.
 
-### 3.11 Reports (`/app/reports/[runId]`)
-- Reading layout (max 880px text width + wide figures): summary box (outcome, confidence, recommendation), root cause, evidence table, recommendation with DDL and rollback, plan diff figure, benchmark table/chart, trade-offs, limitations, reproducibility block.
-- Export: Markdown, JSON. Print stylesheet.
-- Every number carries provenance; LLM-written paragraphs carry a subtle "AI-written summary" label.
+### 3.11 Reports (`/app/reports/[runId]`, Report tab, demo detail)
+The sealed report JSON is rendered as stored: no section content is recomputed, reworded or dropped (exports and the frozen Markdown renderer are untouched). UI Pass 2 changes presentation only:
+- **Page chrome (standalone page):** breadcrumb Investigations › investigation title (from the report) › Report; actions: Export Markdown, Export JSON, Verify report.
+- **Replay navigation bar:** Open the run (`/app/investigations/{investigationId}?run={runId}`) · Reproducibility & replay (`/app/replay/{runId}`) · when the report has `replay.replayOf.runId`, "Original run's report" · when `run.parentRunId`, "Parent run".
+- **Reading layout:** article ≤ 46rem; on ≥ 1024px a sticky **table of contents** lists the sections the report actually contains (numbered, same order as the article) and highlights the one in view. In the investigation's Report tab the contents list is omitted (the column is narrow).
+- **Evidence hierarchy:** the header is a verdict block (outcome, headline, recommendation verdict badge, and the primary measurement when one exists, with its provenance). Notices (sandbox only, prerecorded, stub model, partial) are icon callouts, each in its meaning's color. AI-written text sits in a distinct block (left rule in `--hypothesis`, "AI-written" label); measured values keep their provenance chip and "Why?" link.
+- Print: the contents list and action bars are hidden.
 
 ### 3.12 Settings (`/app/settings`)
-- Sections: Profile · LLM keys (BYOK: provider, masked hint, default model, test button, delete) · Defaults (budget profile, theme) · Data (delete all my data).
-- Key entry field is `type=password`, never echoed back; after saving shows `••••abcd`.
+- **Layout** (UI Pass 2, settings-section pattern): *Model key*: the saved key (provider, `…hint`, model, added / last used) with Delete key, or "No key saved" plus what runs will use instead; *Add a key* / *Replace the key*: OpenRouter API key (`type=password`, never echoed) and optional free model; *Appearance*: theme as native radios (Dark, Light, Match system), the same setting as the sidebar toggle, kept in this browser only.
+- Copy, validation (free models only), and storage behavior are unchanged.
+
+### 3.13 Demo gallery (`/demo`)
+- **Investigation cards** (UI Pass 2): title link, outcome pill (words + icon), headline, the "What this case tests" disclosure, and a footer that always carries **Prerecorded** plus model, recorded date and "measured on …" or "no benchmark". The text of every label, headline and summary is the API's, unchanged.
+- **Benchmark cards:** per arm a verdict badge, kind and first reason code, the exact SQL, then a small table per parameter set (baseline median, candidate median, speed-up with 95% interval, n) instead of a sentence list. Numbers are the API's strings, not recomputed. The card's provenance label stays visible.
 
 ## 4. Key interaction flows
 

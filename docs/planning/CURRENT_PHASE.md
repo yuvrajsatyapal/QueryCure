@@ -85,6 +85,14 @@
   - **Correction to the redesign entry above:** its "axe clean in light and dark" was only true for dark. With dark as the fixed default, `emulateMedia` no longer switched themes. The e2e now applies the theme class (`e2e/theme.ts`), and light mode passes too.
   - **Verified:** lint, typecheck, 111 unit tests, build, e2e 14/14 against local Docker (the investigation e2e now also checks Cited by, Show step, tree keys and axe in both themes). Browser check on a local stub-model run at 398px and 1366px.
 
+- [x] **UI Pass 2: Reports, Connections, Settings, Dashboard, History, Demo gallery (2026-10-19, UI_UX §3.2, §3.3, §3.9, §3.11–§3.13, owner-approved).** Frontend only; existing endpoints; no backend or contract change.
+  - **Reports:** reading layout with a numbered table of contents (only sections the report renders), verdict header, icon callouts, AI-written blocks, and a navigation bar from the sealed report (run, replay page, original run, parent run). Report content, exports and the frozen Markdown renderer are unchanged.
+  - **Connections / Settings:** shared `SettingsSection` rows. Connection form in Identity / Server / Credentials groups after the read-only role. Test status pills (passed, failed, role refused, never tested). Capability refusals shown as ✕. Settings gains Appearance (native theme radios).
+  - **Dashboard:** counts per status from `GET /investigations?status=…&limit=100`; exact unless a cursor is returned, then `100+` (stated). Refreshes every 10 s while anything is in flight. Replaces counts over the 25 newest.
+  - **History:** server-side outcome filter (the frontend client gained the `outcome` param the API already had), Clear filters, result line, and grouping by local day. Sorting and mode filtering are **not offered**: the endpoint has a fixed newest-first order and no mode parameter.
+  - **Demo gallery:** outcome pills, a Prerecorded tag on every card, benchmark stats as a table of the API's own strings, and the demo header matches the app.
+  - **Verified:** lint, typecheck, 122 unit tests, build, e2e 15/15 against local Docker (axe now also covers Connections, light and dark). Browser check on local data at 398px and 1280px.
+
 ## Completed
 
 - [x] Repository inspected (was empty).
