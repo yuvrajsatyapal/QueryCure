@@ -46,7 +46,7 @@ test("pages load with the cursor returned by the previous page", async () => {
   renderWithQuery(<HistoryView />);
 
   expect(await screen.findByText("Investigation 2")).toBeDefined();
-  expect(screen.getAllByText("completed · unverified recommendations")).toHaveLength(2);
+  expect(screen.getAllByText("unverified recommendations")).toHaveLength(2);
   await user.click(screen.getByRole("button", { name: "Load more" }));
 
   expect(await screen.findByText("Investigation 3")).toBeDefined();

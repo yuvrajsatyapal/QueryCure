@@ -6,11 +6,14 @@
 @theme inline {
   --color-bg: var(--bg);
   --color-surface: var(--surface);
+  --color-sidebar: var(--sidebar);
   --color-surface-2: var(--surface-2);
+  --color-hover: var(--hover);
   --color-border: var(--border);
   --color-border-strong: var(--border-strong);
   --color-ink: var(--ink);
   --color-muted: var(--muted);
+  --color-faint: var(--faint);
   --color-accent: var(--accent);
   --color-accent-tint: var(--accent-tint);
   --color-accent-fg: var(--accent-fg);
@@ -19,8 +22,11 @@
   --color-verified: var(--verified);
   --color-rejected: var(--rejected);
   --color-inconclusive: var(--inconclusive);
-  --font-sans: var(--font-plex-sans), system-ui, sans-serif;
-  --font-mono: var(--font-plex-mono), ui-monospace, monospace;
+  --color-running: var(--running);
+  --color-approval: var(--approval);
+  --font-sans: var(--font-inter), system-ui, sans-serif;
+  --font-mono: var(--font-jetbrains), ui-monospace, monospace;
+  --shadow-pop: var(--shadow-pop);
   --radius-sm: 4px;
   --radius-md: 6px;
   --radius-lg: 8px;
@@ -29,6 +35,39 @@
 body {
   background: var(--bg);
   color: var(--ink);
+  font-size: 14px;
+  font-feature-settings: "cv11", "ss01";
+}
+
+/* Shared control styles (Linear-like): one definition, used by every form and toolbar. */
+@utility qc-input {
+  @apply rounded-md border border-border bg-surface px-2.5 py-1.5 text-sm text-ink placeholder:text-muted hover:border-border-strong;
+}
+@utility qc-btn {
+  @apply inline-flex items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium whitespace-nowrap disabled:opacity-60;
+}
+@utility qc-btn-primary {
+  @apply qc-btn bg-accent text-accent-fg hover:opacity-90;
+}
+@utility qc-btn-secondary {
+  @apply qc-btn border border-border bg-surface text-ink hover:border-border-strong hover:bg-hover;
+}
+@utility qc-btn-ghost {
+  @apply qc-btn text-muted hover:bg-hover hover:text-ink;
+}
+@utility qc-eyebrow {
+  @apply font-mono text-[11px] font-medium tracking-wider text-muted uppercase;
+}
+@utility qc-panel {
+  @apply rounded-lg border border-border bg-surface;
+}
+
+@keyframes qc-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+.qc-pulse {
+  animation: qc-pulse 1.6s ease-in-out infinite;
 }
 
 /* Links inside running text must not rely on colour alone (WCAG 1.4.1, axe link-in-text-block). */

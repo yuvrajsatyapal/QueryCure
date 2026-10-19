@@ -205,10 +205,10 @@ export function ReplayConfirm({ experiment, runId, onDone }: { experiment: Exper
       )}
       <div className="flex gap-2">
         <button type="button" disabled={start.isPending || arms.length === 0} onClick={() => start.mutate()}
-          className="rounded-md bg-accent px-3 py-1 text-accent-fg">
+          className="qc-btn-primary">
           {start.isPending ? "Starting…" : "Confirm and re-run"}
         </button>
-        <button type="button" onClick={onDone} className="rounded-md border border-border px-3 py-1">
+        <button type="button" onClick={onDone} className="qc-btn-secondary">
           Close
         </button>
       </div>
@@ -245,7 +245,7 @@ export function ReplayView({ runId }: { runId: string }) {
   return (
     <div className="flex max-w-5xl flex-col gap-6">
       <header>
-        <p className="font-mono text-xs uppercase tracking-wider text-muted">Reproducibility & replay</p>
+        <p className="qc-eyebrow">Reproducibility & replay</p>
         <h1 className="text-2xl font-semibold">Run {run.data?.runNumber ?? "…"}</h1>
         <p className="text-sm text-muted">
           Report replay checks stored evidence against stored digests (no model calls, no SQL). Experiment replay re-measures in a fresh sandbox (no model
@@ -258,7 +258,7 @@ export function ReplayView({ runId }: { runId: string }) {
         ) : null}
       </header>
 
-      <section aria-label="Manifest" className="flex flex-col gap-2 rounded-lg border border-border bg-surface p-4">
+      <section aria-label="Manifest" className="flex flex-col gap-2 qc-panel p-4">
         <h2 className="text-lg font-semibold">Manifest</h2>
         {manifest.error instanceof ApiError && manifest.error.code === "NOT_FINALIZED" ? (
           <p className="text-sm text-muted">{REPLAY_CODE_TEXT.not_finalized}</p>
@@ -302,7 +302,7 @@ export function ReplayView({ runId }: { runId: string }) {
           </dl>
         ) : null}
         <div className="flex flex-wrap gap-2">
-          <button type="button" onClick={() => verify.mutate()} disabled={verify.isPending} className="rounded-md border border-accent px-3 py-1 text-sm text-accent">
+          <button type="button" onClick={() => verify.mutate()} disabled={verify.isPending} className="qc-btn-secondary text-accent">
             {verify.isPending ? "Verifying…" : "Verify & replay report"}
           </button>
         </div>
@@ -328,7 +328,7 @@ export function ReplayView({ runId }: { runId: string }) {
               {confirming === e.id ? (
                 <ReplayConfirm experiment={e} runId={runId} onDone={() => setConfirming(null)} />
               ) : (
-                <button type="button" onClick={() => setConfirming(e.id)} className="self-start rounded-md border border-border-strong px-3 py-1">
+                <button type="button" onClick={() => setConfirming(e.id)} className="self-start qc-btn-secondary">
                   Re-run experiment…
                 </button>
               )}
@@ -380,7 +380,7 @@ export function ReplayView({ runId }: { runId: string }) {
           <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} />I understand this makes new model calls.
         </label>
         <button type="button" disabled={!consent || again.isPending || !run.data} onClick={() => again.mutate()}
-          className="self-start rounded-md border border-border-strong px-3 py-1 text-sm">
+          className="self-start qc-btn-secondary">
           {again.isPending ? "Starting…" : "Start re-investigation"}
         </button>
         <ErrorNotice error={again.error} />

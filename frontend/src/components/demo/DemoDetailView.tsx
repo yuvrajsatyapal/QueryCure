@@ -28,11 +28,11 @@ export function DemoDetailView({ slug }: { slug: string }) {
         ← Demo gallery
       </Link>
       <PrerecordedBanner label={d.label} />
-      <section aria-label="Integrity" className="flex flex-col gap-2 rounded-lg border border-border bg-surface p-4 text-sm">
+      <section aria-label="Integrity" className="flex flex-col gap-2 qc-panel p-4 text-sm">
         <p>
           Manifest <span className="font-mono">sha256:{d.manifestSha256.slice(0, 16)}…</span> · run <span className="font-mono">{d.runId.slice(0, 8)}</span>
         </p>
-        <button type="button" onClick={() => setChecking(true)} className="w-fit rounded-md border border-border-strong px-3 py-1">
+        <button type="button" onClick={() => setChecking(true)} className="w-fit qc-btn-secondary">
           Check stored digests
         </button>
         {verification.data ? (

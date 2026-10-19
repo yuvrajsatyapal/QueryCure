@@ -56,14 +56,14 @@ export function StartInvestigation({
   }
 
   return (
-    <form onSubmit={submit} aria-label="Start investigation" className="flex flex-col gap-3 rounded-lg border border-border bg-surface p-4">
+    <form onSubmit={submit} aria-label="Start investigation" className="flex flex-col gap-3 qc-panel p-4">
       <label className="flex flex-col gap-1 text-sm">
         Title
-        <input value={title} onChange={(e) => setTitle(e.target.value)} maxLength={200} className="rounded-md border border-border-strong bg-surface px-3 py-2" />
+        <input value={title} onChange={(e) => setTitle(e.target.value)} maxLength={200} className="qc-input" />
       </label>
       <label className="flex flex-col gap-1 text-sm">
         Objective
-        <textarea value={objective} onChange={(e) => setObjective(e.target.value)} maxLength={2000} rows={2} className="rounded-md border border-border-strong bg-surface px-3 py-2" />
+        <textarea value={objective} onChange={(e) => setObjective(e.target.value)} maxLength={2000} rows={2} className="qc-input" />
       </label>
       <ParamSetsEditor rows={rows} onChange={setRows} />
       {workloadId ? (
@@ -96,7 +96,7 @@ export function StartInvestigation({
         </p>
       ) : null}
       <ErrorNotice error={start.error} />
-      <button type="submit" disabled={start.isPending || query.trim() === ""} className="w-fit rounded-md bg-accent px-4 py-2 text-sm font-medium text-accent-fg disabled:opacity-60">
+      <button type="submit" disabled={start.isPending || query.trim() === ""} className="w-fit qc-btn-primary">
         {start.isPending ? "Starting…" : "Start investigation"}
       </button>
     </form>

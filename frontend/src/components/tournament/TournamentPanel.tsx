@@ -266,7 +266,7 @@ export function TournamentPanel({
   });
 
   if (candidates.length === 0) {
-    return <p className="rounded-lg border border-border bg-surface p-6 text-muted">No optimization candidates for this run.</p>;
+    return <p className="qc-panel p-6 text-muted">No optimization candidates for this run.</p>;
   }
   return (
     <div className="flex flex-col gap-4">

@@ -14,7 +14,7 @@ function Row({ label, value }: { label: string; value: string | null | undefined
 export function NodeDetails({ node, metrics }: { node: PlanNode; metrics: NodeMetrics | undefined }) {
   const extra = Object.entries(node.extra ?? {}).filter(([, v]) => v !== null && typeof v !== "object");
   return (
-    <section aria-label="Plan node details" className="rounded-lg border border-border bg-surface p-4">
+    <section aria-label="Plan node details" className="qc-panel p-4">
       <h3 className="text-sm font-semibold">
         {node.nodeType}
         <span className="ml-2 font-mono text-xs text-muted">{node.locator}</span>

@@ -113,7 +113,7 @@ test("the timeline states events in words, errors included", async () => {
   const timeline = await screen.findByRole("region", { name: "Agent timeline" });
   expect(within(timeline).getByText("query_analyzer: Seq Scan dominates.")).toBeDefined();
   expect(within(timeline).getByText(/Error in index_strategist: AGENT_FAILED/)).toBeDefined();
-  expect(within(timeline).getByText("● live")).toBeDefined();
+  expect(within(timeline).getByText("Live")).toBeDefined();
 });
 
 test("budget and model are shown, and a running run can be cancelled", async () => {

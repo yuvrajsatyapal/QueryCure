@@ -78,10 +78,13 @@ Three resizable panels:
 - **Empty:** "No plan yet — paste EXPLAIN (FORMAT JSON) output or run an investigation."
 
 ### 3.6 Multi-agent investigation timeline (right panel / expandable)
-- Vertical list grouped by graph node; each item: timestamp (relative, absolute on hover), agent name, action summary, duration, status icon. Tool calls collapsed under the agent; expanding shows tool name, redacted args, evidence produced.
-- Retries shown as "attempt 2/3" with reason; errors in `--rejected` with recoverable flag.
-- Parallel branches render as side-by-side lanes for the fan-out section.
-- Filter chips: All · Agents · Tools · Errors · Approvals.
+Implemented as a LangSmith-style **trace** ([ADR-0030](../engineering/adr/ADR-0030-linear-langsmith-ui-direction.md); DESIGN_SYSTEM §5 "Trace").
+- Span tree: lifecycle events on the run, one row per graph node, tool calls and log events (summaries, findings, hypotheses, candidates, approvals, verdicts, errors) nested under the node of their agent. Parallel analysts are separate sibling nodes.
+- Each row: status or kind glyph, mono name, evidence count, latency waterfall bar, duration (log events show their offset from the run start). Running spans tick live.
+- Detail on demand: clicking a row expands type, agent, status, start, latency, evidence chips (open the evidence) and the raw events. Chevrons collapse a node's children.
+- Toolbar: Hide/Show logs, Collapse/Expand all. Header: live indicator, node, tool-call and error counts, elapsed time.
+- An `error` closes its node as failed; spans still open when the run ends read "did not finish".
+- Not yet: retry "attempt n" labels, redacted tool arguments (the events do not carry them), Errors/Approvals filter chips.
 
 ### 3.7 Optimization tournament (tab)
 - Table: candidate (kind icon, short SQL), addresses (hypothesis links), VerdictPill, speedup median + SpeedupBar (CI), regression check per param set, index size, build time, write overhead (or "unmeasured").

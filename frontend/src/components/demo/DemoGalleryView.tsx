@@ -17,7 +17,7 @@ const OUTCOME: Record<string, string> = {
 
 function BenchmarkCard({ b }: { b: DemoBenchmark }) {
   return (
-    <li className="flex min-w-0 flex-col gap-2 rounded-lg border border-border bg-surface p-4">
+    <li className="flex min-w-0 flex-col gap-2 qc-panel p-4">
       <p className="font-mono text-xs text-muted">{b.workloadId} · {b.engineVersion}</p>
       {b.arms.map((arm) => (
         <div key={arm.arm} className="flex min-w-0 flex-col gap-1">
@@ -48,7 +48,7 @@ export function DemoGalleryView() {
   return (
     <div className="flex flex-col gap-8">
       <header className="flex flex-col gap-2">
-        <p className="font-mono text-xs uppercase tracking-wider text-muted">Demo gallery</p>
+        <p className="qc-eyebrow">Demo gallery</p>
         <h1 className="text-2xl font-semibold">Prerecorded investigations</h1>
         <p className="max-w-3xl text-sm text-muted">
           Each entry is a sealed run replayed from stored records: real answers recorded from a free model, and (for sandbox runs) real
@@ -60,7 +60,7 @@ export function DemoGalleryView() {
         <h2 className="font-medium">Investigations</h2>
         <ul className="grid grid-cols-1 gap-3 md:grid-cols-2">
           {gallery.data.items.map((item) => (
-            <li key={item.slug} className="flex min-w-0 flex-col gap-2 rounded-lg border border-border bg-surface p-4">
+            <li key={item.slug} className="flex min-w-0 flex-col gap-2 qc-panel p-4">
               <Link href={`/demo/${item.slug}`} className="font-medium text-link">
                 {item.title}
               </Link>

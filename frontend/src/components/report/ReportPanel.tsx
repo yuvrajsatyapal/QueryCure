@@ -39,7 +39,7 @@ export function ReportPanel({
   if (report.isLoading) return <p className="text-muted">Loading report…</p>;
   if (report.error instanceof ApiError && report.error.code === "NOT_FINALIZED") {
     return (
-      <p className="rounded-lg border border-border bg-surface p-6 text-muted">
+      <p className="qc-panel p-6 text-muted">
         The final report is written when the run ends. Runs created before Phase 4 are never sealed and only show their interim findings.
       </p>
     );
@@ -51,17 +51,17 @@ export function ReportPanel({
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center gap-2">
-        <a href={reportExportUrl(runId, "md")} className="rounded-md border border-border px-3 py-1 text-sm" download>
+        <a href={reportExportUrl(runId, "md")} className="qc-btn-secondary" download>
           Export Markdown
         </a>
-        <a href={reportExportUrl(runId, "json")} className="rounded-md border border-border px-3 py-1 text-sm" download>
+        <a href={reportExportUrl(runId, "json")} className="qc-btn-secondary" download>
           Export JSON
         </a>
         <button
           type="button"
           onClick={() => verify.mutate()}
           disabled={verify.isPending}
-          className="rounded-md border border-accent px-3 py-1 text-sm text-accent"
+          className="qc-btn-secondary text-accent"
         >
           {verify.isPending ? "Verifying…" : "Verify report"}
         </button>

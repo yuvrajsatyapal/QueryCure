@@ -24,7 +24,7 @@ const EMPTY: CreateConnectionInput = {
 };
 
 const inputClass =
-  "w-full rounded-md border border-border-strong bg-surface px-3 py-2 text-sm text-ink focus:border-accent";
+  "w-full qc-input text-ink focus:border-accent";
 
 export function ConnectionForm({ onSubmit }: { onSubmit: (input: CreateConnectionInput) => Promise<void> }) {
   const [values, setValues] = useState<CreateConnectionInput>(EMPTY);
@@ -116,7 +116,7 @@ export function ConnectionForm({ onSubmit }: { onSubmit: (input: CreateConnectio
       <button
         type="submit"
         disabled={saving}
-        className="w-fit rounded-md bg-accent px-4 py-2 text-sm font-medium text-accent-fg disabled:opacity-60"
+        className="w-fit qc-btn-primary"
       >
         {saving ? "Saving…" : "Save connection"}
       </button>

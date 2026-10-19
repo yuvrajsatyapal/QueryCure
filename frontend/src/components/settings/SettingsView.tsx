@@ -32,7 +32,7 @@ export function SettingsView() {
   return (
     <div className="flex max-w-3xl flex-col gap-6">
       <header>
-        <p className="font-mono text-xs uppercase tracking-wider text-muted">Settings</p>
+        <p className="qc-eyebrow">Settings</p>
         <h1 className="text-2xl font-semibold">Model key</h1>
         <p className="text-sm text-muted">
           Investigations call a free OpenRouter model with your own key. QueryCure stores it encrypted, shows only its last four characters, and uses it
@@ -40,7 +40,7 @@ export function SettingsView() {
         </p>
       </header>
 
-      <section aria-label="Saved key" className="rounded-lg border border-border bg-surface p-4">
+      <section aria-label="Saved key" className="qc-panel p-4">
         <h2 className="mb-2 font-medium">Saved key</h2>
         {credentials.isLoading ? <p className="text-sm text-muted">Loading…</p> : null}
         <ErrorNotice error={credentials.error} />
@@ -78,7 +78,7 @@ export function SettingsView() {
 
       <form
         aria-label="Add a key"
-        className="flex flex-col gap-3 rounded-lg border border-border bg-surface p-4"
+        className="flex flex-col gap-3 qc-panel p-4"
         onSubmit={(e) => {
           e.preventDefault();
           add.mutate();
@@ -93,7 +93,7 @@ export function SettingsView() {
             spellCheck={false}
             value={apiKey}
             onChange={(e) => setApiKey(e.target.value)}
-            className="rounded-md border border-border-strong bg-surface-2 px-3 py-2 font-mono"
+            className="qc-input bg-surface-2 font-mono"
             required
             minLength={8}
           />
@@ -105,13 +105,13 @@ export function SettingsView() {
             placeholder={models.data?.model ?? "provider/model:free"}
             value={model}
             onChange={(e) => setModel(e.target.value)}
-            className="rounded-md border border-border-strong bg-surface-2 px-3 py-2 font-mono"
+            className="qc-input bg-surface-2 font-mono"
             pattern=".*(:free|^openrouter/free)$"
             title="Only free models (ending in :free) are allowed"
           />
         </label>
         <ErrorNotice error={add.error} />
-        <button type="submit" disabled={add.isPending || apiKey.trim().length < 8} className="w-fit rounded-md bg-accent px-3 py-1.5 text-sm text-accent-fg">
+        <button type="submit" disabled={add.isPending || apiKey.trim().length < 8} className="w-fit qc-btn-primary">
           {add.isPending ? "Saving…" : "Save key"}
         </button>
         {add.isSuccess ? <p role="status" className="text-sm text-verified">Key saved; only its last four characters are kept visible.</p> : null}

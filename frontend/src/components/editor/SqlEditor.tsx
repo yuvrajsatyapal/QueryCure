@@ -19,7 +19,7 @@ const highlight = HighlightStyle.define([
 
 const theme = EditorView.theme({
   "&": { backgroundColor: "var(--surface)", color: "var(--ink)", fontSize: "13px", borderRadius: "6px" },
-  ".cm-content": { fontFamily: "var(--font-plex-mono), ui-monospace, monospace", padding: "8px 0" },
+  ".cm-content": { fontFamily: "var(--font-jetbrains), ui-monospace, monospace", padding: "8px 0" },
   ".cm-gutters": { backgroundColor: "var(--surface-2)", color: "var(--muted)", border: "none" },
   "&.cm-focused": { outline: "2px solid var(--accent)", outlineOffset: "2px" },
   ".cm-cursor": { borderLeftColor: "var(--ink)" },

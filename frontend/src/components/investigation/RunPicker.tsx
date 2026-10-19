@@ -48,8 +48,8 @@ export function RunPicker({
   if (runs.length < 2) return null;
   const newestFirst = [...runs].sort((a, b) => b.runNumber - a.runNumber);
   return (
-    <nav aria-label="Runs of this investigation" className="rounded-lg border border-border bg-surface p-3">
-      <p className="mb-2 font-mono text-xs uppercase tracking-wider text-muted">Runs ({runs.length})</p>
+    <nav aria-label="Runs of this investigation" className="qc-panel p-3">
+      <p className="mb-2 qc-eyebrow">Runs ({runs.length})</p>
       <ul className="flex flex-col gap-1">
         {newestFirst.map((run) => {
           const selected = run.id === selectedId;

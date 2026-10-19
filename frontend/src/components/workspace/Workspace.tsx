@@ -1,5 +1,6 @@
 "use client";
 
+import { Icon } from "@/components/ui/Icon";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useState, type ChangeEvent } from "react";
 import { ErrorNotice } from "@/components/common/ErrorNotice";
@@ -24,8 +25,10 @@ interface PlanResult {
 }
 
 const MAX_PLAN_CHARS = 5 * 1024 * 1024;
+// Segmented control (same look as the investigation page's plan-view switch).
 const tabClass = (active: boolean) =>
-  `rounded-md px-3 py-1.5 text-sm ${active ? "bg-accent-tint font-medium text-ink" : "text-muted hover:text-ink"}`;
+  `rounded px-2.5 py-1 text-xs ${active ? "bg-surface font-medium text-ink shadow-sm" : "text-muted hover:text-ink"}`;
+const SEGMENTS = "flex w-fit gap-0.5 rounded-md border border-border bg-surface-2 p-0.5";
 
 export function Workspace() {
   const [query, setQuery] = useState(
@@ -92,13 +95,14 @@ export function Workspace() {
     <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(360px,0.9fr)_1.4fr]">
       <section aria-label="Query and plan source" className="flex min-w-0 flex-col gap-4">
         <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-semibold">Workspace</h1>
+          <h1 className="text-xl font-semibold tracking-tight">Workspace</h1>
           <button
             type="button"
             onClick={() => setStarting((v) => !v)}
             aria-expanded={starting}
-            className="rounded-md bg-accent px-4 py-2 text-sm font-medium text-accent-fg"
+            className="qc-btn-primary"
           >
+            {starting ? null : <Icon name="plus" size={14} />}
             {starting ? "Close" : "New investigation"}
           </button>
         </div>
@@ -116,8 +120,10 @@ export function Workspace() {
             initialRows={source === "workload" ? exampleRows : undefined}
           />
         ) : null}
-        <SqlEditor value={query} onChange={setQuery} />
-        <div role="tablist" aria-label="Plan source" className="flex gap-2">
+        <div className="overflow-hidden rounded-md border border-border">
+          <SqlEditor value={query} onChange={setQuery} />
+        </div>
+        <div role="tablist" aria-label="Plan source" className={SEGMENTS}>
           <button role="tab" aria-selected={source === "upload"} className={tabClass(source === "upload")} onClick={() => setSource("upload")}>
             Upload plan
           </button>
@@ -137,7 +143,7 @@ export function Workspace() {
               id="workload"
               value={workload.name}
               onChange={(e) => pickWorkload(e.target.value)}
-              className="rounded-md border border-border-strong bg-surface px-3 py-2 text-sm"
+              className="qc-input"
             >
               <option value="">Choose a demo workload…</option>
               {(workloads.data?.items ?? []).map((w) => (
@@ -212,7 +218,7 @@ export function Workspace() {
                 type="button"
                 onClick={() => analyze.mutate()}
                 disabled={analyze.isPending || planText.trim() === "" || planText.length > MAX_PLAN_CHARS}
-                className="rounded-md bg-accent px-4 py-2 text-sm font-medium text-accent-fg disabled:opacity-60"
+                className="qc-btn-primary"
               >
                 {analyze.isPending ? "Analyzing…" : "Analyze plan"}
               </button>
@@ -227,7 +233,7 @@ export function Workspace() {
               id="connection"
               value={connectionId}
               onChange={(e) => setConnectionId(e.target.value)}
-              className="rounded-md border border-border-strong bg-surface px-3 py-2 text-sm"
+              className="qc-input"
             >
               <option value="">Choose a connection…</option>
               {(connections.data?.items ?? []).map((c) => (
@@ -240,7 +246,7 @@ export function Workspace() {
               type="button"
               onClick={() => explain.mutate()}
               disabled={explain.isPending || connectionId === "" || query.trim() === ""}
-              className="w-fit rounded-md bg-accent px-4 py-2 text-sm font-medium text-accent-fg disabled:opacity-60"
+              className="w-fit qc-btn-primary"
             >
               {explain.isPending ? "Running EXPLAIN…" : "Run EXPLAIN"}
             </button>
@@ -253,8 +259,8 @@ export function Workspace() {
         {result ? (
           <>
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <p className="font-mono text-xs uppercase tracking-wider text-muted">{result.origin}</p>
-              <div role="tablist" aria-label="Plan view" className="flex gap-2">
+              <p className="qc-eyebrow">{result.origin}</p>
+              <div role="tablist" aria-label="Plan view" className={SEGMENTS}>
                 <button role="tab" aria-selected={view === "tree"} className={tabClass(view === "tree")} onClick={() => setView("tree")}>
                   Tree
                 </button>
@@ -275,7 +281,7 @@ export function Workspace() {
             )}
           </>
         ) : (
-          <p className="rounded-lg border border-border bg-surface p-6 text-muted">
+          <p className="qc-panel p-6 text-muted">
             No plan yet. Paste EXPLAIN (FORMAT JSON) output, or run a live EXPLAIN on a connection.
           </p>
         )}

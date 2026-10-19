@@ -29,7 +29,7 @@ function TestPanel({ connection }: { connection: ConnectionSummary }) {
         type="button"
         onClick={() => test.mutate()}
         disabled={test.isPending}
-        className="w-fit rounded-md border border-border-strong px-3 py-1.5 text-sm hover:border-accent"
+        className="w-fit qc-btn-secondary"
       >
         {test.isPending ? "Testing…" : "Test connection"}
       </button>
@@ -84,13 +84,13 @@ export function ConnectionsView() {
         <button
           type="button"
           onClick={() => setAdding((a) => !a)}
-          className="rounded-md bg-accent px-4 py-2 text-sm font-medium text-accent-fg"
+          className="qc-btn-primary"
         >
           {adding ? "Close" : "Add connection"}
         </button>
       </div>
       {adding ? (
-        <section className="flex flex-col gap-4 rounded-lg border border-border bg-surface p-4">
+        <section className="flex flex-col gap-4 qc-panel p-4">
           <RoleSnippet />
           <ConnectionForm onSubmit={create} />
         </section>
@@ -98,14 +98,14 @@ export function ConnectionsView() {
       {connections.isPending ? <p className="text-muted">Loading connections…</p> : null}
       {connections.isError ? <ErrorNotice error={connections.error} /> : null}
       {connections.isSuccess && items.length === 0 ? (
-        <p className="rounded-lg border border-border bg-surface p-6 text-muted">
+        <p className="qc-panel p-6 text-muted">
           No connections yet. Add a restricted read-only role to inspect a live database, or use plan
           upload in the workspace.
         </p>
       ) : null}
       <ul className="flex flex-col gap-3">
         {items.map((c) => (
-          <li key={c.id} className="flex flex-col gap-3 rounded-lg border border-border bg-surface p-4">
+          <li key={c.id} className="flex flex-col gap-3 qc-panel p-4">
             <div className="flex flex-wrap items-baseline justify-between gap-2">
               <div>
                 <p className="font-medium">{c.name}</p>
@@ -115,7 +115,7 @@ export function ConnectionsView() {
               </div>
               <div className="flex items-center gap-3">
                 {c.lastTestStatus ? (
-                  <span className="font-mono text-xs uppercase tracking-wider text-muted">
+                  <span className="qc-eyebrow">
                     last test: {c.lastTestStatus}
                   </span>
                 ) : null}

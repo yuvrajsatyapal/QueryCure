@@ -1,10 +1,6 @@
-"use client";
-
-import { useEffect, useRef, useState } from "react";
 import type { RunEvent } from "@/lib/api/types";
 
 type Payload = Record<string, unknown>;
-const ANNOUNCE_EVERY_MS = 5000;
 
 function str(value: unknown): string {
   return typeof value === "string" ? value : "";
@@ -69,50 +65,4 @@ export function describe(event: RunEvent): { text: string; tone: "normal" | "mut
     default:
       return { text: event.type, tone: "muted" };
   }
-}
-
-const TONE = { normal: "text-ink", muted: "text-muted", error: "text-rejected" } as const;
-
-export function Timeline({ events, live }: { events: RunEvent[]; live: boolean }) {
-  const [announcement, setAnnouncement] = useState("");
-  const latest = useRef<string>("");
-  const last = events.at(-1);
-  const lastText = last ? describe(last).text : "";
-  useEffect(() => {
-    latest.current = lastText;
-  }, [lastText]);
-  useEffect(() => {
-    // Screen readers get at most one update every 5 s (DESIGN_SYSTEM §9).
-    const timer = setInterval(() => setAnnouncement(latest.current), ANNOUNCE_EVERY_MS);
-    return () => clearInterval(timer);
-  }, []);
-
-  return (
-    <section aria-label="Agent timeline" className="flex min-w-0 flex-col gap-2">
-      <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold">Timeline</h2>
-        <span className="font-mono text-[11px] text-muted">{live ? "● live" : "○ not streaming"}</span>
-      </div>
-      <p className="sr-only" aria-live="polite">
-        {announcement}
-      </p>
-      {events.length === 0 ? (
-        <p className="text-sm text-muted">Waiting for the worker to pick up the run…</p>
-      ) : (
-        <ol className="flex max-h-[60vh] flex-col gap-1 overflow-y-auto">
-          {events.map((e) => {
-            const { text, tone } = describe(e);
-            return (
-              <li key={e.seq} className={`flex gap-2 text-sm ${TONE[tone]}`}>
-                <time className="shrink-0 font-mono text-[11px] text-muted" dateTime={e.ts} title={e.ts}>
-                  {new Date(e.ts).toLocaleTimeString()}
-                </time>
-                <span className="min-w-0 break-words">{text}</span>
-              </li>
-            );
-          })}
-        </ol>
-      )}
-    </section>
-  );
 }

@@ -19,7 +19,7 @@ export function FindingsPanel({
   activeEvidence: string | null;
 }) {
   if (!data || (data.hypotheses.length === 0 && data.findings.length === 0)) {
-    return <p className="rounded-lg border border-border bg-surface p-6 text-muted">No findings yet.</p>;
+    return <p className="qc-panel p-6 text-muted">No findings yet.</p>;
   }
   const byAgent = data.findings.reduce<Record<string, Finding[]>>((acc, f) => {
     (acc[f.agent] ??= []).push(f);
@@ -38,7 +38,7 @@ export function FindingsPanel({
         ) : (
           <ol className="flex flex-col gap-3">
             {data.hypotheses.map((h) => (
-              <li key={h.key} className="rounded-lg border border-border bg-surface p-4">
+              <li key={h.key} className="qc-panel p-4">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="font-mono text-xs text-muted">#{h.rank}</span>
                   <span className="font-mono text-xs">{h.category}</span>
@@ -64,7 +64,7 @@ export function FindingsPanel({
         </h2>
         {Object.entries(byAgent).map(([agent, findings]) => (
           <div key={agent} className="mb-4">
-            <h3 className="mb-1 font-mono text-xs uppercase tracking-wider text-muted">{AGENT_LABEL[agent] ?? agent}</h3>
+            <h3 className="mb-1 qc-eyebrow">{AGENT_LABEL[agent] ?? agent}</h3>
             <ul className="flex flex-col gap-2">
               {findings.map((f) => (
                 <li key={f.key} className="rounded-md border border-border bg-surface p-3">

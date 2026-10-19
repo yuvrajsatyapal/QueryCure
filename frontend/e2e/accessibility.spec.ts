@@ -37,9 +37,13 @@ test("a11y - empty states are axe-clean too (the history page with no matches)",
 
 test("a11y - keyboard reaches the main actions with a visible focus ring", async ({ page }) => {
   await page.goto("/");
-  await page.keyboard.press("Tab");
+  await expect(page.getByRole("heading", { level: 1 })).toBeVisible({ timeout: 30_000 });
+  // Header (logo, Demo, theme) comes first; the hero's primary action follows in reading order.
   const focused = page.locator(":focus");
-  await expect(focused).toHaveText("Explore prerecorded investigations");
+  for (const name of ["QueryCure", "Demo", "", "Open the app"]) {
+    await page.keyboard.press("Tab");
+    if (name) await expect(focused).toHaveText(name);
+  }
   const outline = await focused.evaluate((el) => getComputedStyle(el).outlineStyle);
   expect(outline).not.toBe("none");
 });

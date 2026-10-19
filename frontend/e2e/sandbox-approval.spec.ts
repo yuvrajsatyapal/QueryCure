@@ -19,7 +19,7 @@ test("sandbox - approve the candidate SQL, then see the benchmarked tournament",
   await expect(card).toBeVisible({ timeout: 60_000 });
   await expect(card.getByText("CREATE INDEX ON orders (customer_id, created_at)")).toBeVisible();
   await expect(card.getByText(/Nothing has run yet/)).toBeVisible();
-  await expect(page.getByText(/Status:\s*awaiting_approval/)).toBeVisible();
+  await expect(page.locator("header").getByText("Approval required", { exact: true })).toBeVisible();
 
   await card.getByRole("button", { name: "Approve and run" }).click();
   await expect(card).toBeHidden({ timeout: 15_000 });

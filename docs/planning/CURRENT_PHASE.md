@@ -4,7 +4,7 @@
 |---|---|
 | Phase | **5 — Production polish** (authorized by the owner 2026-10-16). Phase 1: [PHASE_1_REPORT](reports/PHASE_1_REPORT.md); Phase 2: [PHASE_2_REPORT](reports/PHASE_2_REPORT.md); Phase 3: [PHASE_3_REPORT](reports/PHASE_3_REPORT.md); Phase 4 owner-reviewed 2026-10-16: [PHASE_4_REPORT](reports/PHASE_4_REPORT.md) |
 | Status | **Phase 5 implementation complete and verified locally (2026-10-16); not publicly deployed; awaiting owner review** ([PHASE_5_REPORT](reports/PHASE_5_REPORT.md)). Exit criterion "deployed" not met by design (needs owner approval, domain, accounts) |
-| Last updated | 2026-10-18 |
+| Last updated | 2026-10-19 |
 | Application code | Phases 1–3 (API, metadata DB, parsing, inspection gateway, artifact store, six demo workloads, multi-agent graph, approval gate, sandbox benchmark engine `bench@2`, tournament, web workspace) plus Phase 4: Benchmark Auditor (deterministic checks + downgrade-only review), atomic finalization with versioned reports (`report-builder@1`, `report-md@1`), report replay, experiment replay with statistical comparison, re-investigation start, plan diff; migrations 0001–0012; web app adds Report tab, report and replay pages, lineage drawer, audit panel and plan diff |
 
 ## Post-Phase-5 addition (2026-10-16)
@@ -67,6 +67,15 @@
     - alerting;
     - a Neon PITR check;
     - `report-builder@2`.
+
+- [x] **UI redesign: Linear structure, LangSmith trace, dark-first (2026-10-19, [ADR-0030](../engineering/adr/ADR-0030-linear-langsmith-ui-direction.md)).**
+  - **Tokens and type:** Linear-style neutrals plus status tokens `--running` and `--approval` (new). Teal brand accent kept. Inter + JetBrains Mono. Dark by default. Shared `qc-*` Tailwind utilities.
+  - **Shell:** sidebar with grouped nav, active state, and account footer; mobile drawer.
+  - **Pages:** dashboard (status counts, in progress, recent, get started); Linear-style History list; simple landing page with an illustration labelled as such.
+  - **Investigation page:** header with breadcrumb and status pill, underlined result tabs, approval card in the approval color.
+  - **Trace:** client-built span tree from existing SSE events (`lib/events/trace.ts`, TDD) with a latency waterfall and expandable details (`TraceView`, replacing `Timeline`). No backend or API change.
+  - **Docs:** DESIGN_SYSTEM and UI_UX §3.6 updated. e2e assertions moved to the new wording.
+  - **Verified:** frontend lint, typecheck, 95 unit tests (incl. 4 trace-builder + 2 trace-view), build; e2e 14/14 (axe clean in light and dark). Contrast computed per token: all text tokens ≥ 5.1:1, `--faint` (≈ 2.8:1) restricted to icons.
 
 ## Completed
 

@@ -76,7 +76,7 @@ export function ParamSetsEditor({ rows, onChange }: { rows: ParamSetRow[]; onCha
       <button
         type="button"
         onClick={() => onChange([...rows, { name: "", values: "" }])}
-        className="w-fit rounded-md border border-border-strong px-3 py-1 text-xs"
+        className="w-fit qc-btn-secondary text-xs"
       >
         Add parameter set
       </button>

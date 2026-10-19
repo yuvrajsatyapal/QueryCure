@@ -2,7 +2,7 @@ import { afterEach, expect, test, vi } from "vitest";
 import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { renderWithQuery } from "@/test/render";
-import { describe as describeEvent } from "@/components/investigation/Timeline";
+import { describe as describeEvent } from "@/lib/events/describe";
 import type { Approval, ExperimentDetail, OptimizationCandidate, RunEvent } from "@/lib/api/types";
 import { ApprovalCard } from "../ApprovalCard";
 import { ExperimentView } from "../TournamentPanel";

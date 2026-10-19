@@ -1,38 +1,52 @@
-/* Design tokens: docs/design/DESIGN_SYSTEM.md §2. Binding — no raw palette colors in components. */
+/* Design tokens: docs/design/DESIGN_SYSTEM.md §2. Binding — no raw palette colors in components.
+ * Dark is the primary theme (Linear-style neutrals); light is designed to match, not inverted. */
 :root {
-  --bg: #fafaf9;
+  --bg: #fbfbfc;
+  --sidebar: #f4f5f6;
   --surface: #ffffff;
-  --surface-2: #f1f2f1;
-  --border: #e2e4e6;
-  --border-strong: #c9cdd2;
-  --ink: #15181d;
-  --muted: #566070;
+  --surface-2: #f2f3f5;
+  --hover: #eceef1;
+  --border: #e4e6ea;
+  --border-strong: #cfd2d8;
+  --ink: #16171a;
+  --muted: #5d6270;
+  --faint: #8b909b;
   --accent: #0a6f6a;
   --accent-tint: rgba(10, 111, 106, 0.08);
   --accent-fg: #ffffff;
-  --link: #2c5ba8;
+  --link: #2a59b0;
   --hypothesis: #3f5577;
+  /* Run and verdict semantics. Every status also carries an icon and a word. */
+  --running: #1f5fbf;
   --verified: #1e7240;
   --rejected: #b3261e;
   --inconclusive: #8f5300;
+  --approval: #6a46cc;
+  --shadow-pop: 0 8px 24px rgba(15, 18, 24, 0.12);
   color-scheme: light;
 }
 
 .dark {
-  --bg: #0e1013;
-  --surface: #15181d;
-  --surface-2: #1b1f25;
-  --border: #2a2f37;
-  --border-strong: #3a414b;
-  --ink: #e6e8eb;
-  --muted: #9aa3af;
+  --bg: #08090a;
+  --sidebar: #0d0e10;
+  --surface: #111214;
+  --surface-2: #17181b;
+  --hover: #1d1f22;
+  --border: #222428;
+  --border-strong: #34373d;
+  --ink: #f2f3f5;
+  --muted: #8f95a1;
+  --faint: #636873;
   --accent: #3cc3b4;
   --accent-tint: rgba(60, 195, 180, 0.12);
   --accent-fg: #06211f;
-  --link: #7ea6e8;
+  --link: #8ab0f0;
   --hypothesis: #9db2d6;
+  --running: #6ea8fe;
   --verified: #5bc584;
   --rejected: #f2837a;
   --inconclusive: #e0a84a;
+  --approval: #b39cff;
+  --shadow-pop: 0 8px 24px rgba(0, 0, 0, 0.5);
   color-scheme: dark;
 }

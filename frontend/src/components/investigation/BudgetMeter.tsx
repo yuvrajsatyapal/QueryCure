@@ -10,8 +10,8 @@ function Row({ label, used, limit }: { label: string; used: number; limit: numbe
           {used.toLocaleString()} / {limit.toLocaleString()}
         </span>
       </div>
-      <div className="h-1.5 rounded bg-surface-2" role="meter" aria-label={label} aria-valuenow={used} aria-valuemin={0} aria-valuemax={limit}>
-        <div className={`h-1.5 rounded ${pct >= 80 ? "bg-inconclusive" : "bg-accent"}`} style={{ width: `${pct}%` }} />
+      <div className="h-1 rounded-full bg-surface-2" role="meter" aria-label={label} aria-valuenow={used} aria-valuemin={0} aria-valuemax={limit}>
+        <div className={`h-1 rounded-full ${pct >= 80 ? "bg-inconclusive" : "bg-accent"}`} style={{ width: `${pct}%` }} />
       </div>
     </div>
   );
@@ -20,11 +20,12 @@ function Row({ label, used, limit }: { label: string; used: number; limit: numbe
 export function BudgetMeter({ run }: { run: RunDetail }) {
   const u = run.usage ?? {};
   return (
-    <section aria-label="Budget" className="flex flex-col gap-2">
+    <section aria-label="Budget" className="qc-panel flex flex-col gap-2.5 p-3">
+      <h2 className="qc-eyebrow">Budget</h2>
       <Row label="LLM calls" used={u.llmCalls ?? 0} limit={run.budget.llmCalls} />
       <Row label="Tokens" used={(u.inputTokens ?? 0) + (u.outputTokens ?? 0)} limit={run.budget.totalTokens} />
       <Row label="Tool calls" used={u.toolCalls ?? 0} limit={run.budget.toolCalls} />
-      <p className="font-mono text-[11px] text-muted">
+      <p className="border-t border-border pt-2 font-mono text-[11px] text-muted">
         {run.llmModel ? `${run.llmModel} via ${run.llmProvider}` : "model not assigned yet"}
       </p>
     </section>

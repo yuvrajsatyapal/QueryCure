@@ -24,15 +24,20 @@ import { ApprovalCard } from "@/components/tournament/ApprovalCard";
 import { TournamentPanel } from "@/components/tournament/TournamentPanel";
 import { runRefetchInterval } from "@/lib/events/runEvents";
 import { useRunEvents } from "@/lib/events/useRunEvents";
+import { Icon } from "@/components/ui/Icon";
+import { RunStatusPill } from "@/components/ui/StatusPill";
 import { BudgetMeter } from "./BudgetMeter";
 import { FindingsPanel } from "./FindingsPanel";
 import { RunPicker, runKindLabel, runRelation } from "./RunPicker";
-import { Timeline } from "./Timeline";
+import { TraceView } from "./TraceView";
 
 type Tab = "plan" | "findings" | "tournament" | "report";
 const ACTIVE = new Set(["queued", "running", "awaiting_approval", "cancelling"]);
+// Underlined tabs for the results area (Linear), pill segments for the small plan-view switch.
 const tabClass = (active: boolean) =>
-  `rounded-md px-3 py-1.5 text-sm ${active ? "bg-accent-tint font-medium text-ink" : "text-muted hover:text-ink"}`;
+  `-mb-px border-b-2 px-1 pb-2 text-sm ${active ? "border-accent font-medium text-ink" : "border-transparent text-muted hover:text-ink"}`;
+const segmentClass = (active: boolean) =>
+  `rounded px-2.5 py-1 text-xs ${active ? "bg-surface font-medium text-ink shadow-sm" : "text-muted hover:text-ink"}`;
 
 /** `requestedRunId` comes from `?run=` so a selected run (an older run, a replay) is linkable. */
 export function InvestigationView({ id, requestedRunId }: { id: string; requestedRunId?: string }) {
@@ -94,119 +99,146 @@ export function InvestigationView({ id, requestedRunId }: { id: string; requeste
   const currentPlan = plans.data?.items.find((p) => p.sha256 === planSha) ?? plans.data?.items[0];
   const selectedNode = currentPlan?.plan.nodes.find((n) => n.id === selected);
 
+  const active = r ? ACTIVE.has(r.status) : true;
+  const tabs: { id: Tab; label: string }[] = [
+    { id: "findings", label: "Findings" },
+    { id: "plan", label: "Plan" },
+    ...(sandbox ? [{ id: "tournament" as const, label: "Tournament" }] : []),
+    { id: "report", label: "Report" },
+  ];
+
   return (
-    <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.5fr_minmax(300px,0.8fr)]">
-      <section aria-label="Investigation" className="flex min-w-0 flex-col gap-4">
-        <div>
-          <p className="font-mono text-xs uppercase tracking-wider text-muted">
-            Investigation · run {r?.runNumber ?? "…"}
-            {summary ? ` · ${runKindLabel(summary.kind)}` : null}
-            {summary && runRelation(summary, runs) ? ` ${runRelation(summary, runs)}` : null}
-          </p>
-          <h1 className="text-2xl font-semibold">{investigation.data.title}</h1>
-          <p className="text-sm text-muted">{investigation.data.objective}</p>
-          {parent ? (
-            <button type="button" onClick={() => selectRun(parent.id)} className="mt-1 text-sm text-link">
-              Go to run #{parent.runNumber} ({runKindLabel(parent.kind).toLowerCase()})
-            </button>
-          ) : null}
-        </div>
-        {missingRun ? (
-          <p role="status" className="rounded-md border border-border bg-surface-2 p-3 text-sm">
-            That run is not part of this investigation (it may have been deleted). Showing run {r?.runNumber ?? "…"} instead.
-          </p>
-        ) : null}
-        <div role="tablist" aria-label="Results" className="flex gap-2">
-          <button role="tab" aria-selected={tab === "findings"} className={tabClass(tab === "findings")} onClick={() => setTab("findings")}>
-            Findings
-          </button>
-          <button role="tab" aria-selected={tab === "plan"} className={tabClass(tab === "plan")} onClick={() => setTab("plan")}>
-            Plan
-          </button>
-          {sandbox ? (
-            <button role="tab" aria-selected={tab === "tournament"} className={tabClass(tab === "tournament")} onClick={() => setTab("tournament")}>
-              Tournament
-            </button>
-          ) : null}
-          <button role="tab" aria-selected={tab === "report"} className={tabClass(tab === "report")} onClick={() => setTab("report")}>
-            Report
-          </button>
-        </div>
-        {pending && runId && r?.status === "awaiting_approval" ? <ApprovalCard key={pending.id} approval={pending} runId={runId} /> : null}
-        {evidence ? (
-          <aside aria-label="Selected evidence" className="rounded-md border border-border bg-surface-2 p-3 text-sm">
-            <p className="font-mono text-xs text-muted">
-              {evidence.evidence.id} · {evidence.evidence.kind} · {evidence.evidence.provenance}
-            </p>
-            <p>{evidence.evidence.summary}</p>
-          </aside>
-        ) : null}
-        {tab === "report" && runId ? (
-          <ReportPanel
-            runId={runId}
-            onPlanNode={(sha, node) => {
-              setPlanSha(sha);
-              setSelected(node);
-              setTab("plan");
-            }}
-          />
-        ) : tab === "tournament" ? (
-          <TournamentPanel experiments={experiments.data?.items ?? []} candidates={candidates.data?.items ?? []} runId={runId ?? undefined} />
-        ) : tab === "findings" ? (
-          <FindingsPanel data={findings.data} onEvidence={(e) => void openEvidence(e)} activeEvidence={evidence?.evidence.id ?? null} />
-        ) : currentPlan ? (
-          <div className="flex flex-col gap-3">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <p className="font-mono text-xs uppercase tracking-wider text-muted">
-                {currentPlan.role === "context.plan" ? "live EXPLAIN" : "uploaded plan"} · {currentPlan.sha256.slice(0, 12)}
-              </p>
-              <div role="tablist" aria-label="Plan view" className="flex gap-2">
-                <button role="tab" aria-selected={view === "tree"} className={tabClass(view === "tree")} onClick={() => setView("tree")}>
-                  Tree
-                </button>
-                <button role="tab" aria-selected={view === "graph"} className={tabClass(view === "graph")} onClick={() => setView("graph")}>
-                  Graph
-                </button>
-              </div>
+    <div className="flex flex-col gap-5">
+      <header className="flex flex-col gap-3">
+        <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 text-xs text-muted">
+          <Link href="/app/history" className="hover:text-ink">
+            Investigations
+          </Link>
+          <Icon name="chevronRight" size={12} />
+          <span className="truncate text-ink">{investigation.data.title}</span>
+        </nav>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="flex min-w-0 flex-col gap-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <h1 className="text-xl font-semibold tracking-tight">{investigation.data.title}</h1>
+              {r ? <RunStatusPill status={r.status} /> : null}
+              {r?.outcome ? <span className="text-xs text-muted">{r.outcome.replaceAll("_", " ")}</span> : null}
             </div>
-            {view === "tree" ? (
-              <PlanTreeTable plan={currentPlan.plan} metrics={currentPlan.metrics} onSelect={setSelected} selectedId={selected} />
-            ) : (
-              <PlanGraph plan={currentPlan.plan} metrics={currentPlan.metrics} onSelect={setSelected} selectedId={selected} />
-            )}
-            {selectedNode ? <NodeDetails node={selectedNode} metrics={currentPlan.metrics.find((m) => m.nodeId === selectedNode.id)} /> : null}
+            <p className="font-mono text-[11px] text-muted">
+              Investigation · run {r?.runNumber ?? "…"}
+              {summary ? ` · ${runKindLabel(summary.kind)}` : null}
+              {summary && runRelation(summary, runs) ? ` ${runRelation(summary, runs)}` : null}
+            </p>
+            <p className="max-w-3xl text-sm text-muted">{investigation.data.objective}</p>
+            {parent ? (
+              <button type="button" onClick={() => selectRun(parent.id)} className="w-fit text-sm text-link">
+                Go to run #{parent.runNumber} ({runKindLabel(parent.kind).toLowerCase()})
+              </button>
+            ) : null}
           </div>
-        ) : (
-          <p className="rounded-lg border border-border bg-surface p-6 text-muted">No plan for this run yet.</p>
-        )}
-      </section>
-      <aside aria-label="Run" className="flex min-w-0 flex-col gap-4">
-        <RunPicker runs={runs} selectedId={runId} onSelect={selectRun} />
-        <div className="flex items-center justify-between gap-2">
-          <p className="text-sm">
-            Status: <span className="font-medium">{r?.status ?? "…"}</span>
-            {r?.outcome ? <span className="text-muted"> · {r.outcome.replaceAll("_", " ")}</span> : null}
-          </p>
-          {r && ACTIVE.has(r.status) && r.status !== "cancelling" ? (
-            <button type="button" onClick={() => cancel.mutate()} disabled={cancel.isPending} className="rounded-md border border-rejected px-3 py-1 text-sm text-rejected">
-              Cancel run
-            </button>
-          ) : null}
+          <div className="flex shrink-0 items-center gap-2">
+            {r && !active ? (
+              <Link href={`/app/replay/${r.id}`} className="qc-btn-secondary">
+                <Icon name="replay" size={14} />
+                Reproducibility & replay
+              </Link>
+            ) : null}
+            {r && active && r.status !== "cancelling" ? (
+              <button
+                type="button"
+                onClick={() => cancel.mutate()}
+                disabled={cancel.isPending}
+                className="qc-btn border border-rejected/40 text-rejected hover:bg-rejected/10"
+              >
+                Cancel run
+              </button>
+            ) : null}
+          </div>
         </div>
         {r?.errorCode ? (
-          <p className="text-sm text-rejected">
-            {r.status === "completed" ? "Problem" : "Stopped"}: {r.errorMessage ?? r.errorCode}
+          <p role="status" className="flex items-start gap-2 rounded-md border border-rejected/30 bg-rejected/10 px-3 py-2 text-sm text-rejected">
+            <Icon name="xCircle" size={14} className="mt-0.5" />
+            <span>
+              {r.status === "completed" ? "Problem" : "Stopped"}: {r.errorMessage ?? r.errorCode}
+            </span>
           </p>
         ) : null}
-        {r && !ACTIVE.has(r.status) ? (
-          <Link href={`/app/replay/${r.id}`} className="text-sm text-link">
-            Reproducibility & replay
-          </Link>
-        ) : null}
         <ErrorNotice error={cancel.error} />
-        {r ? <BudgetMeter run={r} /> : null}
-        <Timeline events={events} live={live} />
-      </aside>
+      </header>
+      {missingRun ? (
+        <p role="status" className="rounded-md border border-border bg-surface-2 p-3 text-sm">
+          That run is not part of this investigation (it may have been deleted). Showing run {r?.runNumber ?? "…"} instead.
+        </p>
+      ) : null}
+      {pending && runId && r?.status === "awaiting_approval" ? <ApprovalCard key={pending.id} approval={pending} runId={runId} /> : null}
+      <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(380px,460px)]">
+        <section aria-label="Investigation" className="flex min-w-0 flex-col gap-4">
+          <div role="tablist" aria-label="Results" className="flex gap-5 border-b border-border">
+            {tabs.map((t) => (
+              <button key={t.id} role="tab" aria-selected={tab === t.id} className={tabClass(tab === t.id)} onClick={() => setTab(t.id)}>
+                {t.label}
+              </button>
+            ))}
+          </div>
+          {evidence ? (
+            <aside aria-label="Selected evidence" className="flex items-start gap-2 rounded-md border border-accent/30 bg-accent-tint p-3 text-sm">
+              <Icon name="database" size={14} className="mt-0.5 text-accent" />
+              <div className="min-w-0 flex-1">
+                <p className="font-mono text-xs text-muted">
+                  {evidence.evidence.id} · {evidence.evidence.kind} · {evidence.evidence.provenance}
+                </p>
+                <p>{evidence.evidence.summary}</p>
+              </div>
+              <button type="button" onClick={() => setEvidence(null)} aria-label="Close evidence" className="text-muted hover:text-ink">
+                <Icon name="close" size={14} />
+              </button>
+            </aside>
+          ) : null}
+          {tab === "report" && runId ? (
+            <ReportPanel
+              runId={runId}
+              onPlanNode={(sha, node) => {
+                setPlanSha(sha);
+                setSelected(node);
+                setTab("plan");
+              }}
+            />
+          ) : tab === "tournament" ? (
+            <TournamentPanel experiments={experiments.data?.items ?? []} candidates={candidates.data?.items ?? []} runId={runId ?? undefined} />
+          ) : tab === "findings" ? (
+            <FindingsPanel data={findings.data} onEvidence={(e) => void openEvidence(e)} activeEvidence={evidence?.evidence.id ?? null} />
+          ) : currentPlan ? (
+            <div className="flex flex-col gap-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="qc-eyebrow">
+                  {currentPlan.role === "context.plan" ? "live EXPLAIN" : "uploaded plan"} · {currentPlan.sha256.slice(0, 12)}
+                </p>
+                <div role="tablist" aria-label="Plan view" className="flex gap-0.5 rounded-md border border-border bg-surface-2 p-0.5">
+                  <button role="tab" aria-selected={view === "tree"} className={segmentClass(view === "tree")} onClick={() => setView("tree")}>
+                    Tree
+                  </button>
+                  <button role="tab" aria-selected={view === "graph"} className={segmentClass(view === "graph")} onClick={() => setView("graph")}>
+                    Graph
+                  </button>
+                </div>
+              </div>
+              {view === "tree" ? (
+                <PlanTreeTable plan={currentPlan.plan} metrics={currentPlan.metrics} onSelect={setSelected} selectedId={selected} />
+              ) : (
+                <PlanGraph plan={currentPlan.plan} metrics={currentPlan.metrics} onSelect={setSelected} selectedId={selected} />
+              )}
+              {selectedNode ? <NodeDetails node={selectedNode} metrics={currentPlan.metrics.find((m) => m.nodeId === selectedNode.id)} /> : null}
+            </div>
+          ) : (
+            <p className="qc-panel p-6 text-sm text-muted">No plan for this run yet.</p>
+          )}
+        </section>
+        <aside aria-label="Run" className="flex min-w-0 flex-col gap-4">
+          <RunPicker runs={runs} selectedId={runId} onSelect={selectRun} />
+          <TraceView events={events} live={live} active={active} onEvidence={(e) => void openEvidence(e)} />
+          {r ? <BudgetMeter run={r} /> : null}
+        </aside>
+      </div>
     </div>
   );
 }

@@ -158,7 +158,7 @@ export function AuditSummary({ audit, onWhy }: { audit: CandidateAudit; onWhy?: 
 function Round({ rnd, onWhy }: { rnd: ReportRound; onWhy?: Why }) {
   const exp = rnd.experiment;
   return (
-    <div className="flex flex-col gap-2 rounded-lg border border-border bg-surface p-4">
+    <div className="flex flex-col gap-2 qc-panel p-4">
       <h3 className="font-semibold">Round {rnd.round + 1}</h3>
       <p className="text-sm">
         Approval: <span className="font-medium">{rnd.approval?.status ?? "not requested"}</span>
@@ -227,8 +227,8 @@ export function ReportView({ report, onWhy }: { report: ReportV1; onWhy?: Why })
   const prerecorded = r.provenance.measurements.includes("prerecorded");
   return (
     <article className="flex max-w-[880px] flex-col gap-6" aria-label="Final report">
-      <header className="flex flex-col gap-2 rounded-lg border border-border bg-surface p-4">
-        <p className="font-mono text-xs uppercase tracking-wider text-muted">
+      <header className="flex flex-col gap-2 qc-panel p-4">
+        <p className="qc-eyebrow">
           Final report · {r.run.kind.replaceAll("_", " ")} · run {r.run.runNumber}
         </p>
         <h1 className="text-xl font-semibold">{OUTCOME_LABEL[r.outcome ?? ""] ?? `Run ${r.finalStatus}`}</h1>
