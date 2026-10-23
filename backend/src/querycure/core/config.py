@@ -1,7 +1,9 @@
 import base64
 import binascii
+import re
 from enum import StrEnum
 from typing import Literal, Self, TypedDict
+from urllib.parse import urlsplit
 
 from pydantic import AliasChoices, Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -21,6 +23,43 @@ class WorkerMode(StrEnum):
 
 def _env(name: str) -> AliasChoices:
     return AliasChoices(name, name.lower())
+
+
+LOOPBACK_HOSTS = frozenset({"localhost", "127.0.0.1", "::1"})
+# 32 characters is what `secrets.token_urlsafe(24)` gives; anything shorter is guessable.
+MIN_METRICS_TOKEN_LENGTH = 32
+_COOKIE_DOMAIN = re.compile(r"^\.?[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$")
+
+
+def _url_problem(name: str, value: str, *, bare: bool) -> str | None:
+    """Outside the local profile a public URL is https, or plain http on loopback only (the
+    local `compose.demo.yaml` stack). `bare` also forbids a path: CORS compares origins."""
+    parts = urlsplit(value)
+    if parts.scheme not in {"https", "http"} or not parts.hostname:
+        return f"{name} must be an absolute http(s) URL, got {value!r}"
+    if parts.username or parts.password or parts.query or parts.fragment:
+        return f"{name} must not carry credentials, a query or a fragment"
+    if bare and parts.path:
+        return f"{name} entries must be bare origins (no path or trailing slash), got {value!r}"
+    if parts.scheme == "http" and parts.hostname not in LOOPBACK_HOSTS:
+        return f"{name} must use https outside loopback, got {value!r}"
+    return None
+
+
+def serving_problems(settings: "Settings") -> list[str]:
+    """What the API needs to serve outside the local profile. Checked when the API starts, not
+    in the settings validator: the worker and ops commands load the same settings without
+    needing CORS or a pooled URL."""
+    if settings.profile is Profile.LOCAL:
+        return []
+    problems = []
+    if settings.database_url is None:
+        problems.append("DATABASE_URL is required (the qc_app role)")
+    if not settings.cors_origins:
+        problems.append(
+            'CORS_ORIGINS must list the web app\'s origin, e.g. ["https://app.<domain>"]'
+        )
+    return problems
 
 
 FREE_ROUTER = "openrouter/free"
@@ -313,6 +352,7 @@ class Settings(BaseSettings):
                 raise ValueError("OPENROUTER_API_KEY must not be set in the demo profile (BYOK)")
             if self.groq_api_key is not None:
                 raise ValueError("GROQ_API_KEY must not be set in the demo profile (BYOK)")
+            self._check_public_web_config()
             if self.github_client_id is not None or self.google_client_id is not None:
                 for name, url in (("PUBLIC_API_URL", self.public_api_url),
                                   ("WEB_BASE_URL", self.web_base_url)):  # fmt: skip
@@ -323,6 +363,30 @@ class Settings(BaseSettings):
         if (self.google_client_id is None) != (self.google_client_secret is None):
             raise ValueError("GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET must be set together")
         return self
+
+    def _check_public_web_config(self) -> None:
+        # credentials=True CORS with "*" or a plain-http origin would hand the session cookie's
+        # authority to any page, or to anyone on the network path.
+        for origin in self.cors_origins:
+            if origin == "*":
+                raise ValueError("CORS_ORIGINS must not contain '*' outside the local profile")
+            if problem := _url_problem("CORS_ORIGINS", origin, bare=True):
+                raise ValueError(problem)
+        for name, url in (("PUBLIC_API_URL", self.public_api_url),
+                          ("WEB_BASE_URL", self.web_base_url)):  # fmt: skip
+            if url is not None and (problem := _url_problem(name, url, bare=False)):
+                raise ValueError(problem)
+        if self.web_base_url is not None and self.cors_origins:
+            web = urlsplit(self.web_base_url)
+            if f"{web.scheme}://{web.netloc}" not in self.cors_origins:
+                raise ValueError("WEB_BASE_URL's origin must be listed in CORS_ORIGINS")
+        if self.cookie_domain is not None and not _COOKIE_DOMAIN.match(self.cookie_domain):
+            raise ValueError("COOKIE_DOMAIN must be a bare domain such as .example.dev")
+        token = self.metrics_token.get_secret_value() if self.metrics_token else None
+        if token is not None and len(token) < MIN_METRICS_TOKEN_LENGTH:
+            raise ValueError(
+                f"METRICS_TOKEN must be at least {MIN_METRICS_TOKEN_LENGTH} characters"
+            )
 
     @property
     def github_login_enabled(self) -> bool:

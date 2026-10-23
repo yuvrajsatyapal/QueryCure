@@ -7,7 +7,14 @@ import { investigationKeys } from "@/lib/api/investigations";
 import { optimizationKeys } from "@/lib/api/optimization";
 import { reportKeys } from "@/lib/api/reports";
 import type { RunEvent } from "@/lib/api/types";
-import { EVENT_TYPES, isTerminal, mergeEvents, parseEvent } from "./runEvents";
+import {
+  EVENT_TYPES,
+  isTerminal,
+  mergeEvents,
+  parseEvent,
+  reconnectDelayMs,
+  runEventsUrl,
+} from "./runEvents";
 
 const REFRESH_ON = new Set([
   "finding.created",
@@ -18,7 +25,8 @@ const REFRESH_ON = new Set([
 ]);
 
 /** Streams a run's events into the query cache (key: events). The browser resumes with
- * Last-Event-ID after a drop; the hook closes the stream itself once the run is terminal,
+ * Last-Event-ID after a network drop; after an HTTP error the hook reconnects itself with
+ * bounded backoff (`reconnectDelayMs`). It closes the stream once the run is terminal,
  * because EventSource would otherwise reconnect forever. */
 export function useRunEvents(runId: string | null): { events: RunEvent[]; live: boolean } {
   const client = useQueryClient();
@@ -33,12 +41,15 @@ export function useRunEvents(runId: string | null): { events: RunEvent[]; live: 
 
   useEffect(() => {
     if (!runId || typeof EventSource === "undefined") return;
-    const source = new EventSource(`${API_BASE_URL}/api/v1/runs/${runId}/events`, {
-      withCredentials: true,
-    });
+    let source: EventSource | null = null;
+    let retry: ReturnType<typeof setTimeout> | undefined;
+    let attempt = 0;
+    let lastSeq: number | null = null;
+    let done = false;
     const onEvent = (message: MessageEvent<string>) => {
       const event = parseEvent(message.data);
       if (!event) return;
+      lastSeq = Math.max(lastSeq ?? 0, event.seq);
       client.setQueryData<RunEvent[]>(investigationKeys.events(runId), (prev) =>
         mergeEvents(prev ?? [], [event]),
       );
@@ -70,7 +81,8 @@ export function useRunEvents(runId: string | null): { events: RunEvent[]; live: 
         void client.invalidateQueries({ queryKey: investigationKeys.plans(runId) });
       }
       if (isTerminal(event)) {
-        source.close();
+        done = true;
+        source?.close();
         setLive(false);
         void client.invalidateQueries({ queryKey: ["investigations"] });
         void client.invalidateQueries({ queryKey: investigationKeys.findings(runId) });
@@ -80,11 +92,30 @@ export function useRunEvents(runId: string | null): { events: RunEvent[]; live: 
         void client.invalidateQueries({ queryKey: reportKeys.verifications(runId) });
       }
     };
-    source.onopen = () => setLive(true);
-    source.onerror = () => setLive(source.readyState === EventSource.OPEN);
-    for (const type of EVENT_TYPES) source.addEventListener(type, onEvent as EventListener);
+    const connect = () => {
+      const current = new EventSource(runEventsUrl(API_BASE_URL, runId, lastSeq), {
+        withCredentials: true,
+      });
+      source = current;
+      current.onopen = () => {
+        attempt = 0;
+        setLive(true);
+      };
+      current.onerror = () => {
+        setLive(current.readyState === EventSource.OPEN);
+        if (done || current.readyState !== EventSource.CLOSED) return;
+        const delay = reconnectDelayMs(attempt);
+        if (delay === null) return;
+        attempt += 1;
+        retry = setTimeout(connect, delay);
+      };
+      for (const type of EVENT_TYPES) current.addEventListener(type, onEvent as EventListener);
+    };
+    connect();
     return () => {
-      source.close();
+      done = true;
+      clearTimeout(retry);
+      source?.close();
       setLive(false);
     };
   }, [runId, client]);

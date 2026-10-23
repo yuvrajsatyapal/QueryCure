@@ -1,6 +1,6 @@
 # Deployment
 
-Status: **Phase 5: deployment artifacts prepared and the restricted demo profile verified locally (2026-10-16); no public deployment has been made** (that needs the owner's approval, a domain and accounts). Two operational profiles share one codebase; behaviour differs via `QC_PROFILE=local|demo` and feature flags.
+Status: **Phase 5: deployment artifacts prepared and the restricted demo profile verified locally (2026-10-16); hosted-trial architecture recommended in §3a (2026-10-23); no public deployment has been made** (that needs the owner's approval, a domain and accounts). Two operational profiles share one codebase; behaviour differs via `QC_PROFILE=local|demo` and feature flags.
 
 ## 1. Profiles
 
@@ -132,6 +132,104 @@ Prices, quotas and policies change: verify them on the day you deploy. This revi
 
 **Domains & cookies:** serve web and API on subdomains of one registrable domain (`app.` and `api.`) so cookies are same-site (`SameSite=Lax` works, `Domain=.example.dev`). SSE connects directly to `api.` rather than through a Vercel rewrite (avoids proxy buffering/timeouts on streaming responses).
 
+## 3a. Restricted hosted trial: recommended architecture (2026-10-23, not deployed)
+
+Recommendation for the first restricted trial. Nothing here has been provisioned. Prices and quotas below are from general knowledge, not checked today: **verify each on the provider's pricing page on the day you deploy.**
+
+```mermaid
+flowchart LR
+  U[Invited browser] -->|HTTPS| V[Vercel Hobby<br/>app.domain<br/>Next.js]
+  U -->|HTTPS REST + SSE, same-site cookies| R[Render web service, always on<br/>api.domain<br/>uvicorn + embedded worker]
+  R -->|pooled, qc_app| NP[(Neon pooled endpoint)]
+  R -->|direct: LISTEN, checkpointer| ND[(Neon direct endpoint)]
+  R -->|user's own key, BYOK| OR[[OpenRouter]]
+  OP[Operator machine] -->|DATABASE_MIGRATION_URL, owner role| ND
+  M[Free uptime monitor + metrics scrape] -->|/readyz, /internal/metrics with bearer token| R
+```
+
+| Component | Choice | Why | Notes |
+|---|---|---|---|
+| Web | **Vercel Hobby** | Native Next.js, free; it serves the static app only | Hobby is for personal, non-commercial use. The build needs `NEXT_PUBLIC_API_BASE_URL` (the build fails without it). SSE goes browser → API directly, never through Vercel |
+| API + worker | **One Render web service, paid always-on instance, `WORKER_MODE=embedded`** | SSE needs long-lived connections, and the worker needs CPU between requests. Render's free web services spin down when idle, which breaks both | One service is enough for the trial: with `FEATURE_SANDBOX=false` the worker only runs agent jobs (I/O-bound LLM calls). Durability comes from the Postgres queue (leases, retries, LangGraph checkpoints), not from a separate process |
+| Separate worker (later) | Render background worker from the same image (default CMD `python -m querycure.worker`), `WORKER_MODE=separate` on the API | Isolates API latency from job CPU, and lets the two restart separately | Split when API p95 suffers during runs, or when worker concurrency must grow. No code change needed |
+| Metadata DB | **Neon**, pooled URL for `DATABASE_URL`, direct URL for `DATABASE_URL_DIRECT` (ADR-0025) | Already migrated (0016) and verified | **Cost risk (inferred, not measured):** the always-on worker heartbeats every 20 s and polls every second, so the Neon compute never auto-suspends. A compute running all month (about 720 h) is likely more than the free plan's monthly compute allowance; check the plan's allowance and budget for the paid tier or for a mid-month suspension. Raising `WORKER_POLL_SECONDS` does not help, because the heartbeat alone keeps it awake |
+| Sandbox (Mode C) | **Not hosted for the trial** (`FEATURE_SANDBOX=false`, prerecorded and labelled benchmarks) | Serverless and shared container hosts give no Docker internal network, no `pids`/CPU/memory limits per clone and no quiet host. Measurements would be noise, and isolation (SECURITY §8) could not be met | Later, on a **dedicated VM** that runs the compose `sandbox-db` on an internal network, with a worker on that VM only. This needs job routing by kind (today every worker claims every kind), so it needs an ADR and a code change first |
+| Secrets | Render environment (secret values), Vercel project env | No secrets in Git or images | `QC_MASTER_KEY` is the existing key, never regenerated, with a second offline copy (§4c) |
+| TLS / domain | One registrable domain: `app.` → Vercel, `api.` → Render; both hosts issue certificates | Same-site cookies with `SameSite=Lax` and `COOKIE_DOMAIN=.<domain>` | The web build sends HSTS, and the API sends HSTS in the demo profile. Neither uses `preload` |
+
+### Expected monthly cost (verify on the day)
+
+| Item | Expected |
+|---|---|
+| Vercel Hobby | $0 |
+| Render always-on web service (smallest paid instance) | about $7 |
+| Render background worker (only after a split) | about $7 more |
+| Neon | $0 on free if the compute allowance holds (see the risk above); otherwise the smallest paid plan |
+| Domain | about $10–15 per year |
+| LLM | $0 to the operator: BYOK only, no server key in the demo profile |
+| **Trial total** | **≈ $7–10/month**, plus Neon if the free compute allowance runs out |
+
+### Environment variables (names only)
+
+| Where | Set | Must not be set |
+|---|---|---|
+| Vercel (build) | `NEXT_PUBLIC_API_BASE_URL` (`https://api.<domain>`) | anything secret: every `NEXT_PUBLIC_*` value is public |
+| Render, secret values | `DATABASE_URL` (Neon pooled, `qc_app`), `DATABASE_URL_DIRECT` (Neon direct, `qc_app`), `QC_MASTER_KEY`, `METRICS_TOKEN` (≥ 32 chars), `GITHUB_CLIENT_SECRET`, `GOOGLE_CLIENT_SECRET` | `DATABASE_MIGRATION_URL`, `DATABASE_RETENTION_URL` (owner and retention roles stay on the operator machine), `OPENROUTER_API_KEY`, `GROQ_API_KEY`, `GEMINI_API_KEY`, `SANDBOX_ADMIN_URL`, `SANDBOX_BENCH_PASSWORD` |
+| Render, plain values | `QC_PROFILE=demo`, `QC_MASTER_KEY_VERSION`, `WORKER_MODE=embedded`, `FEATURE_SANDBOX=false`, `FEATURE_LIVE_INSPECTION_PUBLIC=false`, `ALLOW_PRIVATE_TARGETS=false`, `CORS_ORIGINS=["https://app.<domain>"]`, `COOKIE_DOMAIN=.<domain>`, `PUBLIC_API_URL`, `WEB_BASE_URL`, `TRUSTED_PROXY_HOPS`, `GITHUB_CLIENT_ID`, `GOOGLE_CLIENT_ID`, `TZ=UTC`, optionally `LOG_LEVEL`, `DB_POOL_SIZE`, `DB_MAX_OVERFLOW`, `WORKER_SHUTDOWN_GRACE_SECONDS` | `LLM_PROVIDER=stub` (refused outside local) |
+| Operator machine only | `DATABASE_MIGRATION_URL`, `DATABASE_RETENTION_URL` | — |
+
+The API refuses to start with a wildcard or plain-http CORS origin, http public URLs, a short metrics token, or without `DATABASE_URL` / `CORS_ORIGINS` (OBSERVABILITY §0).
+
+**`TRUSTED_PROXY_HOPS` must match the host's proxy chain.** With `0`, every visitor shares the proxy's address, so rate limits become global and users block each other. With too high a value, a client can choose its own rate-limit key. Before the trial opens, confirm from the host's documentation how many entries its proxy appends to `X-Forwarded-For`.
+
+### Database migrations
+
+No migration is pending: Neon is at `0016`, which is the code's head (checked 2026-10-18; the readiness probe re-checks on every deploy). For a future release, run §4b from the operator machine, with `DATABASE_MIGRATION_URL` set in that shell only. Never put the owner role into the Render environment or a pre-deploy hook. Before migrating, create a Neon branch of production as the restore point.
+
+### Worker deployment and health checks
+
+- **Render health check:** `/api/v1/readyz` (database reachable and migrations current). Liveness is `/api/v1/healthz`.
+- **Worker health:** `/readyz` does not see the embedded worker. Check `qc_workers_alive == 1` and its `source_digest` against the release in `/internal/metrics`, and alert when it is 0 (OBSERVABILITY §8).
+- **Deploys and shutdown:** the host stops the old instance after starting the new one, so for a few seconds two embedded workers overlap. That is safe: `SKIP LOCKED` claims and leases. Set the host's shutdown delay above `WORKER_SHUTDOWN_GRACE_SECONDS` (default 20 s). Jobs still running at the cut resume from their checkpoint after the lease expires (≤ 60 s).
+- **Retention:** run `python -m querycure.ops retention` as `qc_retention` from the operator machine, weekly (or later as a scheduled job).
+
+### Deployment order
+
+1. **Owner prerequisites:** choose the domain and accounts; delete the stale `env.bak`; confirm the Neon PITR window and the compute allowance (above); choose the access strategy (below).
+2. **CI green** on the release commit: all `ci.yml` jobs and `audit.yml`.
+3. **Neon restore point:** create a branch of production named `pre-trial-YYYYMMDD`.
+4. **API:** create the Render web service from `backend/Dockerfile` with start command `uvicorn querycure.api.main:app --host 0.0.0.0 --port $PORT`, health check `/api/v1/readyz`, an always-on instance in the region closest to Neon, and the variables above.
+5. **Verify the API** on its host URL: `/readyz` → `ok/current`; `/me` → `profile: demo`, sandbox and live inspection off; `/internal/metrics` with the token → `qc_workers_alive 1` and the release digest.
+6. **DNS:** point `api.<domain>` at Render, then wait for TLS.
+7. **Web:** create the Vercel project (root `frontend/`) with `NEXT_PUBLIC_API_BASE_URL=https://api.<domain>`, deploy, and attach `app.<domain>`. Check that the CSP header names the API origin and that HSTS is present.
+8. **OAuth:** register the callbacks `https://api.<domain>/api/v1/auth/{github,google}/callback`, set the client IDs and secrets, redeploy the API, and run [OAUTH_VERIFICATION_CHECKLIST](../engineering/OAUTH_VERIFICATION_CHECKLIST.md) with test accounts.
+9. **Probe:** `uv run python -m querycure.ops.demo_probe --base-url https://api.<domain> --web-origin https://app.<domain>` must pass every check.
+10. **Monitoring:** set up the uptime monitors, the metrics scrape with the OBSERVABILITY §8 rules, and the log drain alerts. Confirm one test alert reaches you.
+11. **Open** to the restricted audience.
+
+### Rollback and recovery
+
+| Failure | Action |
+|---|---|
+| Bad web release | Vercel: promote the previous deployment (instant, stateless) |
+| Bad API release | Render: roll back to the previous deploy. Migrations are expand-only, so the older image runs on the newer schema |
+| Bad migration | Stop the release before traffic. Restore the `pre-…` Neon branch (or PITR to a child branch), run `verify-integrity`, then repoint both URLs (§4c). Never `alembic downgrade` a database with user data |
+| Worker stuck or dead | Restart the service. Leases expire and jobs resume from checkpoints |
+| Abuse or a security issue | Kill switch: suspend the Render service (the web app then shows API errors), or set `FEATURE_*` off and redeploy. Sealed reports are immutable and survive |
+| Leaked database password | §4d. The master key is never rotated as part of that |
+
+### Restricted-access strategy for the trial
+
+The demo profile today allows **anonymous sessions**: anyone who has the URL can use the app. BYOK, strict rate limits and the disabled Mode B/C bound the damage (no server LLM spend, no access to databases), but they do not restrict who gets in.
+
+| Option | Restricts access? | Change needed |
+|---|---|---|
+| A. Unlisted domain + existing demo limits | No; obscurity only | None |
+| B. **Sign-in allowlist** (recommended): turn anonymous sessions off in the demo, and admit only listed `(provider, subject)` pairs after OAuth | Yes | Backend change (session creation and the OAuth callback, plus a setting). **Needs owner approval** as a contract change; no migration if the list lives in configuration |
+| C. Access proxy (e.g. an identity-aware proxy in front of both subdomains) | Yes | Infrastructure only, but it must pass credentialed cross-origin requests and SSE from `app.` to `api.`; verify that before relying on it |
+
+Until option B (or C) is in place, treat the trial as **open to anyone with the link**.
+
 ## 4. CI/CD (GitHub Actions)
 
 Two workflows exist (checked 2026-10-18). Earlier drafts of this section listed separate `integration.yml`, `evals-smoke.yml`, `e2e.yml` and `deploy.yml` files; those were never created. Their jobs live in `ci.yml`, and there is **no deploy workflow**.
@@ -254,14 +352,15 @@ The app role `qc_app` was rotated on 2026-10-18 after its password appeared in a
 | `WORKER_CONCURRENCY` | default 2 local / 1 demo |
 | `SSE_HEARTBEAT_SECONDS` | SSE heartbeat comment interval (default 15) |
 | `WORKER_LEASE_SECONDS` / `WORKER_HEARTBEAT_SECONDS` / `WORKER_POLL_SECONDS` | job lease (default 60), heartbeat (20; must be under half the lease) and idle poll (1) |
-| `CORS_ORIGINS`, `COOKIE_DOMAIN` | web origin config |
+| `CORS_ORIGINS`, `COOKIE_DOMAIN` | web origin config; outside local, origins must be bare `https://` origins (http only on loopback, never `*`) and `COOKIE_DOMAIN` a bare domain |
+| `NEXT_PUBLIC_API_BASE_URL` | web build: the API's public origin; **required** by `next build` (https, or http on loopback), compiled into the bundle and the CSP |
 | `SESSION_TTL_SECONDS` | session and CSRF cookie lifetime (default 30 days) |
 | `TRUSTED_PROXY_HOPS` | reverse proxies that append to `X-Forwarded-For` (default 0: the header is ignored); rate limits key on the client address |
 | `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` | GitHub OAuth app; sign-in is offered only when both are set |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | Google OAuth client (Web application); sign-in is offered only when both are set. Authorized redirect URI: `<PUBLIC_API_URL>/api/v1/auth/google/callback`. Scopes `openid profile`; no email is read |
 | `PUBLIC_API_URL` / `WEB_BASE_URL` | public origins (OAuth callback, post-sign-in redirect); must be `https://` when any OAuth sign-in is enabled outside the local profile |
 | `OTEL_EXPORTER_OTLP_ENDPOINT`, `LANGSMITH_API_KEY` | reserved: OTel export and LangSmith are **not implemented** (deferred, see PHASE_5_REPORT) |
-| `METRICS_TOKEN` | bearer token for `/api/v1/internal/metrics` outside the local profile (empty = endpoint answers 404) |
+| `METRICS_TOKEN` | bearer token for `/api/v1/internal/metrics` outside the local profile (empty = endpoint answers 404; at least 32 characters when set) |
 | `DB_POOL_SIZE` / `DB_MAX_OVERFLOW` / `DB_POOL_TIMEOUT_SECONDS` | metadata connection pool (defaults 5 / 5 / 10 s) |
 | `DB_STATEMENT_TIMEOUT_MS` / `DB_IDLE_IN_TRANSACTION_TIMEOUT_MS` | server-side limits on the app's metadata connections (60 s / 120 s) |
 | `WORKER_SHUTDOWN_GRACE_SECONDS` | drain time on SIGTERM (default 20) |

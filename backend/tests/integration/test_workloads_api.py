@@ -30,6 +30,9 @@ async def test_demo_profile_marks_benchmarks_prerecorded() -> None:
         profile=Profile.DEMO,
         allow_private_targets=False,
         master_key=base64.b64encode(os.urandom(32)).decode(),
+        # Required to start outside the local profile; never connected (no lifespan here).
+        database_url="postgresql://qc_app:unused@127.0.0.1:1/unused",
+        cors_origins=["https://app.test"],
     )
     transport = httpx.ASGITransport(app=create_app(demo, engine=None))
     async with httpx.AsyncClient(transport=transport, base_url="https://test") as c:

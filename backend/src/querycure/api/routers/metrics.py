@@ -9,6 +9,8 @@ signals the debugging playbook names.
 Since 2026-10-18 it also reports live workers (presence rows with their source digest),
 model-call outcomes, the server's free daily allowance, metadata connections and experiment
 failures by code, so a dead worker, an exhausted quota or a failing sandbox shows without logs.
+Since 2026-10-23 it appends this API process's own counters (`api/process_metrics.py`): responses
+by status class, unhandled errors, and SSE streams by outcome.
 
 Access: open in the local profile; elsewhere only with `Authorization: Bearer $METRICS_TOKEN`,
 and a 404 (not a 401) without it, so the endpoint's existence is not advertised.
@@ -205,5 +207,6 @@ async def metrics(request: Request, engine: EngineDep, settings: SettingsDep) ->
             _line("qc_replay_attempts", r.n, kind=r.kind, status=r.status, failure_code=r.code)
             for r in rows["replays"]
         ),
+        *request.app.state.process_metrics.render(),
     ]
     return PlainTextResponse("\n".join(out) + "\n", media_type=CONTENT_TYPE)

@@ -145,6 +145,8 @@ Mode B is **disabled by default** on the public demo (`FEATURE_LIVE_INSPECTION_P
 | BYOK (T6) | AES-256-GCM with row/user AAD (ADR-0012); hint-only responses; key validated as one printable token and never echoed in validation errors (`SecretStr`); delete wipes ciphertext; paid models and non-OpenRouter providers refused while `LLM_FREE_ONLY` is on; the worker decrypts per run and a removed key stops the run before any provider call; no server fallback model for BYOK runs | `test_byok_api.py` |
 | Cross-user access (T7) | Every documented route with a path parameter is called as another user with real IDs: 404 (or the demo's 403 `FEATURE_DISABLED` for live inspection), no IDs or titles in the body, nothing changed. Found and fixed: `reinvestigate` checked model configuration before ownership (503 instead of 404) | `test_api_hardening.py::test_no_route_exposes_or_acts_on_another_users_resources` |
 | Response headers | nosniff, `Referrer-Policy: no-referrer`, `X-Frame-Options: DENY`, `frame-ancestors 'none'`, `Cache-Control: no-store`, HSTS outside local; no interactive docs page on the demo | `test_api_hardening.py` |
+| Hosted-profile configuration (2026-10-23) | Outside the local profile, settings refuse `*` and plain-http `CORS_ORIGINS` (http only on loopback, for the local demo stack), non-bare origins, http public URLs, a malformed `COOKIE_DOMAIN`, a `METRICS_TOKEN` under 32 characters, and a `WEB_BASE_URL` missing from `CORS_ORIGINS`; the API refuses to start without `DATABASE_URL` or `CORS_ORIGINS`. The web app's production build fails without a valid `NEXT_PUBLIC_API_BASE_URL` (https, or http on loopback), so it can no longer ship a `localhost` API origin | `test_deployment_config.py`, `lib/api/__tests__/origin.test.ts` |
+| Error text in logs (2026-10-23) | Metadata engines set `hide_parameters=True`: statement errors keep the SQL, not the bound values. Residual: PostgreSQL's own message may quote an input value | `test_engine_hides_parameters.py` |
 | Replay idempotency | `Idempotency-Key` on experiment replay, scoped per user and operation; concurrent duplicates converge through a unique index | `test_experiment_replay_idempotency.py` |
 
 ## 6. Prompt injection
@@ -165,7 +167,8 @@ Controls:
 - Master key: `QC_MASTER_KEY` (32 bytes, base64) from environment/secret manager. Every ciphertext records its `key_version`, and `SecretBox` can hold several versions, but settings load only the current key and **no re-encrypt job exists yet**: rotating the key today makes stored secrets undecryptable (users re-enter them). Rotation needs a previous-key setting plus a re-encrypt CLI first ([PRODUCTION_READINESS_AUDIT](../reports/PRODUCTION_READINESS_AUDIT_2026-10-23.md) M1).
 - Encryption: AES-256-GCM via `cryptography`, random 96-bit nonce per secret, associated data = `f"{table}:{row_id}:{user_id}"` (prevents ciphertext swapping between rows).
 - Decryption only inside `connectors`/`llm` modules, returning `SecretStr`; plaintext lifetime limited to the call.
-- structlog processor redacts keys matching `password|secret|token|api_key|authorization|dsn` and any value matching known key prefixes.
+- structlog processor redacts keys matching `password|secret|token|api_key|authorization|dsn` and any value matching known key prefixes (Google `AIza…`, OpenRouter `sk-or-v1-…`, generic `sk-…`, Groq `gsk_…`, Bearer tokens, URL passwords).
+- `QC_MASTER_KEY_VERSION` labels new ciphertexts and selects the key for decryption by each row's stored version. Changing the version without a matching key set makes every existing row undecryptable; never change it on its own.
 - API never returns secrets; only `key_hint` (last 4 chars).
 - LLM provider calls send only the user's own key for their own run.
 
@@ -194,8 +197,8 @@ A user-provisioned sandbox connection gets Mode C privileges **only** if flagged
 - AuthZ: ownership checks in repositories; no admin endpoints in MVP.
 - CSRF: double-submit token header `X-CSRF-Token` for non-GET.
 - CORS: explicit origin allowlist; credentials allowed only for the web origin.
-- Security headers on web app: CSP (no inline scripts except Next nonce), `X-Content-Type-Options`, `Referrer-Policy`, `frame-ancestors 'none'`.
-- Dependency hygiene: `uv lock`/`pnpm-lock.yaml` committed; `pip-audit` and `pnpm audit` in CI; Dependabot.
+- Security headers on web app (production builds, `next.config.ts`): CSP with `connect-src`/`form-action` limited to the API origin, `frame-ancestors 'none'`, `object-src 'none'`; **`script-src` still allows `'unsafe-inline'`** (Next's inline bootstrap; nonce-based CSP is not wired, a known gap); HSTS (`max-age=63072000; includeSubDomains`, no `preload`; since 2026-10-23), `X-Content-Type-Options`, `Referrer-Policy`, `X-Frame-Options`, `Permissions-Policy`.
+- Dependency hygiene: `uv lock`/`pnpm-lock.yaml` committed; `pip-audit` and `pnpm audit --prod` in `audit.yml` (weekly and on lockfile changes). Dependabot is not configured.
 - Rate limits (Phase 5): per session and per IP hash, Postgres token bucket.
 
 ## 10. Integrity of saved evidence

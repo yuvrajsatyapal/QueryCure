@@ -80,7 +80,7 @@ uv run pytest tests/security -q
 uv run python -m querycure.evals run --suite smoke --model nvidia/nemotron-3-super-120b-a12b:free \
   --admin-url postgresql://qc_owner:qc_local_dev_only@127.0.0.1:5432/postgres   # recorded fixtures, no LLM cost; local scratch DBs only
 # frontend
-cd frontend && pnpm lint && pnpm typecheck && pnpm test && pnpm build
+cd frontend && pnpm lint && pnpm typecheck && pnpm test && NEXT_PUBLIC_API_BASE_URL=http://localhost:8000 pnpm build   # production builds require the API origin
 docker compose -f ../infra/docker/compose.yaml stop worker   # e2e starts its own host worker (ADR-0020)
 pnpm exec playwright test                  # e2e; afterwards: docker compose ... up -d worker
 ```

@@ -83,6 +83,9 @@ def make_engine(
     engine = create_async_engine(
         async_url(url),
         pool_pre_ping=True,
+        # Statement errors otherwise embed every bound value in str(exc), which reaches logs
+        # through tracebacks (user SQL, ciphertext, token hashes). The SQL text stays.
+        hide_parameters=True,
         pool_size=pool_size,
         max_overflow=max_overflow,
         pool_timeout=pool_timeout,

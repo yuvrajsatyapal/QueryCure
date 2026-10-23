@@ -9,6 +9,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from querycure.api.deps import CSRF_COOKIE
+from querycure.api.process_metrics import ProcessMetrics
 from querycure.core.errors import CsrfFailedError, PayloadTooLargeError, QueryCureError
 from querycure.core.ids import new_request_id
 from querycure.core.logging import get_logger
@@ -72,10 +73,13 @@ class MaxBodySizeMiddleware:
 
 
 class RequestIdMiddleware:
-    """Plain ASGI (not BaseHTTPMiddleware) so exceptions are never wrapped in task groups."""
+    """Plain ASGI (not BaseHTTPMiddleware) so exceptions are never wrapped in task groups. Also
+    counts responses by status class. It runs inside CORS and the body limit, so their own
+    refusals are not counted; CSRF refusals are."""
 
-    def __init__(self, app: ASGIApp) -> None:
+    def __init__(self, app: ASGIApp, *, metrics: ProcessMetrics) -> None:
         self.app = app
+        self.metrics = metrics
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         if scope["type"] != "http":
@@ -86,6 +90,7 @@ class RequestIdMiddleware:
 
         async def send_with_id(message: Message) -> None:
             if message["type"] == "http.response.start":
+                self.metrics.response(message["status"])
                 headers = [*message.get("headers", []), (b"x-request-id", request_id.encode())]
                 message = {**message, "headers": headers}
             await send(message)
@@ -206,6 +211,7 @@ def install_error_handlers(app: FastAPI) -> None:
                 "The database is unavailable; try again shortly.",
             )
         log.error("unhandled_error", exc_info=exc, path=request.url.path)
+        request.app.state.process_metrics.unhandled_error()
         return _plain_error(request, 500, "INTERNAL_ERROR", "Internal error.")
 
 

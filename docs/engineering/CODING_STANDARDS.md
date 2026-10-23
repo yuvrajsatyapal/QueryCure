@@ -53,7 +53,7 @@ Applies from Phase 1. Tooling decisions: [ADR-0014](adr/ADR-0014-python-tooling.
 - Components: function components, props typed explicitly, no default exports except Next.js route files. Co-locate component tests.
 - Styling: Tailwind with token classes only; `cn()` helper for conditional classes; no inline style except computed graph geometry.
 - Accessibility: interactive elements are buttons/links (no clickable divs); labels for inputs; keyboard paths tested in Playwright.
-- `pnpm lint && pnpm typecheck && pnpm build` before every commit touching `frontend/`.
+- `pnpm lint && pnpm typecheck && NEXT_PUBLIC_API_BASE_URL=http://localhost:8000 pnpm build` before every commit touching `frontend/`. A production build fails without a valid API origin (`lib/api/origin.ts`): https, or http on loopback only.
 
 ## 3. Validation
 

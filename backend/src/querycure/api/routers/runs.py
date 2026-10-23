@@ -3,7 +3,7 @@ import binascii
 import uuid
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Header, Path, Query, status
+from fastapi import APIRouter, Header, Path, Query, Request, status
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncConnection
 
@@ -70,6 +70,7 @@ def _decode_cursor(cursor: str) -> int:
     responses={200: {"content": {"text/event-stream": {}}}},
 )
 async def stream_run_events(
+    request: Request,
     run_id: uuid.UUID,
     user: StreamUser,
     engine: EngineDep,
@@ -94,6 +95,7 @@ async def stream_run_events(
             run_id,
             after_seq=start,
             heartbeat_seconds=settings.sse_heartbeat_seconds,
+            metrics=request.app.state.process_metrics,
         ),
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},

@@ -21,6 +21,7 @@ _VALUE_PATTERNS = (
     re.compile(r"AIza[0-9A-Za-z_\-]{35}"),  # Google API keys (Gemini)
     re.compile(r"sk-or-v1-[0-9a-f]{64}"),  # OpenRouter keys
     re.compile(r"\bsk-[A-Za-z0-9_\-]{20,}"),  # generic sk- style keys
+    re.compile(r"\bgsk_[A-Za-z0-9]{20,}"),  # Groq keys
     re.compile(r"(?<=Bearer )[A-Za-z0-9._~+/=\-]+"),
 )
 

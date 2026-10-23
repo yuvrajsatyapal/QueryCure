@@ -25,6 +25,7 @@ dependencies = [
     "uvicorn[standard]>=0.54.0",
     # Direct use for the GitHub OAuth exchange; already locked as a dependency of openai.
     "httpx>=0.28.1",
+    "anyio>=4.15.1",
 ]
 
 [build-system]

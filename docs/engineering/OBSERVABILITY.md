@@ -15,10 +15,13 @@ Status: structured logging (Phase 1), events (Phase 2), and **Phase 5 operations
     - `qc_llm_free_requests_today` and `qc_llm_daily_request_limit` (the server allowance, same rule as `DailyQuota`);
     - `qc_db_connections` and `qc_db_max_connections`;
     - `qc_experiments{status,error_code}` (last 7 days).
+  - since 2026-10-23, **per API process** (`api/process_metrics.py`; reset on restart, so read them with `qc_process_uptime_seconds`): `qc_http_responses_total{status_class}`, `qc_http_unhandled_errors_total`, `qc_sse_streams_active`, `qc_sse_streams_closed_total{outcome="ended|client_gone|error"}`. Labels are fixed sets (never paths or IDs). The demo runs one API process, so per-process is the whole picture; with several, sum across them.
   It is open in the local profile, and needs `Authorization: Bearer $METRICS_TOKEN` elsewhere (404 otherwise; an empty token counts as unset). In-process counters such as LLM latency histograms are not exported yet; `agent_executions` holds the per-call data.
 - **Worker presence (2026-10-18):** every worker process (standalone or embedded) upserts one `worker_heartbeats` row every `WORKER_HEARTBEAT_SECONDS`. The row holds its `source_digest` (SHA-256 of its installed Python sources, which proves which code it runs) and its bench path. A clean shutdown sets `stopped_at`. The digest is also logged at startup (`worker_identity`). Compare it with `python -c "from querycure.worker.heartbeat import source_digest; print(source_digest())"` in the checkout you meant to deploy.
 - **Stuck work:** every 5 minutes the worker logs `stuck_work_detected {expired_leases, orphaned_runs}` and drops orphaned sandbox clones.
-- **Readiness:** `/readyz` checks the metadata DB and that migrations are at head. Settings fail fast at startup. In the demo profile that includes: a master key is required, no server model key, no private targets, and HTTPS URLs when GitHub sign-in is enabled.
+- **Readiness:** `/readyz` checks the metadata DB and that migrations are at head. It does **not** check the embedded worker: if that task dies, the API stays ready, its heartbeat stops and `qc_workers_alive` drops to 0 within three heartbeat intervals (alert on that, §8). Settings fail fast at startup. In the demo profile that includes: a master key is required, no server model key, no private targets, HTTPS URLs when OAuth sign-in is enabled, and (2026-10-23) CORS origins that are bare https origins (http only on loopback, never `*`), https public URLs, a bare `COOKIE_DOMAIN`, a `METRICS_TOKEN` of at least 32 characters, and the web origin listed in `CORS_ORIGINS`. The API itself also refuses to start without `DATABASE_URL` or `CORS_ORIGINS` (`serving_problems`); the worker and ops commands do not need them.
+- **SSE failures (2026-10-23):** a server-side error after a stream has started is logged as `sse_stream_failed {run_id, last_seq}` and counted (`outcome="error"`); the stream then ends so the browser resumes with `Last-Event-ID`. Each database round trip of a stream is shielded from client disconnects (F1 root cause, [report](../reports/PRODUCTION_HARDENING_2026-10-23.md)).
+- **No parameter values in error text (2026-10-23):** metadata engines use `hide_parameters=True`, so logged tracebacks of statement errors keep the SQL but not the bound values. PostgreSQL's own message can still quote an input value (e.g. "invalid input syntax for type integer: …"). Groq keys (`gsk_…`) are now masked inside log values too.
 - **Timeouts and pools:** metadata connections carry server-side `statement_timeout` and `idle_in_transaction_session_timeout` as startup options; pool size, overflow and timeout are configurable.
 
 ## 1. Three audiences, three channels
@@ -106,6 +109,24 @@ The UI timeline is derived from events, not from OTel. For deeper debugging, a d
 | Connection exhaustion | `qc_db_connections` vs `qc_db_max_connections`; pool timeouts in API logs (503 `SERVICE_UNAVAILABLE`) |
 | Replay failing | `qc_replay_attempts{status="failed",failure_code}` |
 
-## 8. Alerting (demo, minimal)
+## 8. Alerting (restricted trial, low cost)
 
-Uptime check on `/readyz`; log-based alert on `level=error` rate spike; daily check of `qc_jobs_lease_expired`, `qc_workers_alive` (alert at 0 while jobs are pending) and `qc_llm_free_requests_today` against the limit. No paging — this is a portfolio deployment.
+No paging: this is a restricted trial. Three free mechanisms cover the failure modes that matter, with nothing to host:
+
+1. **Uptime monitor** (any free HTTP monitor, 1–5 min interval): `GET https://api.<domain>/api/v1/readyz` must return 200 (database reachable, migrations current), and `https://app.<domain>/` must return 200.
+2. **Metrics scrape with alert rules** (a hosted Prometheus-compatible free tier that can scrape a URL with a bearer token, or a scheduled job that fetches `/internal/metrics` with `METRICS_TOKEN` and compares values). Never put the token in a URL.
+
+   | Rule | Condition | Severity | Meaning |
+   |---|---|---|---|
+   | Worker down | `qc_workers_alive == 0` for 2 min | critical | Nothing claims jobs (also covers a crashed embedded worker, which `/readyz` does not see) |
+   | Queue backlog | `qc_jobs_oldest_pending_seconds > 300` | warning | Workers alive but saturated or stuck |
+   | Stuck jobs | `qc_jobs_lease_expired > 0` for 10 min | warning | A worker died mid-job; the lease reaper should clear it |
+   | Dead jobs | `qc_jobs{status="dead"}` increased | warning | A job exhausted its retries |
+   | Unsealed runs | `qc_runs_terminal_unsealed > 0` for 10 min | critical | Finalization failed; a report is missing |
+   | API errors | `increase(qc_http_responses_total{status_class="5xx"}[10m]) > 5` or `increase(qc_http_unhandled_errors_total[10m]) > 0` | warning | Bugs or an outage (503s are counted as 5xx too) |
+   | SSE failures | `increase(qc_sse_streams_closed_total{outcome="error"}[10m]) > 0` | warning | Server-side stream failures (clients reconnect, but it is a bug) |
+   | Connections | `qc_db_connections / qc_db_max_connections > 0.8` | warning | Pool or connection leak; Neon free has a low limit |
+   | Free quota | `qc_llm_free_requests_today >= qc_llm_daily_request_limit` | info | Expected under BYOK only when the server key is used (local) |
+
+   The per-process counters reset on restart; `increase()` handles that, and a stateless checker should compare against `qc_process_uptime_seconds`.
+3. **Log alerts** in the host's log drain: any `unhandled_error`, `sse_stream_failed`, `worker_teardown_timeout` or `stuck_work_detected` with non-zero counts. Logs are JSON on stdout and redacted before they are written (SECURITY §7).

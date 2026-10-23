@@ -1,6 +1,14 @@
 import { expect, test } from "vitest";
 import type { RunEvent } from "@/lib/api/types";
-import { isTerminal, mergeEvents, parseEvent, runRefetchInterval } from "../runEvents";
+import {
+  MAX_RECONNECTS,
+  isTerminal,
+  mergeEvents,
+  parseEvent,
+  reconnectDelayMs,
+  runEventsUrl,
+  runRefetchInterval,
+} from "../runEvents";
 
 const ev = (seq: number, type = "node.started", payload: Record<string, unknown> = {}): RunEvent =>
   ({ runId: "r", seq, ts: "2026-10-12T00:00:00.000Z", type, payload }) as RunEvent;
@@ -40,4 +48,22 @@ test("an active run's usage is polled; a finished or unknown run is not", () => 
   for (const status of ["completed", "failed", "cancelled", undefined]) {
     expect(runRefetchInterval(status)).toBe(false);
   }
+});
+
+test("a manual reconnect resumes after the last delivered seq", () => {
+  expect(runEventsUrl("https://api.example", "r1", null)).toBe("https://api.example/api/v1/runs/r1/events");
+  expect(runEventsUrl("https://api.example", "r1", 0)).toBe(
+    "https://api.example/api/v1/runs/r1/events?after_seq=0",
+  );
+  expect(runEventsUrl("https://api.example", "r 1", 41)).toBe(
+    "https://api.example/api/v1/runs/r%201/events?after_seq=41",
+  );
+});
+
+test("reconnect delays back off exponentially, are capped, and stop after the limit", () => {
+  expect(reconnectDelayMs(0)).toBe(1000);
+  expect(reconnectDelayMs(1)).toBe(2000);
+  expect(reconnectDelayMs(3)).toBe(8000);
+  expect(reconnectDelayMs(MAX_RECONNECTS - 1)).toBeLessThanOrEqual(30_000);
+  expect(reconnectDelayMs(MAX_RECONNECTS)).toBeNull();
 });

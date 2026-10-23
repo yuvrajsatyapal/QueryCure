@@ -28,6 +28,8 @@ from querycure.worker.runner import Worker, WorkerTimings
 
 pytestmark = pytest.mark.integration
 
+METRICS_TOKEN = "metrics-token-for-tests-0123456789"  # noqa: S105 - test value
+
 
 @pytest.fixture(autouse=True)
 def _empty_queue(owner: psycopg.Connection) -> None:
@@ -57,14 +59,15 @@ async def test_metrics_are_open_locally_and_token_gated_elsewhere(
     engine = make_engine(migrated_db, set_role="qc_app")
     demo = Settings(
         _env_file=None, profile=Profile.DEMO, allow_private_targets=False,
-        master_key=base64.b64encode(os.urandom(32)).decode(), metrics_token=SecretStr("m-token"),
+        master_key=base64.b64encode(os.urandom(32)).decode(),
+        metrics_token=SecretStr(METRICS_TOKEN),
     )  # fmt: skip
     try:
         for settings, headers, expected in (
             (Settings(_env_file=None), {}, 200),
             (demo, {}, 404),
             (demo, {"Authorization": "Bearer wrong"}, 404),
-            (demo, {"Authorization": "Bearer m-token"}, 200),
+            (demo, {"Authorization": f"Bearer {METRICS_TOKEN}"}, 200),
         ):
             app = create_app(settings, engine=engine)
             transport = httpx.ASGITransport(app=app)

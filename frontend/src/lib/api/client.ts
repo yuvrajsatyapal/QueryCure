@@ -1,6 +1,11 @@
 import { toCamel, toSnake } from "./case";
+import { resolveApiOrigin } from "./origin";
 
-export const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
+// next.config.ts fails a production build without a valid value, so the localhost default
+// only ever applies in development and tests.
+export const API_BASE_URL = resolveApiOrigin(process.env.NEXT_PUBLIC_API_BASE_URL, {
+  production: process.env.NODE_ENV === "production",
+});
 const API_PREFIX = "/api/v1";
 
 export interface ApiErrorDetail {

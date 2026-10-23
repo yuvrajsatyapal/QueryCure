@@ -15,6 +15,7 @@ from querycure.api.middleware import (
     SecurityHeadersMiddleware,
     install_error_handlers,
 )
+from querycure.api.process_metrics import ProcessMetrics
 from querycure.api.routers import (
     artifacts,
     auth,
@@ -33,7 +34,7 @@ from querycure.api.routers import (
 from querycure.api.routers import (
     settings as settings_router,
 )
-from querycure.core.config import Profile, Settings, WorkerMode
+from querycure.core.config import Profile, Settings, WorkerMode, serving_problems
 from querycure.core.logging import configure_logging
 from querycure.db.engine import make_engine
 
@@ -43,6 +44,9 @@ API_PREFIX = "/api/v1"
 def create_app(settings: Settings | None = None, engine: AsyncEngine | None = None) -> FastAPI:
     settings = settings or Settings()
     configure_logging(level=settings.log_level)
+    # Tests inject an engine; a real deployment never does, so it must be fully configured.
+    if engine is None and (problems := serving_problems(settings)):
+        raise RuntimeError("refusing to start: " + "; ".join(problems))
     owns_engine = engine is None and settings.database_url is not None
 
     @asynccontextmanager
@@ -88,13 +92,14 @@ def create_app(settings: Settings | None = None, engine: AsyncEngine | None = No
         lifespan=lifespan,
     )
     app.state.settings = settings
+    app.state.process_metrics = ProcessMetrics()
     app.state.engine = engine
     app.state.event_hub = None
     install_error_handlers(app)
     # Starlette runs the last-added middleware first:
     # security headers → body limit → CORS → request id → CSRF.
     app.add_middleware(CsrfMiddleware)
-    app.add_middleware(RequestIdMiddleware)
+    app.add_middleware(RequestIdMiddleware, metrics=app.state.process_metrics)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origins,

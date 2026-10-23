@@ -70,6 +70,7 @@ def test_nested_sensitive_keys_are_redacted() -> None:
         (f"calling gemini with {GOOGLE_KEY}", GOOGLE_KEY),
         (f"key={OPENROUTER_KEY}", OPENROUTER_KEY),
         ("Authorization: Bearer abc.def.ghi", "abc.def.ghi"),
+        ("groq said 401 for gsk_" + "a1B2" * 12, "gsk_" + "a1B2" * 12),
     ],
 )
 def test_secret_patterns_inside_values_are_masked(value: str, leak: str) -> None:

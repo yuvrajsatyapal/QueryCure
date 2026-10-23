@@ -150,6 +150,14 @@
     - browser check on local data at 1366 px, 1280 px light and 375 px.
   - **Not done:** correctness panel (fingerprints) of UI_UX §3.8; early stops from semi/anti joins and `EXISTS` are not detected; host contention has no recorded signal to show.
 
+- [x] **Production hardening for a restricted hosted trial (2026-10-23, [report](../reports/PRODUCTION_HARDENING_2026-10-23.md), [DEPLOYMENT §3a](../architecture/DEPLOYMENT.md#3a-restricted-hosted-trial-recommended-architecture-2026-10-23-not-deployed)).** Code-only, nothing deployed; no migration, contract, benchmarking, claims or replay change.
+  - **F1 root cause found and fixed:** a client disconnect during the pool pre-ping left the ping's `SELECT 1` ACTIVE (anyio cancellation also cancels psycopg's query cancel), and SQLAlchemy's `do_ping` `finally` raised `can't change 'autocommit' now`, replacing the cancellation. Reproduced by a test that fails before the fix; fixed by shielding each SSE database round trip. SSE failures after the response started are logged (`sse_stream_failed`), counted, and end the stream. The web client reconnects itself after HTTP errors (bounded backoff, `after_seq`).
+  - **Config:** `next build` fails without a valid `NEXT_PUBLIC_API_BASE_URL` (https, or loopback http) and the web app sends HSTS. Hosted settings refuse `*`/http CORS origins, http public URLs, a malformed cookie domain and short metrics tokens; the API refuses to start without `DATABASE_URL`/`CORS_ORIGINS`.
+  - **Observability:** per-process `qc_http_responses_total`, `qc_http_unhandled_errors_total`, `qc_sse_streams_*`, `qc_process_uptime_seconds`; alert rules in OBSERVABILITY §8. Logs: `hide_parameters=True`, Groq keys masked.
+  - **Verified:** ruff, mypy, 1005 unit, 626 integration + security, smoke evals 5/5 (0 real requests), frontend lint/typecheck/239 tests/build, e2e 18/18 ×3 with 0 server errors, audits (runtime 0), demo stack `demo_probe` 17/17.
+  - **Disclosure:** one `alembic current` read `alembic_version` on Neon as the owner role, because `backend/.env` defines `DATABASE_MIGRATION_URL` twice. Read-only.
+  - **Open (ranked in the report):** host and domain; real OAuth; access is not restricted (anonymous sessions; an allowlist needs approval); Neon compute allowance with an always-on worker; alerting not wired; `TRUSTED_PROXY_HOPS` for the host; hosted restore check; master-key rotation; CSP `unsafe-inline`.
+
 ## Completed
 
 - [x] Repository inspected (was empty).

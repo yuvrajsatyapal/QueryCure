@@ -134,6 +134,9 @@ jobs:
       - name: Unit tests
         run: pnpm test
       - name: Build
+        # A production build refuses to start without the API origin (lib/api/origin.ts).
+        env:
+          NEXT_PUBLIC_API_BASE_URL: https://api.example.invalid
         run: pnpm build
       - name: Build the demo-profile images
         run: |

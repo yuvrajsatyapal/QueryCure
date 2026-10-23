@@ -60,3 +60,20 @@ const RUN_POLL_MS = 5000;
 export function runRefetchInterval(status: string | undefined): number | false {
   return status !== undefined && POLLED.has(status) ? RUN_POLL_MS : false;
 }
+
+/** The browser resumes a dropped stream on its own (with Last-Event-ID), but an HTTP error on
+ * a reconnect (a 5xx, or 503 during a database outage) closes the EventSource for good. The
+ * hook then reconnects itself, resuming with `after_seq` because a new EventSource sends no
+ * Last-Event-ID. */
+export const MAX_RECONNECTS = 6;
+
+export function runEventsUrl(base: string, runId: string, afterSeq: number | null): string {
+  const url = `${base}/api/v1/runs/${encodeURIComponent(runId)}/events`;
+  return afterSeq === null ? url : `${url}?after_seq=${afterSeq}`;
+}
+
+/** 1, 2, 4, 8, 16, 30 s, then null: give up and show the stream as not live. */
+export function reconnectDelayMs(attempt: number): number | null {
+  if (attempt >= MAX_RECONNECTS) return null;
+  return Math.min(1000 * 2 ** attempt, 30_000);
+}
