@@ -21,6 +21,9 @@ import { ApiError } from "@/lib/api/client";
 import { getApprovals, getCandidates, getExperiments, optimizationKeys } from "@/lib/api/optimization";
 import type { EvidenceDetail } from "@/lib/api/types";
 import { ReportPanel } from "@/components/report/ReportPanel";
+import { ResultSummary } from "@/components/report/ResultSummary";
+import { SUPPORTED_REPORT_SCHEMAS, getReport, reportKeys } from "@/lib/api/reports";
+import type { ReportV1 } from "@/lib/report/types";
 import { ApprovalCard } from "@/components/tournament/ApprovalCard";
 import { TournamentPanel } from "@/components/tournament/TournamentPanel";
 import { buildTrace } from "@/lib/events/trace";
@@ -104,6 +107,14 @@ export function InvestigationView({ id, requestedRunId }: { id: string; requeste
 
   const r = run.data;
   const active = r ? ACTIVE.has(r.status) : true;
+  // Same query as the Report tab, so the sealed report is fetched once (FINAL_UI_POLISH §2.1).
+  const sealed = useQuery({
+    queryKey: reportKeys.report(runId ?? ""),
+    queryFn: ({ signal }) => getReport(runId ?? "", signal),
+    enabled: runId !== null && r !== undefined && !active,
+    retry: false,
+  });
+  const sealedReport = sealed.data && SUPPORTED_REPORT_SCHEMAS.includes(sealed.data.reportSchemaVersion) ? (sealed.data.report as unknown as ReportV1) : null;
   const trace = useMemo(() => buildTrace(events, { active }), [events, active]);
   const claimIndex = useMemo(() => indexClaimSpans(trace), [trace]);
   const selectedSpan = step === RUN_ROW ? undefined : findSpan(trace, step);
@@ -301,6 +312,24 @@ export function InvestigationView({ id, requestedRunId }: { id: string; requeste
           </p>
         ) : null}
       </div>
+
+      {sealedReport && !active ? (
+        <ResultSummary
+          report={sealedReport}
+          onReport={() => {
+            setStep(RUN_ROW);
+            setTab("report");
+          }}
+          onBenchmark={
+            sandbox
+              ? () => {
+                  setStep(RUN_ROW);
+                  setTab("tournament");
+                }
+              : undefined
+          }
+        />
+      ) : null}
 
       {pending && runId && r?.status === "awaiting_approval" ? <ApprovalCard key={pending.id} approval={pending} runId={runId} /> : null}
 

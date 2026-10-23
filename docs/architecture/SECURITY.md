@@ -162,7 +162,7 @@ Controls:
 
 ## 7. Credential & key management
 
-- Master key: `QC_MASTER_KEY` (32 bytes, base64) from environment/secret manager; `key_version` supports rotation (re-encrypt job).
+- Master key: `QC_MASTER_KEY` (32 bytes, base64) from environment/secret manager. Every ciphertext records its `key_version`, and `SecretBox` can hold several versions, but settings load only the current key and **no re-encrypt job exists yet**: rotating the key today makes stored secrets undecryptable (users re-enter them). Rotation needs a previous-key setting plus a re-encrypt CLI first ([PRODUCTION_READINESS_AUDIT](../reports/PRODUCTION_READINESS_AUDIT_2026-10-23.md) M1).
 - Encryption: AES-256-GCM via `cryptography`, random 96-bit nonce per secret, associated data = `f"{table}:{row_id}:{user_id}"` (prevents ciphertext swapping between rows).
 - Decryption only inside `connectors`/`llm` modules, returning `SecretStr`; plaintext lifetime limited to the call.
 - structlog processor redacts keys matching `password|secret|token|api_key|authorization|dsn` and any value matching known key prefixes.

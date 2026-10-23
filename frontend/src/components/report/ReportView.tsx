@@ -4,6 +4,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { Icon, type IconName } from "@/components/ui/Icon";
 import type { LineageSource } from "@/components/lineage/LineageDrawer";
 import { VerdictBadge } from "@/components/tournament/VerdictBadge";
+import { describeCandidate } from "@/lib/benchmark/candidate";
 import { OUTCOME_LABEL, REASON_TEXT, VERDICT_EXPLANATION, ms, x } from "@/lib/report/labels";
 import { reportSections, sectionId, type ReportSection } from "@/lib/report/sections";
 import type { CandidateAudit, Measurement, ReportRound, ReportV1 } from "@/lib/report/types";
@@ -55,7 +56,7 @@ const CALLOUT: Record<"info" | "warning" | "neutral", { icon: IconName; box: str
   neutral: { icon: "bot", box: "border-border-strong bg-surface", iconClass: "text-muted" },
 };
 
-function Callout({ tone, children }: { tone: keyof typeof CALLOUT; children: ReactNode }) {
+export function Callout({ tone, children }: { tone: keyof typeof CALLOUT; children: ReactNode }) {
   const c = CALLOUT[tone];
   return (
     <p role="note" className={`flex items-start gap-2 rounded-md border px-3 py-2 text-sm ${c.box}`}>
@@ -238,8 +239,8 @@ function Round({ rnd, onWhy }: { rnd: ReportRound; onWhy?: Why }) {
       {rnd.candidates.map((c) => (
         <div key={c.key} className="flex flex-col gap-1">
           <p className="flex flex-wrap items-center gap-2 text-sm">
+            <span className="font-medium">{describeCandidate(c)}</span>
             <span className="font-mono text-xs">{c.key}</span>
-            <span className="text-muted">{c.kind.replaceAll("_", " ")}</span>
             <VerdictBadge status={c.status} />
             {c.reasons.map((r) => (
               <span key={r.code} className="text-xs text-muted" title={r.detail}>

@@ -10,7 +10,10 @@ import type { CandidateAudit } from "@/lib/report/types";
 import type { ExperimentDetail, ExperimentSummary, OptimizationCandidate, SpeedupStats, Verification } from "@/lib/api/types";
 import { BADGE_STATUS, classifyRecommendation, speedupRow, type ExperimentResult } from "@/lib/benchmark/analysis";
 import { formatNs as ms, formatSpeedup as x } from "@/lib/format";
+import { describeCandidate } from "@/lib/benchmark/candidate";
 import { BenchmarkAnalytics } from "./BenchmarkAnalytics";
+import { CorrectnessPanel } from "./CorrectnessPanel";
+import { StatsGlossary } from "./StatsGlossary";
 import { VerdictBadge } from "./VerdictBadge";
 
 const bytes = (b: number) => (b >= 1024 * 1024 ? `${(b / 1024 / 1024).toFixed(1)} MB` : `${(b / 1024).toFixed(0)} kB`);
@@ -209,6 +212,7 @@ export function ExperimentView({
   const builds = new Map(result.builds.map((b) => [b.arm, b]));
   const primary = (detail.config as { paramSets?: { name: string }[] } | null)?.paramSets?.[0]?.name;
   const active = selected ?? result.tournament[0]?.arm ?? null;
+  const activeCandidate = active ? byKey.get(active) : undefined;
   const env = detail.environment as Record<string, unknown> | null;
   const replication = detail.replication ?? null;
   const replicated = new Map((replication?.verdicts ?? []).map((v) => [v.arm, v]));
@@ -243,6 +247,7 @@ export function ExperimentView({
                 >
                   <td className="py-1 pr-2 font-mono">{t.rank}</td>
                   <td className="py-1 pr-2">
+                    {c ? <span className="block font-medium">{describeCandidate(c)}</span> : null}
                     <span className="font-mono text-xs">{t.arm}</span>{" "}
                     <span className="break-words font-mono text-xs text-muted">{c ? (c.ddl.join("; ") || c.querySql) : ""}</span>
                     {winner === t.arm ? <span className="ml-1 text-xs font-medium text-verified">Winner</span> : null}
@@ -273,17 +278,20 @@ export function ExperimentView({
         </table>
       </div>
       {replication ? <ReplicationNote replication={replication} /> : null}
+      <StatsGlossary />
       <BenchmarkAnalytics detail={detail} candidates={candidates} audits={audits} />
       {active ? (
         <div className="flex flex-col gap-2">
           <h3 className="text-sm font-semibold">
-            Benchmark comparison · <span className="font-mono">{active}</span>
+            Benchmark comparison · {activeCandidate ? `${describeCandidate(activeCandidate)} · ` : ""}
+            <span className="font-mono">{active}</span>
             {primary ? <span className="font-normal text-muted"> · primary param set {primary}</span> : null}
           </h3>
           {verdicts.get(active)?.reasons[0]?.detail ? (
             <p className="text-xs text-muted">{verdicts.get(active)?.reasons[0]?.detail}</p>
           ) : null}
           <Comparison stats={result.stats.filter((s) => s.arm === active)} result={result} />
+          <CorrectnessPanel result={result} arm={active} />
           {runId ? <PlanCompare runId={runId} detail={detail} arm={active} /> : null}
         </div>
       ) : null}

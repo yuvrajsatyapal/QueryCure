@@ -17,6 +17,7 @@ import {
   type ExperimentResult,
   type RecommendationKind,
 } from "@/lib/benchmark/analysis";
+import { describeCandidate } from "@/lib/benchmark/candidate";
 import { formatNs, formatSpeedup } from "@/lib/format";
 import { VerdictBadge } from "./VerdictBadge";
 
@@ -106,6 +107,7 @@ function VerdictSummary({
         {rows.map(({ candidate: c, rec }) => (
           <li key={c.key} className="flex flex-wrap items-baseline gap-2 text-sm">
             <VerdictBadge status={BADGE_STATUS[rec.kind]} />
+            <span className="font-medium">{describeCandidate(c)}</span>
             <span className="font-mono text-xs">{c.key}</span>
             <span className="min-w-0 break-words font-mono text-xs text-muted">{c.ddl.join("; ") || c.querySql}</span>
             {rec.detail ? <span className="w-full text-xs text-muted sm:w-auto">{rec.detail}</span> : null}

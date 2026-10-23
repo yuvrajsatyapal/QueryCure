@@ -8,13 +8,7 @@ import { StatusPill } from "@/components/ui/StatusPill";
 import { investigationKeys } from "@/lib/api/investigations";
 import { decideApproval, optimizationKeys } from "@/lib/api/optimization";
 import type { Approval, DecisionInput } from "@/lib/api/types";
-
-const KIND: Record<string, string> = {
-  create_index: "Index",
-  analyze_statistics: "Statistics refresh",
-  extended_statistics: "Extended statistics",
-  query_rewrite: "Query rewrite",
-};
+import { describeCandidate } from "@/lib/benchmark/candidate";
 
 /** The human-in-the-loop step (AGENT_SYSTEM §8): shows exactly the SQL that will run in the
  * sandbox. Nothing runs until one of these buttons records a decision. */
@@ -69,7 +63,7 @@ export function ApprovalCard({ approval, runId }: { approval: Approval; runId: s
               />
               <span className="flex min-w-0 flex-col gap-1">
                 <span>
-                  <span className="font-medium">{KIND[c.kind] ?? c.kind}</span>{" "}
+                  <span className="font-medium">{describeCandidate({ kind: c.kind, ddl: c.ddl, querySql: c.querySql })}</span>{" "}
                   <span className="font-mono text-xs text-muted">{c.key}</span>
                 </span>
                 <code className="block whitespace-pre-wrap break-words rounded border border-border bg-surface px-2 py-1.5 font-mono text-xs">

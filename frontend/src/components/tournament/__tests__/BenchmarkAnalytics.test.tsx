@@ -104,3 +104,22 @@ test("an experiment without measurements says the data is unavailable", () => {
 
   expect(screen.getByText("No recorded samples for this experiment.")).toBeDefined();
 });
+
+test("correctness panel reads the recorded fingerprints and never claims equivalence", async () => {
+  const { CorrectnessPanel } = await import("../CorrectnessPanel");
+  render(<CorrectnessPanel result={recorded as unknown as NonNullable<ExperimentDetail["result"]>} arm={ARM} />);
+  const panel = screen.getByRole("region", { name: `Result correctness · ${ARM}` });
+  expect(within(panel).getByText("Same rows as the baseline on every param set")).toBeTruthy();
+  expect(within(panel).getByText(/compared as a multiset/)).toBeTruthy();
+  expect(within(panel).getAllByText("20 / 20")).toHaveLength(1);
+  expect(within(panel).getByLabelText(/^baseline row hash 9183cfaa8528/)).toBeTruthy();
+  expect(within(panel).getByText(/not a proof that the two queries are equivalent/)).toBeTruthy();
+});
+
+test("stats glossary explains the terms and that faster is not verified", async () => {
+  const { StatsGlossary } = await import("../StatsGlossary");
+  render(<StatsGlossary />);
+  await userEvent.click(screen.getByText("How to read these numbers"));
+  for (const term of ["Speedup", "IQR", "Robust CV", "Transport floor"]) expect(screen.getByText(term)).toBeTruthy();
+  expect(screen.getByText(/Faster is not the same as verified/)).toBeTruthy();
+});

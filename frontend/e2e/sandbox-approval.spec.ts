@@ -24,6 +24,8 @@ test("sandbox - approve the candidate SQL, then see the benchmarked tournament",
   await expect(card).toBeVisible({ timeout: 60_000 });
   await expect(card.getByText("CREATE INDEX ON orders (customer_id, created_at)")).toBeVisible();
   await expect(card.getByText(/Nothing has run yet/)).toBeVisible();
+  // Deterministic description derived from the DDL (FINAL_UI_POLISH §2.2), key kept beside it.
+  await expect(card.getByText("Composite index on orders (customer_id, created_at)")).toBeVisible();
   await expect(page.locator("header").getByText("Approval required", { exact: true })).toBeVisible();
 
   await card.getByRole("button", { name: "Approve and run" }).click();
@@ -32,7 +34,14 @@ test("sandbox - approve the candidate SQL, then see the benchmarked tournament",
   await expect(timeline.getByText("Approval approved")).toBeVisible({ timeout: 15_000 });
   await expect(timeline.getByText(/Run completed/).first()).toBeVisible({ timeout: 90_000 });
 
-  await page.getByRole("tab", { name: "Tournament" }).click();
+  // Final polish (FINAL_UI_POLISH §2.1): the sealed conclusion is above the trace, no tab switch.
+  const summary = page.getByRole("region", { name: "Result summary" });
+  await expect(summary).toBeVisible({ timeout: 30_000 });
+  await expect(summary.getByRole("heading", { level: 2 })).toHaveText(/Verified recommendation|Unverified recommendations|Inconclusive|No action needed/);
+  await expect(summary.getByText(/Nothing was applied to your database/)).toBeVisible();
+  await summary.getByRole("button", { name: "Full report" }).click();
+  await expect(page.getByRole("article", { name: "Final report" })).toBeVisible({ timeout: 15_000 });
+  await summary.getByRole("button", { name: "Benchmark details" }).click();
   const table = page.getByRole("table", { name: "Optimization tournament" });
   await expect(table).toBeVisible({ timeout: 15_000 });
   // Any deterministic verdict is legitimate on shared CI hardware, including the noise-warning
@@ -49,6 +58,14 @@ test("sandbox - approve the candidate SQL, then see the benchmarked tournament",
   await expect(page.getByRole("img", { name: /^Latency distribution · experiment [0-9a-f]{8} · round 1 · param set / })).toBeVisible();
   // A speedup is drawn only when the engine recorded a valid one; otherwise the row says why.
   await expect(page.getByRole("figure", { name: /Speedup with 95% CI/ }).getByText("1× no improvement")).toBeVisible();
+  await expect(table.getByText("Composite index on orders (customer_id, created_at)")).toBeVisible();
+  // Result correctness from recorded fingerprints (UI_UX §3.8), and the statistics glossary.
+  const correctness = page.getByRole("region", { name: /^Result correctness · oc_/ });
+  await expect(correctness).toBeVisible();
+  await expect(correctness.getByRole("table", { name: /Result fingerprints/ })).toBeVisible();
+  await expect(correctness.getByText(/not a proof that the two queries are equivalent/)).toBeVisible();
+  await page.getByText("How to read these numbers").click();
+  await expect(page.getByText(/Faster is not the same as verified/)).toBeVisible();
   for (const scheme of ["light", "dark"] as const) {
     await applyTheme(page, scheme);
     const result = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]).analyze();

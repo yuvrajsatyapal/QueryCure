@@ -10,6 +10,7 @@ import { PlanDiffTable, diffSummary } from "@/components/plan/PlanDiffView";
 import type { PlanDiff } from "@/lib/api/types";
 import { ReportView } from "../ReportView";
 import { ReportPanel } from "../ReportPanel";
+import { ResultSummary } from "../ResultSummary";
 
 const getReport = vi.fn();
 const verifyReport = vi.fn();
@@ -299,4 +300,41 @@ test("the investigation's Report tab has no contents list or page navigation", a
   await screen.findByRole("article", { name: "Final report" });
   expect(screen.queryByRole("navigation", { name: "Report contents" })).toBeNull();
   expect(screen.queryByRole("navigation", { name: "Report navigation" })).toBeNull();
+});
+
+test("result summary puts outcome, verdict, candidate, CI and every limitation first", async () => {
+  const onReport = vi.fn();
+  const onBenchmark = vi.fn();
+  render(<ResultSummary report={report({ limitations: ["Measured in a disposable sandbox copy.", "Warm cache only."] })} onReport={onReport} onBenchmark={onBenchmark} />);
+  const s = screen.getByRole("region", { name: "Result summary" });
+  expect(within(s).getByRole("heading", { name: "Verified recommendation" })).toBeTruthy();
+  expect(within(s).getByText("A candidate change was verified in an isolated sandbox.")).toBeTruthy();
+  expect(within(s).getByText("Composite index on orders (customer_id, created_at)")).toBeTruthy();
+  expect(within(s).getByText("oc_0000000000a1")).toBeTruthy();
+  expect(within(s).getByText(/12\.0×/)).toBeTruthy();
+  expect(within(s).getByText(/10\.5×–13\.4×/)).toBeTruthy();
+  expect(within(s).getByText("Warm cache only.")).toBeTruthy();
+  expect(within(s).getByText(/Nothing was applied to your database/)).toBeTruthy();
+  // The AI-written summary stays in the report, not in the summary.
+  expect(within(s).queryByText("The scan dominates.")).toBeNull();
+  await userEvent.click(within(s).getByRole("button", { name: "Full report" }));
+  await userEvent.click(within(s).getByRole("button", { name: "Benchmark details" }));
+  expect(onReport).toHaveBeenCalledOnce();
+  expect(onBenchmark).toHaveBeenCalledOnce();
+});
+
+test("result summary without a recommendation says so and keeps warnings", () => {
+  render(
+    <ResultSummary
+      report={report({ partial: true, stopReason: "budget_exhausted", provenance: { measurements: ["prerecorded"], stubModel: true, llm: [] } }, "unverified")}
+      onReport={() => {}}
+    />,
+  );
+  const s = screen.getByRole("region", { name: "Result summary" });
+  expect(within(s).getByRole("heading", { name: "Inconclusive" })).toBeTruthy();
+  expect(within(s).getByText(/No recommendation was verified/)).toBeTruthy();
+  expect(within(s).getByText(/Partial report/)).toBeTruthy();
+  expect(within(s).getByText(/prerecorded/i)).toBeTruthy();
+  expect(within(s).getByText(/offline stub model/)).toBeTruthy();
+  expect(within(s).queryByRole("button", { name: "Benchmark details" })).toBeNull();
 });

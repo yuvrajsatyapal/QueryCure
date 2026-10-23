@@ -109,7 +109,7 @@ Charts, verdict classes, warnings and replicate selection: §3.17.
 - **Empty:** "No candidates benchmarked" with reason (Mode C unavailable / approvals declined / not needed).
 
 ### 3.8 Benchmark comparison (drill-down from a tournament row)
-Distribution chart and stats table as implemented: §3.17. The correctness panel below is not built yet.
+Distribution chart and stats table as implemented: §3.17. Correctness panel as implemented: §3.18.
 - Latency distribution chart per arm (dot strip + box), per param set tabs.
 - Stats table: n, median, p95 (or n/a), CV, min/max, bootstrap CI.
 - Correctness panel: fingerprints, row counts, order mode (ordered/multiset), outcome.
@@ -206,6 +206,15 @@ Frontend only. Input is `GET /experiments/{id}` (`ExperimentResult` measurements
 - **Warnings** (only when recorded): transport floor share of the fastest arm (≥ 50% = transport-dominated, ADR-0029); robust CV above `max_cv`; noise screens; failed samples and sample errors; p95 unavailable (n < 20); prerecorded provenance. Host contention is **not recorded** by `bench@2`; the panel says so instead of guessing. Older results without a transport floor say "not recorded".
 - **Data table:** the stats table (n, median, p95, IQR, robust CV, min–max, failures, speedup with CI or the reason it is absent) is always shown; each distribution has a collapsed "Recorded samples" table with every sample value.
 - **Unavailable data:** an experiment without a result, or a param set without measurements, says so in place of the chart.
+
+### 3.18 Final polish: result summary, candidate descriptions, statistics glossary, correctness panel
+
+Frontend only; spec and audit in [FINAL_UI_POLISH](../reports/FINAL_UI_POLISH_2026-10-23.md). No contract change.
+
+- **Result summary** (investigation page, above the trace): shown only for a finished run with a sealed report in a supported schema (`GET /runs/{id}/report`, same query as the Report tab). Order: outcome and deterministic headline → recommendation verdict badge, candidate description and key, primary speedup with 95% CI, n and provenance → `VERDICT_EXPLANATION` (verified only) → callouts (sandbox only, prerecorded, stub model, partial) → **every** recorded limitation → "Full report" / "Benchmark details". Without a verified recommendation it says "No recommendation was verified" and points to the per-candidate verdicts. The AI-written summary stays in the Report tab.
+- **Candidate descriptions:** `describeCandidate` (`lib/benchmark/candidate.ts`) parses only the three allowlisted DDL forms ("Composite index on orders (customer_id, created_at)", "… · hash", "· includes x", "· partial", "Extended statistics on t (a, b) · dependencies", "Refresh planner statistics on t", "Query rewrite"); anything else gets the generic kind label. No model. The key stays beside it in mono. Used in the approval card, tournament ranking, comparison heading, verdict list, report rounds and the result summary.
+- **Statistics glossary:** "How to read these numbers" (`<details>`, closed) in the Tournament tab: speedup, 95% CI, IQR, robust CV, transport floor, p95, and "Faster is not the same as verified" with the full list of conditions.
+- **Correctness panel** (benchmark comparison of the selected candidate, `lib/benchmark/correctness.ts`): the outcome comes from the rule verdict's gate (gate 3 is correctness): *same rows on every param set* (gate `null` or ≥ 4), *results differ* / *could not be decided* (gate 3, with reason words and the recorded detail; only the first failing param set is recorded), *not checked* (gate 1–2 or no verdict). Then the order rule from `order_is_total`, and per param set: rows (baseline / candidate), same rows (row count + multiset hash, the backend's `correctness_check` definition), same order (ordered hash), repeatability (`consistent`) per arm, hash-cap truncation, short row hashes (full hash in the accessible name). A missing fingerprint reads "unknown · no successful execution". The panel states that same rows on the tested data is not SQL equivalence.
 
 ## 4. Key interaction flows
 
