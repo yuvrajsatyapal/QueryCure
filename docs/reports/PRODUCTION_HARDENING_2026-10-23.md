@@ -95,7 +95,7 @@ The 2026-10-18 hypothesis, a connection returned to the pool with a statement in
 | Audits | `pip-audit` on the locked runtime set; `pnpm audit --prod --audit-level high`; full `pnpm audit` | 0; 0; 1 high (dev-only `braces`, L1) |
 | Demo stack | `compose.demo.yaml` + `demo_probe` | See §5a |
 | Python 3.13 | — | Not run locally; CI runs it |
-| GitHub CI | `ci.yml`, `audit.yml` on the pushed commit | See §9 |
+| GitHub CI | `ci.yml`, `audit.yml` on `1d9014b` | all jobs green, including Python 3.13 (§9) |
 
 ### 5a. Demo-profile stack
 
@@ -138,7 +138,7 @@ While checking the local migration state I ran `uv run alembic current` in `back
 - [x] Logs: no bound parameters, Groq keys masked.
 - [x] API error and SSE outcome metrics; alert rules written.
 - [x] Local suites, e2e ×3, evals, audits green (§5).
-- [ ] CI green on the release commit (§9).
+- [x] CI green on `1d9014b` (§9); re-check on the actual release commit.
 - [ ] Owner: domain and accounts; `env.bak` deleted; `.env` duplicate resolved; PITR window and Neon compute allowance checked.
 - [ ] Owner: access strategy chosen (allowlist approval, or accept "open to anyone with the link").
 - [ ] Deploy in the order of DEPLOYMENT §3a: API → verify → DNS → web → OAuth → probe → monitoring.
@@ -150,7 +150,7 @@ While checking the local migration state I ran `uv run alembic current` in `back
 
 ## 9. Commits and CI
 
-PENDING_CI
+`1d9014b` (hardening) on `main`: GitHub **CI green** on every job: Backend (Python 3.12), Backend (Python 3.13), Backend integration (PostgreSQL 17), Frontend (which includes both image builds), End-to-end (stub LLM). **Audit green.** This report update is docs only.
 
 ## 10. What to study
 
