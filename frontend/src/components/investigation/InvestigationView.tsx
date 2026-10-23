@@ -6,8 +6,8 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ErrorNotice } from "@/components/common/ErrorNotice";
 import { NodeDetails } from "@/components/plan/NodeDetails";
-import { PlanGraph } from "@/components/plan/PlanGraph";
-import { PlanTreeTable } from "@/components/plan/PlanTreeTable";
+import { PlanExplorer, type PlanView } from "@/components/plan/PlanExplorer";
+import { stopsEarly } from "@/lib/plan/analysis";
 import {
   cancelRun,
   getEvidence,
@@ -52,8 +52,6 @@ const NO_COMMANDS: Command[] = [];
 // Underlined tabs for the results area (Linear), pill segments for the small plan-view switch.
 const tabClass = (active: boolean) =>
   `-mb-px border-b-2 px-1 pb-2 text-sm ${active ? "border-accent font-medium text-ink" : "border-transparent text-muted hover:text-ink"}`;
-const segmentClass = (active: boolean) =>
-  `rounded px-2.5 py-1 text-xs ${active ? "bg-surface font-medium text-ink shadow-sm" : "text-muted hover:text-ink"}`;
 
 /** `requestedRunId` comes from `?run=` so a selected run (an older run, a replay) is linkable.
  * Layout (UI_UX §3.6): sticky header, then a split trace: the step tree on the left, details of
@@ -66,7 +64,7 @@ export function InvestigationView({ id, requestedRunId }: { id: string; requeste
   useEffect(() => {
     tabRef.current = tab;
   }, [tab]);
-  const [view, setView] = useState<"tree" | "graph">("tree");
+  const [view, setView] = useState<PlanView>("tree");
   const [planSha, setPlanSha] = useState<string | null>(null);
   const [selected, setSelected] = useState<number | null>(null);
   const [evidence, setEvidence] = useState<EvidenceDetail | null>(null);
@@ -364,43 +362,36 @@ export function InvestigationView({ id, requestedRunId }: { id: string; requeste
                 onShowStep={setStep}
               />
             ) : currentPlan ? (
-              <div className="flex flex-col gap-3">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <p className="qc-eyebrow">
-                    {currentPlan.role === "context.plan" ? "live EXPLAIN" : "uploaded plan"} · {currentPlan.sha256.slice(0, 12)}
-                  </p>
-                  <div role="tablist" aria-label="Plan view" className="flex gap-0.5 rounded-md border border-border bg-surface-2 p-0.5">
-                    <button role="tab" aria-selected={view === "tree"} className={segmentClass(view === "tree")} onClick={() => setView("tree")}>
-                      Tree
-                    </button>
-                    <button role="tab" aria-selected={view === "graph"} className={segmentClass(view === "graph")} onClick={() => setView("graph")}>
-                      Graph
-                    </button>
-                  </div>
-                </div>
-                {view === "tree" ? (
-                  <PlanTreeTable plan={currentPlan.plan} metrics={currentPlan.metrics} onSelect={setSelected} selectedId={selected} citationCounts={citationCounts} />
-                ) : (
-                  <PlanGraph plan={currentPlan.plan} metrics={currentPlan.metrics} onSelect={setSelected} selectedId={selected} />
-                )}
-                {selectedNode ? (
-                  <NodeDetails
-                    node={selectedNode}
-                    metrics={currentPlan.metrics.find((m) => m.nodeId === selectedNode.id)}
-                    citations={
-                      citations
-                        ? {
-                            citation: citations.byNode.get(selectedNode.id),
-                            labels: claimLabels,
-                            pending: citations.pending,
-                            failed: citations.failed,
-                            onClaim: showClaim,
-                          }
-                        : undefined
-                    }
-                  />
-                ) : null}
-              </div>
+              <PlanExplorer
+                plan={currentPlan.plan}
+                metrics={currentPlan.metrics}
+                selectedId={selected}
+                onSelect={setSelected}
+                view={view}
+                onViewChange={setView}
+                citationCounts={citationCounts}
+                label={`${currentPlan.role === "context.plan" ? "live EXPLAIN" : "uploaded plan"} · ${currentPlan.sha256.slice(0, 12)}`}
+                details={
+                  selectedNode ? (
+                    <NodeDetails
+                      node={selectedNode}
+                      stoppedEarly={stopsEarly(currentPlan.plan, selectedNode.id)}
+                      metrics={currentPlan.metrics.find((m) => m.nodeId === selectedNode.id)}
+                      citations={
+                        citations
+                          ? {
+                              citation: citations.byNode.get(selectedNode.id),
+                              labels: claimLabels,
+                              pending: citations.pending,
+                              failed: citations.failed,
+                              onClaim: showClaim,
+                            }
+                          : undefined
+                      }
+                    />
+                  ) : null
+                }
+              />
             ) : (
               <p className="qc-panel p-6 text-sm text-muted">No plan for this run yet.</p>
             )}

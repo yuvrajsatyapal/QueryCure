@@ -39,6 +39,24 @@ test("investigation - start from an uploaded plan, follow the timeline, open cit
   // Pass 1 (UI_UX §3.6): the cited node names the claims that cite it.
   await expect(page.getByRole("region", { name: "Cited by" }).getByRole("button", { name: /Stub hypothesis/ })).toBeVisible({ timeout: 15_000 });
 
+  // Pass 4 (UI_UX §3.16): plan summary, flags in words, full-width view with focus return, axe.
+  const explorer = page.getByRole("region", { name: "Plan explorer" });
+  await expect(explorer.getByRole("group", { name: "Plan summary" })).toContainText("EXPLAIN ANALYZE");
+  await expect(selected).toContainText("hottest", { ignoreCase: true });
+  const fullWidth = explorer.getByRole("button", { name: "Full width" });
+  await fullWidth.click();
+  const dialog = page.getByRole("dialog", { name: "Execution plan, full width" });
+  await expect(dialog.getByRole("treegrid").locator('tr[aria-selected="true"]')).toContainText("Seq Scan");
+  for (const scheme of ["light", "dark"] as const) {
+    await applyTheme(page, scheme);
+    const result = await new AxeBuilder({ page }).include('[role="dialog"]').withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]).analyze();
+    const summary = result.violations.map((v) => `${v.id} (${v.impact}): ${v.nodes.map((n) => n.target.join(" ")).slice(0, 3).join(" | ")}`);
+    expect(summary, `full-width plan in ${scheme} mode`).toEqual([]);
+  }
+  await page.keyboard.press("Escape");
+  await expect(dialog).toBeHidden();
+  await expect(fullWidth).toBeFocused();
+
   // A finding's "Show step" selects the trace row that recorded it; the details pane follows.
   await page.getByRole("tab", { name: "Findings" }).click();
   await page.getByRole("button", { name: /^Show step/ }).first().click();

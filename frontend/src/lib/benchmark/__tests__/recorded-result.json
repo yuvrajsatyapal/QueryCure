@@ -1,0 +1,283 @@
+{
+ "builds": [
+  {
+   "arm": "oc_70a238eea02a",
+   "buildNs": 23760958,
+   "detail": "",
+   "indexSizeBytes": 335872,
+   "ok": true,
+   "reason": null
+  }
+ ],
+ "engineVersion": "bench@2",
+ "environmentDigest": "847b71cc872694dcb9f019d28f420d73074531bc3a6d813dcc4b81ee77a875c4",
+ "experimentId": "2601e225-50b0-5970-8c24-3063b7a929a3",
+ "measurements": [
+  {
+   "arm": "baseline",
+   "consistent": true,
+   "failures": [],
+   "fingerprint": {
+    "multiset": "9183cfaa8528bfbad7c048947b7a7e12020906e9bb4157fd0104de3a6a6347be",
+    "ordered": "7fa2793f0eb4846f80c7206b8fc368d6d44e772cb35f2e377668fbb962b29b6b",
+    "rows": 20,
+    "truncated": false
+   },
+   "latenciesNs": [
+    818875,
+    705833,
+    721167,
+    686583,
+    726250,
+    1055542,
+    695583,
+    715583,
+    673041,
+    630708,
+    720458,
+    648458,
+    643542,
+    617792,
+    653292,
+    739166,
+    702333,
+    700917,
+    696250,
+    747666,
+    845791,
+    752833,
+    709083,
+    814417,
+    660959,
+    779375,
+    656458,
+    698000,
+    653167,
+    697000
+   ],
+   "paramSet": "hot_customer",
+   "planSha256": null
+  },
+  {
+   "arm": "baseline",
+   "consistent": true,
+   "failures": [],
+   "fingerprint": {
+    "multiset": "670f232299fa18cc426959db2bf9aeb1f0d9def36e07c8ae8d2afce2eca3353f",
+    "ordered": "a563d32d65b95373abbb1aade39f2d4e6213e8d7bf7efe70b84c302f76c8040b",
+    "rows": 7,
+    "truncated": false
+   },
+   "latenciesNs": [
+    630625,
+    630541,
+    585917,
+    659084,
+    604250,
+    796750,
+    754667,
+    936583,
+    1272834,
+    735458,
+    739000,
+    901125,
+    704667,
+    616875,
+    627209,
+    606833,
+    620750,
+    625167,
+    579125,
+    591791,
+    1190792,
+    818292,
+    622500,
+    615583,
+    580834,
+    653542,
+    596625,
+    654833,
+    638375,
+    643583
+   ],
+   "paramSet": "regular_customer",
+   "planSha256": null
+  },
+  {
+   "arm": "oc_70a238eea02a",
+   "consistent": true,
+   "failures": [],
+   "fingerprint": {
+    "multiset": "9183cfaa8528bfbad7c048947b7a7e12020906e9bb4157fd0104de3a6a6347be",
+    "ordered": "7fa2793f0eb4846f80c7206b8fc368d6d44e772cb35f2e377668fbb962b29b6b",
+    "rows": 20,
+    "truncated": false
+   },
+   "latenciesNs": [
+    651083,
+    406417,
+    419250,
+    451792,
+    400458,
+    549500,
+    476459,
+    443167,
+    733542,
+    419083,
+    575042,
+    721584,
+    487041,
+    434083,
+    627667,
+    478334,
+    475917,
+    405625,
+    462375,
+    415458,
+    447833,
+    409042,
+    415250,
+    367792,
+    421833,
+    422458,
+    412416,
+    442125,
+    485292,
+    400250
+   ],
+   "paramSet": "hot_customer",
+   "planSha256": null
+  },
+  {
+   "arm": "oc_70a238eea02a",
+   "consistent": true,
+   "failures": [],
+   "fingerprint": {
+    "multiset": "670f232299fa18cc426959db2bf9aeb1f0d9def36e07c8ae8d2afce2eca3353f",
+    "ordered": "a563d32d65b95373abbb1aade39f2d4e6213e8d7bf7efe70b84c302f76c8040b",
+    "rows": 7,
+    "truncated": false
+   },
+   "latenciesNs": [
+    572334,
+    511125,
+    424042,
+    426208,
+    765167,
+    400833,
+    322250,
+    321291,
+    319584,
+    300542,
+    413084,
+    370708,
+    387500,
+    302833,
+    338458,
+    451167,
+    347708,
+    363833,
+    295166,
+    306250,
+    381458,
+    396875,
+    384125,
+    374250,
+    369458,
+    411375,
+    422792,
+    313125,
+    308750,
+    342667
+   ],
+   "paramSet": "regular_customer",
+   "planSha256": null
+  }
+ ],
+ "noiseScreens": [],
+ "orderIsTotal": false,
+ "provenance": "measured",
+ "schemaVersion": 2,
+ "stats": [
+  {
+   "arm": "oc_70a238eea02a",
+   "baseline": {
+    "cv": 0.11700732264637369,
+    "iqrNs": 71957.5,
+    "maxNs": 1055542,
+    "medianNs": 701625,
+    "minNs": 617792,
+    "n": 30,
+    "p95Ns": 845791,
+    "robustCv": 0.07602546085631721
+   },
+   "candidate": {
+    "cv": 0.20012192177305135,
+    "iqrNs": 68250.5,
+    "maxNs": 733542,
+    "medianNs": 442646,
+    "minNs": 367792,
+    "n": 30,
+    "p95Ns": 721584,
+    "robustCv": 0.11429766115673805
+   },
+   "ciHigh": 1.6938559572785934,
+   "ciLow": 1.4719333540534412,
+   "paramSet": "hot_customer",
+   "speedup": 1.5850702367128586
+  },
+  {
+   "arm": "oc_70a238eea02a",
+   "baseline": {
+    "cv": 0.2396669211536992,
+    "iqrNs": 122208.5,
+    "maxNs": 1272834,
+    "medianNs": 634500,
+    "minNs": 579125,
+    "n": 30,
+    "p95Ns": 1190792,
+    "robustCv": 0.14277686357871838
+   },
+   "candidate": {
+    "cv": 0.24576645574284445,
+    "iqrNs": 91126,
+    "maxNs": 765167,
+    "medianNs": 372479,
+    "minNs": 295166,
+    "n": 30,
+    "p95Ns": 572334,
+    "robustCv": 0.1813545954384987
+   },
+   "ciHigh": 1.9089370796176224,
+   "ciLow": 1.5827443117491131,
+   "paramSet": "regular_customer",
+   "speedup": 1.7034517382187988
+  }
+ ],
+ "tournament": [
+  {
+   "arm": "oc_70a238eea02a",
+   "primaryCiLow": 1.4719333540534412,
+   "rank": 1,
+   "verdict": "verified"
+  }
+ ],
+ "transportFloor": {
+  "afterMedianNs": 228416,
+  "beforeMedianNs": 229583,
+  "iqrNs": 34427,
+  "medianNs": 228999.5,
+  "samples": 50,
+  "shareOfFastestArm": 0.6148,
+  "transportDominated": true
+ },
+ "verdicts": [
+  {
+   "arm": "oc_70a238eea02a",
+   "gate": null,
+   "reasons": [],
+   "verdict": "verified"
+  }
+ ],
+ "winner": "oc_70a238eea02a"
+}

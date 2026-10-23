@@ -8,6 +8,9 @@ const STYLE: Record<string, { icon: string; label: string; className: string }> 
   },
   rejected: { icon: "✕", label: "Rejected", className: "border-rejected/40 bg-rejected/10 text-rejected" },
   inconclusive: { icon: "?", label: "Inconclusive", className: "border-inconclusive/40 bg-inconclusive/10 text-inconclusive" },
+  // The Benchmark Auditor downgraded the engine verdict (downgrade-only, ADR-0009).
+  disputed: { icon: "!", label: "Disputed · auditor downgrade", className: "border-dashed border-inconclusive/60 bg-inconclusive/10 text-inconclusive" },
+  unverified: { icon: "–", label: "Unverified · not measured", className: "border-dashed border-border-strong text-muted" },
   proposed: { icon: "○", label: "Proposed · awaiting approval", className: "border-dashed border-approval/60 bg-approval/10 text-approval" },
   approved: { icon: "○", label: "Approved · not yet measured", className: "border-dashed border-hypothesis text-hypothesis" },
   benchmarked: { icon: "◐", label: "Benchmarking", className: "border-dashed border-running/60 bg-running/10 text-running" },

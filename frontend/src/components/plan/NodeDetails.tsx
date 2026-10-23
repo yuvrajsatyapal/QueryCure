@@ -1,4 +1,5 @@
-import { formatMs, formatRows } from "@/lib/format";
+import { formatCost, formatMs, formatPct, formatRows } from "@/lib/format";
+import { estimateSentence } from "@/lib/plan/analysis";
 import type { NodeMetrics, PlanNode } from "@/lib/api/types";
 import type { Citation } from "@/lib/investigation/links";
 
@@ -48,14 +49,25 @@ function CitedBy({ c }: { c: NodeCitations }) {
 function Row({ label, value }: { label: string; value: string | null | undefined }) {
   if (value === null || value === undefined || value === "") return null;
   return (
-    <div className="grid grid-cols-[160px_1fr] gap-2 border-t border-border py-1.5 text-sm">
+    <div className="grid grid-cols-[minmax(0,160px)_minmax(0,1fr)] gap-2 border-t border-border py-1.5 text-sm">
       <dt className="text-muted">{label}</dt>
       <dd className="break-words font-mono text-[13px]">{value}</dd>
     </div>
   );
 }
 
-export function NodeDetails({ node, metrics, citations }: { node: PlanNode; metrics: NodeMetrics | undefined; citations?: NodeCitations }) {
+export function NodeDetails({
+  node,
+  metrics,
+  citations,
+  stoppedEarly = false,
+}: {
+  node: PlanNode;
+  metrics: NodeMetrics | undefined;
+  citations?: NodeCitations;
+  /** A LIMIT above can stop this node early (lib/plan/analysis `stopsEarly`). */
+  stoppedEarly?: boolean;
+}) {
   const extra = Object.entries(node.extra ?? {}).filter(([, v]) => v !== null && typeof v !== "object");
   return (
     <section aria-label="Plan node details" className="qc-panel p-4">
@@ -63,21 +75,48 @@ export function NodeDetails({ node, metrics, citations }: { node: PlanNode; metr
         {node.nodeType}
         <span className="ml-2 font-mono text-xs text-muted">{node.locator}</span>
       </h3>
+      <p className="mt-2 text-sm text-muted">{estimateSentence(node, metrics, { stoppedEarly })}</p>
       <dl className="mt-2">
         <Row label="Relation" value={node.relationName} />
         <Row label="Index" value={node.indexName} />
+        <Row label="Relationship" value={node.subplanName ?? node.parentRelationship} />
+        <Row label="Join type" value={node.joinType} />
         <Row label="Filter" value={node.filter} />
         <Row label="Index condition" value={node.indexCond} />
         <Row label="Sort key" value={node.sortKey?.join(", ")} />
         <Row label="Sort method" value={node.sortMethod} />
+        <Row label="Sort space" value={node.sortSpaceUsedKb != null ? `${formatRows(node.sortSpaceUsedKb)} kB (${node.sortSpaceType ?? "?"})` : null} />
+        <Row label="Startup cost" value={node.startupCost != null ? formatCost(node.startupCost) : null} />
+        <Row label="Total cost" value={node.totalCost != null ? formatCost(node.totalCost) : null} />
+        <Row label="Plan width" value={node.planWidth != null ? `${node.planWidth} bytes` : null} />
+        <Row
+          label="Actual time / loop"
+          value={node.actualTotalTimeMs != null ? `${formatMs(node.actualStartupTimeMs)} .. ${formatMs(node.actualTotalTimeMs)}` : null}
+        />
         <Row label="Inclusive time" value={metrics?.inclusiveTimeMs != null ? formatMs(metrics.inclusiveTimeMs) : null} />
+        <Row label="Self time" value={metrics?.selfTimeMs != null ? `${formatMs(metrics.selfTimeMs)} · ${formatPct(metrics.selfTimeShare)}` : null} />
         <Row label="Loops" value={node.actualLoops != null ? String(node.actualLoops) : null} />
         <Row label="Actual rows, all loops" value={metrics?.totalActualRows != null ? formatRows(metrics.totalActualRows) : null} />
         <Row
           label="Rows removed by filter"
           value={metrics?.rowsRemovedByFilterTotal != null ? formatRows(metrics.rowsRemovedByFilterTotal) : null}
         />
-        <Row label="Total cost" value={node.totalCost != null ? String(node.totalCost) : null} />
+        <Row
+          label="Workers planned / launched"
+          value={node.workersPlanned != null ? `${node.workersPlanned} / ${node.workersLaunched ?? "—"}` : null}
+        />
+        <Row
+          label="Shared read / hit (self)"
+          value={metrics?.selfSharedReadBlocks != null ? `${formatRows(metrics.selfSharedReadBlocks)} / ${formatRows(metrics.selfSharedHitBlocks)} blocks` : null}
+        />
+        <Row
+          label="Temp read / written (self)"
+          value={
+            metrics?.selfTempReadBlocks != null && (metrics.selfTempReadBlocks || metrics.selfTempWrittenBlocks)
+              ? `${formatRows(metrics.selfTempReadBlocks)} / ${formatRows(metrics.selfTempWrittenBlocks)} blocks`
+              : null
+          }
+        />
         {extra.map(([k, v]) => (
           <Row key={k} label={k} value={String(v)} />
         ))}

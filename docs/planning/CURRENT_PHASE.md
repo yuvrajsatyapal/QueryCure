@@ -124,6 +124,32 @@
   - **Verified:** `pnpm audit --prod --audit-level high` clean (the CI gate); lint; typecheck; 158 unit tests; 5/5 clean `next build`s (`.next` removed each time); 3/3 `next start` and 5/5 clean `next dev` starts serving `/app` with HTTP 200; Playwright 18/18 on two consecutive runs against local Docker with no retries (axe, keyboard, investigation, sandbox approval, lifecycle). Local Docker only; no `.env` in the worktree.
   - **Remaining:** dev-only `braces <=3.0.3` (GHSA-vfj7-8cjw-p6xm, high, no patched release) through `eslint-config-next` → `fast-glob` → `micromatch`; not in the production bundle and not caught by the `--prod` gate. A future Next advisory will bring the alternating stop back under an agent until Next is upgraded again.
 
+- [x] **UI Pass 4: execution-plan viewer and benchmark analytics (2026-10-23, UI_UX §3.16–§3.17).** Frontend only: existing `GET /runs/{id}/plans`, `GET /experiments/{id}`, `GET /runs/{id}/verifications`; no backend, contract, schema or benchmarking change; no new dependency (charts are HTML on the design tokens).
+  - **Plan viewer** (`PlanExplorer`, `lib/plan/analysis.ts`, TDD):
+    - keeps the parsed parent → child structure, including subplan relationships;
+    - adds loops, est. cost, time per loop, a summary line, Expand all / Collapse all / Hottest node, a thresholds legend, and a full-width modal (Esc returns focus);
+    - *expensive* = self time ≥ 20% of the root; *hottest* unchanged;
+    - row misestimates use the backend ratio: significant ≥ 10×, severe ≥ 100×; not flagged when never executed, when under 100 rows across all loops, or when fewer rows than estimated come from a node a LIMIT stopped early.
+  - **Fix found in browser verification:** the recorded orders plan showed Gather Merge "433× over · severe" only because `LIMIT 20` stopped it. The early-stop rule above walks up to the Limit and stops at Sort, Hash or a non-sorted Aggregate.
+  - **Evidence navigation:** a node selected from evidence, the report or Hottest node is revealed when its parents are collapsed. Pass 1 trace ↔ evidence ↔ plan links and Cited by are unchanged.
+  - **Benchmark analytics** (`BenchmarkAnalytics`, `lib/benchmark/analysis.ts`, TDD against a real result recorded from a local stub-model run):
+    - per param set, latency distributions of every recorded sample, with the box computed by the engine's quartile method (it matches the stored IQR);
+    - a speedup forest plot with a 1× no-improvement line and the configured `min_effect` / `max_regression`, drawn only from valid recorded stats and never for arms that failed correctness;
+    - verdict classes from backend verdicts: Disputed = auditor downgrade; Unverified = not measured;
+    - recorded warnings: transport floor, robust CV over `max_cv`, failed samples, noise screens, p95 n/a, prerecorded. Host contention is stated as not recorded;
+    - a replicate selector, so experiments are never pooled, and a "Recorded samples" table;
+    - the stats table gains IQR, robust CV, min–max and failed counts.
+  - **Other fixes:**
+    - the ranking table overflowed the page at 375 px;
+    - the selected row's teal tint dropped the Verified badge to 4.49:1 in light mode, so it now uses `--surface-2` with an accent bar;
+    - the stats table scroll region was not focusable.
+  - **Environment:** the first build stopped with Next's `SecurityFatalError` because `node_modules` still held 16.4.0 after the 16.4.2 merge. `pnpm install --frozen-lockfile` fixed it; there was no version change.
+  - **Verified:**
+    - lint, typecheck, 212 unit tests (plan analysis 16, benchmark analysis 18, format 4, PlanExplorer 8, BenchmarkAnalytics 8), production build;
+    - Playwright 18/18 on two consecutive runs against local Docker with the stub model. The specs now also cover the full-width plan (axe in light and dark, focus return) and the tournament analytics (axe in light and dark, no sideways scroll at 390 px);
+    - browser check on local data at 1366 px, 1280 px light and 375 px.
+  - **Not done:** correctness panel (fingerprints) of UI_UX §3.8; early stops from semi/anti joins and `EXISTS` are not detected; host contention has no recorded signal to show.
+
 ## Completed
 
 - [x] Repository inspected (was empty).

@@ -15,20 +15,22 @@ import {
 import { useMemo } from "react";
 import type { NodeMetrics, PlanNode, PlanTree } from "@/lib/api/types";
 import { formatMs, formatPct, formatRows } from "@/lib/format";
-import { estimateLabel, isMisestimate } from "@/lib/plan/estimate";
-import { hottestNodeId } from "@/lib/plan/hottest";
+import { estimateLabel } from "@/lib/plan/estimate";
+import { isFlaggedEstimate, nodeFlags, type NodeFlags } from "@/lib/plan/analysis";
 import { NODE_HEIGHT, NODE_WIDTH, layoutPlan } from "@/lib/plan/layout";
 
 interface CardData extends Record<string, unknown> {
   node: PlanNode;
   metrics: NodeMetrics | undefined;
-  hottest: boolean;
+  flags: NodeFlags | undefined;
   selected: boolean;
 }
 type CardNode = Node<CardData, "plan">;
 
 function PlanNodeCard({ data }: NodeProps<CardNode>) {
-  const { node, metrics: m, hottest, selected } = data;
+  const { node, metrics: m, flags, selected } = data;
+  const hottest = flags?.hottest ?? false;
+  const estimate = flags?.estimate.level;
   const target = node.relationName ?? node.indexName;
   const share = m?.selfTimeShare ?? null;
   return (
@@ -48,6 +50,10 @@ function PlanNodeCard({ data }: NodeProps<CardNode>) {
           <span className="rounded-sm border border-accent px-1 font-mono text-[10px] uppercase tracking-wider text-accent">
             hottest
           </span>
+        ) : flags?.expensive ? (
+          <span className="rounded-sm border border-inconclusive/60 px-1 font-mono text-[10px] uppercase tracking-wider text-inconclusive">
+            expensive
+          </span>
         ) : null}
       </div>
       <span className="truncate text-xs text-muted">{target ? `on ${target}` : " "}</span>
@@ -55,7 +61,10 @@ function PlanNodeCard({ data }: NodeProps<CardNode>) {
         <span className="truncate text-muted">
           est {formatRows(node.planRows)} · act {formatRows(node.actualRows)}
         </span>
-        <span className={`shrink-0 ${isMisestimate(m) ? "text-inconclusive" : "text-muted"}`}>{estimateLabel(m)}</span>
+        <span className={`shrink-0 ${estimate === "severe" ? "text-rejected" : estimate && isFlaggedEstimate(estimate) ? "text-inconclusive" : "text-muted"}`}>
+          {estimate === "never_executed" ? "never executed" : estimateLabel(m)}
+          {estimate === "stopped_early" ? " · LIMIT above" : ""}
+        </span>
       </div>
       <div className="flex items-center gap-2 font-mono text-[11px] tabular-nums text-muted">
         <span aria-hidden className="h-1.5 flex-1 rounded-sm bg-surface-2">
@@ -78,14 +87,17 @@ export function PlanGraph({
   metrics,
   onSelect,
   selectedId,
+  tall = false,
 }: {
   plan: PlanTree;
   metrics: NodeMetrics[];
   onSelect?: (nodeId: number) => void;
   selectedId?: number | null;
+  /** Full-width dialog: use most of the viewport height. */
+  tall?: boolean;
 }) {
   const layout = useMemo(() => layoutPlan(plan), [plan]);
-  const hottestId = useMemo(() => hottestNodeId(metrics), [metrics]);
+  const flags = useMemo(() => nodeFlags(plan, metrics), [plan, metrics]);
 
   const nodes = useMemo<CardNode[]>(() => {
     const byId = new Map(plan.nodes.map((n) => [n.id, n]));
@@ -102,11 +114,11 @@ export function PlanGraph({
           height: NODE_HEIGHT,
           draggable: false,
           connectable: false,
-          data: { node, metrics: metricsById.get(pos.id), hottest: pos.id === hottestId, selected: pos.id === selectedId },
+          data: { node, metrics: metricsById.get(pos.id), flags: flags.get(pos.id), selected: pos.id === selectedId },
         },
       ];
     });
-  }, [layout, plan.nodes, metrics, hottestId, selectedId]);
+  }, [layout, plan.nodes, metrics, flags, selectedId]);
 
   const edges = useMemo<Edge[]>(
     () =>
@@ -124,7 +136,7 @@ export function PlanGraph({
 
   return (
     <figure aria-label="Plan graph" className="flex flex-col gap-2">
-      <div className="qc-plan-graph h-[360px] overflow-hidden rounded-lg border border-border md:h-[480px]">
+      <div className={`qc-plan-graph overflow-hidden rounded-lg border border-border ${tall ? "h-[70vh]" : "h-[360px] md:h-[480px]"}`}>
         <ReactFlow
           nodes={nodes}
           edges={edges}

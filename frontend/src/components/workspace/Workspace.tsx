@@ -7,8 +7,8 @@ import { ErrorNotice } from "@/components/common/ErrorNotice";
 import { SqlEditor } from "@/components/editor/SqlEditor";
 import { ParamSetsEditor, parseParamSets, type ParamSetRow } from "@/components/investigation/ParamSetsEditor";
 import { NodeDetails } from "@/components/plan/NodeDetails";
-import { PlanGraph } from "@/components/plan/PlanGraph";
-import { PlanTreeTable } from "@/components/plan/PlanTreeTable";
+import { PlanExplorer, type PlanView } from "@/components/plan/PlanExplorer";
+import { stopsEarly } from "@/lib/plan/analysis";
 import { connectionKeys, explainOnConnection, listConnections } from "@/lib/api/connections";
 import { inspectPlan, inspectSql } from "@/lib/api/inspect";
 import { createInvestigation, getModels, investigationKeys } from "@/lib/api/investigations";
@@ -19,7 +19,6 @@ import { buildCreateInput, modeOptions, resolveMode, type Mode, type PlanSource 
 import { PlanSourceStep, type WorkloadPick } from "./PlanSourceStep";
 import { WizardStep, type StepState } from "./WizardStep";
 
-type View = "tree" | "graph";
 interface PlanResult {
   plan: PlanTree;
   metrics: NodeMetrics[];
@@ -46,9 +45,6 @@ const MODE_COPY: Record<Mode, { label: string; detail: string }> = {
     detail: "Candidates are benchmarked in a disposable sandbox copy of the demo workload, only after you approve their exact SQL.",
   },
 };
-const segment = (active: boolean) =>
-  `rounded px-2.5 py-1 text-xs ${active ? "bg-surface font-medium text-ink shadow-sm" : "text-muted hover:text-ink"}`;
-const SEGMENTS = "flex w-fit gap-0.5 rounded-md border border-border bg-surface-2 p-0.5";
 const isMac = () => typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
 
 export function Workspace() {
@@ -67,7 +63,7 @@ export function Workspace() {
   const [replacedQuery, setReplacedQuery] = useState(false);
   const [result, setResult] = useState<PlanResult | null>(null);
   const [selected, setSelected] = useState<number | null>(null);
-  const [view, setView] = useState<View>("tree");
+  const [view, setView] = useState<PlanView>("tree");
 
   const [chosenMode, setChosenMode] = useState<Mode | null>(null);
   const [objective, setObjective] = useState("Why is this query slow, and what should change?");
@@ -469,29 +465,22 @@ export function Workspace() {
 
       <section aria-label="Plan" className="flex min-w-0 flex-col gap-4">
         {shown ? (
-          <>
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <p className="qc-eyebrow">{shown.origin}</p>
-              <div role="tablist" aria-label="Plan view" className={SEGMENTS}>
-                <button role="tab" aria-selected={view === "tree"} className={segment(view === "tree")} onClick={() => setView("tree")}>
-                  Tree
-                </button>
-                <button role="tab" aria-selected={view === "graph"} className={segment(view === "graph")} onClick={() => setView("graph")}>
-                  Graph
-                </button>
-              </div>
-            </div>
-            {view === "tree" ? (
-              <PlanTreeTable plan={shown.plan} metrics={shown.metrics} onSelect={setSelected} selectedId={selected} />
-            ) : (
-              <PlanGraph plan={shown.plan} metrics={shown.metrics} onSelect={setSelected} selectedId={selected} />
-            )}
-            {selectedNode ? (
-              <NodeDetails node={selectedNode} metrics={shown.metrics.find((m) => m.nodeId === selectedNode.id)} />
-            ) : (
-              <p className="text-sm text-muted">Select a node to see its details.</p>
-            )}
-          </>
+          <PlanExplorer
+            plan={shown.plan}
+            metrics={shown.metrics}
+            selectedId={selected}
+            onSelect={setSelected}
+            view={view}
+            onViewChange={setView}
+            label={shown.origin}
+            details={
+              selectedNode ? (
+                <NodeDetails node={selectedNode} stoppedEarly={stopsEarly(shown.plan, selectedNode.id)} metrics={shown.metrics.find((m) => m.nodeId === selectedNode.id)} />
+              ) : (
+                <p className="text-sm text-muted">Select a node to see its details.</p>
+              )
+            }
+          />
         ) : analyze.isPending || explain.isPending ? (
           <div className="qc-panel p-4">
             <p className="sr-only" role="status">Loading the plan…</p>

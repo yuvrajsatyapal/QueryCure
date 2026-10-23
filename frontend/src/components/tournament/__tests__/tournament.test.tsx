@@ -148,7 +148,7 @@ const candidates = [
 ] as unknown as OptimizationCandidate[];
 
 test("tournament ranks candidates and compares the winner against the baseline", () => {
-  render(<ExperimentView detail={detail} candidates={candidates} />);
+  renderWithQuery(<ExperimentView detail={detail} candidates={candidates} />);
 
   const table = screen.getByRole("table", { name: "Optimization tournament" });
   const [first, second] = within(table).getAllByRole("row").slice(1) as [HTMLElement, HTMLElement];
@@ -225,7 +225,7 @@ test("a replicated round shows the replication verdict, its range and every repl
     },
   } as unknown as ExperimentDetail;
 
-  render(<ExperimentView detail={noisy} candidates={candidates} />);
+  renderWithQuery(<ExperimentView detail={noisy} candidates={candidates} />);
 
   const table = screen.getByRole("table", { name: "Optimization tournament" });
   const first = within(table).getAllByRole("row")[1] as HTMLElement;

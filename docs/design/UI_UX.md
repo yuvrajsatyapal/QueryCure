@@ -70,6 +70,7 @@ Three resizable panels:
 - **Mobile:** tabs Query · Plan · Agents · Results; approval card full-screen modal.
 
 ### 3.5 Execution-plan explorer (`/plan-explorer`, also embedded)
+Implemented embedded (Plan tab, New investigation preview); controls, flags and full-width view in §3.16.
 - **Graph view (React Flow):** top-down tree laid out with dagre; node = PlanNode component; edge thickness ∝ actual (or estimated) rows on a log scale; hottest node by self time gets the accent border.
 - **Tree-table view:** indented rows with columns: node, relation, est rows, actual rows, error ratio, self time %, buffers hit/read, loops. Default on mobile and for screen readers.
 - **Node detail drawer:** all raw fields, derived metrics, linked evidence/findings.
@@ -101,12 +102,14 @@ Implemented as a LangSmith-style **split trace** ([ADR-0030](../engineering/adr/
 - Plan nodes show **"Cited by"**: findings and hypotheses whose evidence resolves to that node, and the tree table shows a citation count per node. Evidence is resolved per ID through `GET /runs/{id}/evidence/{evidence_id}` (immutable, cached); while resolving, the count reads as pending; failures are counted and reported, not hidden.
 
 ### 3.7 Optimization tournament (tab)
+Charts, verdict classes, warnings and replicate selection: §3.17.
 - Table: candidate (kind icon, short SQL), addresses (hypothesis links), VerdictPill, speedup median + SpeedupBar (CI), regression check per param set, index size, build time, write overhead (or "unmeasured").
 - Winner row has the accent left border (only one); rejected rows show reason codes.
 - Round selector when multiple rounds occurred.
 - **Empty:** "No candidates benchmarked" with reason (Mode C unavailable / approvals declined / not needed).
 
 ### 3.8 Benchmark comparison (drill-down from a tournament row)
+Distribution chart and stats table as implemented: §3.17. The correctness panel below is not built yet.
 - Latency distribution chart per arm (dot strip + box), per param set tabs.
 - Stats table: n, median, p95 (or n/a), CV, min/max, bootstrap CI.
 - Correctness panel: fingerprints, row counts, order mode (ordered/multiset), outcome.
@@ -178,6 +181,31 @@ Frontend only. Same endpoints (`POST /inspect/sql`, `POST /inspect/plan`, `POST 
 
   A `g` sequence expires after 1 s. The sidebar shows the `⌘K` hint as a button, which also opens the palette by pointer or touch.
 - **Feedback:** after a theme change from the palette, a polite live region announces it ("Dark theme on"). Navigation needs no toast.
+
+### 3.16 Execution-plan viewer (UI Pass 4)
+
+Frontend only. Input is the existing `GET /runs/{id}/plans` (`PlanTree` + backend `NodeMetrics`, `plans/metrics.py`); no contract change. Derived display logic is pure and unit-tested in `lib/plan/analysis.ts`.
+
+- **Structure:** the tree is the parsed plan's own parent → child structure (`PlanNode.children`, `parent_id`), including subplans and InitPlans with their `parent_relationship` / `subplan_name`. Nothing is re-ordered or merged.
+- **Columns (tree-table):** node (type, relation/index, relationship), est. rows / loop, actual rows / loop, loops, estimate error, est. cost (startup..total), actual time / loop (ms), self time (ms · share), buffers read / hit. Every missing value is "—"; never zero.
+- **Expensive nodes** (only when the plan has timing): *hottest* = the single node with the largest backend self time (unchanged); *expensive* = self time ≥ 20% of the root's inclusive time (`self_time_share` ≥ 0.20). Plain EXPLAIN plans flag no node: the planner's cumulative cost is shown as a bar labelled "est. cost, cumulative", because self cost cannot be derived reliably (Limit, Nested Loop inner rescans).
+- **Row-estimation errors** use the backend ratio `max(actual, est) / max(min(actual, est), 1)` per loop, with its direction. Shown as *significant* at ≥ 10× and *severe* at ≥ 100×, except: a node that never executed (`actual_loops = 0`) reads "never executed" and is not flagged; an error whose larger side, summed over all loops, is under 100 rows is shown but not flagged ("small rows"); fewer actual rows than estimated on a node that a `Limit` above can stop early is shown with "LIMIT above" and not flagged (the walk up to the `Limit` stops at a node that reads its whole input: Sort, Hash, or a non-sorted Aggregate). Under-estimates (more rows than expected) are still flagged there; early stops from semi/anti joins and `EXISTS` subplans are not detected. These are display thresholds only; no verdict reads them.
+- **Interaction:** expand/collapse per row, Expand all / Collapse all, Jump to hottest, a summary line (nodes, planning and execution time, analyzed/buffers, flagged counts), and a legend that states the thresholds. Treegrid keys as before (↑/↓, ←/→, Home/End, Enter/Space selects). No single-letter keys inside the tree, because `c` and `g …` are global shortcuts (§3.15).
+- **Full width:** a "Full width" button opens the same viewer (tree or graph plus node details) in a modal dialog over the page; Esc or Close returns focus to the button.
+- **Selection:** selecting a node from evidence, the report or the URL reveals it (its collapsed ancestors expand) and scrolls it into view. Pass 1 navigation (trace ↔ evidence ↔ plan node, Cited by) is unchanged.
+- **Node details:** adds startup/total cost, actual startup/total time per loop, workers planned/launched, shared/temp buffers, and the estimate explanation in words ("planner expected 120 rows per loop, 4,812 returned: 40× under").
+
+### 3.17 Benchmark analytics (UI Pass 4)
+
+Frontend only. Input is `GET /experiments/{id}` (`ExperimentResult` measurements, stats, verdicts, replication, transport floor, noise screens) plus `GET /runs/{id}/verifications`; no contract or algorithm change. Pure logic in `lib/benchmark/analysis.ts`, unit-tested.
+
+- **Attribution (claims@2):** every chart, row and figure names its experiment (short ID, round, replicate), candidate arm and param set. Samples are never pooled across param sets, arms or experiments. Replicates are separate experiments, chosen with an experiment selector inside a round; the replication range is shown as the backend reports it, labelled "range across N experiments", never as one pooled CI.
+- **Timing distributions:** per param set, one row per arm (baseline first) on a shared log-scale axis: every recorded sample as a dot (`ArmMeasurement.latencies_ns`) and a box (Q1–Q3, recomputed from the same samples with the engine's inclusive quartile method) with the backend median. Failed samples are counted in words, never plotted. When the transport floor was recorded, a dashed line marks its median ("SELECT 1 round trip").
+- **Speedup and CI:** a forest plot, one row per candidate × param set, point = `speedup`, whiskers = `ci_low`..`ci_high`, log axis, with a solid **1× no-improvement** line and, when the config records them, dashed `min_effect` and `max_regression` lines. A row is drawn only when a `SpeedupStats` entry exists, its numbers are finite and positive with `ci_low ≤ speedup ≤ ci_high`, and the arm did not fail correctness (`result_mismatch`, `nondeterministic_order`, `result_too_large`): otherwise the row says why it is not shown ("not comparable: results differ from the baseline").
+- **Verdicts** (from the backend, never inferred): *Verified*; *Verified · noise warning* (replication); *Disputed* = the Benchmark Auditor downgraded the engine verdict (`auditor_downgraded`; the backend has no separate "disputed" verdict); *Rejected*; *Inconclusive*; *Unverified* = no measured verdict (declined, expired, proposed, approved, or absent from the experiment). Precedence: an auditor downgrade, then the replication verdict, then the audited verdict, then the engine verdict, then the candidate status. A summary strip counts each class; badges keep icon + words.
+- **Warnings** (only when recorded): transport floor share of the fastest arm (≥ 50% = transport-dominated, ADR-0029); robust CV above `max_cv`; noise screens; failed samples and sample errors; p95 unavailable (n < 20); prerecorded provenance. Host contention is **not recorded** by `bench@2`; the panel says so instead of guessing. Older results without a transport floor say "not recorded".
+- **Data table:** the stats table (n, median, p95, IQR, robust CV, min–max, failures, speedup with CI or the reason it is absent) is always shown; each distribution has a collapsed "Recorded samples" table with every sample value.
+- **Unavailable data:** an experiment without a result, or a param set without measurements, says so in place of the chart.
 
 ## 4. Key interaction flows
 

@@ -23,3 +23,21 @@ export function formatDuration(ms: number | null | undefined): string {
   const s = Math.floor((v % 60_000) / 1000);
   return `${m}m ${String(s).padStart(2, "0")}s`;
 }
+
+/** Benchmark latencies are recorded in nanoseconds; they are shown in milliseconds. */
+export function formatNs(value: number | null | undefined): string {
+  return value === null || value === undefined || !Number.isFinite(value) ? "—" : formatMs(value / 1e6);
+}
+
+/** Speedup ratio (median baseline / median candidate): 1.59×, 13.8×. */
+export function formatSpeedup(value: number | null | undefined): string {
+  if (value === null || value === undefined || !Number.isFinite(value)) return "—";
+  return `${value >= 10 ? value.toFixed(1) : value.toFixed(2)}×`;
+}
+
+const cost = new Intl.NumberFormat("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+/** Planner cost units, as EXPLAIN prints them. */
+export function formatCost(value: number | null | undefined): string {
+  return value === null || value === undefined ? "—" : cost.format(value);
+}

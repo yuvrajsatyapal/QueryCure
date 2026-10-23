@@ -1,10 +1,11 @@
 "use client";
 
-import { useMemo, useRef, useState, type KeyboardEvent } from "react";
-import { formatMs, formatPct, formatRows } from "@/lib/format";
-import { estimateLabel, isMisestimate } from "@/lib/plan/estimate";
-import { hottestNodeId } from "@/lib/plan/hottest";
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
+import { formatCost, formatMs, formatPct, formatRows } from "@/lib/format";
+import { estimateLabel } from "@/lib/plan/estimate";
+import { costShare, isFlaggedEstimate, nodeFlags, type EstimateAssessment } from "@/lib/plan/analysis";
 import type { NodeMetrics, PlanNode, PlanTree } from "@/lib/api/types";
+import { usePlanCollapse, type PlanCollapse } from "./usePlanCollapse";
 
 interface Row {
   node: PlanNode;
@@ -12,7 +13,7 @@ interface Row {
   hasChildren: boolean;
 }
 
-function visibleRows(root: PlanNode, collapsed: Set<number>): Row[] {
+function visibleRows(root: PlanNode, collapsed: ReadonlySet<number>): Row[] {
   const out: Row[] = [];
   const walk = (node: PlanNode, level: number) => {
     const children = node.children ?? [];
@@ -28,12 +29,30 @@ function label(node: PlanNode): string {
   return target ? ` on ${target}` : "";
 }
 
+const tag = "ml-2 rounded-sm border px-1 font-mono text-[11px] uppercase tracking-wider whitespace-nowrap";
+
+/** The estimate error with its severity in words (UI_UX §3.16). */
+export function EstimateCell({ estimate, metrics }: { estimate: EstimateAssessment; metrics: NodeMetrics | undefined }) {
+  if (estimate.level === "never_executed") return <span className="text-muted">never executed</span>;
+  const flagged = isFlaggedEstimate(estimate.level);
+  const tone = estimate.level === "severe" ? "text-rejected" : flagged ? "text-inconclusive" : "text-muted";
+  return (
+    <span className={tone}>
+      <span>{estimateLabel(metrics)}</span>
+      {flagged ? <span className="ml-1 font-sans text-[11px]">{estimate.level}</span> : null}
+      {estimate.level === "small" ? <span className="ml-1 font-sans text-[11px]">small rows</span> : null}
+      {estimate.level === "stopped_early" ? <span className="ml-1 font-sans text-[11px]">LIMIT above</span> : null}
+    </span>
+  );
+}
+
 export function PlanTreeTable({
   plan,
   metrics,
   onSelect,
   selectedId,
   citationCounts,
+  collapse,
 }: {
   plan: PlanTree;
   metrics: NodeMetrics[];
@@ -41,26 +60,34 @@ export function PlanTreeTable({
   selectedId?: number | null;
   /** Findings + hypotheses citing each node (UI_UX §3.6); omitted when not computed. */
   citationCounts?: ReadonlyMap<number, number>;
+  /** Collapse state owned by a parent (PlanExplorer); otherwise the table keeps its own. */
+  collapse?: PlanCollapse;
 }) {
-  const [collapsed, setCollapsed] = useState<Set<number>>(new Set());
+  const own = usePlanCollapse(plan, selectedId);
+  const { collapsed, toggle } = collapse ?? own;
   const [focusId, setFocusId] = useState<number>(plan.root.id);
+  const [followed, setFollowed] = useState(selectedId);
+  if (selectedId !== followed) {
+    setFollowed(selectedId);
+    if (selectedId != null) setFocusId(selectedId);
+  }
   const rowRefs = useRef(new Map<number, HTMLTableRowElement>());
   const byId = useMemo(() => new Map(metrics.map((m) => [m.nodeId, m])), [metrics]);
+  const flags = useMemo(() => nodeFlags(plan, metrics), [plan, metrics]);
   const rows = useMemo(() => visibleRows(plan.root, collapsed), [plan.root, collapsed]);
   const parents = useMemo(() => new Map(plan.nodes.map((n) => [n.id, n.parentId ?? null])), [plan.nodes]);
-  const hottestId = useMemo(() => hottestNodeId(metrics), [metrics]);
+  const costed = useMemo(() => new Map(plan.nodes.map((n) => [n.id, costShare(plan, n)])), [plan]);
+  const timed = plan.hasTiming;
+
+  useEffect(() => {
+    if (selectedId == null) return;
+    rowRefs.current.get(selectedId)?.scrollIntoView?.({ block: "nearest" });
+  }, [selectedId, rows]);
 
   const focusRow = (id: number) => {
     setFocusId(id);
     rowRefs.current.get(id)?.focus();
   };
-  const toggle = (id: number, expand: boolean) =>
-    setCollapsed((prev) => {
-      const next = new Set(prev);
-      if (expand) next.delete(id);
-      else next.add(id);
-      return next;
-    });
 
   function onKeyDown(event: KeyboardEvent, row: Row, index: number) {
     const id = row.node.id;
@@ -84,6 +111,18 @@ export function PlanTreeTable({
     } else if (event.key === "Enter" || event.key === " ") onSelect?.(id);
   }
 
+  const headers = [
+    "Node",
+    "Est. rows / loop",
+    "Actual rows / loop",
+    "Loops",
+    "Estimate",
+    timed ? "Est. cost" : "Est. cost (cumulative)",
+    "Time / loop",
+    "Self time",
+    "Buffers read / hit",
+  ];
+
   return (
     <div className="flex flex-col gap-2">
       {!plan.analyzed ? (
@@ -92,11 +131,11 @@ export function PlanTreeTable({
         </p>
       ) : null}
       <div className="overflow-x-auto rounded-lg border border-border">
-        <table role="treegrid" aria-label="Execution plan" className="w-full min-w-[720px] border-collapse text-sm">
+        <table role="treegrid" aria-label="Execution plan" className="w-full min-w-[1040px] border-collapse text-sm">
           <thead className="bg-surface-2 text-left text-xs text-muted">
             <tr role="row">
-              {["Node", "Est. rows / loop", "Actual rows / loop", "Estimate", "Self time", "Buffers read / hit"].map((h) => (
-                <th key={h} role="columnheader" className="px-3 py-2 font-medium">
+              {headers.map((h) => (
+                <th key={h} role="columnheader" className="px-3 py-2 font-medium whitespace-nowrap">
                   {h}
                 </th>
               ))}
@@ -104,61 +143,83 @@ export function PlanTreeTable({
           </thead>
           <tbody>
             {rows.map((row, index) => {
-              const m = byId.get(row.node.id);
-              const hottest = row.node.id === hottestId;
-              const selected = row.node.id === selectedId;
+              const node = row.node;
+              const m = byId.get(node.id);
+              const f = flags.get(node.id);
+              const selected = node.id === selectedId;
+              const share = costed.get(node.id) ?? null;
               return (
                 <tr
-                  key={row.node.id}
+                  key={node.id}
                   ref={(el) => {
-                    if (el) rowRefs.current.set(row.node.id, el);
-                    else rowRefs.current.delete(row.node.id);
+                    if (el) rowRefs.current.set(node.id, el);
+                    else rowRefs.current.delete(node.id);
                   }}
                   role="row"
                   aria-level={row.level}
-                  aria-expanded={row.hasChildren ? !collapsed.has(row.node.id) : undefined}
+                  aria-expanded={row.hasChildren ? !collapsed.has(node.id) : undefined}
                   aria-selected={selected}
-                  tabIndex={row.node.id === focusId ? 0 : -1}
+                  data-node-id={node.id}
+                  tabIndex={node.id === focusId ? 0 : -1}
                   onKeyDown={(e) => onKeyDown(e, row, index)}
-                  onFocus={() => setFocusId(row.node.id)}
-                  onClick={() => onSelect?.(row.node.id)}
+                  onFocus={() => setFocusId(node.id)}
+                  onClick={() => onSelect?.(node.id)}
                   className={`cursor-pointer border-t border-border font-mono text-[13px] tabular-nums hover:bg-surface-2 ${
                     selected ? "bg-accent-tint" : ""
-                  } ${hottest ? "shadow-[inset_3px_0_0_var(--accent)]" : ""}`}
+                  } ${f?.hottest ? "shadow-[inset_3px_0_0_var(--accent)]" : ""}`}
                 >
                   <td role="gridcell" className="px-3 py-2 font-sans" style={{ paddingLeft: `${12 + (row.level - 1) * 16}px` }}>
                     {row.hasChildren ? (
-                      <span aria-hidden className="mr-1 inline-block w-3 text-muted">
-                        {collapsed.has(row.node.id) ? "▸" : "▾"}
-                      </span>
+                      <button
+                        type="button"
+                        tabIndex={-1}
+                        aria-label={collapsed.has(node.id) ? `Expand ${node.nodeType}` : `Collapse ${node.nodeType}`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggle(node.id, collapsed.has(node.id));
+                        }}
+                        className="mr-1 inline-block w-3 text-muted hover:text-ink"
+                      >
+                        <span aria-hidden>{collapsed.has(node.id) ? "▸" : "▾"}</span>
+                      </button>
                     ) : (
                       <span aria-hidden className="mr-1 inline-block w-3" />
                     )}
-                    <span className="font-medium">{row.node.nodeType}</span>
-                    <span className="text-muted">{label(row.node)}</span>
-                    {hottest ? (
-                      <span className="ml-2 rounded-sm border border-accent px-1 font-mono text-[11px] uppercase tracking-wider text-accent">
-                        hottest
+                    {node.parentRelationship && node.parentRelationship !== "Outer" && node.parentRelationship !== "Member" ? (
+                      <span className="mr-1 text-[11px] text-muted">{node.subplanName ?? node.parentRelationship} ›</span>
+                    ) : null}
+                    <span className="font-medium">{node.nodeType}</span>
+                    <span className="text-muted">{label(node)}</span>
+                    {f?.hottest ? <span className={`${tag} border-accent text-accent`}>hottest</span> : null}
+                    {f?.expensive ? <span className={`${tag} border-inconclusive/60 text-inconclusive`}>expensive</span> : null}
+                    {citationCounts?.get(node.id) ? (
+                      <span className="ml-2 rounded-full border border-border px-1.5 text-[11px] whitespace-nowrap text-muted">
+                        cited by {citationCounts.get(node.id)}
                       </span>
                     ) : null}
-                    {citationCounts?.get(row.node.id) ? (
-                      <span className="ml-2 rounded-full border border-border px-1.5 font-sans text-[11px] whitespace-nowrap text-muted">
-                        cited by {citationCounts.get(row.node.id)}
+                    {m?.sortSpilled ? <span className="ml-2 text-xs text-inconclusive">spilled to disk</span> : null}
+                  </td>
+                  <td role="gridcell" className="px-3 py-2 text-right">{formatRows(node.planRows)}</td>
+                  <td role="gridcell" className="px-3 py-2 text-right">{formatRows(node.actualRows)}</td>
+                  <td role="gridcell" className="px-3 py-2 text-right text-muted">{node.actualLoops != null ? formatRows(node.actualLoops) : "—"}</td>
+                  <td role="gridcell" className="px-3 py-2 whitespace-nowrap">
+                    {f ? <EstimateCell estimate={f.estimate} metrics={m} /> : "—"}
+                  </td>
+                  <td role="gridcell" className="px-3 py-2 whitespace-nowrap text-muted">
+                    {node.totalCost != null ? `${formatCost(node.startupCost)}..${formatCost(node.totalCost)}` : "—"}
+                    {!timed && share !== null ? (
+                      <span aria-hidden className="mt-1 block h-1 w-24 rounded-sm bg-surface-2">
+                        <span className="block h-full rounded-sm bg-border-strong" style={{ width: `${Math.round(share * 100)}%` }} />
                       </span>
                     ) : null}
-                    {m?.sortSpilled ? (
-                      <span className="ml-2 text-xs text-inconclusive">spilled to disk</span>
-                    ) : null}
                   </td>
-                  <td role="gridcell" className="px-3 py-2 text-right">{formatRows(row.node.planRows)}</td>
-                  <td role="gridcell" className="px-3 py-2 text-right">{formatRows(row.node.actualRows)}</td>
-                  <td role="gridcell" className={`px-3 py-2 ${isMisestimate(m) ? "text-inconclusive" : "text-muted"}`}>
-                    {estimateLabel(m)}
+                  <td role="gridcell" className="px-3 py-2 whitespace-nowrap text-muted">
+                    {node.actualTotalTimeMs != null ? formatMs(node.actualTotalTimeMs) : "—"}
                   </td>
-                  <td role="gridcell" className="px-3 py-2">
+                  <td role="gridcell" className="px-3 py-2 whitespace-nowrap">
                     {m?.selfTimeMs != null ? `${formatMs(m.selfTimeMs)} · ${formatPct(m.selfTimeShare)}` : "—"}
                   </td>
-                  <td role="gridcell" className="px-3 py-2 text-muted">
+                  <td role="gridcell" className="px-3 py-2 whitespace-nowrap text-muted">
                     {m?.selfSharedReadBlocks != null ? `${formatRows(m.selfSharedReadBlocks)} / ${formatRows(m.selfSharedHitBlocks)}` : "—"}
                   </td>
                 </tr>

@@ -1,4 +1,6 @@
+import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
+import { applyTheme } from "./theme";
 
 /** Mode C through the real stack (API, worker, metadata DB, sandbox PostgreSQL) with the
  * offline stub LLM: the run must stop for approval with the exact SQL on screen, and only
@@ -40,4 +42,19 @@ test("sandbox - approve the candidate SQL, then see the benchmarked tournament",
   ).toBeVisible();
   await expect(page.getByRole("table", { name: /Baseline versus candidate/ })).toBeVisible();
   await expect(page.getByText(/Measured in the sandbox/)).toBeVisible();
+
+  // Pass 4 (UI_UX §3.17): recorded samples, speedup with the 1× reference, warnings, verdicts.
+  await expect(page.getByRole("region", { name: "Recommendation verdicts" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Measurement warnings" }).getByText(/Host contention is not recorded/)).toBeVisible();
+  await expect(page.getByRole("img", { name: /^Latency distribution · experiment [0-9a-f]{8} · round 1 · param set / })).toBeVisible();
+  // A speedup is drawn only when the engine recorded a valid one; otherwise the row says why.
+  await expect(page.getByRole("figure", { name: /Speedup with 95% CI/ }).getByText("1× no improvement")).toBeVisible();
+  for (const scheme of ["light", "dark"] as const) {
+    await applyTheme(page, scheme);
+    const result = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]).analyze();
+    const summary = result.violations.map((v) => `${v.id} (${v.impact}): ${v.nodes.map((n) => n.target.join(" ")).slice(0, 3).join(" | ")}`);
+    expect(summary, `tournament tab in ${scheme} mode`).toEqual([]);
+  }
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
 });
