@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useCommands } from "@/components/command/CommandProvider";
+import { KeyHint } from "@/components/command/KeyHint";
 import { Icon, type IconName } from "@/components/ui/Icon";
 
 interface NavItem {
@@ -57,12 +59,30 @@ function NavLink({ item, pathname, onNavigate }: { item: NavItem; pathname: stri
 
 export function SideNav({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
+  const { openPalette, mac } = useCommands();
   return (
     <nav aria-label="Main" className="flex flex-1 flex-col gap-5">
-      <Link href="/app/investigations/new" onClick={onNavigate} className="qc-btn-secondary w-full justify-start shadow-sm">
-        <Icon name="plus" size={15} className="text-muted" />
-        New investigation
-      </Link>
+      <div className="flex flex-col gap-1.5">
+        <button
+          type="button"
+          onClick={() => {
+            onNavigate?.();
+            openPalette();
+          }}
+          aria-keyshortcuts={mac ? "Meta+K" : "Control+K"}
+          className="qc-btn-ghost w-full justify-between border border-border px-2 text-[13px] font-normal"
+        >
+          <span className="flex items-center gap-2.5">
+            <Icon name="search" size={15} className="text-faint" />
+            Search or jump to…
+          </span>
+          <KeyHint keys={["Mod", "K"]} mac={mac} />
+        </button>
+        <Link href="/app/investigations/new" onClick={onNavigate} className="qc-btn-secondary w-full justify-start shadow-sm">
+          <Icon name="plus" size={15} className="text-muted" />
+          New investigation
+        </Link>
+      </div>
       {GROUPS.map((group) => (
         <div key={group.title ?? "main"} className="flex flex-col gap-0.5">
           {group.title ? <p className="px-2 pb-1 text-[11px] font-medium text-muted">{group.title}</p> : null}

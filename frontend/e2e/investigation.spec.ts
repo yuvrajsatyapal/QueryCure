@@ -8,13 +8,17 @@ const PLAN = readFileSync(join(__dirname, "orders-plan.json"), "utf8");
 
 test("investigation - start from an uploaded plan, follow the timeline, open cited evidence", async ({ page }) => {
   await page.goto("/app/investigations/new");
+  await page.getByRole("button", { name: "Check and continue" }).click();
+  await expect(page.getByText(/SELECT · orders · 0 parameters/)).toBeVisible();
   await page.getByLabel("Plan JSON").fill(PLAN);
   await page.getByRole("button", { name: "Analyze plan" }).click();
   await expect(page.getByRole("treegrid")).toBeVisible();
+  await page.getByRole("button", { name: "Continue" }).click();
+  await expect(page.getByRole("radio", { name: /Offline/ })).toBeChecked();
+  await page.getByRole("button", { name: "Continue" }).click();
 
-  await page.getByRole("button", { name: "New investigation" }).click();
   await page.getByLabel("Title").fill(`E2E orders ${Date.now()}`);
-  await expect(page.getByText("with the uploaded plan")).toBeVisible();
+  await expect(page.getByText(/Uploaded plan · uploaded plan · artifact/)).toBeVisible();
   await page.getByRole("button", { name: "Start investigation" }).click();
 
   await expect(page).toHaveURL(/\/app\/investigations\/[0-9a-f-]{36}$/, { timeout: 30_000 });

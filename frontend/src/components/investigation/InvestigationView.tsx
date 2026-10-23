@@ -34,7 +34,9 @@ import {
   planTargetOfEvidence,
   stepForClaim,
 } from "@/lib/investigation/links";
+import { useContextCommands, type Command } from "@/components/command/CommandProvider";
 import { Icon } from "@/components/ui/Icon";
+import { Skeleton } from "@/components/ui/Skeleton";
 import { RunStatusPill } from "@/components/ui/StatusPill";
 import { BudgetMeter } from "./BudgetMeter";
 import { FindingsPanel } from "./FindingsPanel";
@@ -46,6 +48,7 @@ import { TraceTree } from "./TraceTree";
 type Tab = "plan" | "findings" | "tournament" | "report";
 const ACTIVE = new Set(["queued", "running", "awaiting_approval", "cancelling"]);
 const RUN_ROW = "run";
+const NO_COMMANDS: Command[] = [];
 // Underlined tabs for the results area (Linear), pill segments for the small plan-view switch.
 const tabClass = (active: boolean) =>
   `-mb-px border-b-2 px-1 pb-2 text-sm ${active ? "border-accent font-medium text-ink" : "border-transparent text-muted hover:text-ink"}`;
@@ -59,6 +62,10 @@ export function InvestigationView({ id, requestedRunId }: { id: string; requeste
   const client = useQueryClient();
   const router = useRouter();
   const [tab, setTab] = useState<Tab>("findings");
+  const tabRef = useRef(tab);
+  useEffect(() => {
+    tabRef.current = tab;
+  }, [tab]);
   const [view, setView] = useState<"tree" | "graph">("tree");
   const [planSha, setPlanSha] = useState<string | null>(null);
   const [selected, setSelected] = useState<number | null>(null);
@@ -172,8 +179,29 @@ export function InvestigationView({ id, requestedRunId }: { id: string; requeste
     else setNotice(`No trace step recorded ${key}.`);
   }
 
+  // Palette entries and `[` `]` / `g f` `g p` `g t` `g r` for the result tabs (UI_UX §3.15).
+  const tabCommands = useMemo<Command[]>(() => {
+    const ids: Tab[] = ["findings", "plan", ...(sandbox ? (["tournament"] as const) : []), "report"];
+    const labels: Record<Tab, string> = { findings: "Findings", plan: "Plan", tournament: "Tournament", report: "Report" };
+    const show = (t: Tab) => {
+      setStep(RUN_ROW);
+      setEvidence(null);
+      setTab(t);
+    };
+    const shift = (by: number) => {
+      const i = ids.indexOf(tabRef.current);
+      show(ids[(i + by + ids.length) % ids.length] ?? tabRef.current);
+    };
+    return [
+      ...ids.map((t) => ({ id: `tab-${t}`, label: `Show ${labels[t]} tab`, group: "This investigation" as const, keys: ["g", t.charAt(0)], run: () => show(t) })),
+      { id: "tab-prev", label: "Previous result tab", group: "This investigation", keys: ["["], run: () => shift(-1) },
+      { id: "tab-next", label: "Next result tab", group: "This investigation", keys: ["]"], run: () => shift(1) },
+    ];
+  }, [sandbox]);
+  useContextCommands("investigation", investigation.data ? tabCommands : NO_COMMANDS);
+
   if (investigation.error) return <ErrorNotice error={investigation.error} />;
-  if (!investigation.data) return <p className="text-muted">Loading investigation…</p>;
+  if (!investigation.data) return <Skeleton label="Loading investigation" lines={3} className="max-w-xl" />;
 
   const currentPlan = plans.data?.items.find((p) => p.sha256 === planSha) ?? plans.data?.items[0];
   const selectedNode = currentPlan?.plan.nodes.find((n) => n.id === selected);

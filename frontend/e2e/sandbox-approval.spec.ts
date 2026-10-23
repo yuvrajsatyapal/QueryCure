@@ -5,13 +5,16 @@ import { expect, test } from "@playwright/test";
  * after approval benchmark in the sandbox and show a tournament verdict. */
 test("sandbox - approve the candidate SQL, then see the benchmarked tournament", async ({ page }) => {
   await page.goto("/app/investigations/new");
-  await page.getByRole("tab", { name: "Demo workload" }).click();
-  await page.getByLabel("Workload").selectOption("orders_ecommerce");
+  await page.getByRole("button", { name: "Check and continue" }).click();
+  await page.getByRole("radio", { name: /Demo workload/ }).check();
+  await page.getByLabel("Workload", { exact: true }).selectOption("orders_ecommerce");
   await page.getByLabel("Scale factor").selectOption("0.01");
 
-  await page.getByRole("button", { name: "New investigation" }).click();
+  await page.getByRole("button", { name: "Continue" }).click();
+  await expect(page.getByRole("radio", { name: /Sandbox benchmark/ })).toBeChecked();
+  await page.getByRole("button", { name: "Continue" }).click();
   await page.getByLabel("Title").fill(`E2E sandbox ${Date.now()}`);
-  await expect(page.getByText(/Mode: sandbox benchmark on/)).toBeVisible();
+  await expect(page.getByText(/Demo workload · orders_ecommerce@v\d+:sf=0\.01:seed=\d+/).first()).toBeVisible();
   await page.getByRole("button", { name: "Start investigation" }).click();
   await expect(page).toHaveURL(/\/app\/investigations\/[0-9a-f-]{36}$/, { timeout: 30_000 });
 

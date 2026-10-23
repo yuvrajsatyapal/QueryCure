@@ -4,7 +4,7 @@
 |---|---|
 | Phase | **5 — Production polish** (authorized by the owner 2026-10-16). Phase 1: [PHASE_1_REPORT](reports/PHASE_1_REPORT.md); Phase 2: [PHASE_2_REPORT](reports/PHASE_2_REPORT.md); Phase 3: [PHASE_3_REPORT](reports/PHASE_3_REPORT.md); Phase 4 owner-reviewed 2026-10-16: [PHASE_4_REPORT](reports/PHASE_4_REPORT.md) |
 | Status | **Phase 5 implementation complete and verified locally (2026-10-16); not publicly deployed; awaiting owner review** ([PHASE_5_REPORT](reports/PHASE_5_REPORT.md)). Exit criterion "deployed" not met by design (needs owner approval, domain, accounts) |
-| Last updated | 2026-10-19 |
+| Last updated | 2026-10-23 |
 | Application code | Phases 1–3 (API, metadata DB, parsing, inspection gateway, artifact store, six demo workloads, multi-agent graph, approval gate, sandbox benchmark engine `bench@2`, tournament, web workspace) plus Phase 4: Benchmark Auditor (deterministic checks + downgrade-only review), atomic finalization with versioned reports (`report-builder@1`, `report-md@1`), report replay, experiment replay with statistical comparison, re-investigation start, plan diff; migrations 0001–0012; web app adds Report tab, report and replay pages, lineage drawer, audit panel and plan diff |
 
 ## Post-Phase-5 addition (2026-10-16)
@@ -92,6 +92,29 @@
   - **History:** server-side outcome filter (the frontend client gained the `outcome` param the API already had), Clear filters, result line, and grouping by local day. Sorting and mode filtering are **not offered**: the endpoint has a fixed newest-first order and no mode parameter.
   - **Demo gallery:** outcome pills, a Prerecorded tag on every card, benchmark stats as a table of the API's own strings, and the demo header matches the app.
   - **Verified:** lint, typecheck, 122 unit tests, build, e2e 15/15 against local Docker (axe now also covers Connections, light and dark). Browser check on local data at 398px and 1280px.
+
+- [x] **UI Pass 3: guided New investigation, command palette, keyboard shortcuts (2026-10-23, UI_UX §3.14–§3.15, owner-approved).** Frontend only. Existing endpoints, and the same create request body as before, so server validation, mode rules, approvals and the idempotency key are unchanged. No backend or schema change.
+  - **Guided flow:** SQL query → Plan source → Investigation mode → Review & start.
+    - Step 1 checks the SQL through `POST /inspect/sql`, which runs the same `validate_select` as creation.
+    - A workload example that replaces the SQL makes the check stale, and Review checks it again before Start is enabled.
+    - Modes the plan source cannot support are disabled with the reason (`lib/investigations/wizard.ts`, TDD).
+    - Focus moves to each newly opened step. `⌘/Ctrl+Enter` advances outside the SQL editor; CodeMirror keeps its own `Mod-Enter`.
+  - **Suggested titles:** `suggestTitle` (`lib/investigations/title.ts`, TDD) is pure and deterministic, with no LLM. It strips comments and literals and excludes CTE names. A blank title submits the suggestion; a typed title overrides it.
+  - **Command palette:** `⌘K` / `Ctrl+K`, or the sidebar "Search or jump to…" button. It holds actions, navigation, the investigation page's tab commands, recent investigations, and title search through `GET /investigations?q=` (debounced, with a skeleton and an empty state). It is a modal combobox with a focus trap and focus restore.
+  - **Shortcuts:** `?`, `c`, `g d/h/c/s`, and on the investigation page `[`/`]` and `g f/p/t/r`. None fire while you type in a field or CodeMirror, or while a modal is open. The shortcuts dialog is generated from the live command list.
+  - **Feedback:** skeletons while workloads, connections, plans and the investigation load; pending button labels; a polite announcement after a theme change.
+  - **Fixes found in verification:**
+    - The API sends `statement_type` in lower case; it is now displayed in upper case, and the unit mock now matches the API.
+    - The palette's group-label ids contained spaces, which broke `aria-labelledby`.
+    - axe `scrollable-region-focusable` failed once the results overflowed. The results region is now a tab stop with the same keys, and the e2e forces the overflow.
+  - **Verified:**
+    - lint, typecheck, 158 unit tests (title 10, wizard rules 5, keyboard helpers 6, Workspace 10, commands 10), build;
+    - e2e 18/18 on three consecutive runs against local Docker, including the new `keyboard.spec.ts`: keyboard-only start, tab shortcuts, palette search, axe with the palette open in light and dark, and 390 px mobile;
+    - browser check on local stub-model data at 1366 px and 375 px.
+  - **Not done:**
+    - The palette offers no destructive actions (cancel run, delete).
+    - On non-US layouts, `?` depends on the browser reporting `?` as the key.
+  - **Environment note:** at the time of this pass, `next build` / `next dev` printed a Next.js security advisory and stopped every other invocation; a retry continues. The e2e runs above were retried on that stop. The Next.js upgrade is not part of this pass.
 
 ## Completed
 

@@ -7,10 +7,13 @@ import { expect, test } from "@playwright/test";
 test("lifecycle - approve, audit, report, verify, replay the experiment", async ({ page }) => {
   test.setTimeout(240_000);
   await page.goto("/app/investigations/new");
-  await page.getByRole("tab", { name: "Demo workload" }).click();
-  await page.getByLabel("Workload").selectOption("orders_ecommerce");
+  await page.getByRole("button", { name: "Check and continue" }).click();
+  await page.getByRole("radio", { name: /Demo workload/ }).check();
+  await page.getByLabel("Workload", { exact: true }).selectOption("orders_ecommerce");
   await page.getByLabel("Scale factor").selectOption("0.01");
-  await page.getByRole("button", { name: "New investigation" }).click();
+  await page.getByRole("button", { name: "Continue" }).click();
+  await expect(page.getByRole("radio", { name: /Sandbox benchmark/ })).toBeChecked();
+  await page.getByRole("button", { name: "Continue" }).click();
   await page.getByLabel("Title").fill(`E2E lifecycle ${Date.now()}`);
   await page.getByRole("button", { name: "Start investigation" }).click();
   await expect(page).toHaveURL(/\/app\/investigations\/[0-9a-f-]{36}$/, { timeout: 30_000 });

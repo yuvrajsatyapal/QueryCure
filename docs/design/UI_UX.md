@@ -66,7 +66,7 @@ Three resizable panels:
 - **Draft state:** editor active, "Start investigation" primary; plan tab shows uploaded/EXPLAIN plan if available.
 - **Running:** editor read-only (shows the exact query being investigated); timeline streams; findings appear incrementally with ClaimBadges.
 - **Findings tab:** hypotheses list sorted by confidence; each shows statement, ClaimBadge, supporting/contradicting EvidenceChips, verification method, linked candidates. Clicking an EvidenceChip highlights the plan node in the Plan tab.
-- **Keyboard:** `⌘/Ctrl+Enter` start, `Esc` close drawers, `[`/`]` switch tabs, `g p` plan, `g f` findings.
+- **Keyboard:** see §3.15 (palette and shortcuts, UI Pass 3).
 - **Mobile:** tabs Query · Plan · Agents · Results; approval card full-screen modal.
 
 ### 3.5 Execution-plan explorer (`/plan-explorer`, also embedded)
@@ -142,6 +142,42 @@ The sealed report JSON is rendered as stored: no section content is recomputed, 
 ### 3.13 Demo gallery (`/demo`)
 - **Investigation cards** (UI Pass 2): title link, outcome pill (words + icon), headline, the "What this case tests" disclosure, and a footer that always carries **Prerecorded** plus model, recorded date and "measured on …" or "no benchmark". The text of every label, headline and summary is the API's, unchanged.
 - **Benchmark cards:** per arm a verdict badge, kind and first reason code, the exact SQL, then a small table per parameter set (baseline median, candidate median, speed-up with 95% interval, n) instead of a sentence list. Numbers are the API's strings, not recomputed. The card's provenance label stays visible.
+
+### 3.14 New investigation (`/app/investigations/new`): guided flow (UI Pass 3)
+Frontend only. Same endpoints (`POST /inspect/sql`, `POST /inspect/plan`, `POST /connections/{id}/explain`, `GET /workloads`, `GET /settings/models`, `POST /investigations`), same request body as before Pass 3, so every server-side check (`validate_select`, the mode rules, production-connection refusal, param-set arity, approvals) applies unchanged.
+
+- **Layout:** a four-step wizard on the left; the plan preview (tree / graph, node details) on the right from `xl` up, below it on smaller screens. A step list (`<ol>`, `aria-current="step"`) shows progress. Completed steps can be reopened. Later steps open only once the earlier ones are valid.
+- **1 · SQL query:** the CodeMirror editor. **Continue** sends the text to `POST /inspect/sql`, which uses the same validator as creation. On success the step shows the statement type (the API sends it lower-case; it is displayed upper-case), the tables and the parameter count. On failure it shows the API's message and the step stays open. Editing the SQL afterwards marks the check stale, and Review checks again before Start is enabled.
+- **2 · Plan source:** *Upload plan* (paste or file, then Analyze), *Live EXPLAIN* (connection, then Run EXPLAIN; plain EXPLAIN only), *Demo workload* (workload, scale and example query; picking one replaces the SQL with the example, and the step says so), or *No plan* (agents work from the SQL text). An upload or live source needs a plan before Continue. A workload needs a workload.
+- **3 · Investigation mode:** three radio cards: Offline, Live inspection and Sandbox benchmark. Only the modes the chosen source supports are enabled. Each disabled card says why, for example "Choose a connection in Plan source". The default is the mode the source implies, which matches the pre-Pass-3 behaviour. The step also holds the objective and the param sets, plus the parameter count from step 1. For sandbox mode it adds the existing approval note and the pre-authorize checkbox, unchanged.
+- **4 · Review & start:** a read-only summary of every choice, each with an Edit button. A demo workload shows its full workload id here (`orders_ecommerce@v1:sf=0.01:seed=42`), as the old form did. Then the title, the model line and **Start investigation**. Start keeps the per-form idempotency key.
+- **Suggested title:** `suggestTitle(sql)` in `lib/investigations/title.ts` is pure, deterministic code with no LLM and no network call. It strips comments and literals, then builds the title from the tables (CTE names excluded, at most 3, then "+N"), the WHERE columns (at most 2), GROUP BY / aggregate, the first ORDER BY column and LIMIT. Example: `orders · where customer_id · order by created_at · limit 20`. The result is capped at 120 characters. The title field shows it as the placeholder plus a "Suggested:" hint. A blank title submits the suggestion, and anything typed overrides it. No suggestion (SQL that cannot be read) → a title is required, as before.
+- **Keyboard:** `⌘/Ctrl+Enter` continues to the next step, or starts on Review. Inside the SQL editor CodeMirror keeps its own `Mod-Enter`, so press `Tab` to leave the editor first. Focus moves to the heading of each newly opened step.
+- **States:** pending buttons read "Checking…", "Analyzing…", "Running EXPLAIN…" or "Starting…". The workload and connection selects show a skeleton line while they load. Errors appear through `ErrorNotice` with the API's message.
+
+### 3.15 Command palette and keyboard shortcuts (UI Pass 3)
+- **Palette:** `⌘K` (macOS) or `Ctrl+K` opens it from anywhere in `/app`, inputs included. It is a modal `dialog` with a combobox and a listbox (`aria-activedescendant`). Focus is trapped while it is open and returns to the previous element when it closes. `↑/↓` move, `Enter` runs, `Esc` closes.
+- **Groups:**
+  1. *Actions*: New investigation, Switch to light/dark theme, Keyboard shortcuts.
+  2. *Navigate*: Dashboard, History, Connections, Settings, Demo gallery.
+  3. *This investigation*, only on an investigation page: Show Findings / Plan / Tournament / Report.
+  4. *Investigations*: title search through `GET /investigations?q=…&limit=8`, debounced 200 ms, with a skeleton while loading and a "No matching investigations" line when nothing is found.
+
+  Commands are filtered with a case-insensitive match on the words of their label. Nothing is fabricated: every command is an existing route or action.
+- **Shortcuts** (none fire while focus is in an input, textarea, select, contenteditable or CodeMirror, while a modifier other than Shift is held, or while a modal dialog is open):
+
+  | Keys | Action |
+  |---|---|
+  | `⌘K` / `Ctrl+K` | Command palette (works in inputs) |
+  | `?` | Keyboard shortcuts dialog |
+  | `c` | New investigation |
+  | `g d` · `g h` · `g c` · `g s` | Dashboard · History · Connections · Settings |
+  | `[` / `]` | Previous / next result tab (investigation page) |
+  | `g f` · `g p` · `g t` · `g r` | Findings · Plan · Tournament · Report tab (investigation page) |
+  | `⌘/Ctrl+Enter` | Next step / Start (new investigation, outside the SQL editor) |
+
+  A `g` sequence expires after 1 s. The sidebar shows the `⌘K` hint as a button, which also opens the palette by pointer or touch.
+- **Feedback:** after a theme change from the palette, a polite live region announces it ("Dark theme on"). Navigation needs no toast.
 
 ## 4. Key interaction flows
 
