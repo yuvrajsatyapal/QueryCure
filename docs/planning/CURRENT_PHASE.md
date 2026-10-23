@@ -157,6 +157,28 @@
   - **Verified:** ruff, mypy, 1005 unit, 626 integration + security, smoke evals 5/5 (0 real requests), frontend lint/typecheck/239 tests/build, e2e 18/18 ×3 with 0 server errors, audits (runtime 0), demo stack `demo_probe` 17/17.
   - **Disclosure:** one `alembic current` read `alembic_version` on Neon as the owner role, because `backend/.env` defines `DATABASE_MIGRATION_URL` twice. Read-only.
   - **Open (ranked in the report):** host and domain; real OAuth; access is not restricted (anonymous sessions; an allowlist needs approval); Neon compute allowance with an always-on worker; alerting not wired; `TRUSTED_PROXY_HOPS` for the host; hosted restore check; master-key rotation; CSP `unsafe-inline`.
+- [x] **Restricted-trial sign-in allowlist (2026-10-23, [ADR-0031](../engineering/adr/ADR-0031-restricted-access-email-allowlist.md), [DEPLOYMENT §3a](../architecture/DEPLOYMENT.md#managing-approved-accounts-option-b)).** Closes the code side of hardening item N6. Nothing deployed; **no migration** (`users.email` exists since 0001).
+  - **Settings.** `RESTRICTED_ACCESS` and `ACCESS_ALLOWLIST` (a JSON list).
+    - Demo profile only, and needs an OAuth provider.
+    - A list without the switch is refused at startup.
+    - `[]` admits nobody.
+  - **Backend.**
+    - `POST /session` returns 403 `ACCESS_DENIED` and creates no anonymous user.
+    - `current_user` and `stream_user` re-check the stored email on every request: 401 without a session (or with a leftover anonymous one), 403 for an account that is not approved. Removing an address and restarting therefore revokes existing sessions.
+    - The callback accepts only a provider-verified email (Google `email_verified`, GitHub `/user/emails` `verified`) and refuses with `not_allowed` before writing any row or session.
+    - Email scopes are requested only while restricted, so open mode is unchanged.
+    - New public `GET /auth/options`. The list is never echoed in responses or logs.
+  - **Web.** SessionGate shows a sign-in screen when the session is refused, and a "not approved" screen with sign-out.
+  - **Verified:**
+    - Backend: ruff, format, mypy; `pytest` 1657 passed (unit, integration and security), including 17 new security tests and 8 new settings tests. Security suite alone: 162. Smoke evals 5/5.
+    - Frontend: lint, typecheck, 243 tests (4 new for SessionGate), build.
+    - e2e: 18/18 (local profile, stub model).
+  - **Not verified:** real Google/GitHub email scopes on a deployed origin (mocked providers only).
+  - **Limitations:**
+    - List changes need a restart.
+    - An already-open SSE stream and already-queued jobs are not cut off.
+    - The demo gallery stays public.
+    - Approved emails are stored in `users.email`.
 
 ## Completed
 

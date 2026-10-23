@@ -16,6 +16,10 @@ the code, and links the account:
 
 Both endpoints are browser navigations (GET, no CSRF header possible); the state check is
 the CSRF defence. Failures redirect to the web app with `?auth_error=<code>`.
+
+While access is restricted (ADR-0031) the email scope is requested, and an account with no
+verified address on ACCESS_ALLOWLIST is refused (`not_allowed`) before any row or session is
+written. There are no anonymous users to link in that mode.
 """
 
 import base64
@@ -32,7 +36,7 @@ from fastapi.responses import RedirectResponse
 from querycure.api.deps import ConnDep, OptionalUser, SettingsDep, hash_token
 from querycure.api.rate_limit import rate_limit
 from querycure.api.routers.session import issue_session
-from querycure.auth import github, google, oauth
+from querycure.auth import access, github, google, oauth
 from querycure.core.config import Profile, Settings
 from querycure.core.errors import FeatureDisabledError
 from querycure.core.logging import get_logger
@@ -133,6 +137,7 @@ def _build_router(provider: Provider) -> APIRouter:
                 redirect_uri=_redirect_uri(settings, provider),
                 state=state,
                 verifier=verifier,
+                with_email=settings.restricted_access,
             ),
             status_code=302,
         )
@@ -181,14 +186,20 @@ def _build_router(provider: Provider) -> APIRouter:
                 redirect_uri=_redirect_uri(settings, provider),
                 code=code,
                 verifier=verifier,
+                with_email=settings.restricted_access,
             )
         except oauth.OAuthError as exc:
             return _fail(settings, provider, exc.code)
+        email = access.approved_email(settings, identity)
+        if settings.restricted_access and email is None:
+            return _fail(settings, provider, "not_allowed")
 
         account = await users.find_oauth_user(
             conn, provider=provider.name, subject=identity.subject
         )
-        anonymous = current if current is not None and current.kind is UserKind.ANONYMOUS else None
+        # A restricted trial never links an anonymous session left over from open mode.
+        linkable = current is not None and current.kind is UserKind.ANONYMOUS
+        anonymous = current if linkable and not settings.restricted_access else None
         if account is None and anonymous is not None:
             account = await users.convert_to_oauth(
                 conn, user_id=anonymous.id, provider=provider.name, subject=identity.subject,
@@ -200,9 +211,10 @@ def _build_router(provider: Provider) -> APIRouter:
                 provider=provider.name,
                 subject=identity.subject,
                 display_name=identity.display_name,
+                email=email,
             )
         else:
-            await users.touch_oauth_user(conn, account.id, identity.display_name)
+            account = await users.touch_oauth_user(conn, account.id, identity.display_name, email)
             if anonymous is not None and anonymous.id != account.id:
                 await move_credentials(conn, settings, from_user=anonymous.id, to_user=account.id)
                 await users.merge_user_data(conn, from_user=anonymous.id, to_user=account.id)

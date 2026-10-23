@@ -46,6 +46,14 @@ class UnauthenticatedError(QueryCureError):
     status = 401
 
 
+class AccessDeniedError(QueryCureError):
+    """Restricted trial (ADR-0031): the caller is not an approved account. The message never
+    says which accounts are approved."""
+
+    code = "ACCESS_DENIED"
+    status = 403
+
+
 class CsrfFailedError(QueryCureError):
     code = "CSRF_FAILED"
     status = 403

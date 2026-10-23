@@ -34,7 +34,7 @@ async def get_session_user(conn: AsyncConnection, token_hash: str) -> User | Non
     row = (
         await conn.execute(
             text(
-                "SELECT u.id, u.kind, u.display_name FROM sessions s "
+                "SELECT u.id, u.kind, u.display_name, u.email FROM sessions s "
                 "JOIN users u ON u.id = s.user_id AND u.deleted_at IS NULL "
                 "WHERE s.token_hash = :token_hash AND s.deleted_at IS NULL AND s.expires_at > now()"
             ),

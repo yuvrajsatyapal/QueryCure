@@ -6,6 +6,7 @@ type Camel<K extends keyof Schemas> = CamelCasedPropertiesDeep<Schemas[K]>;
 
 export type User = Camel<"UserOut">;
 export type Me = Camel<"MeResponse">;
+export type AuthOptions = Camel<"AuthOptions">;
 export type ConnectionSummary = Camel<"ConnectionSummary">;
 export type ConnectionList = Camel<"ConnectionList">;
 export type ConnectionTestResult = Camel<"ConnectionTestResponse">;

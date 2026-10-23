@@ -19,6 +19,8 @@ class OAuthError(Exception):
 class OAuthIdentity:
     subject: str  # the provider's stable id: display names and logins can change, this cannot
     display_name: str
+    # Lowercased, provider-verified addresses; collected only when asked for (ADR-0031).
+    verified_emails: frozenset[str] = frozenset()
 
 
 def new_state() -> str:

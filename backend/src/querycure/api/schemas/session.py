@@ -27,6 +27,12 @@ class Features(BaseModel):
     google_login: bool = False
 
 
+class AuthOptions(BaseModel):
+    restricted_access: bool
+    github_login: bool
+    google_login: bool
+
+
 class MeResponse(BaseModel):
     user: UserOut
     profile: Profile

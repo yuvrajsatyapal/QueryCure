@@ -36,7 +36,7 @@ Status: Planned. Base path `/api/v1`. JSON is `snake_case`. Timestamps ISO 8601 
 |---|---|
 | 400 | `BAD_REQUEST`, `INVALID_PLAN_FORMAT` |
 | 401 | `UNAUTHENTICATED` |
-| 403 | `CSRF_FAILED`, `FEATURE_DISABLED` (e.g. Mode B on public demo) |
+| 403 | `CSRF_FAILED`, `FEATURE_DISABLED` (e.g. Mode B on public demo), `ACCESS_DENIED` (restricted trial: no anonymous session, or an account that is not approved; ADR-0031) |
 | 404 | `NOT_FOUND`, `NOT_FINALIZED` (manifest requested for an unfinalized run) |
 | 409 | `INVALID_STATE` (e.g. approving a non-pending request), `IDEMPOTENCY_CONFLICT`, `APPROVAL_REQUIRED` |
 | 413 | `PAYLOAD_TOO_LARGE` |
@@ -59,7 +59,8 @@ Error messages never include credentials, DSNs, or raw driver errors (driver err
 ### Session & settings
 | Method | Path | Purpose | Phase |
 |---|---|---|---|
-| POST | `/session` | Create anonymous/local session; sets cookies | 1 |
+| POST | `/session` | Create anonymous/local session; sets cookies. With `RESTRICTED_ACCESS`: 200 for an approved signed-in session, else 403 `ACCESS_DENIED` and nothing is created | 1 |
+| GET | `/auth/options` | Public: `{restricted_access, github_login, google_login}` for the sign-in screen; never the allowlist | 5 ✅ |
 | GET | `/me` | Current user + feature flags + profile (`local`/`demo`) | 1 |
 | GET | `/auth/{github,google}/login?return_to=`, `/auth/{github,google}/callback` | OAuth (state + PKCE in a 10-minute HttpOnly cookie; `return_to` must be a relative path). 403 `FEATURE_DISABLED` unless configured. Failures redirect to `WEB_BASE_URL/app?auth_error=<code>` | 5 ✅ |
 | POST | `/auth/logout` | 204; revokes the session row and clears both cookies; needs the CSRF token | 5 ✅ |

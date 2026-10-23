@@ -184,3 +184,62 @@ def test_a_blank_master_key_still_fails_closed_in_the_demo_profile(
     monkeypatch.setenv("QC_MASTER_KEY", "")
     with pytest.raises(ValueError, match="QC_MASTER_KEY"):
         Settings(_env_file=None, profile="demo", allow_private_targets=False)
+
+
+def _restricted(**overrides: object) -> Settings:
+    base: dict[str, object] = {
+        "_env_file": None,
+        "profile": Profile.DEMO,
+        "allow_private_targets": False,
+        "master_key": key(),
+        "google_client_id": "abc",
+        "google_client_secret": "s",
+        "public_api_url": "https://api.example.com",
+        "web_base_url": "https://app.example.com",
+        "restricted_access": True,
+    }
+    return Settings(**{**base, **overrides})  # type: ignore[arg-type]
+
+
+def test_restricted_access_is_off_by_default() -> None:
+    settings = Settings(_env_file=None)
+
+    assert settings.restricted_access is False
+    assert settings.allowed_emails == frozenset()
+
+
+def test_allowlist_is_normalised_to_trimmed_lowercase() -> None:
+    settings = _restricted(access_allowlist=["  Ada@Example.COM ", "ada@example.com", "b@x.dev"])
+
+    assert settings.allowed_emails == frozenset({"ada@example.com", "b@x.dev"})
+
+
+def test_allowlist_is_read_from_the_environment(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("ACCESS_ALLOWLIST", '["ada@example.com"]')
+
+    assert _restricted().allowed_emails == frozenset({"ada@example.com"})
+
+
+def test_restricted_access_is_refused_in_the_local_profile() -> None:
+    with pytest.raises(ValidationError, match="RESTRICTED_ACCESS"):
+        Settings(_env_file=None, restricted_access=True)
+
+
+def test_restricted_access_needs_an_oauth_provider() -> None:
+    with pytest.raises(ValidationError, match="RESTRICTED_ACCESS"):
+        _restricted(google_client_id=None, google_client_secret=None)
+
+
+def test_an_allowlist_without_restricted_access_is_refused() -> None:
+    # An operator who sets the list but not the switch must not believe access is restricted.
+    with pytest.raises(ValidationError, match="ACCESS_ALLOWLIST"):
+        _restricted(restricted_access=False, access_allowlist=["ada@example.com"])
+
+
+def test_an_empty_allowlist_is_a_valid_kill_switch() -> None:
+    assert _restricted(access_allowlist=[]).allowed_emails == frozenset()
+
+
+def test_allowlist_entries_must_look_like_emails() -> None:
+    with pytest.raises(ValidationError, match="ACCESS_ALLOWLIST"):
+        _restricted(access_allowlist=["not-an-email"])

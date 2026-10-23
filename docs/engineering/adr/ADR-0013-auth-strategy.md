@@ -26,3 +26,7 @@ All endpoints depend on `current_user`; anonymous users are real `users` rows (`
 ## Amendment (2026-10-16): Google sign-in
 
 Google is a second OAuth provider on the same flow (authorization code, `state`, PKCE S256, rotated session). The endpoints and the account-linking logic are shared; a `Provider` supplies only its endpoints and credentials. Accounts are identified by `(auth_provider, auth_subject)`, where Google's subject is the OIDC `sub` claim. No migration was needed. Scopes are `openid profile`: no email is requested, so accounts on different providers are never merged by email and the same person on GitHub and Google has two accounts. Each provider is enabled independently by its own client ID and secret.
+
+## Amendment (2026-10-23): restricted trial
+
+[ADR-0031](ADR-0031-restricted-access-email-allowlist.md) adds `RESTRICTED_ACCESS`. While it is on, there are no anonymous sessions, and the email scopes are requested so that a provider-verified address can be checked against a server-side allowlist. With it off, everything above holds unchanged, including "no email requested".

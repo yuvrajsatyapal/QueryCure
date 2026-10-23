@@ -14,8 +14,16 @@ from querycure.api.deps import (
     hash_token,
 )
 from querycure.api.rate_limit import rate_limit
-from querycure.api.schemas.session import Features, MeResponse, SessionResponse, UserOut
+from querycure.api.schemas.session import (
+    AuthOptions,
+    Features,
+    MeResponse,
+    SessionResponse,
+    UserOut,
+)
+from querycure.auth.access import DENIED, admit
 from querycure.core.config import Profile, Settings
+from querycure.core.errors import AccessDeniedError, UnauthenticatedError
 from querycure.db.repositories import sessions, users
 from querycure.domain.users import User
 
@@ -64,6 +72,13 @@ async def create_session(
     settings: SettingsDep,
     existing: OptionalUser,
 ) -> SessionResponse:
+    if settings.restricted_access:
+        # No anonymous sessions in a restricted trial (ADR-0031): only an approved signed-in
+        # session is handed back; everyone else is sent to sign in.
+        try:
+            existing = admit(settings, existing)
+        except UnauthenticatedError as exc:
+            raise AccessDeniedError(DENIED) from exc
     if existing is not None:
         response.status_code = status.HTTP_200_OK
         return SessionResponse(user=UserOut.from_user(existing))
@@ -93,6 +108,17 @@ async def logout(request: Request, conn: ConnDep, settings: SettingsDep) -> Resp
             samesite="lax",
         )
     return response
+
+
+@router.get("/auth/options")
+async def auth_options(settings: SettingsDep) -> AuthOptions:
+    """Public: what the sign-in screen should offer before any session exists. Says whether
+    access is restricted, never who is approved."""
+    return AuthOptions(
+        restricted_access=settings.restricted_access,
+        github_login=settings.github_login_enabled,
+        google_login=settings.google_login_enabled,
+    )
 
 
 @router.get("/me")

@@ -379,6 +379,29 @@
         "title": "ArtifactRefOut",
         "type": "object"
       },
+      "AuthOptions": {
+        "properties": {
+          "github_login": {
+            "title": "Github Login",
+            "type": "boolean"
+          },
+          "google_login": {
+            "title": "Google Login",
+            "type": "boolean"
+          },
+          "restricted_access": {
+            "title": "Restricted Access",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "restricted_access",
+          "github_login",
+          "google_login"
+        ],
+        "title": "AuthOptions",
+        "type": "object"
+      },
       "BlockOut": {
         "properties": {
           "arm": {
@@ -6642,6 +6665,28 @@
           }
         },
         "summary": "Logout",
+        "tags": [
+          "session"
+        ]
+      }
+    },
+    "/api/v1/auth/options": {
+      "get": {
+        "description": "Public: what the sign-in screen should offer before any session exists. Says whether\naccess is restricted, never who is approved.",
+        "operationId": "auth_options_api_v1_auth_options_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthOptions"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Auth Options",
         "tags": [
           "session"
         ]

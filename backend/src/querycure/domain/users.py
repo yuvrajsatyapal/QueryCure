@@ -16,3 +16,5 @@ class User(BaseModel):
     id: uuid.UUID
     kind: UserKind
     display_name: str | None = None
+    # Provider-verified, stored only while access is restricted (ADR-0031); never returned.
+    email: str | None = None

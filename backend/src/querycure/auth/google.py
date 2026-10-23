@@ -1,7 +1,9 @@
 """Google sign-in (OpenID Connect authorization-code flow with state and PKCE; ADR-0013).
 
 Only the `sub` claim (Google's stable, never-reused account id) and the display name are kept.
-The scope is `openid profile`: no email address is requested or stored. The access token is used
+The scope is `openid profile`: no email address is requested or stored, except while access
+is restricted (ADR-0031), when `email` is added and only an address Google marks verified
+counts. The access token is used
 for one userinfo call over TLS and then discarded; provider tokens are never stored. The profile
 comes from the userinfo endpoint rather than from an unverified ID token.
 """
@@ -19,13 +21,15 @@ TIMEOUT_SECONDS = 10.0
 FALLBACK_NAME = "Google user"
 
 
-def authorize_url(*, client_id: str, redirect_uri: str, state: str, verifier: str) -> str:
+def authorize_url(
+    *, client_id: str, redirect_uri: str, state: str, verifier: str, with_email: bool = False
+) -> str:
     query = urlencode(
         {
             "client_id": client_id,
             "redirect_uri": redirect_uri,
             "response_type": "code",
-            "scope": "openid profile",
+            "scope": "openid email profile" if with_email else "openid profile",
             "state": state,
             "code_challenge": challenge(verifier),
             "code_challenge_method": "S256",
@@ -42,6 +46,7 @@ async def exchange(
     redirect_uri: str,
     code: str,
     verifier: str,
+    with_email: bool = False,
 ) -> OAuthIdentity:
     try:
         token_response = await http.post(
@@ -76,4 +81,9 @@ async def exchange(
         raise OAuthError("profile_unavailable")
     name = profile.get("name")
     display = name.strip()[:100] if isinstance(name, str) and name.strip() else FALLBACK_NAME
-    return OAuthIdentity(subject=subject, display_name=display)
+    emails: frozenset[str] = frozenset()
+    email = profile.get("email")
+    # `is True`: a missing or string "true" claim must not count as verified.
+    if with_email and isinstance(email, str) and profile.get("email_verified") is True:
+        emails = frozenset({email.strip().lower()})
+    return OAuthIdentity(subject=subject, display_name=display, verified_emails=emails)

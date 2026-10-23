@@ -6,8 +6,9 @@ import psycopg
 from fastapi import Depends, Request
 from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine
 
+from querycure.auth.access import admit
 from querycure.core.config import Settings
-from querycure.core.errors import QueryCureError, UnauthenticatedError
+from querycure.core.errors import QueryCureError
 from querycure.db.engine import CONNECT_TIMEOUT_SECONDS, KEEPALIVE
 from querycure.db.repositories import sessions
 from querycure.domain.users import User
@@ -54,10 +55,10 @@ async def optional_user(
     return await sessions.get_session_user(conn, hash_token(token))
 
 
-async def current_user(user: Annotated[User | None, Depends(optional_user)]) -> User:
-    if user is None:
-        raise UnauthenticatedError("Sign in to continue.")
-    return user
+async def current_user(
+    request: Request, user: Annotated[User | None, Depends(optional_user)]
+) -> User:
+    return admit(get_settings(request), user)
 
 
 async def stream_user(
@@ -73,9 +74,7 @@ async def stream_user(
     if token:
         async with engine.begin() as conn:
             user = await sessions.get_session_user(conn, hash_token(token))
-    if user is None:
-        raise UnauthenticatedError("Sign in to continue.")
-    return user
+    return admit(get_settings(request), user)
 
 
 def listen_url(settings: Settings, engine: AsyncEngine) -> str:

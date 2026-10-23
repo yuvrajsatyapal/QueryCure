@@ -225,10 +225,50 @@ The demo profile today allows **anonymous sessions**: anyone who has the URL can
 | Option | Restricts access? | Change needed |
 |---|---|---|
 | A. Unlisted domain + existing demo limits | No; obscurity only | None |
-| B. **Sign-in allowlist** (recommended): turn anonymous sessions off in the demo, and admit only listed `(provider, subject)` pairs after OAuth | Yes | Backend change (session creation and the OAuth callback, plus a setting). **Needs owner approval** as a contract change; no migration if the list lives in configuration |
+| B. **Sign-in allowlist** (recommended, **implemented 2026-10-23**, [ADR-0031](../engineering/adr/ADR-0031-restricted-access-email-allowlist.md)): anonymous sessions off, and only OAuth accounts with a provider-verified email on `ACCESS_ALLOWLIST` admitted | Yes | `RESTRICTED_ACCESS=true` plus the list; no migration |
 | C. Access proxy (e.g. an identity-aware proxy in front of both subdomains) | Yes | Infrastructure only, but it must pass credentialed cross-origin requests and SSE from `app.` to `api.`; verify that before relying on it |
 
-Until option B (or C) is in place, treat the trial as **open to anyone with the link**.
+Until `RESTRICTED_ACCESS=true` is set on the host (or option C is in place), treat the trial as **open to anyone with the link**.
+
+#### Managing approved accounts (option B)
+
+Configure the API service:
+
+```
+RESTRICTED_ACCESS=true
+ACCESS_ALLOWLIST=["ada@example.com","grace@example.org"]
+```
+
+The list is a JSON array, like `CORS_ORIGINS`. Store it as a secret env var on the host, because it holds personal data.
+
+**Adding an account**
+1. Add the person's address to the array.
+2. Restart or redeploy the API.
+3. Ask them to sign in with Google or GitHub.
+
+The address must be one the provider reports as **verified**:
+- Google: the account's email, with `email_verified` true.
+- GitHub: any verified address under Settings → Emails, not only the primary one.
+
+Matching ignores case and nothing else, so `a.da@gmail.com` and `ada@gmail.com` are different entries.
+
+**Removing an account**
+1. Delete the address from the array.
+2. Restart or redeploy the API.
+
+The person's next request gets `403 ACCESS_DENIED`. This applies to existing sessions and SSE reconnects too, because every request checks the address stored at sign-in. No session rows need deleting. Their data is kept. Delete it separately if needed.
+
+**Behaviour while restricted**
+- `POST /session` returns `403 ACCESS_DENIED`. Protected endpoints return `401` without a session and `403` for an account that is not approved.
+- A refused sign-in returns to `/app?auth_error=not_allowed`. Responses and logs never show which addresses are listed.
+- Sessions and anonymous users created before restriction was switched on are refused, and are never linked.
+- An OAuth account from open mode must sign in once more, so its verified email can be read.
+
+**Turning it off or on**
+- `ACCESS_ALLOWLIST=[]` admits nobody, which works as a kill switch.
+- Unsetting `RESTRICTED_ACCESS` reopens the trial. Then also unset `ACCESS_ALLOWLIST`, because a list without the switch is refused at startup.
+
+**Provider consoles:** no new redirect URI is needed. When restricted, Google asks for the `email` scope and GitHub for `user:email`, so users see an extra consent line.
 
 ## 4. CI/CD (GitHub Actions)
 
@@ -357,7 +397,8 @@ The app role `qc_app` was rotated on 2026-10-18 after its password appeared in a
 | `SESSION_TTL_SECONDS` | session and CSRF cookie lifetime (default 30 days) |
 | `TRUSTED_PROXY_HOPS` | reverse proxies that append to `X-Forwarded-For` (default 0: the header is ignored); rate limits key on the client address |
 | `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` | GitHub OAuth app; sign-in is offered only when both are set |
-| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | Google OAuth client (Web application); sign-in is offered only when both are set. Authorized redirect URI: `<PUBLIC_API_URL>/api/v1/auth/google/callback`. Scopes `openid profile`; no email is read |
+| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | Google OAuth client (Web application); sign-in is offered only when both are set. Authorized redirect URI: `<PUBLIC_API_URL>/api/v1/auth/google/callback`. Scopes `openid profile`; no email is read unless `RESTRICTED_ACCESS` is on (adds `email`) |
+| `RESTRICTED_ACCESS` / `ACCESS_ALLOWLIST` | restricted trial ([ADR-0031](../engineering/adr/ADR-0031-restricted-access-email-allowlist.md), §3a "Managing approved accounts"): no anonymous sessions; only OAuth accounts with a verified email on the JSON list. Demo profile only; needs an OAuth provider; restart to apply |
 | `PUBLIC_API_URL` / `WEB_BASE_URL` | public origins (OAuth callback, post-sign-in redirect); must be `https://` when any OAuth sign-in is enabled outside the local profile |
 | `OTEL_EXPORTER_OTLP_ENDPOINT`, `LANGSMITH_API_KEY` | reserved: OTel export and LangSmith are **not implemented** (deferred, see PHASE_5_REPORT) |
 | `METRICS_TOKEN` | bearer token for `/api/v1/internal/metrics` outside the local profile (empty = endpoint answers 404; at least 32 characters when set) |

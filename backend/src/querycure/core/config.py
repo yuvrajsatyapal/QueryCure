@@ -29,6 +29,7 @@ LOOPBACK_HOSTS = frozenset({"localhost", "127.0.0.1", "::1"})
 # 32 characters is what `secrets.token_urlsafe(24)` gives; anything shorter is guessable.
 MIN_METRICS_TOKEN_LENGTH = 32
 _COOKIE_DOMAIN = re.compile(r"^\.?[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$")
+_EMAIL = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 
 def _url_problem(name: str, value: str, *, bare: bool) -> str | None:
@@ -236,6 +237,12 @@ class Settings(BaseSettings):
     session_ttl_seconds: int = Field(
         default=30 * 24 * 3600, ge=300, validation_alias=_env("SESSION_TTL_SECONDS")
     )
+    # Restricted trial (ADR-0031): no anonymous sessions, and only OAuth accounts with a
+    # provider-verified email on the list get in. Changing the list needs a restart.
+    restricted_access: bool = Field(default=False, validation_alias=_env("RESTRICTED_ACCESS"))
+    access_allowlist: list[str] = Field(
+        default_factory=list, validation_alias=_env("ACCESS_ALLOWLIST")
+    )
 
     @field_validator(
         "metrics_token",
@@ -325,6 +332,27 @@ class Settings(BaseSettings):
                 )
         return self
 
+    @field_validator("access_allowlist")
+    @classmethod
+    def _normalise_allowlist(cls, value: list[str]) -> list[str]:
+        emails = sorted({entry.strip().lower() for entry in value})
+        if any(not _EMAIL.match(email) for email in emails):
+            # The entry itself is not echoed: the list is not to appear in logs.
+            raise ValueError("ACCESS_ALLOWLIST entries must be email addresses")
+        return emails
+
+    @model_validator(mode="after")
+    def _restricted_access_rules(self) -> Self:
+        if not self.restricted_access:
+            if self.access_allowlist:
+                raise ValueError("ACCESS_ALLOWLIST is set but RESTRICTED_ACCESS is off")
+            return self
+        if self.profile is Profile.LOCAL:
+            raise ValueError("RESTRICTED_ACCESS is only allowed outside the local profile")
+        if not (self.github_login_enabled or self.google_login_enabled):
+            raise ValueError("RESTRICTED_ACCESS needs GitHub or Google sign-in configured")
+        return self
+
     @model_validator(mode="after")
     def _apply_profile_rules(self) -> Self:
         local = self.profile is Profile.LOCAL
@@ -395,6 +423,10 @@ class Settings(BaseSettings):
     @property
     def google_login_enabled(self) -> bool:
         return self.google_client_id is not None and self.google_client_secret is not None
+
+    @property
+    def allowed_emails(self) -> frozenset[str]:
+        return frozenset(self.access_allowlist)
 
     def direct_database_url(self) -> str | None:
         """Unpooled endpoint for LISTEN and the checkpointer; the single URL when not pooled."""

@@ -130,6 +130,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/auth/options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Auth Options
+         * @description Public: what the sign-in screen should offer before any session exists. Says whether
+         *     access is restricted, never who is approved.
+         */
+        get: operations["auth_options_api_v1_auth_options_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/connections": {
         parameters: {
             query?: never;
@@ -1099,6 +1120,15 @@ export interface components {
             kind: string;
             /** Sha256 */
             sha256: string;
+        };
+        /** AuthOptions */
+        AuthOptions: {
+            /** Github Login */
+            github_login: boolean;
+            /** Google Login */
+            google_login: boolean;
+            /** Restricted Access */
+            restricted_access: boolean;
         };
         /** BlockOut */
         BlockOut: {
@@ -3244,6 +3274,26 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    auth_options_api_v1_auth_options_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthOptions"];
+                };
             };
         };
     };

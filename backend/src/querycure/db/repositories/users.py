@@ -21,7 +21,7 @@ async def get_or_create_local_user(conn: AsyncConnection) -> User:
     row = (
         await conn.execute(
             text(
-                "SELECT id, kind, display_name FROM users "
+                "SELECT id, kind, display_name, email FROM users "
                 "WHERE kind = 'local' AND deleted_at IS NULL"
             )
         )
@@ -34,7 +34,7 @@ async def create_anonymous_user(conn: AsyncConnection) -> User:
         await conn.execute(
             text(
                 "INSERT INTO users (kind, last_seen_at) VALUES (:kind, now()) "
-                "RETURNING id, kind, display_name"
+                "RETURNING id, kind, display_name, email"
             ),
             {"kind": UserKind.ANONYMOUS.value},
         )
@@ -45,7 +45,10 @@ async def create_anonymous_user(conn: AsyncConnection) -> User:
 async def get_user(conn: AsyncConnection, user_id: uuid.UUID) -> User | None:
     row = (
         await conn.execute(
-            text("SELECT id, kind, display_name FROM users WHERE id = :id AND deleted_at IS NULL"),
+            text(
+                "SELECT id, kind, display_name, email FROM users "
+                "WHERE id = :id AND deleted_at IS NULL"
+            ),
             {"id": user_id},
         )
     ).one_or_none()
@@ -56,7 +59,7 @@ async def find_oauth_user(conn: AsyncConnection, *, provider: str, subject: str)
     row = (
         await conn.execute(
             text(
-                "SELECT id, kind, display_name FROM users WHERE auth_provider = :p "
+                "SELECT id, kind, display_name, email FROM users WHERE auth_provider = :p "
                 "AND auth_subject = :s AND deleted_at IS NULL"
             ),
             {"p": provider, "s": subject},
@@ -74,7 +77,7 @@ async def convert_to_oauth(
             text(
                 "UPDATE users SET kind = 'oauth', auth_provider = :p, auth_subject = :s, "
                 "display_name = :name, last_seen_at = now() WHERE id = :id "
-                "RETURNING id, kind, display_name"
+                "RETURNING id, kind, display_name, email"
             ),
             {"id": user_id, "p": provider, "s": subject, "name": display_name},
         )
@@ -83,26 +86,41 @@ async def convert_to_oauth(
 
 
 async def create_oauth_user(
-    conn: AsyncConnection, *, provider: str, subject: str, display_name: str
+    conn: AsyncConnection,
+    *,
+    provider: str,
+    subject: str,
+    display_name: str,
+    email: str | None = None,
 ) -> User:
     row = (
         await conn.execute(
             text(
-                "INSERT INTO users (kind, auth_provider, auth_subject, display_name, "
-                "last_seen_at) VALUES ('oauth', :p, :s, :name, now()) "
-                "RETURNING id, kind, display_name"
+                "INSERT INTO users (kind, auth_provider, auth_subject, display_name, email, "
+                "last_seen_at) VALUES ('oauth', :p, :s, :name, :email, now()) "
+                "RETURNING id, kind, display_name, email"
             ),
-            {"p": provider, "s": subject, "name": display_name},
+            {"p": provider, "s": subject, "name": display_name, "email": email},
         )
     ).one()
     return _user(row)
 
 
-async def touch_oauth_user(conn: AsyncConnection, user_id: uuid.UUID, display_name: str) -> None:
-    await conn.execute(
-        text("UPDATE users SET display_name = :name, last_seen_at = now() WHERE id = :id"),
-        {"id": user_id, "name": display_name},
-    )
+async def touch_oauth_user(
+    conn: AsyncConnection, user_id: uuid.UUID, display_name: str, email: str | None = None
+) -> User:
+    """Refreshes the profile at sign-in. `email` is the approved address while access is
+    restricted (ADR-0031); None keeps whatever is stored."""
+    row = (
+        await conn.execute(
+            text(
+                "UPDATE users SET display_name = :name, email = COALESCE(:email, email), "
+                "last_seen_at = now() WHERE id = :id RETURNING id, kind, display_name, email"
+            ),
+            {"id": user_id, "name": display_name, "email": email},
+        )
+    ).one()
+    return _user(row)
 
 
 # Tables whose rows belong to a user through `user_id` (DATABASE_DESIGN). llm_credentials and
