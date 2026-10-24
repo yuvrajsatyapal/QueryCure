@@ -3,7 +3,7 @@
 import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, type ReactNode, type RefObject } from "react";
 import { ErrorNotice } from "@/components/common/ErrorNotice";
 import { NodeDetails } from "@/components/plan/NodeDetails";
 import { PlanExplorer, type PlanView } from "@/components/plan/PlanExplorer";
@@ -30,6 +30,7 @@ import { buildTrace } from "@/lib/events/trace";
 import { runRefetchInterval } from "@/lib/events/runEvents";
 import { useRunEvents } from "@/lib/events/useRunEvents";
 import {
+  ancestorIds,
   citationsByNode,
   citedEvidenceIds,
   findSpan,
@@ -38,17 +39,70 @@ import {
   stepForClaim,
 } from "@/lib/investigation/links";
 import { useContextCommands, type Command } from "@/components/command/CommandProvider";
+import { BottomSheet } from "@/components/ui/BottomSheet";
+import { ContextMenu, type MenuItem } from "@/components/ui/ContextMenu";
 import { Icon } from "@/components/ui/Icon";
 import { Skeleton } from "@/components/ui/Skeleton";
-import { RunStatusPill } from "@/components/ui/StatusPill";
-import { BudgetMeter } from "./BudgetMeter";
+import { RunStatusPill, TONE_TEXT } from "@/components/ui/StatusPill";
+import { activityOf } from "@/lib/trace/activity";
+import { graphRun } from "@/lib/trace/graph";
+import type { Span } from "@/lib/events/trace";
+import { RunStats } from "./BudgetMeter";
 import { FindingsPanel } from "./FindingsPanel";
 import { runKindLabel } from "./RunPicker";
 import { RunSelector } from "./RunSelector";
 import { StepDetails } from "./StepDetails";
+import { TraceGraph } from "./TraceGraph";
 import { TraceTree } from "./TraceTree";
 
 type Tab = "plan" | "findings" | "tournament" | "report";
+type View = "waterfall" | "graph" | "results";
+const VIEWS: { id: View; label: string }[] = [
+  { id: "waterfall", label: "Waterfall" },
+  { id: "graph", label: "Graph" },
+  { id: "results", label: "Results" },
+];
+// The split (trace beside the inspector) needs this much width of its own container, so it
+// follows the collapsed or expanded sidebar rather than the viewport.
+const SPLIT_MIN_PX = 900;
+const INSPECTOR = { min: 340, max: 640, share: 0.38, step: 24 };
+
+/** `ref`'s own width (the workspace, so it follows the sidebar rail), or null until measured. */
+function useWidth(ref: RefObject<HTMLElement | null>, ready: boolean): number | null {
+  const [width, setWidth] = useState<number | null>(null);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(([entry]) => setWidth(Math.round(entry?.contentRect.width ?? 0)));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [ref, ready]);
+  return width;
+}
+
+/** A clock for open durations; null until mounted so server and client render the same. */
+function useClock(active: boolean): number | null {
+  const [now, setNow] = useState<number | null>(null);
+  useEffect(() => {
+    const tick = () => setNow(Date.now());
+    const first = setTimeout(tick, 0);
+    const t = active ? setInterval(tick, 1000) : undefined;
+    return () => {
+      clearTimeout(first);
+      clearInterval(t);
+    };
+  }, [active]);
+  return now;
+}
+
+/** The graph node a trace row belongs to (itself, or the node that encloses it). */
+function nodeOf(trace: Span, span: Span | undefined): string | null {
+  if (!span || span.kind === "run") return null;
+  if (span.kind === "node") return span.name;
+  const outer = ancestorIds(trace, span.id)[0];
+  const parent = outer ? findSpan(trace, outer) : undefined;
+  return parent?.kind === "node" ? parent.name : null;
+}
 const ACTIVE = new Set(["queued", "running", "awaiting_approval", "cancelling"]);
 const RUN_ROW = "run";
 const NO_COMMANDS: Command[] = [];
@@ -73,10 +127,26 @@ export function InvestigationView({ id, requestedRunId }: { id: string; requeste
   const [evidence, setEvidence] = useState<EvidenceDetail | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [step, setStep] = useState<string>(RUN_ROW);
+  const [mode, setMode] = useState<View>("waterfall");
+  const [graphPick, setGraphPick] = useState<string | null>(null);
+  const [menu, setMenu] = useState<{ spanId: string; at: { x: number; y: number } } | null>(null);
+  const [sheet, setSheet] = useState(false);
+  // Set when a menu switches views ("Show in graph"): the pane focuses its selection, then clears it.
+  const [paneFocus, setPaneFocus] = useState(false);
+  const focusDone = useCallback(() => setPaneFocus(false), []);
+  // null: a share of the workspace until the user resizes it.
+  const [resized, setResized] = useState<number | null>(null);
   const header = useRef<HTMLElement>(null);
   const page = useRef<HTMLDivElement>(null);
+  const split = useRef<HTMLDivElement>(null);
 
   const investigation = useQuery({ queryKey: investigationKeys.detail(id), queryFn: ({ signal }) => getInvestigation(id, signal) });
+  const width = useWidth(page, investigation.data !== undefined);
+  // Assumed wide until measured, so the server render and tests get the split.
+  const wide = width === null || width >= SPLIT_MIN_PX;
+  const clampW = (w: number) => Math.max(INSPECTOR.min, Math.min(INSPECTOR.max, w));
+  const inspectorW = resized ?? clampW(Math.round((width ?? 1200) * INSPECTOR.share));
+  const setInspectorW = (next: number | ((w: number) => number)) => setResized(clampW(typeof next === "function" ? next(inspectorW) : next));
   const runs = investigation.data?.runs ?? [];
   const requested = requestedRunId ? runs.find((x) => x.id === requestedRunId) : undefined;
   const missingRun = Boolean(requestedRunId && investigation.data && !requested);
@@ -89,6 +159,9 @@ export function InvestigationView({ id, requestedRunId }: { id: string; requeste
     setEvidence(null);
     setNotice(null);
     setStep(RUN_ROW);
+    setGraphPick(null);
+    setMenu(null);
+    setSheet(false);
     router.replace(`/app/investigations/${id}?run=${next}`, { scroll: false });
   }
   const run = useQuery({ queryKey: investigationKeys.run(runId ?? ""), queryFn: ({ signal }) => getRun(runId ?? "", signal), enabled: runId !== null, refetchInterval: (q) => runRefetchInterval(q.state.data?.status) });
@@ -99,7 +172,7 @@ export function InvestigationView({ id, requestedRunId }: { id: string; requeste
   const approvals = useQuery({ queryKey: optimizationKeys.approvals(runId ?? ""), queryFn: ({ signal }) => getApprovals(runId ?? "", signal), enabled: runId !== null && sandbox });
   const experiments = useQuery({ queryKey: optimizationKeys.experiments(runId ?? ""), queryFn: ({ signal }) => getExperiments(runId ?? "", signal), enabled: runId !== null && sandbox });
   const pending = approvals.data?.items.find((a) => a.status === "pending") ?? null;
-  const { events, live } = useRunEvents(runId);
+  const { events, live, stream } = useRunEvents(runId);
   const cancel = useMutation({
     mutationFn: () => cancelRun(runId ?? ""),
     onSuccess: (r) => client.setQueryData(investigationKeys.run(r.id), r),
@@ -118,6 +191,9 @@ export function InvestigationView({ id, requestedRunId }: { id: string; requeste
   const trace = useMemo(() => buildTrace(events, { active }), [events, active]);
   const claimIndex = useMemo(() => indexClaimSpans(trace), [trace]);
   const selectedSpan = step === RUN_ROW ? undefined : findSpan(trace, step);
+  const graph = useMemo(() => graphRun(trace), [trace]);
+  const clock = useClock(active);
+  const activity = activityOf({ status: r?.status ?? "queued", outcome: r?.outcome ?? null, errorMessage: r?.errorMessage ?? null, trace, events, stream: stream ?? (live ? "live" : "closed") });
 
   // Plan citations resolve each cited evidence ID once (immutable, cached), only while the Plan tab is open.
   const claims = findings.data;
@@ -182,10 +258,64 @@ export function InvestigationView({ id, requestedRunId }: { id: string; requeste
     }
   }
 
+  /** Select a trace row from elsewhere (a finding, a plan citation, the menu): the trace is shown,
+   * and on narrow screens the details open in the sheet. */
+  function showStep(spanId: string) {
+    setGraphPick(null);
+    setStep(spanId);
+    if (mode === "results") setMode("waterfall");
+    if (!wide) setSheet(true);
+  }
+
   function showClaim(key: string) {
     const match = stepForClaim(claimIndex, key);
-    if (match.status === "found") setStep(match.spanId);
+    if (match.status === "found") showStep(match.spanId);
     else setNotice(`No trace step recorded ${key}.`);
+  }
+
+  function selectNode(name: string) {
+    const visits = graph.nodes.get(name)?.visits ?? [];
+    const latest = visits.at(-1);
+    if (latest) {
+      setGraphPick(null);
+      setStep(latest.id);
+      if (!wide) setSheet(true);
+    } else {
+      setStep(RUN_ROW);
+      setGraphPick(name);
+    }
+  }
+
+  async function copy(text: string, what: string) {
+    try {
+      await navigator.clipboard.writeText(text);
+      setNotice(`Copied ${what}.`);
+    } catch {
+      setNotice(`Could not copy ${what}: the browser refused clipboard access.`);
+    }
+  }
+
+  function menuItems(spanId: string): MenuItem[] {
+    const s = findSpan(trace, spanId);
+    if (!s) return [];
+    if (s.kind === "run") {
+      return [
+        { id: "results", label: "Open results full width", icon: "expand", onSelect: () => setMode("results") },
+        { id: "graph", label: "Show in graph", icon: "node", onSelect: () => (setMode("graph"), setPaneFocus(true)) },
+        { id: "copy-run", label: "Copy run ID", onSelect: () => void copy(runId ?? "", "the run ID") },
+      ];
+    }
+    const node = nodeOf(trace, s);
+    const seqs = s.events.map((e) => e.seq);
+    return [
+      { id: "inspect", label: "Inspect", icon: "arrowRight", onSelect: () => showStep(s.id) },
+      mode === "graph"
+        ? { id: "waterfall", label: "Show in waterfall", icon: "gauge", onSelect: () => (setMode("waterfall"), showStep(s.id), setPaneFocus(true)) }
+        : { id: "graph", label: "Show in graph", icon: "node", disabled: !node, onSelect: () => (setMode("graph"), showStep(s.id), setPaneFocus(true)) },
+      { id: "copy-name", label: s.kind === "event" ? "Copy event text" : "Copy step name", onSelect: () => void copy(s.name, s.kind === "event" ? "the event text" : "the step name") },
+      { id: "copy-seq", label: `Copy event seq ${seqs.length > 1 ? `${seqs[0]}–${seqs.at(-1)}` : seqs[0]}`, onSelect: () => void copy(seqs.join(","), "the event sequence numbers") },
+      { id: "run", label: "Back to run results", icon: "play", onSelect: () => setStep(RUN_ROW) },
+    ];
   }
 
   // Palette entries and `[` `]` / `g f` `g p` `g t` `g r` for the result tabs (UI_UX §3.15).
@@ -193,6 +323,7 @@ export function InvestigationView({ id, requestedRunId }: { id: string; requeste
     const ids: Tab[] = ["findings", "plan", ...(sandbox ? (["tournament"] as const) : []), "report"];
     const labels: Record<Tab, string> = { findings: "Findings", plan: "Plan", tournament: "Tournament", report: "Report" };
     const show = (t: Tab) => {
+      setGraphPick(null);
       setStep(RUN_ROW);
       setEvidence(null);
       setTab(t);
@@ -205,6 +336,7 @@ export function InvestigationView({ id, requestedRunId }: { id: string; requeste
       ...ids.map((t) => ({ id: `tab-${t}`, label: `Show ${labels[t]} tab`, group: "This investigation" as const, keys: ["g", t.charAt(0)], run: () => show(t) })),
       { id: "tab-prev", label: "Previous result tab", group: "This investigation", keys: ["["], run: () => shift(-1) },
       { id: "tab-next", label: "Next result tab", group: "This investigation", keys: ["]"], run: () => shift(1) },
+      ...VIEWS.map((v) => ({ id: `view-${v.id}`, label: `Show ${v.label.toLowerCase()} view`, group: "This investigation" as const, run: () => setMode(v.id) })),
     ];
   }, [sandbox]);
   useContextCommands("investigation", investigation.data ? tabCommands : NO_COMMANDS);
@@ -229,8 +361,235 @@ export function InvestigationView({ id, requestedRunId }: { id: string; requeste
     { id: "report", label: "Report" },
   ];
 
+  const sealedSummary =
+    sealedReport && !active ? (
+      <ResultSummary
+        report={sealedReport}
+        onReport={() => {
+          setStep(RUN_ROW);
+          setGraphPick(null);
+          setTab("report");
+        }}
+        onBenchmark={
+          sandbox
+            ? () => {
+                setStep(RUN_ROW);
+                setGraphPick(null);
+                setTab("tournament");
+              }
+            : undefined
+        }
+      />
+    ) : null;
+
+  const results = (
+    <section aria-label="Selection details" className="flex min-w-0 flex-col gap-4">
+      <div role="tablist" aria-label="Results" className="flex gap-5 overflow-x-auto border-b border-border">
+        {tabs.map((t) => (
+          <button key={t.id} role="tab" aria-selected={tab === t.id} className={tabClass(tab === t.id)} onClick={() => setTab(t.id)}>
+            {t.label}
+          </button>
+        ))}
+      </div>
+      {evidence ? (
+        <aside aria-label="Selected evidence" className="flex items-start gap-2 rounded-md border border-accent/30 bg-accent-tint p-3 text-sm">
+          <Icon name="database" size={14} className="mt-0.5 text-accent" />
+          <div className="min-w-0 flex-1">
+            <p className="font-mono text-xs text-muted">
+              {evidence.evidence.id} · {evidence.evidence.kind} · {evidence.evidence.provenance}
+            </p>
+            <p>{evidence.evidence.summary}</p>
+          </div>
+          <button type="button" onClick={() => setEvidence(null)} aria-label="Close evidence" className="text-muted hover:text-ink">
+            <Icon name="close" size={14} />
+          </button>
+        </aside>
+      ) : null}
+      {tab === "report" && runId ? (
+        <ReportPanel
+          runId={runId}
+          onPlanNode={(sha, node) => {
+            setPlanSha(sha);
+            setSelected(node);
+            setTab("plan");
+          }}
+        />
+      ) : tab === "tournament" ? (
+        <TournamentPanel experiments={experiments.data?.items ?? []} candidates={candidates.data?.items ?? []} runId={runId ?? undefined} />
+      ) : tab === "findings" ? (
+        <FindingsPanel
+          data={findings.data}
+          onEvidence={(e) => void openEvidence(e)}
+          activeEvidence={evidence?.evidence.id ?? null}
+          stepFor={(key) => stepForClaim(claimIndex, key)}
+          onShowStep={showStep}
+        />
+      ) : currentPlan ? (
+        <PlanExplorer
+          plan={currentPlan.plan}
+          metrics={currentPlan.metrics}
+          selectedId={selected}
+          onSelect={setSelected}
+          view={view}
+          onViewChange={setView}
+          citationCounts={citationCounts}
+          label={`${currentPlan.role === "context.plan" ? "live EXPLAIN" : "uploaded plan"} · ${currentPlan.sha256.slice(0, 12)}`}
+          details={
+            selectedNode ? (
+              <NodeDetails
+                node={selectedNode}
+                stoppedEarly={stopsEarly(currentPlan.plan, selectedNode.id)}
+                metrics={currentPlan.metrics.find((m) => m.nodeId === selectedNode.id)}
+                citations={
+                  citations
+                    ? {
+                        citation: citations.byNode.get(selectedNode.id),
+                        labels: claimLabels,
+                        pending: citations.pending,
+                        failed: citations.failed,
+                        onClaim: showClaim,
+                      }
+                    : undefined
+                }
+              />
+            ) : null
+          }
+        />
+      ) : (
+        <p className="qc-panel p-6 text-sm text-muted">No plan for this run yet.</p>
+      )}
+    </section>
+  );
+
+  const visits = selectedSpan?.kind === "node" ? trace.children.filter((c) => c.kind === "node" && c.name === selectedSpan.name) : undefined;
+  const details = (embedded: boolean) =>
+    selectedSpan && runId ? (
+      <StepDetails
+        key={selectedSpan.id}
+        span={selectedSpan}
+        runId={runId}
+        embedded={embedded}
+        visits={visits}
+        onBack={() => {
+          setSheet(false);
+          setStep(RUN_ROW);
+        }}
+        onSelect={setStep}
+        onOpenEvidence={(e) => {
+          setSheet(false);
+          void openEvidence(e);
+        }}
+        onActions={(at) => setMenu({ spanId: selectedSpan.id, at })}
+        onClose={() => setSheet(false)}
+      />
+    ) : null;
+  const notReached = graphPick ? (
+    <section aria-label="Selection details" className="qc-panel flex flex-col gap-2 p-4">
+      <p className="qc-eyebrow">Graph node</p>
+      <h2 className="font-mono text-base font-semibold">{graphPick}</h2>
+      <p className="text-sm text-muted">
+        {active ? "No events recorded for this step yet." : "Not reached in this run: the run recorded no events for this step."}
+      </p>
+      <button type="button" onClick={() => setGraphPick(null)} className="qc-btn-secondary qc-btn-sm w-fit">
+        Back to run results
+      </button>
+    </section>
+  ) : null;
+
+  const tracePane =
+    mode === "graph" ? (
+      <TraceGraph
+        trace={trace}
+        active={active}
+        selectedNode={graphPick ?? nodeOf(trace, selectedSpan)}
+        onSelectNode={selectNode}
+        fillHeight={wide}
+        focusRequest={paneFocus}
+        onFocusDone={focusDone}
+      />
+    ) : (
+      <TraceTree
+        trace={trace}
+        events={events}
+        runLabel={r ? `Run #${r.runNumber}` : "Run"}
+        live={live}
+        stream={stream}
+        active={active}
+        selectedId={selectedSpan ? step : RUN_ROW}
+        onSelect={(id) => {
+          setGraphPick(null);
+          setStep(id);
+        }}
+        onActivate={(id) => {
+          if (!wide && id !== RUN_ROW) setSheet(true);
+        }}
+        onMenu={(spanId, at) => setMenu({ spanId, at })}
+        focusRequest={paneFocus}
+        onFocusDone={focusDone}
+      />
+    );
+
+  function onSplitterKey(e: ReactKeyboardEvent<HTMLDivElement>) {
+    const by = e.key === "ArrowLeft" ? INSPECTOR.step : e.key === "ArrowRight" ? -INSPECTOR.step : 0;
+    if (e.key === "Home") setInspectorW(INSPECTOR.max);
+    else if (e.key === "End") setInspectorW(INSPECTOR.min);
+    else if (by) setInspectorW((w) => w + by);
+    else return;
+    e.preventDefault();
+  }
+  function onSplitterDown(e: ReactPointerEvent<HTMLDivElement>) {
+    const host = split.current;
+    if (!host) return;
+    e.currentTarget.setPointerCapture(e.pointerId);
+    const right = host.getBoundingClientRect().right;
+    const move = (ev: PointerEvent) => setResized(clampW(right - ev.clientX - 4));
+    const up = () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+  }
+
+  let workspace: ReactNode;
+  if (mode === "results") {
+    workspace = results;
+  } else if (wide) {
+    workspace = (
+      <div
+        ref={split}
+        className="grid h-[calc(100dvh-var(--qc-sticky)-2rem)] min-h-[560px] items-stretch"
+        style={{ gridTemplateColumns: `minmax(0,1fr) 12px ${inspectorW}px` }}
+      >
+        <div className="flex min-h-0 min-w-0 flex-col">{tracePane}</div>
+        <div
+          role="separator"
+          aria-orientation="vertical"
+          aria-label="Resize the details panel"
+          aria-valuenow={inspectorW}
+          aria-valuemin={INSPECTOR.min}
+          aria-valuemax={INSPECTOR.max}
+          tabIndex={0}
+          onKeyDown={onSplitterKey}
+          onPointerDown={onSplitterDown}
+          className="group flex cursor-col-resize touch-none items-center justify-center"
+        >
+          <span aria-hidden="true" className="h-8 w-[3px] rounded-full bg-border-strong group-hover:bg-muted group-focus-visible:bg-accent" />
+        </div>
+        <div className="min-h-0 min-w-0 overflow-y-auto">{details(false) ?? notReached ?? results}</div>
+      </div>
+    );
+  } else {
+    workspace = (
+      <div className="flex flex-col gap-5">
+        <div className="flex max-h-[70dvh] min-h-0 flex-col">{tracePane}</div>
+        {notReached ?? results}
+      </div>
+    );
+  }
+
   return (
-    <div ref={page} className="flex flex-col gap-4 [--qc-sticky:0px]">
+    <div ref={page} className="@container flex flex-col gap-4 [--qc-sticky:0px]">
       <header
         ref={header}
         className="-mx-4 -mt-5 flex flex-col gap-2 border-b border-border bg-bg/95 px-4 pt-4 pb-3 backdrop-blur-sm md:sticky md:top-0 md:z-20 md:-mx-8 md:-mt-7 md:px-8"
@@ -245,39 +604,40 @@ export function InvestigationView({ id, requestedRunId }: { id: string; requeste
           </nav>
           <div className="flex shrink-0 items-center gap-2">
             {r && !active ? (
-              <Link href={`/app/replay/${r.id}`} className="qc-btn-secondary py-1 text-xs">
+              <Link href={`/app/replay/${r.id}`} className="qc-btn-secondary qc-btn-sm">
                 <Icon name="replay" size={13} />
-                Reproducibility & replay
+                <span className="hidden sm:inline">Reproducibility & replay</span>
+                <span className="sm:hidden">Replay</span>
               </Link>
             ) : null}
             {r && active && r.status !== "cancelling" ? (
-              <button
-                type="button"
-                onClick={() => cancel.mutate()}
-                disabled={cancel.isPending}
-                className="qc-btn border border-rejected/40 py-1 text-xs text-rejected hover:bg-rejected/10"
-              >
+              <button type="button" onClick={() => cancel.mutate()} disabled={cancel.isPending} className="qc-btn-danger qc-btn-sm">
                 Cancel run
               </button>
             ) : null}
           </div>
         </div>
-        <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
+        <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-2">
           <div className="flex min-w-0 flex-col gap-1">
             <div className="flex flex-wrap items-center gap-2">
-              <h1 className="text-xl font-semibold tracking-tight">{investigation.data.title}</h1>
+              <h1 className="qc-page-title min-w-0 break-words">{investigation.data.title}</h1>
               {r ? <RunStatusPill status={r.status} /> : null}
-              {r?.outcome ? <span className="text-xs text-muted">{r.outcome.replaceAll("_", " ")}</span> : null}
             </div>
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-              <RunSelector runs={runs} selectedId={runId} onSelect={selectRun} />
-              {!summary && r ? <span className="font-mono text-[11px] text-muted">run {r.runNumber}</span> : null}
-              <span className="font-mono text-[11px] text-muted">
-                {r ? (r.llmModel ? `${r.llmModel} via ${r.llmProvider}` : "model not assigned yet") : ""}
-              </span>
-            </div>
+            {r ? (
+              <p className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 text-[13px]">
+                <span aria-hidden="true" className={`flex size-3.5 shrink-0 items-center justify-center ${TONE_TEXT[activity.tone]}`}>
+                  {activity.animate ? <span className="qc-orb qc-orb-live size-3.5" /> : <span className="size-2 rounded-full bg-current" />}
+                </span>
+                <span className="font-medium text-ink">{activity.label}</span>
+                <span className="text-muted">{activity.detail}</span>
+              </p>
+            ) : null}
           </div>
-          {r ? <BudgetMeter run={r} /> : null}
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+            <RunSelector runs={runs} selectedId={runId} onSelect={selectRun} />
+            {!summary && r ? <span className="font-mono text-xs text-muted">run {r.runNumber}</span> : null}
+            <span className="font-mono text-xs text-muted">{r ? (r.llmModel ? `${r.llmModel} via ${r.llmProvider}` : "model not assigned yet") : ""}</span>
+          </div>
         </div>
       </header>
 
@@ -313,120 +673,40 @@ export function InvestigationView({ id, requestedRunId }: { id: string; requeste
         ) : null}
       </div>
 
-      {sealedReport && !active ? (
-        <ResultSummary
-          report={sealedReport}
-          onReport={() => {
-            setStep(RUN_ROW);
-            setTab("report");
-          }}
-          onBenchmark={
-            sandbox
-              ? () => {
-                  setStep(RUN_ROW);
-                  setTab("tournament");
-                }
-              : undefined
-          }
-        />
-      ) : null}
+      {r ? <RunStats run={r} events={events} nowMs={clock} /> : null}
+
+      {sealedSummary}
 
       {pending && runId && r?.status === "awaiting_approval" ? <ApprovalCard key={pending.id} approval={pending} runId={runId} /> : null}
 
-      <div className="grid grid-cols-1 items-start gap-5 xl:grid-cols-[minmax(340px,420px)_minmax(0,1fr)]">
-        <div className="flex min-w-0 flex-col xl:sticky xl:top-[calc(var(--qc-sticky)+1rem)] xl:max-h-[calc(100vh-var(--qc-sticky)-2rem)] max-xl:max-h-[60vh]">
-          <TraceTree
-            trace={trace}
-            events={events}
-            runLabel={r ? `Run #${r.runNumber}` : "Run"}
-            live={live}
-            active={active}
-            selectedId={selectedSpan ? step : RUN_ROW}
-            onSelect={setStep}
-          />
+      <div className="flex flex-wrap items-center gap-3">
+        <div role="group" aria-label="Workspace view" className="inline-flex rounded-md bg-surface-2 p-0.5">
+          {VIEWS.map((v) => (
+            <button
+              key={v.id}
+              type="button"
+              aria-pressed={mode === v.id}
+              onClick={() => setMode(v.id)}
+              className={`h-7 rounded px-3 text-[13px] pointer-coarse:h-10 ${mode === v.id ? "bg-surface text-ink shadow-sm" : "text-muted hover:text-ink"}`}
+            >
+              {v.label}
+            </button>
+          ))}
         </div>
-
-        {selectedSpan && runId ? (
-          <StepDetails span={selectedSpan} runId={runId} onBack={() => setStep(RUN_ROW)} onSelect={setStep} onOpenEvidence={(e) => void openEvidence(e)} />
-        ) : (
-          <section aria-label="Selection details" className="flex min-w-0 flex-col gap-4">
-            <div role="tablist" aria-label="Results" className="flex gap-5 border-b border-border">
-              {tabs.map((t) => (
-                <button key={t.id} role="tab" aria-selected={tab === t.id} className={tabClass(tab === t.id)} onClick={() => setTab(t.id)}>
-                  {t.label}
-                </button>
-              ))}
-            </div>
-            {evidence ? (
-              <aside aria-label="Selected evidence" className="flex items-start gap-2 rounded-md border border-accent/30 bg-accent-tint p-3 text-sm">
-                <Icon name="database" size={14} className="mt-0.5 text-accent" />
-                <div className="min-w-0 flex-1">
-                  <p className="font-mono text-xs text-muted">
-                    {evidence.evidence.id} · {evidence.evidence.kind} · {evidence.evidence.provenance}
-                  </p>
-                  <p>{evidence.evidence.summary}</p>
-                </div>
-                <button type="button" onClick={() => setEvidence(null)} aria-label="Close evidence" className="text-muted hover:text-ink">
-                  <Icon name="close" size={14} />
-                </button>
-              </aside>
-            ) : null}
-            {tab === "report" && runId ? (
-              <ReportPanel
-                runId={runId}
-                onPlanNode={(sha, node) => {
-                  setPlanSha(sha);
-                  setSelected(node);
-                  setTab("plan");
-                }}
-              />
-            ) : tab === "tournament" ? (
-              <TournamentPanel experiments={experiments.data?.items ?? []} candidates={candidates.data?.items ?? []} runId={runId ?? undefined} />
-            ) : tab === "findings" ? (
-              <FindingsPanel
-                data={findings.data}
-                onEvidence={(e) => void openEvidence(e)}
-                activeEvidence={evidence?.evidence.id ?? null}
-                stepFor={(key) => stepForClaim(claimIndex, key)}
-                onShowStep={setStep}
-              />
-            ) : currentPlan ? (
-              <PlanExplorer
-                plan={currentPlan.plan}
-                metrics={currentPlan.metrics}
-                selectedId={selected}
-                onSelect={setSelected}
-                view={view}
-                onViewChange={setView}
-                citationCounts={citationCounts}
-                label={`${currentPlan.role === "context.plan" ? "live EXPLAIN" : "uploaded plan"} · ${currentPlan.sha256.slice(0, 12)}`}
-                details={
-                  selectedNode ? (
-                    <NodeDetails
-                      node={selectedNode}
-                      stoppedEarly={stopsEarly(currentPlan.plan, selectedNode.id)}
-                      metrics={currentPlan.metrics.find((m) => m.nodeId === selectedNode.id)}
-                      citations={
-                        citations
-                          ? {
-                              citation: citations.byNode.get(selectedNode.id),
-                              labels: claimLabels,
-                              pending: citations.pending,
-                              failed: citations.failed,
-                              onClaim: showClaim,
-                            }
-                          : undefined
-                      }
-                    />
-                  ) : null
-                }
-              />
-            ) : (
-              <p className="qc-panel p-6 text-sm text-muted">No plan for this run yet.</p>
-            )}
-          </section>
-        )}
+        <span className="text-[13px] text-muted">
+          {graph.nodes.size ? `${[...graph.nodes.values()].filter((n) => n.state !== "not_reached").length} of ${graph.nodes.size} graph steps reached` : ""}
+        </span>
+        {mode !== "results" && wide ? <span className="ml-auto hidden text-xs text-muted @4xl:inline">Right-click or Shift+F10 on a step for actions</span> : null}
       </div>
+
+      {workspace}
+
+      {menu ? <ContextMenu label="Step actions" at={menu.at} items={menuItems(menu.spanId)} onClose={() => setMenu(null)} /> : null}
+      {sheet && !wide && selectedSpan ? (
+        <BottomSheet label={`Step details: ${selectedSpan.name}`} onClose={() => setSheet(false)} ownHeader>
+          {details(true)}
+        </BottomSheet>
+      ) : null}
     </div>
   );
 }

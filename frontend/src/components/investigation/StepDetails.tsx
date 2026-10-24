@@ -94,12 +94,24 @@ export function StepDetails({
   onBack,
   onSelect,
   onOpenEvidence,
+  onActions,
+  visits,
+  embedded = false,
+  onClose,
 }: {
   span: Span;
   runId: string;
   onBack: () => void;
   onSelect: (spanId: string) => void;
   onOpenEvidence: (evidenceId: string) => void;
+  /** Opens the step's actions menu (the same one as right-click on the row). */
+  onActions?: (at: { x: number; y: number }) => void;
+  /** Every recorded execution of this graph node, when there is more than one. */
+  visits?: Span[];
+  /** Inside a bottom sheet: no panel frame, and one header row with Actions and Close. */
+  embedded?: boolean;
+  /** Closes the sheet (embedded only); the selection stays. */
+  onClose?: () => void;
 }) {
   const [tab, setTab] = useState<Tab>("input");
   const first = span.events[0];
@@ -110,21 +122,80 @@ export function StepDetails({
   const evidence = evidenceIdsOfSpan(span);
   const kindLabel = span.kind === "event" ? (first?.type ?? "event") : span.kind === "node" ? "graph step" : "tool call";
   const isAgent = span.kind === "node" && Boolean(span.agent);
+  const tools = span.children.filter((c) => c.kind === "tool").length;
+  const subline =
+    span.kind === "node"
+      ? [isAgent ? `Agent step · ${span.agent}` : "Deterministic step", tools ? `${tools} tool call${tools === 1 ? "" : "s"}` : null, typeof start.attempt === "number" ? `attempt ${start.attempt}` : null, span.resumed ? "resumed after approval" : null]
+          .filter(Boolean)
+          .join(" · ")
+      : span.kind === "tool"
+        ? `Tool call${span.agent ? ` by ${span.agent}` : ""}`
+        : `Logged event · ${first?.type ?? "event"} · seq ${first?.seq ?? "?"}`;
+  const waited = span.wait?.endTs ? Date.parse(span.wait.endTs) - Date.parse(span.wait.startTs) : null;
+  const visitIndex = visits ? visits.findIndex((v) => v.id === span.id) : -1;
+  const actions = (cls: string) =>
+    onActions ? (
+      <button
+        type="button"
+        aria-haspopup="menu"
+        onClick={(e) => {
+          const r = e.currentTarget.getBoundingClientRect();
+          onActions({ x: r.left, y: r.bottom + 4 });
+        }}
+        className={`qc-btn-ghost qc-btn-sm shrink-0 px-2 pointer-coarse:min-h-11 ${cls}`}
+      >
+        Actions
+        <Icon name="chevronDown" size={12} />
+      </button>
+    ) : null;
 
   return (
-    <section aria-label="Selection details" className="qc-panel flex min-w-0 flex-col">
-      <header className="flex flex-col gap-2 border-b border-border px-4 pt-3">
-        <button type="button" onClick={onBack} className="flex w-fit items-center gap-1 text-xs text-muted hover:text-ink">
-          <Icon name="chevronRight" size={12} className="rotate-180" />
-          Back to run results
-        </button>
-        <div className="flex flex-wrap items-center gap-2">
+    <section aria-label="Selection details" className={`flex min-w-0 flex-col ${embedded ? "" : "qc-panel"}`}>
+      <header className={`flex flex-col gap-2 border-b border-border px-4 ${embedded ? "pt-1" : "pt-3"}`}>
+        {embedded ? null : (
+          <div className="flex items-center gap-2">
+            <button type="button" onClick={onBack} className="flex w-fit items-center gap-1 text-xs text-muted hover:text-ink pointer-coarse:min-h-11">
+              <Icon name="chevronRight" size={12} className="rotate-180" />
+              Back to run results
+            </button>
+            {actions("ml-auto")}
+          </div>
+        )}
+        <div className="flex items-center gap-2">
           <SpanGlyph span={span} />
-          <h2 className={`min-w-0 text-base font-semibold break-words ${span.kind === "event" ? "" : "font-mono"}`}>{span.name}</h2>
-          {tone ? <StatusPill tone={tone} label={STATUS_WORD[span.status]} /> : null}
-          <span className="text-xs text-muted">{kindLabel}</span>
-          {span.durationMs !== undefined ? <span className="ml-auto font-mono text-xs text-muted tabular-nums">{formatDuration(span.durationMs)}</span> : null}
+          <h2 className={`min-w-0 flex-1 text-base font-semibold break-words ${span.kind === "event" ? "" : "font-mono"}`}>
+            {span.name}
+          </h2>
+          {embedded ? (
+            <>
+              {actions("")}
+              <button type="button" data-autofocus onClick={onClose} aria-label="Close details" className="qc-btn-ghost -mr-2 size-11 shrink-0 p-0">
+                <Icon name="close" size={16} />
+              </button>
+            </>
+          ) : null}
         </div>
+        <p className="-mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] text-muted">
+          {tone ? <StatusPill tone={tone} label={STATUS_WORD[span.status]} /> : null}
+          {span.durationMs !== undefined ? <span className="font-mono text-ink tabular-nums">{formatDuration(span.durationMs)}</span> : null}
+          <span>{subline}</span>
+        </p>
+        {visits && visits.length > 1 ? (
+          <div role="group" aria-label="Executions of this step" className="flex flex-wrap items-center gap-1 text-xs">
+            <span className="mr-1 text-muted">Execution</span>
+            {visits.map((v, i) => (
+              <button
+                key={v.id}
+                type="button"
+                aria-pressed={i === visitIndex}
+                onClick={() => onSelect(v.id)}
+                className={`rounded px-2 py-0.5 font-mono pointer-coarse:min-h-9 ${i === visitIndex ? "bg-surface-2 text-ink" : "text-muted hover:bg-hover"}`}
+              >
+                {i + 1}
+              </button>
+            ))}
+          </div>
+        ) : null}
         <div role="tablist" aria-label="Step details" className="flex gap-5">
           {(Object.keys(TAB_LABEL) as Tab[]).map((t) => (
             <button
@@ -165,6 +236,12 @@ export function StepDetails({
             <Fields rows={Object.entries(start).map(([k, v]) => [k, value(v)] as [string, ReactNode])} />
           ) : (
             <>
+              {waited !== null ? (
+                <p className="flex items-center gap-2 rounded-md border border-approval/40 bg-approval/10 px-3 py-2 text-sm">
+                  <Icon name="hand" size={14} className="text-approval" />
+                  Waited {formatDuration(waited)} for your decision{span.wait?.decision ? ` · ${span.wait.decision.replaceAll("_", " ")}` : ""}.
+                </p>
+              ) : null}
               <Fields
                 rows={[
                   ["Status", span.kind === "tool" && typeof end.status === "string" && span.endTs ? end.status : STATUS_WORD[span.status] || "done"],

@@ -98,3 +98,37 @@ test("write_report, which never emits node.completed, is closed by the run's con
   expect(report).toMatchObject({ status: "ok", durationMs: 1000 });
   expect(report.endTs).toBe(new Date(Date.UTC(2026, 9, 12, 10, 0, 2)).toISOString());
 });
+
+test("an approval interrupt closes the gate at the decision and records the wait; the resumed gate is its own span", () => {
+  seq = 0;
+  // Shape recorded from a local sandbox run: the gate starts, interrupts, and starts again on resume.
+  const trace = buildTrace(
+    [
+      ev("node.started", { node: "approval_gate", agent: null, attempt: 1 }, 10),
+      ev("approval.requested", { status: "pending", round: 0 }, 10),
+      ev("run.status_changed", { from: "running", to: "awaiting_approval" }, 10),
+      ev("approval.decided", { status: "approved", round: 0 }, 45),
+      ev("run.status_changed", { from: "awaiting_approval", to: "queued" }, 45),
+      ev("node.started", { node: "approval_gate", agent: null, attempt: 1 }, 46),
+      ev("node.completed", { node: "approval_gate", agent: null, attempt: 1, durationMs: 15 }, 46),
+    ],
+    { active: false },
+  );
+  const gates = trace.children.filter((c) => c.kind === "node");
+  expect(gates).toHaveLength(2);
+  expect(gates[0]).toMatchObject({ status: "ok", durationMs: 35_000 });
+  expect(gates[0]!.resumed).toBeUndefined();
+  expect(gates[0]!.wait).toEqual({ startTs: gates[0]!.startTs, endTs: gates[0]!.endTs, decision: "approved" });
+  expect(gates[1]).toMatchObject({ status: "ok", durationMs: 15, resumed: true });
+});
+
+test("an approval still pending keeps the gate open in the approval state", () => {
+  seq = 0;
+  const trace = buildTrace(
+    [ev("node.started", { node: "approval_gate", agent: null, attempt: 1 }, 1), ev("approval.requested", { status: "pending", round: 1 }, 2)],
+    { active: true },
+  );
+  expect(trace.children[0]).toMatchObject({ status: "approval" });
+  expect(trace.children[0]!.endTs).toBeUndefined();
+  expect(trace.children[0]!.wait).toEqual({ startTs: trace.children[0]!.children[0]!.startTs });
+});

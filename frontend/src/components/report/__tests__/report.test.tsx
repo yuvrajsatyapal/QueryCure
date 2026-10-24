@@ -25,6 +25,7 @@ afterEach(() => {
   cleanup();
   getReport.mockReset();
   verifyReport.mockReset();
+  window.localStorage.clear();
 });
 
 const measurement = {
@@ -302,7 +303,7 @@ test("the investigation's Report tab has no contents list or page navigation", a
   expect(screen.queryByRole("navigation", { name: "Report navigation" })).toBeNull();
 });
 
-test("result summary puts outcome, verdict, candidate, CI and every limitation first", async () => {
+test("result summary puts outcome, verdict, candidate and CI first; limitations are one disclosure away", async () => {
   const onReport = vi.fn();
   const onBenchmark = vi.fn();
   render(<ResultSummary report={report({ limitations: ["Measured in a disposable sandbox copy.", "Warm cache only."] })} onReport={onReport} onBenchmark={onBenchmark} />);
@@ -313,8 +314,15 @@ test("result summary puts outcome, verdict, candidate, CI and every limitation f
   expect(within(s).getByText("oc_0000000000a1")).toBeTruthy();
   expect(within(s).getByText(/12\.0×/)).toBeTruthy();
   expect(within(s).getByText(/10\.5×–13\.4×/)).toBeTruthy();
-  expect(within(s).getByText("Warm cache only.")).toBeTruthy();
+  // Provenance is never collapsed; the limitations are, behind a labelled disclosure.
   expect(within(s).getByText(/Nothing was applied to your database/)).toBeTruthy();
+  const disclosure = within(s).getByRole("button", { name: "Limitations (2)" });
+  expect(disclosure.getAttribute("aria-expanded")).toBe("false");
+  expect(within(s).queryByRole("list", { name: "Limitations" })).toBeNull();
+  await userEvent.click(disclosure);
+  expect(disclosure.getAttribute("aria-expanded")).toBe("true");
+  expect(within(within(s).getByRole("list", { name: "Limitations" })).getByText("Warm cache only.")).toBeTruthy();
+  expect(within(s).getByText("Measured in a disposable sandbox copy.")).toBeTruthy();
   // The AI-written summary stays in the report, not in the summary.
   expect(within(s).queryByText("The scan dominates.")).toBeNull();
   await userEvent.click(within(s).getByRole("button", { name: "Full report" }));

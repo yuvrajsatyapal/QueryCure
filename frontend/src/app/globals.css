@@ -96,6 +96,48 @@ body {
   animation: qc-pulse 1.6s ease-in-out infinite;
 }
 
+/* Waterfall trace segments (UI_UX §3.6). The live stripe moves only while a step is open; with
+ * reduced motion it is a still stripe. */
+@keyframes qc-stripe {
+  from { background-position: 0 0; }
+  to { background-position: 24px 0; }
+}
+.qc-seg-live {
+  background-color: var(--running);
+  background-image: repeating-linear-gradient(135deg, rgb(0 0 0 / 0.28) 0 6px, transparent 6px 12px);
+  background-size: 24px 100%;
+  animation: qc-stripe 1s linear infinite;
+}
+.qc-seg-wait {
+  background-color: color-mix(in srgb, var(--approval) 28%, transparent);
+  background-image: repeating-linear-gradient(135deg, color-mix(in srgb, var(--approval) 70%, transparent) 0 2px, transparent 2px 6px);
+  outline: 1px solid color-mix(in srgb, var(--approval) 60%, transparent);
+  outline-offset: -1px;
+}
+.qc-seg-unfinished {
+  outline: 1px dashed var(--border-strong);
+  outline-offset: -1px;
+}
+/* A compressed stretch of the time axis (UI_UX §3.6a): dashed edges so it never reads as scale. */
+.qc-axis-break {
+  border-inline: 1px dashed color-mix(in srgb, var(--approval) 55%, transparent);
+  background: color-mix(in srgb, var(--approval) 6%, transparent);
+}
+/* The live orb (prototype "activity states"): dots drift only while the backend reports a step running. */
+@keyframes qc-orb {
+  to { background-position: 7px 3.5px; }
+}
+.qc-orb {
+  display: inline-block;
+  border-radius: 9999px;
+  background-image: radial-gradient(currentColor 0.9px, transparent 1.3px);
+  background-size: 3.5px 3.5px;
+  mask: radial-gradient(circle, #000 58%, transparent 72%);
+}
+.qc-orb-live {
+  animation: qc-orb 2.4s linear infinite;
+}
+
 /* Light theme only: a hairline lift so white panels separate from the near-white page. */
 html:not(.dark) .qc-panel {
   box-shadow: 0 1px 2px rgba(15, 18, 24, 0.04);

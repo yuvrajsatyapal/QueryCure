@@ -1,0 +1,147 @@
+{
+  "_comment": "Mirror of backend/src/querycure/agents/graph.py (compiled LangGraph). Guarded by backend/tests/unit/agents/test_graph_topology_contract.py; regenerate from compile_graph().get_graph() when the graph changes.",
+  "nodes": [
+    "__end__",
+    "__start__",
+    "approval_gate",
+    "benchmark_auditor",
+    "collect_context",
+    "index_strategist",
+    "intake",
+    "next_round",
+    "optimization_engineer",
+    "query_analyzer",
+    "run_experiment",
+    "supervisor_plan",
+    "synthesize_hypotheses",
+    "workload_investigator",
+    "write_report"
+  ],
+  "edges": [
+    {
+      "source": "__start__",
+      "target": "intake",
+      "conditional": false
+    },
+    {
+      "source": "approval_gate",
+      "target": "run_experiment",
+      "conditional": true
+    },
+    {
+      "source": "approval_gate",
+      "target": "write_report",
+      "conditional": true
+    },
+    {
+      "source": "benchmark_auditor",
+      "target": "next_round",
+      "conditional": true
+    },
+    {
+      "source": "benchmark_auditor",
+      "target": "write_report",
+      "conditional": true
+    },
+    {
+      "source": "collect_context",
+      "target": "supervisor_plan",
+      "conditional": true
+    },
+    {
+      "source": "collect_context",
+      "target": "write_report",
+      "conditional": true
+    },
+    {
+      "source": "index_strategist",
+      "target": "synthesize_hypotheses",
+      "conditional": false
+    },
+    {
+      "source": "intake",
+      "target": "collect_context",
+      "conditional": true
+    },
+    {
+      "source": "intake",
+      "target": "write_report",
+      "conditional": true
+    },
+    {
+      "source": "next_round",
+      "target": "optimization_engineer",
+      "conditional": true
+    },
+    {
+      "source": "next_round",
+      "target": "write_report",
+      "conditional": true
+    },
+    {
+      "source": "optimization_engineer",
+      "target": "approval_gate",
+      "conditional": true
+    },
+    {
+      "source": "optimization_engineer",
+      "target": "write_report",
+      "conditional": true
+    },
+    {
+      "source": "query_analyzer",
+      "target": "synthesize_hypotheses",
+      "conditional": false
+    },
+    {
+      "source": "run_experiment",
+      "target": "benchmark_auditor",
+      "conditional": true
+    },
+    {
+      "source": "run_experiment",
+      "target": "write_report",
+      "conditional": true
+    },
+    {
+      "source": "supervisor_plan",
+      "target": "index_strategist",
+      "conditional": true
+    },
+    {
+      "source": "supervisor_plan",
+      "target": "query_analyzer",
+      "conditional": true
+    },
+    {
+      "source": "supervisor_plan",
+      "target": "workload_investigator",
+      "conditional": true
+    },
+    {
+      "source": "supervisor_plan",
+      "target": "write_report",
+      "conditional": true
+    },
+    {
+      "source": "synthesize_hypotheses",
+      "target": "optimization_engineer",
+      "conditional": true
+    },
+    {
+      "source": "synthesize_hypotheses",
+      "target": "write_report",
+      "conditional": true
+    },
+    {
+      "source": "workload_investigator",
+      "target": "synthesize_hypotheses",
+      "conditional": false
+    },
+    {
+      "source": "write_report",
+      "target": "__end__",
+      "conditional": false
+    }
+  ]
+}

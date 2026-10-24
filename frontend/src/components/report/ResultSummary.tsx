@@ -1,12 +1,36 @@
+"use client";
+
+import { useId, useState, type ReactNode } from "react";
 import { VerdictBadge } from "@/components/tournament/VerdictBadge";
+import { Icon, type IconName } from "@/components/ui/Icon";
 import { describeCandidate } from "@/lib/benchmark/candidate";
 import { OUTCOME_LABEL, VERDICT_EXPLANATION, x } from "@/lib/report/labels";
 import type { ReportV1 } from "@/lib/report/types";
-import { Callout } from "./ReportView";
 
-/** The sealed report's conclusion above the trace (FINAL_UI_POLISH §2.1): outcome, verdict,
- * candidate, primary interval and every limitation, as stored. The AI-written summary and the
- * detail stay in the Report tab. */
+const EXPANDED_KEY = "qc.resultSummary.expanded";
+
+function readExpanded(): boolean {
+  try {
+    return typeof window !== "undefined" && window.localStorage.getItem(EXPANDED_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+/** A one-line provenance note. Warnings keep their colour; none of these is ever collapsed. */
+function Note({ icon, warn = false, children }: { icon: IconName; warn?: boolean; children: ReactNode }) {
+  return (
+    <li className={`flex items-start gap-1.5 ${warn ? "text-inconclusive" : "text-muted"}`}>
+      <Icon name={icon} size={13} className={`mt-[3px] shrink-0 ${warn ? "" : "text-faint"}`} />
+      <span>{children}</span>
+    </li>
+  );
+}
+
+/** The sealed report's conclusion above the trace (FINAL_UI_POLISH §2.1, UI_UX §3.6a): outcome,
+ * headline, verdict, candidate and primary interval, and every provenance warning, always shown;
+ * the limitations and the verdict explanation sit behind a disclosure so the trace stays in
+ * reach. The AI-written summary and the detail stay in the Report tab. */
 export function ResultSummary({
   report: r,
   onReport,
@@ -17,77 +41,109 @@ export function ResultSummary({
   /** Absent when the run has no sandbox benchmark. */
   onBenchmark?: () => void;
 }) {
+  const [expanded, setExpanded] = useState(readExpanded);
+  const panel = useId();
   const rec = r.recommendation;
   const m = rec.primaryMeasurement;
   const benchmarked = r.rounds.some((rnd) => rnd.experiment);
   const prerecorded = r.provenance.measurements.includes("prerecorded");
   const verified = rec.status === "verified" || rec.status === "verified_with_noise_warning";
+  const explanation = verified && rec.status in VERDICT_EXPLANATION ? VERDICT_EXPLANATION[rec.status] : null;
+  const more = r.limitations.length + (explanation ? 1 : 0);
+
+  function toggle() {
+    const next = !expanded;
+    setExpanded(next);
+    try {
+      window.localStorage.setItem(EXPANDED_KEY, next ? "1" : "0");
+    } catch {
+      // Remembering the choice is a convenience; without storage it resets on reload.
+    }
+  }
+
   return (
-    <section aria-label="Result summary" className="flex flex-col gap-3 rounded-lg border border-border bg-surface p-4">
-      <div className="flex flex-col gap-1">
-        <p className="qc-eyebrow">Result · run {r.run.runNumber}</p>
-        <h2 className="text-lg font-semibold tracking-tight">{OUTCOME_LABEL[r.outcome ?? ""] ?? `Run ${r.finalStatus}`}</h2>
-        <p className="text-sm">{r.headline}</p>
+    <section aria-label="Result summary" className="flex flex-col gap-2.5 rounded-lg border border-border bg-surface px-4 py-3">
+      <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-2">
+        <div className="flex min-w-0 flex-1 basis-96 flex-col gap-0.5">
+          <p className="qc-eyebrow">Result · run {r.run.runNumber}</p>
+          <h2 className="text-base font-semibold tracking-tight">{OUTCOME_LABEL[r.outcome ?? ""] ?? `Run ${r.finalStatus}`}</h2>
+          <p className="text-sm">{r.headline}</p>
+        </div>
+        <div className="flex shrink-0 flex-wrap gap-2">
+          <button type="button" onClick={onReport} className="qc-btn-secondary py-1 text-xs pointer-coarse:min-h-11">
+            Full report
+          </button>
+          {onBenchmark && benchmarked ? (
+            <button type="button" onClick={onBenchmark} className="qc-btn-secondary py-1 text-xs pointer-coarse:min-h-11">
+              Benchmark details
+            </button>
+          ) : null}
+        </div>
       </div>
 
       {rec.candidateKey ? (
-        <div className="flex flex-col gap-1.5 border-t border-border pt-3">
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-            <VerdictBadge status={rec.status} />
-            <span className="font-medium">{describeCandidate({ kind: rec.kind ?? "", ddl: rec.ddl, querySql: rec.querySql })}</span>
-            <span className="font-mono text-xs text-muted">{rec.candidateKey}</span>
-          </div>
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-border pt-2.5 text-sm">
+          <VerdictBadge status={rec.status} />
+          <span className="font-medium">{describeCandidate({ kind: rec.kind ?? "", ddl: rec.ddl, querySql: rec.querySql })}</span>
+          <span className="font-mono text-xs text-muted">{rec.candidateKey}</span>
           {m ? (
-            <p className="text-sm">
+            <span>
               <span className="text-muted">Speedup on </span>
               <span className="font-mono text-xs">{m.paramSet}</span>
               <span className="text-muted">: </span>
-              <span className="text-base font-semibold tabular-nums">{x(m.speedup)}</span>
+              <span className="font-semibold tabular-nums">{x(m.speedup)}</span>
               <span className="text-muted">
                 {" "}
-                · 95% CI <span className="tabular-nums">{x(m.ciLow)}–{x(m.ciHigh)}</span> · n {m.baseline.n}/{m.candidate.n} ·{" "}
-                {m.provenance ?? "recorded"}
+                · 95% CI <span className="tabular-nums">{x(m.ciLow)}–{x(m.ciHigh)}</span> · n {m.baseline.n}/{m.candidate.n} · {m.provenance ?? "recorded"}
               </span>
-            </p>
+            </span>
           ) : null}
         </div>
       ) : (
-        <p className="border-t border-border pt-3 text-sm text-muted">
+        <p className="border-t border-border pt-2.5 text-sm text-muted">
           No recommendation was verified.{benchmarked && onBenchmark ? " Benchmark details give each candidate's verdict and its reason." : ""}
         </p>
       )}
-      {verified && rec.status in VERDICT_EXPLANATION ? <p className="text-sm text-muted">{VERDICT_EXPLANATION[rec.status]}</p> : null}
 
-      <div className="flex flex-col gap-2">
-        {benchmarked ? (
-          <Callout tone="info">Sandbox only: every measurement ran in a disposable copy of a demo database. Nothing was applied to your database.</Callout>
+      <ul aria-label="Provenance" className="flex flex-col gap-1 text-[13px] leading-5 empty:hidden">
+        {benchmarked ? <Note icon="flask">Sandbox only: every measurement ran in a disposable copy of a demo database. Nothing was applied to your database.</Note> : null}
+        {prerecorded ? (
+          <Note icon="alert" warn>
+            Contains prerecorded demo measurements: these are not live results.
+          </Note>
         ) : null}
-        {prerecorded ? <Callout tone="warning">Contains prerecorded demo measurements: these are not live results.</Callout> : null}
-        {r.provenance.stubModel ? <Callout tone="neutral">Agent text came from the offline stub model: canned, not a diagnosis.</Callout> : null}
-        {r.partial ? <Callout tone="warning">Partial report: the run stopped ({r.stopReason ?? r.finalStatus}).</Callout> : null}
-      </div>
+        {r.provenance.stubModel ? <Note icon="bot">Agent text came from the offline stub model: canned, not a diagnosis.</Note> : null}
+        {r.partial ? (
+          <Note icon="alert" warn>
+            Partial report: the run stopped ({r.stopReason ?? r.finalStatus}).
+          </Note>
+        ) : null}
+      </ul>
 
-      {r.limitations.length ? (
-        <div className="text-sm">
-          <h3 className="font-medium">Limitations</h3>
-          <ul className="mt-1 list-disc pl-5 text-muted">
-            {r.limitations.map((l) => (
-              <li key={l}>{l}</li>
-            ))}
-          </ul>
+      {more ? (
+        <div className="flex flex-col gap-2">
+          <button
+            type="button"
+            aria-expanded={expanded}
+            aria-controls={panel}
+            onClick={toggle}
+            className="flex w-fit items-center gap-1 text-[13px] font-medium text-ink hover:text-accent pointer-coarse:min-h-11"
+          >
+            <Icon name={expanded ? "chevronDown" : "chevronRight"} size={13} className="text-muted" />
+            {r.limitations.length ? `Limitations (${r.limitations.length})` : "What this verdict means"}
+          </button>
+          <div id={panel} hidden={!expanded} className="flex flex-col gap-2 pl-[18px] text-sm">
+            {explanation ? <p className="text-muted">{explanation}</p> : null}
+            {r.limitations.length ? (
+              <ul aria-label="Limitations" className="list-disc pl-4 text-muted">
+                {r.limitations.map((l) => (
+                  <li key={l}>{l}</li>
+                ))}
+              </ul>
+            ) : null}
+          </div>
         </div>
       ) : null}
-
-      <div className="flex flex-wrap gap-2">
-        <button type="button" onClick={onReport} className="qc-btn-secondary py-1 text-xs">
-          Full report
-        </button>
-        {onBenchmark && benchmarked ? (
-          <button type="button" onClick={onBenchmark} className="qc-btn-secondary py-1 text-xs">
-            Benchmark details
-          </button>
-        ) : null}
-      </div>
     </section>
   );
 }

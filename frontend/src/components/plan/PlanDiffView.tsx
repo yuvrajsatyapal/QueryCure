@@ -40,7 +40,8 @@ export function PlanDiffTable({ diff }: { diff: PlanDiff }) {
           table is the measurement that decides)
         </p>
       ) : null}
-      <div className="overflow-x-auto">
+      {/* Scrolls sideways in narrow panes (the inspector), so it is a tab stop for keyboard users. */}
+      <div className="overflow-x-auto" tabIndex={0} role="region" aria-label="Node changes, baseline versus candidate">
         <table className="w-full min-w-[520px] text-left text-sm">
           <caption className="sr-only">Plan nodes, baseline versus candidate</caption>
           <thead className="font-mono text-[11px] uppercase text-muted">

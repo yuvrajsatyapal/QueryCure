@@ -20,6 +20,10 @@ export interface Span {
   events: RunEvent[];
   evidenceIds: string[];
   children: Span[];
+  /** The recorded wait for a human decision: approval.requested → approval.decided. */
+  wait?: { startTs: string; endTs?: string; decision?: string };
+  /** The node started again after an approval interrupt (LangGraph re-runs the gate on resume). */
+  resumed?: true;
 }
 
 type Payload = Record<string, unknown>;
@@ -28,6 +32,7 @@ const RUN_LEVEL = new Set(["run.status_changed", "run.concluded", "report.ready"
 // write_report seals the event log and emits no node.completed; the run's conclusion is its end.
 const REPORT_NODE = "write_report";
 const CONCLUSION = new Set(["run.concluded", "report.ready"]);
+const GATE_NODE = "approval_gate";
 
 const str = (v: unknown): string | null => (typeof v === "string" && v ? v : null);
 const ids = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : []);
@@ -78,6 +83,7 @@ export function buildTrace(events: RunEvent[], { active }: { active: boolean }):
   };
   const openNodes: Span[] = [];
   const openTools: Span[] = [];
+  const decided = new Set<string>();
   const latest = <T extends Span>(list: T[], match: (s: T) => boolean) => [...list].reverse().find(match);
   const remove = (list: Span[], s: Span) => list.splice(list.indexOf(s), 1);
 
@@ -88,6 +94,10 @@ export function buildTrace(events: RunEvent[], { active }: { active: boolean }):
     switch (event.type) {
       case "node.started": {
         const s = span("node", node ?? "node", event, agent, "running");
+        if (node && decided.has(node)) {
+          s.resumed = true;
+          decided.delete(node);
+        }
         root.children.push(s);
         openNodes.push(s);
         break;
@@ -138,7 +148,16 @@ export function buildTrace(events: RunEvent[], { active }: { active: boolean }):
             close(parent, event, undefined, "error");
             parent.status = "error";
             remove(openNodes, parent);
-          } else if (status === "approval") parent.status = "approval";
+          } else if (status === "approval") {
+            parent.status = "approval";
+            parent.wait = { startTs: event.ts };
+          } else if (event.type === "approval.decided" && parent.wait && !parent.wait.endTs) {
+            // The interrupt ends the gate's first execution at the decision; resume starts a new one.
+            close(parent, event, undefined, "ok");
+            parent.wait = { ...parent.wait, endTs: event.ts, decision: str(p.status) ?? undefined };
+            if (parent.name === GATE_NODE) decided.add(parent.name);
+            remove(openNodes, parent);
+          }
         }
       }
     }
