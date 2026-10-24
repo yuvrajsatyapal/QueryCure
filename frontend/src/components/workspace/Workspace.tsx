@@ -24,6 +24,8 @@ interface PlanResult {
   metrics: NodeMetrics[];
   origin: string;
   source: PlanSource;
+  /** What the plan was produced from (plan text, or connection + SQL): a later edit makes it stale. */
+  input: string;
   artifactSha256?: string;
 }
 
@@ -102,18 +104,21 @@ export function Workspace() {
     mutationFn: (sql: string) => inspectSql(sql),
     onSuccess: (analysis, sql) => setChecked({ query: sql, analysis }),
   });
-  const show = (plan: PlanTree, metrics: NodeMetrics[], origin: string, from: PlanSource, artifactSha256?: string) => {
-    setResult({ plan, metrics, origin, source: from, artifactSha256 });
+  const show = (plan: PlanTree, metrics: NodeMetrics[], origin: string, from: PlanSource, input: string, artifactSha256?: string) => {
+    setResult({ plan, metrics, origin, source: from, input, artifactSha256 });
     setSelected(null);
+    setFormError(null);
   };
+  const liveInput = (id: string, sql: string) => `${id}\n${sql}`;
   const analyze = useMutation({
-    mutationFn: () => inspectPlan(planText),
-    onSuccess: (r) =>
-      show(r.plan, r.metrics, `uploaded plan · artifact ${r.artifactSha256.slice(0, 12)}`, "upload", r.artifactSha256),
+    mutationFn: (text: string) => inspectPlan(text),
+    onSuccess: (r, text) =>
+      show(r.plan, r.metrics, `uploaded plan · artifact ${r.artifactSha256.slice(0, 12)}`, "upload", text, r.artifactSha256),
   });
   const explain = useMutation({
-    mutationFn: () => explainOnConnection(connectionId, query),
-    onSuccess: (r) => show(r.plan, r.metrics, r.genericPlan ? "live EXPLAIN · generic plan" : "live EXPLAIN", "live"),
+    mutationFn: (v: { connectionId: string; query: string }) => explainOnConnection(v.connectionId, v.query),
+    onSuccess: (r, v) =>
+      show(r.plan, r.metrics, r.genericPlan ? "live EXPLAIN · generic plan" : "live EXPLAIN", "live", liveInput(v.connectionId, v.query)),
   });
   const start = useMutation({
     mutationFn: (input: CreateInvestigationInput) => createInvestigation(input, idempotencyKey),
@@ -126,12 +131,28 @@ export function Workspace() {
     if (step === 3 && !fresh && !checking && !checkFailed && query.trim() !== "") runCheck(query);
   }, [step, fresh, checking, checkFailed, query, runCheck]);
 
+  // `shown` is what the plan panel displays; `current` is the plan for the inputs as they are now. A response
+  // that arrives after the plan text, connection or SQL changed is displayed but never counts as ready.
   const shown = result && result.source === source ? result : null;
+  const sourceInput = source === "upload" ? planText : liveInput(connectionId, query);
+  const current = shown && shown.input === sourceInput ? shown : null;
+  const sourcePending = (source === "upload" && analyze.isPending) || (source === "live" && explain.isPending);
   const sourceReady =
     source === "none" ||
     (source === "workload" && Boolean(workloadId)) ||
-    (source === "upload" && shown !== null) ||
-    (source === "live" && connectionId !== "" && shown !== null);
+    (source === "upload" && current !== null) ||
+    (source === "live" && connectionId !== "" && current !== null);
+  const sourceBlocker = sourceReady
+    ? null
+    : source === "upload"
+      ? shown
+        ? "The plan changed since it was analyzed: analyze it again, or choose No plan."
+        : "Analyze a plan first, or choose No plan."
+      : source === "live"
+        ? shown
+          ? "The connection or SQL changed since EXPLAIN ran: run EXPLAIN again."
+          : "Choose a connection and run EXPLAIN first."
+        : "Choose a demo workload.";
 
   function go(next: number) {
     setMoved(true);
@@ -163,15 +184,9 @@ export function Workspace() {
   }
 
   function continueFromSource() {
-    if (!sourceReady) {
-      return setFormError(
-        source === "upload"
-          ? "Analyze a plan first, or choose No plan."
-          : source === "live"
-            ? "Choose a connection and run EXPLAIN first."
-            : "Choose a demo workload.",
-      );
-    }
+    // The keyboard shortcut bypasses the disabled button: a pending analysis neither advances nor errors.
+    if (sourcePending) return;
+    if (sourceBlocker) return setFormError(sourceBlocker);
     go(2);
   }
 
@@ -197,7 +212,7 @@ export function Workspace() {
         paramSets: sets,
         mode,
         source: choice,
-        planArtifactSha256: shown?.artifactSha256,
+        planArtifactSha256: current?.artifactSha256,
         preAuthorize,
       }),
     );
@@ -219,18 +234,29 @@ export function Workspace() {
   const paramCount = analysis ? analysis.metadata.parameterCount : null;
   const tables = analysis ? analysis.metadata.tables.map((t) => t.name) : [];
   const selectedNode = shown?.plan.nodes.find((n) => n.id === selected);
-  const continueButton = (label: string, pending?: boolean, pendingLabel?: string) => (
+  const continueButton = (label: string, pending?: boolean, pendingLabel?: string, blocked?: string | null) => (
     <div className="flex flex-wrap items-center gap-3">
-      <button type="button" onClick={advance} disabled={pending} className="qc-btn-primary">
+      <button
+        type="button"
+        onClick={advance}
+        disabled={pending || Boolean(blocked)}
+        aria-describedby={blocked ? (formError ? "wizard-error" : "wizard-hint") : undefined}
+        className="qc-btn-primary"
+      >
         {pending ? pendingLabel : label}
       </button>
+      {blocked && !pending && !formError ? (
+        <span id="wizard-hint" className="text-xs text-muted">
+          {blocked}
+        </span>
+      ) : null}
       <span className="hidden text-xs text-muted sm:inline">
         <kbd className="font-mono">{isMac() ? "⌘" : "Ctrl"}</kbd>+<kbd className="font-mono">Enter</kbd>
       </span>
     </div>
   );
   const alert = formError ? (
-    <p role="alert" className="text-sm text-rejected">
+    <p id="wizard-error" role="alert" className="text-sm text-rejected">
       {formError}
     </p>
   ) : null;
@@ -295,7 +321,7 @@ export function Workspace() {
                 {SOURCE_LABEL[source]}
                 {source === "workload" && workloadId ? <span className="font-mono"> · {workloadId}</span> : null}
                 {source === "live" ? ` · ${connections.data?.items.find((c) => c.id === connectionId)?.name ?? "connection"}` : null}
-                {shown ? ` · ${shown.plan.nodes.length} plan nodes` : null}
+                {current ? ` · ${current.plan.nodes.length} plan nodes` : null}
               </span>
             }
           >
@@ -307,14 +333,16 @@ export function Workspace() {
               }}
               planText={planText}
               onPlanText={setPlanText}
-              onAnalyze={() => analyze.mutate()}
+              onAnalyze={() => analyze.mutate(planText)}
               analyzing={analyze.isPending}
+              analyzeFailed={analyze.isError && analyze.variables === planText}
               connectionId={connectionId}
               onConnection={setConnectionId}
               connections={connections.data}
               connectionsLoading={connections.isPending}
-              onExplain={() => explain.mutate()}
+              onExplain={() => explain.mutate({ connectionId, query })}
               explaining={explain.isPending}
+              explainFailed={explain.isError && explain.variables?.connectionId === connectionId && explain.variables.query === query}
               queryBlank={query.trim() === ""}
               workloads={workloads.data}
               workloadsLoading={workloads.isPending}
@@ -325,7 +353,7 @@ export function Workspace() {
               error={source === "upload" ? analyze.error : source === "live" ? explain.error : workloads.error}
             />
             {alert}
-            {continueButton("Continue")}
+            {continueButton("Continue", sourcePending, source === "live" ? "Running EXPLAIN…" : "Analyzing plan…", sourceBlocker)}
           </WizardStep>
 
           <WizardStep
@@ -398,7 +426,7 @@ export function Workspace() {
               {(
                 [
                   ["SQL", <code key="sql" className="block truncate font-mono text-xs">{query.trim().split("\n")[0]}</code>, 0],
-                  ["Plan source", `${SOURCE_LABEL[source]}${shown ? ` · ${shown.origin}` : ""}${source === "workload" && workloadId ? ` · ${workloadId}` : ""}`, 1],
+                  ["Plan source", `${SOURCE_LABEL[source]}${current ? ` · ${current.origin}` : ""}${source === "workload" && workloadId ? ` · ${workloadId}` : ""}`, 1],
                   ["Mode", MODE_COPY[mode].label, 2],
                   ["Objective", objective.trim(), 2],
                   ["Parameter sets", parsedSets.sets.map((s) => s.name).join(", ") || "none", 2],

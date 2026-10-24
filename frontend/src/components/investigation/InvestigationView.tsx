@@ -19,10 +19,13 @@ import {
 } from "@/lib/api/investigations";
 import { ApiError } from "@/lib/api/client";
 import { getApprovals, getCandidates, getExperiments, optimizationKeys } from "@/lib/api/optimization";
-import type { EvidenceDetail } from "@/lib/api/types";
+import type { EvidenceDetail, Verification } from "@/lib/api/types";
+import { EvidenceExplorer } from "@/components/evidence/EvidenceExplorer";
+import type { GraphNode as EvidenceNode } from "@/lib/evidence/graph";
+import type { AuditCheck, AuditConcern } from "@/lib/report/types";
 import { ReportPanel } from "@/components/report/ReportPanel";
 import { ResultSummary } from "@/components/report/ResultSummary";
-import { SUPPORTED_REPORT_SCHEMAS, getReport, reportKeys } from "@/lib/api/reports";
+import { SUPPORTED_REPORT_SCHEMAS, getReport, getVerifications, reportKeys } from "@/lib/api/reports";
 import type { ReportV1 } from "@/lib/report/types";
 import { ApprovalCard } from "@/components/tournament/ApprovalCard";
 import { TournamentPanel } from "@/components/tournament/TournamentPanel";
@@ -35,6 +38,7 @@ import {
   citedEvidenceIds,
   findSpan,
   indexClaimSpans,
+  indexEvidenceSpans,
   planTargetOfEvidence,
   stepForClaim,
 } from "@/lib/investigation/links";
@@ -55,7 +59,7 @@ import { StepDetails } from "./StepDetails";
 import { TraceGraph } from "./TraceGraph";
 import { TraceTree } from "./TraceTree";
 
-type Tab = "plan" | "findings" | "tournament" | "report";
+type Tab = "plan" | "findings" | "evidence" | "tournament" | "report";
 type View = "waterfall" | "graph" | "results";
 const VIEWS: { id: View; label: string }[] = [
   { id: "waterfall", label: "Waterfall" },
@@ -117,6 +121,8 @@ export function InvestigationView({ id, requestedRunId }: { id: string; requeste
   const client = useQueryClient();
   const router = useRouter();
   const [tab, setTab] = useState<Tab>("findings");
+  // "Open in benchmark" from the evidence tab: the tournament selects this arm.
+  const [focusArm, setFocusArm] = useState<string | null>(null);
   const tabRef = useRef(tab);
   useEffect(() => {
     tabRef.current = tab;
@@ -171,6 +177,7 @@ export function InvestigationView({ id, requestedRunId }: { id: string; requeste
   const candidates = useQuery({ queryKey: optimizationKeys.candidates(runId ?? ""), queryFn: ({ signal }) => getCandidates(runId ?? "", signal), enabled: runId !== null && sandbox });
   const approvals = useQuery({ queryKey: optimizationKeys.approvals(runId ?? ""), queryFn: ({ signal }) => getApprovals(runId ?? "", signal), enabled: runId !== null && sandbox });
   const experiments = useQuery({ queryKey: optimizationKeys.experiments(runId ?? ""), queryFn: ({ signal }) => getExperiments(runId ?? "", signal), enabled: runId !== null && sandbox });
+  const verifications = useQuery({ queryKey: reportKeys.verifications(runId ?? ""), queryFn: ({ signal }) => getVerifications(runId ?? "", signal), enabled: runId !== null && sandbox && tab === "evidence" });
   const pending = approvals.data?.items.find((a) => a.status === "pending") ?? null;
   const { events, live, stream } = useRunEvents(runId);
   const cancel = useMutation({
@@ -190,19 +197,29 @@ export function InvestigationView({ id, requestedRunId }: { id: string; requeste
   const sealedReport = sealed.data && SUPPORTED_REPORT_SCHEMAS.includes(sealed.data.reportSchemaVersion) ? (sealed.data.report as unknown as ReportV1) : null;
   const trace = useMemo(() => buildTrace(events, { active }), [events, active]);
   const claimIndex = useMemo(() => indexClaimSpans(trace), [trace]);
+  const evidenceIndex = useMemo(() => indexEvidenceSpans(trace), [trace]);
   const selectedSpan = step === RUN_ROW ? undefined : findSpan(trace, step);
   const graph = useMemo(() => graphRun(trace), [trace]);
   const clock = useClock(active);
   const activity = activityOf({ status: r?.status ?? "queued", outcome: r?.outcome ?? null, errorMessage: r?.errorMessage ?? null, trace, events, stream: stream ?? (live ? "live" : "closed") });
 
-  // Plan citations resolve each cited evidence ID once (immutable, cached), only while the Plan tab is open.
+  // Cited evidence resolves once per ID (immutable, cached), only while the Plan or Evidence tab is
+  // open. The evidence tab also resolves what the Benchmark Auditor's checks cite.
   const claims = findings.data;
-  const citedIds = useMemo(() => (claims ? citedEvidenceIds(claims.findings, claims.hypotheses) : []), [claims]);
+  const audits: Verification[] = useMemo(() => verifications.data?.items ?? [], [verifications.data]);
+  const citedIds = useMemo(() => {
+    const ids = claims ? citedEvidenceIds(claims.findings, claims.hypotheses) : [];
+    const audited = audits.flatMap((v) => [
+      ...(v.checks as unknown as AuditCheck[]).flatMap((c) => c.evidenceIds ?? []),
+      ...(v.auditorConcerns as unknown as AuditConcern[]).flatMap((c) => c.evidenceIds ?? []),
+    ]);
+    return [...new Set([...ids, ...audited])];
+  }, [claims, audits]);
   const resolved = useQueries({
     queries: citedIds.map((ev) => ({
       queryKey: investigationKeys.evidence(runId ?? "", ev),
       queryFn: ({ signal }: { signal: AbortSignal }) => getEvidence(runId ?? "", ev, signal),
-      enabled: runId !== null && tab === "plan" && step === RUN_ROW,
+      enabled: runId !== null && (tab === "plan" || tab === "evidence") && step === RUN_ROW,
       staleTime: Infinity,
       retry: false,
     })),
@@ -318,10 +335,40 @@ export function InvestigationView({ id, requestedRunId }: { id: string; requeste
     ];
   }
 
+  function openBenchmark(arm: string | null) {
+    setFocusArm(arm);
+    setTab("tournament");
+  }
+
+  function evidenceActions(node: EvidenceNode): ReactNode {
+    const btn = (label: string, run: () => void) => (
+      <button key={label} type="button" onClick={run} className="qc-btn-secondary qc-btn-sm">
+        {label}
+      </button>
+    );
+    const stepButton = (spanId: string | undefined) => (spanId ? btn("Show step", () => showStep(spanId)) : null);
+    if (node.column === "evidence") {
+      const kind = node.detail?.evidence.kind;
+      const data = (node.detail?.evidence.data ?? {}) as Record<string, unknown>;
+      const arm = typeof data.arm === "string" ? data.arm : (node.detail?.evidence.locator.match(/^\/(?:stats|correctness)\/([^/]+)\//)?.[1] ?? null);
+      return [
+        kind === "plan_node" ? btn("Show in plan", () => void openEvidence(node.id)) : null,
+        stepButton(evidenceIndex.get(node.id)?.[0]),
+        sandbox && (kind === "benchmark_metric" || kind === "correctness_check") ? btn("Open in benchmark", () => openBenchmark(arm)) : null,
+      ];
+    }
+    if (node.column === "finding" || node.column === "hypothesis") {
+      const match = stepForClaim(claimIndex, node.id);
+      return [match.status === "found" ? stepButton(match.spanId) : <span key="none" className="text-xs text-muted">Step not recorded</span>, btn("Show in Findings", () => setTab("findings"))];
+    }
+    const arm = node.column === "candidate" ? node.id : node.verification.candidateKey;
+    return sandbox ? btn("Open in benchmark", () => openBenchmark(arm)) : null;
+  }
+
   // Palette entries and `[` `]` / `g f` `g p` `g t` `g r` for the result tabs (UI_UX §3.15).
   const tabCommands = useMemo<Command[]>(() => {
-    const ids: Tab[] = ["findings", "plan", ...(sandbox ? (["tournament"] as const) : []), "report"];
-    const labels: Record<Tab, string> = { findings: "Findings", plan: "Plan", tournament: "Tournament", report: "Report" };
+    const ids: Tab[] = ["findings", "evidence", "plan", ...(sandbox ? (["tournament"] as const) : []), "report"];
+    const labels: Record<Tab, string> = { findings: "Findings", evidence: "Evidence", plan: "Plan", tournament: "Tournament", report: "Report" };
     const show = (t: Tab) => {
       setGraphPick(null);
       setStep(RUN_ROW);
@@ -356,6 +403,7 @@ export function InvestigationView({ id, requestedRunId }: { id: string; requeste
   ]);
   const tabs: { id: Tab; label: string }[] = [
     { id: "findings", label: "Findings" },
+    { id: "evidence", label: "Evidence" },
     { id: "plan", label: "Plan" },
     ...(sandbox ? [{ id: "tournament" as const, label: "Tournament" }] : []),
     { id: "report", label: "Report" },
@@ -415,7 +463,16 @@ export function InvestigationView({ id, requestedRunId }: { id: string; requeste
           }}
         />
       ) : tab === "tournament" ? (
-        <TournamentPanel experiments={experiments.data?.items ?? []} candidates={candidates.data?.items ?? []} runId={runId ?? undefined} />
+        <TournamentPanel experiments={experiments.data?.items ?? []} candidates={candidates.data?.items ?? []} runId={runId ?? undefined} focusArm={focusArm} />
+      ) : tab === "evidence" ? (
+        <EvidenceExplorer
+          findings={claims?.findings ?? []}
+          hypotheses={claims?.hypotheses ?? []}
+          candidates={candidates.data?.items ?? []}
+          verifications={audits}
+          evidence={resolved}
+          actionsFor={evidenceActions}
+        />
       ) : tab === "findings" ? (
         <FindingsPanel
           data={findings.data}

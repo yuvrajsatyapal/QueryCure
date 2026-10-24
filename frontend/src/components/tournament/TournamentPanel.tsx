@@ -14,6 +14,7 @@ import { describeCandidate } from "@/lib/benchmark/candidate";
 import { BenchmarkAnalytics } from "./BenchmarkAnalytics";
 import { CorrectnessPanel } from "./CorrectnessPanel";
 import { StatsGlossary } from "./StatsGlossary";
+import { StudioSection, useCompactStudio } from "./StudioSection";
 import { VerdictBadge } from "./VerdictBadge";
 
 const bytes = (b: number) => (b >= 1024 * 1024 ? `${(b / 1024 / 1024).toFixed(1)} MB` : `${(b / 1024).toFixed(0)} kB`);
@@ -186,13 +187,23 @@ export function ExperimentView({
   detail,
   candidates,
   runId,
+  focusArm = null,
 }: {
   detail: ExperimentDetail;
   candidates: OptimizationCandidate[];
   runId?: string;
+  /** Arm to select, e.g. from "Open in benchmark" on the evidence tab. */
+  focusArm?: string | null;
 }) {
   const result = detail.result;
-  const [selected, setSelected] = useState<string | null>(null);
+  const [selected, setSelected] = useState<string | null>(focusArm);
+  const [seenFocus, setSeenFocus] = useState(focusArm);
+  if (focusArm !== seenFocus) {
+    setSeenFocus(focusArm);
+    if (focusArm) setSelected(focusArm);
+  }
+  const [tables, setTables] = useState(false);
+  const compact = useCompactStudio();
   const verifications = useQuery({
     queryKey: reportKeys.verifications(runId ?? ""),
     queryFn: ({ signal }) => getVerifications(runId ?? "", signal),
@@ -210,92 +221,111 @@ export function ExperimentView({
   const byKey = new Map(candidates.map((c) => [c.key, c]));
   const verdicts = new Map(result.verdicts.map((v) => [v.arm, v]));
   const builds = new Map(result.builds.map((b) => [b.arm, b]));
-  const primary = (detail.config as { paramSets?: { name: string }[] } | null)?.paramSets?.[0]?.name;
-  const active = selected ?? result.tournament[0]?.arm ?? null;
+  const ranked = result.tournament.map((t) => t.arm);
+  const active = selected && (byKey.has(selected) || ranked.includes(selected)) ? selected : (ranked[0] ?? candidates[0]?.key ?? null);
   const activeCandidate = active ? byKey.get(active) : undefined;
   const env = detail.environment as Record<string, unknown> | null;
   const replication = detail.replication ?? null;
   const replicated = new Map((replication?.verdicts ?? []).map((v) => [v.arm, v]));
   const winner = replication?.winner ?? result.winner;
   const audited = new Map(audits.filter((a) => a.experimentId === detail.id).map((a) => [a.candidateKey, a]));
+  const primary = (detail.config as { paramSets?: { name: string }[] } | null)?.paramSets?.[0]?.name;
 
   return (
     <div className="flex min-w-0 flex-col gap-4">
-      <div className="overflow-x-auto" tabIndex={0} role="region" aria-label="Tournament ranking table">
-        <table className="w-full min-w-[420px] text-left text-sm">
-          <caption className="sr-only">Optimization tournament</caption>
-          <thead className="font-mono text-[11px] uppercase text-muted">
-            <tr>
-              <th className="py-1 pr-2">Rank</th>
-              <th className="py-1 pr-2">Candidate</th>
-              <th className="py-1 pr-2">Verdict</th>
-              <th className="py-1 pr-2">Primary CI low</th>
-              <th className="py-1">Index size</th>
-            </tr>
-          </thead>
-          <tbody>
-            {result.tournament.map((t) => {
-              const c = byKey.get(t.arm);
-              const v = verdicts.get(t.arm);
-              const b = builds.get(t.arm);
-              return (
-                <tr
-                  key={t.arm}
-                  className={`cursor-pointer border-t border-border ${active === t.arm ? "bg-surface-2 shadow-[inset_3px_0_0_var(--accent)]" : ""}`}
-                  onClick={() => setSelected(t.arm)}
-                  aria-selected={active === t.arm}
-                >
-                  <td className="py-1 pr-2 font-mono">{t.rank}</td>
-                  <td className="py-1 pr-2">
-                    {c ? <span className="block font-medium">{describeCandidate(c)}</span> : null}
-                    <span className="font-mono text-xs">{t.arm}</span>{" "}
-                    <span className="break-words font-mono text-xs text-muted">{c ? (c.ddl.join("; ") || c.querySql) : ""}</span>
-                    {winner === t.arm ? <span className="ml-1 text-xs font-medium text-verified">Winner</span> : null}
-                  </td>
-                  <td className="py-1 pr-2">
-                    <VerdictBadge
-                      status={
-                        c
-                          ? BADGE_STATUS[
-                              classifyRecommendation({ candidate: c, ruleVerdict: t.verdict, audit: audited.get(t.arm), replicationVerdict: replicated.get(t.arm)?.verdict })
-                                .kind
-                            ]
-                          : (replicated.get(t.arm)?.verdict ?? t.verdict)
-                      }
-                    />
-                    {v?.reasons[0] ? (
-                      <span className="ml-1 font-mono text-[11px] text-muted" title={v.reasons[0].detail}>
-                        {v.reasons[0].code}
-                      </span>
-                    ) : null}
-                  </td>
-                  <td className="py-1 pr-2">{t.primaryCiLow === null ? "—" : x(t.primaryCiLow)}</td>
-                  <td className="py-1">{b && b.ok ? bytes(b.indexSizeBytes) : "—"}</td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-      {replication ? <ReplicationNote replication={replication} /> : null}
-      <StatsGlossary />
-      <BenchmarkAnalytics detail={detail} candidates={candidates} audits={audits} />
-      {active ? (
-        <div className="flex flex-col gap-2">
-          <h3 className="text-sm font-semibold">
-            Benchmark comparison · {activeCandidate ? `${describeCandidate(activeCandidate)} · ` : ""}
-            <span className="font-mono">{active}</span>
-            {primary ? <span className="font-normal text-muted"> · primary param set {primary}</span> : null}
-          </h3>
-          {verdicts.get(active)?.reasons[0]?.detail ? (
-            <p className="text-xs text-muted">{verdicts.get(active)?.reasons[0]?.detail}</p>
-          ) : null}
-          <Comparison stats={result.stats.filter((s) => s.arm === active)} result={result} />
-          <CorrectnessPanel result={result} arm={active} />
-          {runId ? <PlanCompare runId={runId} detail={detail} arm={active} /> : null}
+      <header className="flex flex-wrap items-center gap-x-3 gap-y-2">
+        <div className="flex min-w-0 flex-col">
+          <h2 className="text-lg font-semibold">Candidate comparison</h2>
+          <p className="text-xs text-muted">
+            Experiment {detail.id.slice(0, 8)} · round {detail.round + 1}
+            {detail.replicate ? ` · replicate ${detail.replicate}` : ""} · {detail.provenance === "prerecorded" ? "prerecorded, not measured now" : "measured in the sandbox"}
+          </p>
         </div>
+        <button type="button" aria-expanded={tables} aria-controls={`tables-${detail.id}`} onClick={() => setTables((v) => !v)} className="qc-btn-secondary qc-btn-sm ml-auto">
+          {tables ? "Hide data tables" : "Show data tables"}
+        </button>
+      </header>
+      {replication ? <ReplicationNote replication={replication} /> : null}
+      <BenchmarkAnalytics detail={detail} candidates={candidates} audits={audits} selected={active} onSelect={setSelected} />
+      {active && runId && detail.blocks.some((b) => b.phase === "plan" && b.planSha256 && b.arm === active) ? (
+        <StudioSection key={active} compact={compact} title="Execution-plan differences" summary={`baseline → ${active} · EXPLAIN ANALYZE captured after timing`}>
+          <PlanCompare runId={runId} detail={detail} arm={active} />
+        </StudioSection>
       ) : null}
-      {runId ? <AuditList audits={audits} experimentId={detail.id} /> : null}
+      {tables ? (
+        <section id={`tables-${detail.id}`} aria-label="Data tables" className="flex min-w-0 flex-col gap-4 rounded-lg border border-border p-4">
+          <div className="overflow-x-auto" tabIndex={0} role="region" aria-label="Tournament ranking table">
+            <table className="w-full min-w-[420px] text-left text-sm">
+              <caption className="sr-only">Optimization tournament</caption>
+              <thead className="font-mono text-[11px] uppercase text-muted">
+                <tr>
+                  <th className="py-1 pr-2">Rank</th>
+                  <th className="py-1 pr-2">Candidate</th>
+                  <th className="py-1 pr-2">Verdict</th>
+                  <th className="py-1 pr-2">Primary CI low</th>
+                  <th className="py-1">Index size</th>
+                </tr>
+              </thead>
+              <tbody>
+                {result.tournament.map((t) => {
+                  const c = byKey.get(t.arm);
+                  const v = verdicts.get(t.arm);
+                  const b = builds.get(t.arm);
+                  return (
+                    <tr
+                      key={t.arm}
+                      className={`cursor-pointer border-t border-border ${active === t.arm ? "bg-surface-2 shadow-[inset_3px_0_0_var(--accent)]" : ""}`}
+                      onClick={() => setSelected(t.arm)}
+                      aria-selected={active === t.arm}
+                    >
+                      <td className="py-1 pr-2 font-mono">{t.rank}</td>
+                      <td className="py-1 pr-2">
+                        {c ? <span className="block font-medium">{describeCandidate(c)}</span> : null}
+                        <span className="font-mono text-xs">{t.arm}</span>{" "}
+                        <span className="break-words font-mono text-xs text-muted">{c ? c.ddl.join("; ") || c.querySql : ""}</span>
+                        {winner === t.arm ? <span className="ml-1 text-xs font-medium text-verified">Winner</span> : null}
+                      </td>
+                      <td className="py-1 pr-2">
+                        <VerdictBadge
+                          status={
+                            c
+                              ? BADGE_STATUS[
+                                  classifyRecommendation({ candidate: c, ruleVerdict: t.verdict, audit: audited.get(t.arm), replicationVerdict: replicated.get(t.arm)?.verdict })
+                                    .kind
+                                ]
+                              : (replicated.get(t.arm)?.verdict ?? t.verdict)
+                          }
+                        />
+                        {v?.reasons[0] ? (
+                          <span className="ml-1 font-mono text-[11px] text-muted" title={v.reasons[0].detail}>
+                            {v.reasons[0].code}
+                          </span>
+                        ) : null}
+                      </td>
+                      <td className="py-1 pr-2">{t.primaryCiLow === null ? "—" : x(t.primaryCiLow)}</td>
+                      <td className="py-1">{b && b.ok ? bytes(b.indexSizeBytes) : "—"}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+          {active ? (
+            <div className="flex min-w-0 flex-col gap-2">
+              <h3 className="text-sm font-semibold">
+                Benchmark statistics · {activeCandidate ? `${describeCandidate(activeCandidate)} · ` : ""}
+                <span className="font-mono">{active}</span>
+                {primary ? <span className="font-normal text-muted"> · primary param set {primary}</span> : null}
+              </h3>
+              {verdicts.get(active)?.reasons[0]?.detail ? <p className="text-xs text-muted">{verdicts.get(active)?.reasons[0]?.detail}</p> : null}
+              <Comparison stats={result.stats.filter((s) => s.arm === active)} result={result} />
+              <CorrectnessPanel result={result} arm={active} />
+            </div>
+          ) : null}
+          {runId ? <AuditList audits={audits} experimentId={detail.id} /> : null}
+        </section>
+      ) : null}
+      <StatsGlossary />
       <p className="text-xs text-muted">
         <span className="font-medium">Measured in the sandbox</span> ({detail.engineVersion}, {detail.rowProfile}
         {env ? `, PostgreSQL ${String(env.pgVersion ?? "?")}, ${String(env.cpuArch ?? "?")}` : ""}
@@ -310,10 +340,12 @@ export function TournamentPanel({
   experiments,
   candidates,
   runId,
+  focusArm = null,
 }: {
   experiments: ExperimentSummary[];
   candidates: OptimizationCandidate[];
   runId?: string;
+  focusArm?: string | null;
 }) {
   // Replicates (ADR-0019) are independent experiments of their round: each is shown on its
   // own, never pooled with the approved experiment (UI_UX §3.17).
@@ -371,7 +403,7 @@ export function TournamentPanel({
         </div>
       ) : null}
       {detail.data ? (
-        <ExperimentView detail={detail.data} candidates={candidates} runId={runId} />
+        <ExperimentView detail={detail.data} candidates={candidates} runId={runId} focusArm={focusArm} />
       ) : (
         <ul className="flex flex-col gap-2">
           {candidates.map((c) => (

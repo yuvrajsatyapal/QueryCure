@@ -1,5 +1,5 @@
 import { afterEach, expect, test, vi } from "vitest";
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { renderWithQuery } from "@/test/render";
 import { describe as describeEvent } from "@/lib/events/describe";
@@ -149,6 +149,9 @@ const candidates = [
 
 test("tournament ranks candidates and compares the winner against the baseline", () => {
   renderWithQuery(<ExperimentView detail={detail} candidates={candidates} />);
+  // The full tables sit behind a toggle; the studio above them is the default view.
+  expect(screen.queryByRole("table", { name: "Optimization tournament" })).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "Show data tables" }));
 
   const table = screen.getByRole("table", { name: "Optimization tournament" });
   const [first, second] = within(table).getAllByRole("row").slice(1) as [HTMLElement, HTMLElement];
@@ -226,6 +229,7 @@ test("a replicated round shows the replication verdict, its range and every repl
   } as unknown as ExperimentDetail;
 
   renderWithQuery(<ExperimentView detail={noisy} candidates={candidates} />);
+  fireEvent.click(screen.getByRole("button", { name: "Show data tables" }));
 
   const table = screen.getByRole("table", { name: "Optimization tournament" });
   const first = within(table).getAllByRole("row")[1] as HTMLElement;

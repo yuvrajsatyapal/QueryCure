@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { advanceTo } from "./wizard";
 
 /** Phase 4 lifecycle through the real stack (API, worker, metadata DB, sandbox PostgreSQL) with
  * the offline stub LLM: workspace → investigation → agents → candidate → approval → sandbox
@@ -7,13 +8,13 @@ import { expect, test } from "@playwright/test";
 test("lifecycle - approve, audit, report, verify, replay the experiment", async ({ page }) => {
   test.setTimeout(240_000);
   await page.goto("/app/investigations/new");
-  await page.getByRole("button", { name: "Check and continue" }).click();
+  await advanceTo(page, "Plan source", "Check and continue");
   await page.getByRole("radio", { name: /Demo workload/ }).check();
   await page.getByLabel("Workload", { exact: true }).selectOption("orders_ecommerce");
   await page.getByLabel("Scale factor").selectOption("0.01");
-  await page.getByRole("button", { name: "Continue" }).click();
+  await advanceTo(page, "Investigation mode");
   await expect(page.getByRole("radio", { name: /Sandbox benchmark/ })).toBeChecked();
-  await page.getByRole("button", { name: "Continue" }).click();
+  await advanceTo(page, "Review & start");
   await page.getByLabel("Title").fill(`E2E lifecycle ${Date.now()}`);
   await page.getByRole("button", { name: "Start investigation" }).click();
   await expect(page).toHaveURL(/\/app\/investigations\/[0-9a-f-]{36}$/, { timeout: 30_000 });
@@ -28,6 +29,9 @@ test("lifecycle - approve, audit, report, verify, replay the experiment", async 
 
   // Benchmark Auditor and plan diff in the tournament.
   await page.getByRole("tab", { name: "Tournament" }).click();
+  // The studio's gates card shows the checks; the full auditor summary is with the data tables.
+  await expect(page.getByRole("list", { name: "Auditor checks" }).first()).toBeVisible({ timeout: 15_000 });
+  await page.getByRole("button", { name: "Show data tables" }).click();
   const auditor = page.getByRole("region", { name: "Benchmark Auditor" });
   await expect(auditor).toBeVisible({ timeout: 15_000 });
   await expect(auditor.getByText("rescore")).toBeVisible();

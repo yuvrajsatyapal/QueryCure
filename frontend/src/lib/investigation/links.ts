@@ -67,6 +67,16 @@ export function evidenceIdsOfSpan(span: Span): string[] {
   return [...new Set(ids)];
 }
 
+/** Evidence ID → trace rows whose own events recorded it (the tool call that produced it, the
+ * claims that cite it), in trace order. */
+export function indexEvidenceSpans(root: Span): Map<string, string[]> {
+  const index = new Map<string, string[]>();
+  walk(root, (s) => {
+    for (const id of evidenceIdsOfSpan(s)) index.set(id, [...(index.get(id) ?? []), s.id]);
+  });
+  return index;
+}
+
 export type PlanTarget =
   | { status: "found"; planSha: string; nodeId: number }
   | { status: "not_plan_node" }

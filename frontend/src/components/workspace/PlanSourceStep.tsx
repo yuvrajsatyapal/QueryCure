@@ -28,12 +28,15 @@ export function PlanSourceStep(props: {
   onPlanText: (text: string) => void;
   onAnalyze: () => void;
   analyzing: boolean;
+  /** The last analysis of this exact plan text failed: the button offers a retry. */
+  analyzeFailed?: boolean;
   connectionId: string;
   onConnection: (id: string) => void;
   connections: { items: ConnectionSummary[] } | undefined;
   connectionsLoading: boolean;
   onExplain: () => void;
   explaining: boolean;
+  explainFailed?: boolean;
   queryBlank: boolean;
   workloads: WorkloadCatalog | undefined;
   workloadsLoading: boolean;
@@ -101,7 +104,7 @@ export function PlanSourceStep(props: {
               disabled={props.analyzing || props.planText.trim() === "" || props.planText.length > MAX_PLAN_CHARS}
               className="qc-btn-secondary"
             >
-              {props.analyzing ? "Analyzing…" : "Analyze plan"}
+              {props.analyzing ? "Analyzing…" : props.analyzeFailed ? "Retry analysis" : "Analyze plan"}
             </button>
           </div>
         </div>
@@ -133,7 +136,7 @@ export function PlanSourceStep(props: {
             disabled={props.explaining || props.connectionId === "" || props.queryBlank}
             className="w-fit qc-btn-secondary"
           >
-            {props.explaining ? "Running EXPLAIN…" : "Run EXPLAIN"}
+            {props.explaining ? "Running EXPLAIN…" : props.explainFailed ? "Retry EXPLAIN" : "Run EXPLAIN"}
           </button>
           <p className="text-xs text-muted">Plain EXPLAIN only: the query is planned, never executed.</p>
         </div>

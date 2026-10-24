@@ -3,19 +3,18 @@ import { join } from "node:path";
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
 import { applyTheme } from "./theme";
+import { advanceTo, analyzeUploadedPlan } from "./wizard";
 
 const PLAN = readFileSync(join(__dirname, "orders-plan.json"), "utf8");
 
 test("investigation - start from an uploaded plan, follow the timeline, open cited evidence", async ({ page }) => {
   await page.goto("/app/investigations/new");
-  await page.getByRole("button", { name: "Check and continue" }).click();
+  await advanceTo(page, "Plan source", "Check and continue");
   await expect(page.getByText(/SELECT · orders · 0 parameters/)).toBeVisible();
-  await page.getByLabel("Plan JSON").fill(PLAN);
-  await page.getByRole("button", { name: "Analyze plan" }).click();
-  await expect(page.getByRole("treegrid")).toBeVisible();
-  await page.getByRole("button", { name: "Continue" }).click();
+  await analyzeUploadedPlan(page, PLAN);
+  await advanceTo(page, "Investigation mode");
   await expect(page.getByRole("radio", { name: /Offline/ })).toBeChecked();
-  await page.getByRole("button", { name: "Continue" }).click();
+  await advanceTo(page, "Review & start");
 
   await page.getByLabel("Title").fill(`E2E orders ${Date.now()}`);
   await expect(page.getByText(/Uploaded plan · uploaded plan · artifact/)).toBeVisible();

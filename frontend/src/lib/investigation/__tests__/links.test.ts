@@ -8,6 +8,7 @@ import {
   evidenceIdsOfSpan,
   findSpan,
   indexClaimSpans,
+  indexEvidenceSpans,
   planTargetOfEvidence,
   stepForClaim,
   traceRows,
@@ -58,6 +59,15 @@ test("ancestors of a nested row are its enclosing nodes, outermost first, exclud
   expect(ancestorIds(trace, tool.id)).toEqual([trace.children[0]!.id]);
   expect(ancestorIds(trace, trace.children[0]!.id)).toEqual([]);
   expect(ancestorIds(trace, "nope")).toEqual([]);
+});
+
+test("evidence maps to the trace rows that recorded it, producing tool first", () => {
+  const trace = sampleTrace();
+  const [analyst, synth] = trace.children;
+  const index = indexEvidenceSpans(trace);
+  expect(index.get("ev_000000000001")).toEqual([analyst!.children[0]!.id, analyst!.children[1]!.id, synth!.children[0]!.id]);
+  expect(index.get("ev_000000000003")).toEqual([synth!.children[0]!.id]);
+  expect(index.has("ev_000000000009")).toBe(false);
 });
 
 test("a step's evidence is everything its events recorded, deduplicated in order", () => {

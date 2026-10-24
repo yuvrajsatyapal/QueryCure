@@ -3,17 +3,17 @@ import { join } from "node:path";
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
 import { applyTheme } from "./theme";
+import { advanceTo, analyzeUploadedPlan, currentStep, expectStep } from "./wizard";
 
 const PLAN = readFileSync(join(__dirname, "orders-plan.json"), "utf8");
 const TAGS = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"];
 
 async function finishedOfflineRun(page: Page): Promise<string> {
   await page.goto("/app/investigations/new");
-  await page.getByRole("button", { name: "Check and continue" }).click();
-  await page.getByLabel("Plan JSON").fill(PLAN);
-  await page.getByRole("button", { name: "Analyze plan" }).click();
-  await page.getByRole("button", { name: "Continue" }).click();
-  await page.getByRole("button", { name: "Continue" }).click();
+  await advanceTo(page, "Plan source", "Check and continue");
+  await analyzeUploadedPlan(page, PLAN);
+  await advanceTo(page, "Investigation mode");
+  await advanceTo(page, "Review & start");
   await page.getByLabel("Title").fill(`E2E workspace ${Date.now()}`);
   await page.getByRole("button", { name: "Start investigation" }).click();
   await expect(page).toHaveURL(/\/app\/investigations\/[0-9a-f-]{36}$/, { timeout: 30_000 });
@@ -98,4 +98,51 @@ test("workspace - phone width: trace rows open the inspector as a bottom sheet",
   await page.keyboard.press("Escape");
   await expect(sheet).toBeHidden();
   await expect(row).toBeFocused();
+});
+
+test("workspace - Continue cannot advance while the plan analysis is pending", async ({ page }) => {
+  // Hold the real request until the test releases it; the response itself comes from the API.
+  let release!: () => void;
+  const released = new Promise<void>((resolve) => (release = resolve));
+  let requests = 0;
+  await page.route("**/api/v1/inspect/plan", async (route) => {
+    requests += 1;
+    await released;
+    await route.continue();
+  });
+
+  await page.goto("/app/investigations/new");
+  await advanceTo(page, "Plan source", "Check and continue");
+  await page.getByLabel("Plan JSON").fill(PLAN);
+  await page.getByRole("button", { name: "Analyze plan" }).click();
+
+  const pending = currentStep(page).getByRole("button", { name: "Analyzing plan…" });
+  await expect(pending).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Analyzing…" })).toBeDisabled();
+  // The disabled button ignores a click, and the keyboard shortcut (which bypasses it) must not advance either.
+  await pending.click({ force: true });
+  await page.getByLabel("Plan JSON").press("ControlOrMeta+Enter");
+  await expectStep(page, "Plan source");
+  await expect(currentStep(page).getByRole("alert")).toHaveCount(0);
+  await axe(page, "pending plan analysis");
+
+  release();
+  await expect(page.getByRole("treegrid")).toBeVisible();
+  await advanceTo(page, "Investigation mode");
+  expect(requests).toBe(1);
+});
+
+test("workspace - a refused plan analysis keeps Continue disabled and offers a retry", async ({ page }) => {
+  await page.goto("/app/investigations/new");
+  await advanceTo(page, "Plan source", "Check and continue");
+  await page.getByLabel("Plan JSON").fill('{"not": "an EXPLAIN plan"}');
+  await page.getByRole("button", { name: "Analyze plan" }).click();
+
+  await expect(currentStep(page).getByRole("alert").first()).toBeVisible();
+  await expect(page.getByRole("button", { name: "Retry analysis" })).toBeEnabled();
+  await expect(currentStep(page).getByRole("button", { name: "Continue", exact: true })).toBeDisabled();
+  await axe(page, "failed plan analysis");
+
+  await analyzeUploadedPlan(page, PLAN);
+  await advanceTo(page, "Investigation mode");
 });

@@ -136,10 +136,85 @@ test("an upload source needs an analyzed plan before it can continue", async () 
   renderWithQuery(<Workspace />);
   await toPlanSource(user);
 
-  await user.click(screen.getByRole("button", { name: "Continue" }));
-
+  const next = screen.getByRole("button", { name: "Continue" });
+  expect(next).toHaveProperty("disabled", true);
+  expect(document.getElementById(next.getAttribute("aria-describedby") ?? "")?.textContent).toMatch(/Analyze a plan first/);
+  // The keyboard shortcut reaches the same guard and says why.
+  fireEvent.keyDown(screen.getByLabelText("Plan JSON"), { key: "Enter", ctrlKey: true, metaKey: true });
   expect(screen.getByRole("alert").textContent).toMatch(/Analyze a plan first/);
   expect(screen.getByRole("listitem", { current: "step" }).textContent).toContain("Plan source");
+});
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (reason: unknown) => void;
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+  return { promise, resolve, reject };
+}
+
+test("Continue stays disabled while the plan analysis is pending and cannot advance the wizard", async () => {
+  const pending = deferred<Awaited<ReturnType<typeof inspectPlan>>>();
+  vi.mocked(inspectPlan).mockReturnValue(pending.promise);
+  const user = userEvent.setup();
+  renderWithQuery(<Workspace />);
+  await toPlanSource(user);
+  fireEvent.change(screen.getByLabelText("Plan JSON"), { target: { value: "[{}]" } });
+  await user.click(screen.getByRole("button", { name: "Analyze plan" }));
+
+  const next = await screen.findByRole("button", { name: "Analyzing plan…" });
+  expect(next).toHaveProperty("disabled", true);
+  expect(screen.getByRole("button", { name: "Analyzing…" })).toHaveProperty("disabled", true);
+  await user.click(next);
+  fireEvent.keyDown(screen.getByLabelText("Plan JSON"), { key: "Enter", ctrlKey: true, metaKey: true });
+  expect(screen.getByRole("listitem", { current: "step" }).textContent).toContain("Plan source");
+  expect(screen.queryByRole("alert")).toBeNull();
+  expect(vi.mocked(inspectPlan)).toHaveBeenCalledTimes(1);
+
+  pending.resolve({ artifactSha256: "abc", plan, metrics });
+  const ready = await screen.findByRole("button", { name: "Continue" });
+  await waitFor(() => expect(ready).toHaveProperty("disabled", false));
+  await user.click(ready);
+  expect(screen.getByRole("listitem", { current: "step" }).textContent).toContain("Investigation mode");
+});
+
+test("a failed analysis explains the error, keeps Continue disabled and can be retried", async () => {
+  vi.mocked(inspectPlan).mockRejectedValueOnce(new ApiError("PLAN_INVALID", "The plan JSON is not EXPLAIN output.", 422, [], null));
+  const user = userEvent.setup();
+  renderWithQuery(<Workspace />);
+  await toPlanSource(user);
+  fireEvent.change(screen.getByLabelText("Plan JSON"), { target: { value: "[{}]" } });
+  await user.click(screen.getByRole("button", { name: "Analyze plan" }));
+
+  expect((await screen.findByRole("alert")).textContent).toContain("The plan JSON is not EXPLAIN output.");
+  expect(screen.getByRole("button", { name: "Continue" })).toHaveProperty("disabled", true);
+  await user.click(screen.getByRole("button", { name: "Retry analysis" }));
+  await screen.findByRole("treegrid");
+  expect(screen.getByRole("button", { name: "Continue" })).toHaveProperty("disabled", false);
+});
+
+test("editing the plan after it was analyzed needs a new analysis; a late response for old text does not count", async () => {
+  const pending = deferred<Awaited<ReturnType<typeof inspectPlan>>>();
+  const user = userEvent.setup();
+  renderWithQuery(<Workspace />);
+  await toPlanSource(user);
+  await analyzeUpload(user, "[1]");
+  expect(screen.getByRole("button", { name: "Continue" })).toHaveProperty("disabled", false);
+
+  fireEvent.change(screen.getByLabelText("Plan JSON"), { target: { value: "[2]" } });
+  const next = screen.getByRole("button", { name: "Continue" });
+  expect(next).toHaveProperty("disabled", true);
+  expect(document.getElementById(next.getAttribute("aria-describedby") ?? "")?.textContent).toMatch(/changed since it was analyzed/);
+
+  // Analyze "[2]", then edit to "[3]" before the response arrives: the "[2]" result is stale.
+  vi.mocked(inspectPlan).mockReturnValue(pending.promise);
+  await user.click(screen.getByRole("button", { name: "Analyze plan" }));
+  fireEvent.change(screen.getByLabelText("Plan JSON"), { target: { value: "[3]" } });
+  pending.resolve({ artifactSha256: "def", plan, metrics });
+  await waitFor(() => expect(screen.getByRole("button", { name: "Analyze plan" })).toHaveProperty("disabled", false));
+  expect(screen.getByRole("button", { name: "Continue" })).toHaveProperty("disabled", true);
 });
 
 test("modes the source cannot support are disabled and say why", async () => {
