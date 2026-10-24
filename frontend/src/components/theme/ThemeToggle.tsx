@@ -6,7 +6,7 @@ import { Icon } from "@/components/ui/Icon";
 
 const subscribe = () => () => {};
 
-export function ThemeToggle() {
+export function ThemeToggle({ className = "" }: { className?: string }) {
   const { resolvedTheme, setTheme } = useTheme();
   // The resolved theme is only known in the browser; render a stable control during SSR.
   const mounted = useSyncExternalStore(subscribe, () => true, () => false);
@@ -15,7 +15,7 @@ export function ThemeToggle() {
     <button
       type="button"
       onClick={() => setTheme(isDark ? "light" : "dark")}
-      className="qc-btn-ghost size-7 p-0"
+      className={`qc-btn-ghost size-7 shrink-0 p-0 ${className}`}
       aria-label={isDark ? "Switch to light theme" : "Switch to dark theme"}
       title={isDark ? "Light theme" : "Dark theme"}
     >

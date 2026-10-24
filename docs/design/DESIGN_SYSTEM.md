@@ -27,11 +27,11 @@ Defined as CSS variables in `frontend/src/styles/tokens.css`, mapped into Tailwi
 | `--surface` | `#FFFFFF` | `#111214` | Panels, cards |
 | `--surface-2` | `#F2F3F5` | `#17181B` | Nested regions, table header, code blocks, segmented controls |
 | `--hover` | `#ECEEF1` | `#1D1F22` | Row and nav hover, active nav item |
-| `--border` | `#E4E6EA` | `#222428` | Hairlines (1px) |
-| `--border-strong` | `#CFD2D8` | `#34373D` | Hovered inputs, focused panels |
+| `--border` | `#E1E4E8` | `#232529` | Hairlines (1px) |
+| `--border-strong` | `#CBCFD6` | `#34373D` | Hovered inputs, focused panels |
 | `--ink` | `#16171A` | `#F2F3F5` | Primary text |
-| `--muted` | `#5D6270` | `#8F95A1` | Secondary text, axis labels (≥ 5.2:1 on every surface, both themes) |
-| `--faint` | `#8B909B` | `#636873` | Icons and non-text marks only (≈ 2.8–3.0:1, below text contrast). Never text |
+| `--muted` | `#565B68` | `#9AA0AB` | Secondary text, axis labels (6.6:1 light / 7.6:1 dark on `--bg`) |
+| `--faint` | `#8B909B` | `#636873` | Icons and non-text marks only (3.1:1 light / 3.6:1 dark, below text contrast). Never text |
 | `--accent` | `#0A6F6A` | `#3CC3B4` | Primary buttons, focus ring, active nav, focal element (5.8:1 / 8.8:1) |
 | `--accent-tint` | `rgba(10,111,106,0.08)` | `rgba(60,195,180,0.12)` | Selected rows, accent-bordered boxes |
 | `--accent-fg` | `#FFFFFF` | `#06211F` | Text on accent fills |
@@ -77,11 +77,12 @@ HTML/CSS on the tokens (UI Pass 4), no chart library: Recharts was never install
 | Role | Font | Size / line-height | Weight |
 |---|---|---|---|
 | Display (landing only) | Inter | 48/52 | 600, tight tracking |
-| H1 page title | Inter | 20/28 | 600, tight tracking |
-| H2 section | Inter | 14/20 | 600 |
+| H1 page title (`qc-page-title`) | Inter | 20/28 | 600, tight tracking |
+| H2 section / panel title (`qc-section-title`) | Inter | 15/22 | 600 |
+| Field and column label (`qc-label`) | Inter | 12/16 | 500, `--muted` |
 | Body | Inter | 14/22 | 400 |
 | Small / meta | Inter | 12/18 | 400–500 |
-| Eyebrow / tag (`qc-eyebrow`) | JetBrains Mono | 11/16 | 500, uppercase, wide tracking |
+| Eyebrow / tag (`qc-eyebrow`) | JetBrains Mono | 12/16 | 500, uppercase, wide tracking |
 | Code, SQL, plan nodes, span names, numbers | JetBrains Mono | 13/20 | 400–500, `tabular-nums` |
 
 Loaded via `next/font/google` (self-hosted at build, no runtime Google request). Numeric table columns are right-aligned and tabular.
@@ -91,7 +92,7 @@ Loaded via `next/font/google` (self-hosted at build, no runtime Google request).
 - Base unit 4px. Scale: `1=4, 2=8, 3=12, 4=16, 6=24, 8=32, 12=48`. No arbitrary values (`p-[13px]` is forbidden).
 - Panel padding 16; dense table cell 8×12; page gutter 24 desktop / 16 mobile.
 - Radius: inputs/buttons 6px, panels 8px, badges 4px. Nothing larger than 10px.
-- Elevation: **borders, not shadows.** One exception: popovers/menus/dialogs use `0 8px 24px rgba(0,0,0,0.12)` (dark: `rgba(0,0,0,0.5)`) to separate from content.
+- Elevation: **borders, not shadows.** Exceptions: popovers/menus/dialogs use `--shadow-pop` (`0 12px 32px`, 14% light / 55% dark) over `--scrim` (32% light / 66% dark); in light mode `qc-panel` adds a 1px 4% lift so white panels separate from the near-white page.
 
 ## 5. Component patterns
 
@@ -124,7 +125,8 @@ Shared Tailwind utilities in `globals.css` (`@utility`): `qc-btn-primary`, `qc-b
 | **InvestigationRow** | Linear-style 44px list row: status icon, run number, title, mode tags, outcome (≥ xl), compact age (`14h`). |
 | **ApprovalCard** | `--approval` border with an inset left bar, hand icon, "Waiting on you" pill; exact SQL, target sandbox, risk list, Approve selected / Decline. Primary button is the only accent on screen while pending. |
 | **EmptyState** | One sentence of what's missing + one primary action + optional demo link. |
-| **Button hierarchy** | One primary (accent) per view; secondary = bordered; ghost for toolbars; destructive = `--rejected` outline. |
+| **Button hierarchy** | One primary (accent) per view; secondary = bordered; ghost for toolbars; destructive = `--rejected` outline (`qc-btn-danger`). Compact toolbar size `qc-btn-sm`. |
+| **Panel** | `qc-panel` (8px radius, `--border`, `--surface`) with a `qc-panel-header` row (48px min, title in `qc-section-title`, one quiet caption or link on the right). Tags `qc-tag` (22px, `--surface-2`), key hints `qc-kbd`. |
 
 ## 6. Dark / light mode
 
@@ -132,7 +134,7 @@ Shared Tailwind utilities in `globals.css` (`@utility`): `qc-btn-primary`, `qc-b
 
 ## 7. Layout rules (dashboard & workspace)
 
-- App shell (Linear): fixed 240px sidebar on `--sidebar` (brand + theme toggle, "New investigation", grouped nav with active state, Settings and account at the bottom). Below `md` the sidebar is a drawer behind a 48px top bar. No global top bar on desktop: each page header carries its breadcrumb, title, status pill and actions. Content max width none for the workspace and investigation (tools), 1152px for dashboard and history.
+- App shell (Linear): sidebar on `--sidebar`, 240px or a 56px icon rail (the collapse button beside the brand; the choice is a per-browser `localStorage` convenience). Top to bottom: brand, search (⌘K), "New investigation" (secondary, accent icon, so a view's one primary stays the page's), Dashboard and History, *Active runs* (up to 5 in-flight investigations from the recent list, status dot and word; status icon in the rail), Workspace group, Settings, then account and theme toggle. In the rail every item keeps its accessible name and a tooltip. Below `md` the sidebar is a drawer behind a 48px top bar. No global top bar on desktop: each page header carries its breadcrumb, title, status pill and actions. Content max width none for the workspace and investigation (tools), 1280px for the dashboard, 1152px for history.
 - Investigation page (UI_UX §3.6): a header sticky from `md` up (breadcrumb, title, status pill, run selector, model, usage meters, actions; static on phones, where it is too tall to pin), then objective and notices, the approval card when pending, and the split trace: a 340–420px tree column (sticky below the header on ≥ 1280) and the selection details. Below 1280 the tree stacks above the details at up to 60vh.
 - Information density: tables at 32px row height; no card grids for primary data — use tables.
 - Asymmetry over symmetry: summary rows use varied widths (e.g. `1.4fr 1fr 0.8fr`), not three identical cards.

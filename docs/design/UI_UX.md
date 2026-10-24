@@ -47,8 +47,11 @@ Every data-driven region implements these states — designed, not defaulted:
 ### 3.2 Dashboard (`/app`)
 - **Purpose:** resume work, see what needs attention.
 - **Counts** (UI Pass 2): Running (`queued` + `running` + `cancelling`), Needs approval (`awaiting_approval`), Completed, Failed, Cancelled. Each comes from `GET /investigations?status=…&limit=100`, which filters on the latest run's status. A count is exact only when the endpoint returns no `next_cursor`; otherwise it reads **"100+"** (or "N+" for a sum that includes a capped status) with a tooltip saying the list endpoint has no total. While anything runs or awaits approval, counts refresh every 10 s.
-- **Below:** "In progress" (running and approval-required investigations) and "Recent investigations" (10 newest), then Get started links.
-- **Empty:** "Nothing investigated yet" + Start an investigation.
+- **Layout** (UI rebuild Phase 1, prototype Layout 3): page header, then a `1.75fr / 1fr` row of *Active investigations* and *Run outcomes*, then *Recent investigations* (8 newest, a table: outcome pill, title, mode, run, updated), then the status counts above as a strip.
+- **Active investigations:** investigations whose latest run is in flight, from the shared recent list (`GET /investigations?limit=25`), ordered awaiting approval → running → cancelling → queued, newest first within a status. An approval row shows the pending approval's round, candidate count and expiry (`GET /runs/{id}/approvals`) and the one primary action, *Review candidates*. A running row shows LLM and tool calls against the run budget (`GET /runs/{id}`, `usage` / `budget`, polled every 10 s); no current-step or progress estimate (the list carries no events). A footer counts runs concluded in the 24 h before the list was fetched. With nothing in flight, the panel holds the Get started links.
+- **Run outcomes:** the latest run of each of the 25 recent investigations, counted by `RunOutcome` (plus failed and cancelled; in-flight runs excluded) as a stacked bar and a legend with icons and words, and the median wall-clock time (`started_at` → `finished_at`) of the completed ones with its n. Candidate verdicts and speedups are not on the dashboard: they need per-run verification records.
+- **Empty:** "Nothing in flight" with Get started links; "Nothing investigated yet" + Start an investigation in the recent table.
+- **Error:** the API error notice, and each panel says it is unavailable rather than showing an empty state.
 
 ### 3.3 Database connections (`/app/connections`)
 - **Purpose:** register restricted read-only connections and see what each one can do.

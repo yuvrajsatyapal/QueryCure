@@ -28,13 +28,13 @@ export function AccountMenu() {
           {user.kind === "oauth" ? `Signed in as ${name}` : name}
         </span>
         {user.kind === "oauth" ? (
-          <button type="button" onClick={() => out.mutate()} disabled={out.isPending} aria-label="Sign out" title="Sign out" className="qc-btn-ghost size-7 p-0">
+          <button type="button" onClick={() => out.mutate()} disabled={out.isPending} aria-label="Sign out" title="Sign out" className="qc-btn-ghost size-7 p-0 pointer-coarse:size-11">
             <Icon name="logout" size={14} />
           </button>
         ) : null}
       </div>
       {user.kind !== "oauth" && (features.googleLogin || features.githubLogin) ? (
-        <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs">
+        <div className="flex flex-wrap gap-x-4 text-xs">
           {features.googleLogin ? <SignInLink provider="google" label="Google" returnTo={returnTo} /> : null}
           {features.githubLogin ? <SignInLink provider="github" label="GitHub" returnTo={returnTo} /> : null}
         </div>
@@ -48,7 +48,7 @@ function SignInLink({ provider, label, returnTo }: { provider: "google" | "githu
     <a
       href={`${API_BASE_URL}/api/v1/auth/${provider}/login?return_to=${encodeURIComponent(returnTo)}`}
       aria-label={`Sign in with ${label}`}
-      className="whitespace-nowrap text-link"
+      className="inline-flex min-h-6 items-center whitespace-nowrap text-link hover:underline pointer-coarse:min-h-11"
     >
       Sign in with {label}
     </a>
