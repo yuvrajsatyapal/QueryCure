@@ -52,7 +52,8 @@ test("the speedup chart marks 1× and draws only recorded intervals", () => {
   render(<BenchmarkAnalytics detail={detail} candidates={candidates} audits={[]} />);
 
   const forest = screen.getByRole("figure", { name: /Speedup with 95% CI/ });
-  expect(within(forest).getByText("1× no improvement")).toBeDefined();
+  // In the legend and as the in-chart label above the 1× line.
+  expect(within(forest).getAllByText("1× no change").length).toBeGreaterThanOrEqual(1);
   expect(within(forest).getByText("min effect 1.10×")).toBeDefined();
   const rows = within(forest).getAllByRole("listitem");
   expect(rows).toHaveLength(2); // one candidate × two param sets
@@ -181,6 +182,39 @@ test("gates show the correctness outcome, the rule verdict and the auditor's rec
   expect(within(checks).getByText("rescore")).toBeDefined();
   expect(within(checks).getByText("warning:")).toBeDefined();
   expect(within(gates).getByText(/It can only downgrade/)).toBeDefined();
+});
+
+test("each speedup row keeps the candidate, its param set, the measured ratio and n together in one header", () => {
+  render(<BenchmarkAnalytics detail={detail} candidates={candidates} audits={[]} />);
+  const forest = screen.getByRole("figure", { name: /Speedup with 95% CI/ });
+  const [row] = within(forest).getAllByRole("listitem");
+  const head = row!.querySelector<HTMLElement>("[data-row-head]");
+  expect(head).not.toBeNull();
+  const text = head!.textContent ?? "";
+  for (const part of [ARM, "param set hot_customer", "1.59× (1.47×–1.69×)", "n 30 / 30"]) expect(text).toContain(part);
+  // The interval strip follows its header inside the same row.
+  expect(within(row!).getByRole("img", { name: /on hot_customer: ratio 1\.59×/ })).toBeDefined();
+});
+
+test("timing distributions keep a compact key visible and the full explanation in a disclosure", async () => {
+  const user = userEvent.setup();
+  render(<BenchmarkAnalytics detail={detail} candidates={candidates} audits={[]} />);
+  const dist = screen.getByRole("region", { name: "Timing distributions" });
+  const key = within(dist).getByRole("list", { name: "Chart key" });
+  expect(key.textContent).toContain("median");
+  expect(key.textContent).toContain("outliers");
+  expect(key.textContent).toContain("transport floor 0.23 ms");
+
+  const howTo = within(dist).getByText("How to read this chart");
+  expect(howTo.tagName).toBe("SUMMARY");
+  const details = howTo.closest("details")!;
+  expect(details.open).toBe(false);
+  await user.click(howTo);
+  expect(details.open).toBe(true);
+  for (const term of ["Q1–Q3", "whisker", "1.5×IQR", "log scale", "spread vertically", "arrow keys"]) expect(details.textContent).toContain(term);
+  // The recorded-samples disclosure is still there.
+  expect(within(dist).getByText(/^Recorded samples · hot_customer/).tagName).toBe("SUMMARY");
+  expect(within(dist).getByText(/^Recorded samples · hot_customer/).textContent).toBe("Recorded samples · hot_customer · n 30 / 30");
 });
 
 test("each sample can be read from the keyboard; outliers are marked, never removed", async () => {

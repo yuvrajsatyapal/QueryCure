@@ -63,7 +63,7 @@ test("sandbox - approve the candidate SQL, then see the benchmarked tournament",
   await expect(page.getByRole("region", { name: "Measurement warnings" }).getByText(/Host contention is not recorded/)).toBeVisible();
   await expect(page.getByRole("img", { name: /^Latency distribution · experiment [0-9a-f]{8} · round 1 · param set / })).toBeVisible();
   // A speedup is drawn only when the engine recorded a valid one; otherwise the row says why.
-  await expect(page.getByRole("figure", { name: /Speedup with 95% CI/ }).getByText("1× no improvement")).toBeVisible();
+  await expect(page.getByRole("figure", { name: /Speedup with 95% CI/ }).getByText("1× no change").first()).toBeVisible();
   await expect(table.getByText("Composite index on orders (customer_id, created_at)")).toBeVisible();
   // Result correctness from recorded fingerprints (UI_UX §3.8), and the statistics glossary.
   const correctness = page.getByRole("region", { name: /^Result correctness · oc_/ });

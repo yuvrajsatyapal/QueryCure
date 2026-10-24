@@ -50,6 +50,7 @@ function attribution(detail: ExperimentDetail) {
   return `experiment ${detail.id.slice(0, 8)} · round ${detail.round + 1}${detail.replicate ? ` · replicate ${detail.replicate}` : ""}`;
 }
 
+const DISCLOSURE = "w-fit cursor-pointer rounded-sm text-muted select-none outline-none hover:text-ink focus-visible:ring-2 focus-visible:ring-accent";
 const pct = (d: LogDomain, v: number) => `${fraction(d, v) * 100}%`;
 const ratio = (decades: number) => formatSpeedup(10 ** decades);
 
@@ -172,11 +173,15 @@ function DistributionChart({
     return `${r.arm} · sample ${i + 1} of ${r.d.samplesNs.length} (recording order) · ${formatNs(ns)}${r.outliers[i] ? " · outlier (beyond 1.5×IQR)" : ""}`;
   };
   const rowGrid = "grid grid-cols-1 gap-1 @lg/studio:grid-cols-[8.5rem_minmax(0,1fr)] @lg/studio:items-center @lg/studio:gap-3";
+  // Narrow: the name, then the figures as one unbreakable unit (it moves to the next line whole, never
+  // splitting at a separator). Beside the strip: stacked.
   const armLabel = (r: DistRow) => (
-    <div className="min-w-0 font-mono text-[11px]">
-      <span className="block truncate">{r.arm}</span>
-      <span className="block text-muted">median {formatNs(r.d.medianNs)}</span>
-      <span className="block text-muted">
+    <div className="flex min-w-0 flex-wrap items-baseline gap-x-2 font-mono text-[11px] @lg/studio:block">
+      <span className="max-w-full truncate font-medium text-ink @lg/studio:block">{r.arm}</span>
+      <span className="whitespace-nowrap text-muted @lg/studio:whitespace-normal">
+        <span className="@lg/studio:block">median {formatNs(r.d.medianNs)}</span>
+        <span className="@lg/studio:hidden"> · </span>
+        <span className="@lg/studio:block">
         {[
           `n ${r.d.n}`,
           r.d.failures.length ? `${r.d.failures.length} failed` : "",
@@ -184,6 +189,7 @@ function DistributionChart({
         ]
           .filter(Boolean)
           .join(" · ")}
+        </span>
       </span>
     </div>
   );
@@ -297,12 +303,35 @@ function DistributionChart({
         <span className="hidden @lg/studio:block" />
         <LogAxis domain={domain} width={width} ticks={ticks} format={(v) => `${tickText(v)} ms`} />
       </div>
-      <p className="text-[11px] text-muted">
-        Dots: every recorded sample at its recorded latency (log scale), spread vertically only so they do not overlap. Rings: outliers beyond 1.5×IQR, kept. Box:
-        Q1–Q3; bold line: median; thin line: min–max.
-        {floorNs ? <> Dashed line: transport floor, {formatNs(floorNs)} median SELECT 1 round trip.</> : null} Focus a row and use the arrow keys to read single samples.
-      </p>
-      <SamplesTable paramSet={paramSet} rows={rows} />
+      <ul aria-label="Chart key" className="flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-muted">
+        <li className="inline-flex items-center gap-1.5">
+          <span aria-hidden className="inline-block h-3 w-[3px] rounded-full bg-ink" />
+          median
+        </li>
+        <li className="inline-flex items-center gap-1.5">
+          <span aria-hidden className="inline-block size-2 rounded-full border-2 border-muted" />
+          outliers, kept
+        </li>
+        {floorNs ? (
+          <li className="inline-flex items-center gap-1.5">
+            <span aria-hidden className="inline-block h-3 border-l-[1.5px] border-dashed border-hypothesis" />
+            transport floor {formatNs(floorNs)}
+          </li>
+        ) : null}
+      </ul>
+      <div className="flex flex-col gap-1">
+        <details className="text-xs">
+          <summary className={DISCLOSURE}>How to read this chart</summary>
+          <p className="mt-1.5 max-w-prose text-[11px] leading-relaxed text-muted">
+            Each dot is one recorded sample at its recorded latency, spread vertically only so dots do not overlap. Box: Q1–Q3, the middle half of the samples;
+            bold line: median; thin line (whisker): min–max. Rings: outliers beyond 1.5×IQR from the box, kept and counted.
+            {floorNs ? <> Dashed line: transport floor, the {formatNs(floorNs)} median SELECT 1 round trip; a sample near it is mostly round-trip time.</> : null} The
+            axis is a log scale, so equal distances are equal ratios. Focus a row and use the arrow keys to read single samples (Home and End jump to the fastest and
+            slowest).
+          </p>
+        </details>
+        <SamplesTable paramSet={paramSet} rows={rows} />
+      </div>
     </div>
   );
 }
@@ -311,8 +340,9 @@ function SamplesTable({ paramSet, rows }: { paramSet: string; rows: { arm: strin
   const n = Math.max(...rows.map((r) => r.d.samplesNs.length));
   return (
     <details className="text-xs">
-      <summary className="cursor-pointer text-muted select-none hover:text-ink">
-        Recorded samples · {paramSet} ({rows.map((r) => `${r.arm} ${r.d.n}`).join(", ")})
+      <summary className={DISCLOSURE}>
+        {/* Counts in chart order; the arm names head the table's columns. */}
+        Recorded samples · {paramSet} · n {rows.map((r) => r.d.n).join(" / ")}
       </summary>
       <div className="mt-2 max-h-72 overflow-auto rounded-md border border-border" tabIndex={0} role="region" aria-label={`Recorded samples table, ${paramSet}`}>
         <table className="w-full text-left font-mono text-[12px] tabular-nums">
@@ -385,7 +415,8 @@ function SpeedupChart({
   const ticks = adaptiveLogTicks(domain, w, { must: [1] });
   const refs = (
     <>
-      <span aria-hidden className="absolute inset-y-0 w-0.5 -translate-x-1/2 bg-ink/80" style={{ left: pct(domain, 1) }} />
+      {/* 1×: solid ink with a halo, so it reads apart from the gridline under it and the dashed thresholds. */}
+      <span aria-hidden className="absolute inset-y-0 w-0.5 -translate-x-1/2 bg-ink shadow-[0_0_0_1px_var(--surface-2)]" style={{ left: pct(domain, 1) }} />
       {minEffect ? <span aria-hidden className="absolute inset-y-0 border-l-[1.5px] border-dashed border-verified" style={{ left: pct(domain, minEffect) }} /> : null}
       {maxRegression ? <span aria-hidden className="absolute inset-y-0 border-l-[1.5px] border-dashed border-rejected" style={{ left: pct(domain, maxRegression) }} /> : null}
     </>
@@ -400,14 +431,20 @@ function SpeedupChart({
   );
   const headTone: Record<string, string> = { one: "font-semibold text-ink", min: "text-verified", reg: "text-rejected" };
   const grid = "grid grid-cols-1 gap-1 @2xl/studio:grid-cols-[12rem_minmax(0,1fr)_9.5rem] @2xl/studio:items-center @2xl/studio:gap-3";
+  // Narrow: a header line (candidate and param set left, ratio and n right) over the strip, rows ruled apart.
+  // Wide: the header dissolves into the grid's name and value columns either side of the strip.
+  const rowCls = `${grid} border-t border-border pt-2 first:border-t-0 first:pt-0 @2xl/studio:border-t-0 @2xl/studio:pt-0`;
+  const head = "flex min-w-0 items-start justify-between gap-3 @2xl/studio:contents";
+  const valueCls = "shrink-0 text-right font-mono text-[12px] tabular-nums @2xl/studio:order-3 @2xl/studio:text-left";
+  const stripCls = "relative h-6 rounded bg-surface-2 @2xl/studio:order-2 @2xl/studio:h-7";
   return (
     <figure aria-label={`Speedup with 95% CI · ${attribution(detail)}`} className="flex flex-col gap-1.5">
       <figcaption className="flex flex-col gap-1">
         <span className="text-sm font-semibold">Speedup with 95% CI · {attribution(detail)}</span>
         <span className="flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-muted">
           <span className="inline-flex items-center gap-1">
-            <span aria-hidden className="inline-block h-3 w-0.5 bg-ink/80" />
-            1× no improvement
+            <span aria-hidden className="inline-block h-3 w-0.5 bg-ink" />
+            1× no change
           </span>
           {minEffect ? (
             <span className="inline-flex items-center gap-1">
@@ -421,10 +458,9 @@ function SpeedupChart({
               max regression {formatSpeedup(maxRegression)}
             </span>
           ) : null}
-          <span>Right of 1× is faster. Median baseline / median candidate, percentile bootstrap.</span>
         </span>
         <span className="text-[11px] text-muted">
-          Axis {formatSpeedup(domain.lo)}–{formatSpeedup(domain.hi)}, log scale
+          Right of 1× is faster · median baseline / median candidate, percentile bootstrap · axis {formatSpeedup(domain.lo)}–{formatSpeedup(domain.hi)}, log scale
           {domain.widened ? `; widened to at least a ${ratio(SPEEDUP_MIN_DECADES)} range so small differences are not exaggerated` : ""}.
         </span>
       </figcaption>
@@ -452,14 +488,24 @@ function SpeedupChart({
               ? `${arm} on ${ps}: ratio ${formatSpeedup(row.speedup)} (95% CI ${formatSpeedup(row.ciLow)}–${formatSpeedup(row.ciHigh)}), ${sideOfOne(row.ciLow, row.ciHigh)}; n ${row.nBaseline} baseline / ${row.nCandidate} candidate samples`
               : "";
           return (
-            <li key={key} className={grid}>
-              <span className="min-w-0 font-mono text-[11px]">
-                <span className={`block truncate ${arm === selected ? "font-semibold text-ink" : ""}`} title={arm}>
-                  {arm}
-                  {arm === selected ? <span className="font-sans font-normal text-muted"> · selected</span> : null}
+            <li key={key} className={rowCls}>
+              <div data-row-head className={head}>
+                <span className="min-w-0 font-mono text-[11px] @2xl/studio:order-1">
+                  <span className={`block truncate ${arm === selected ? "font-semibold text-ink" : ""}`} title={arm}>
+                    {arm}
+                    {arm === selected ? <span className="font-sans font-normal text-muted"> · selected</span> : null}
+                  </span>
+                  <span className="block truncate text-muted">param set {ps}</span>
                 </span>
-                <span className="text-muted">param set {ps}</span>
-              </span>
+                {row.status === "shown" ? (
+                  <span className={valueCls}>
+                    {formatSpeedup(row.speedup)} ({formatSpeedup(row.ciLow)}–{formatSpeedup(row.ciHigh)})
+                    <span className="block text-[11px] text-muted">
+                      n {row.nBaseline} / {row.nCandidate}
+                    </span>
+                  </span>
+                ) : null}
+              </div>
               {row.status === "shown" ? (
                 <>
                   <span
@@ -471,7 +517,7 @@ function SpeedupChart({
                     onFocus={() => setTip(key)}
                     onBlur={() => setTip(null)}
                     onKeyDown={(e) => (e.key === "Escape" ? setTip(null) : undefined)}
-                    className="relative h-7 rounded bg-surface-2 outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                    className={`${stripCls} outline-none focus-visible:ring-2 focus-visible:ring-accent`}
                   >
                     <Gridlines ticks={ticks} domain={domain} />
                     {refs}
@@ -491,38 +537,34 @@ function SpeedupChart({
                       </Tip>
                     ) : null}
                   </span>
-                  <span className="font-mono text-[12px] tabular-nums">
-                    {formatSpeedup(row.speedup)} ({formatSpeedup(row.ciLow)}–{formatSpeedup(row.ciHigh)})
-                    <span className="block text-[11px] text-muted">
-                      n {row.nBaseline} / {row.nCandidate}
-                    </span>
-                  </span>
                 </>
               ) : (
-                <span className="text-xs text-muted @2xl/studio:col-span-2">{row.reason}</span>
+                <span className="text-xs text-muted @2xl/studio:order-2 @2xl/studio:col-span-2">{row.reason}</span>
               )}
             </li>
           );
         })}
         {replication.map((v) => (
-          <li key={`rep-${v.arm}`} className={grid}>
-            <span className="min-w-0 font-mono text-[11px]">
-              <span className="block truncate">{v.arm}</span>
-              <span className="text-muted">
-                {v.primaryParamSet} · range across {v.experimentIds.length} experiments
+          <li key={`rep-${v.arm}`} className={rowCls}>
+            <div data-row-head className={head}>
+              <span className="min-w-0 font-mono text-[11px] @2xl/studio:order-1">
+                <span className="block truncate">{v.arm}</span>
+                <span className="block text-muted">
+                  {v.primaryParamSet} · range across {v.experimentIds.length} experiments
+                </span>
               </span>
-            </span>
-            <span aria-hidden className="relative h-7 rounded bg-surface-2">
+              <span className={valueCls}>
+                {formatSpeedup(v.ciLow)}–{formatSpeedup(v.ciHigh)}
+                <span className="block text-[11px] text-muted">range, not one CI</span>
+              </span>
+            </div>
+            <span aria-hidden className={stripCls}>
               <Gridlines ticks={ticks} domain={domain} />
               {refs}
               <span
                 className={`absolute top-1/2 h-2 -translate-y-1/2 rounded-full border border-dashed ${seriesOf(arms, v.arm).border}`}
                 style={{ left: pct(domain, v.ciLow ?? 1), width: `max(2px, calc(${pct(domain, v.ciHigh ?? 1)} - ${pct(domain, v.ciLow ?? 1)}))` }}
               />
-            </span>
-            <span className="font-mono text-[12px] tabular-nums">
-              {formatSpeedup(v.ciLow)}–{formatSpeedup(v.ciHigh)}
-              <span className="block text-[11px] text-muted">range, not one CI</span>
             </span>
           </li>
         ))}
