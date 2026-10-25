@@ -42,6 +42,49 @@ test("keyboard - start an investigation by keyboard, title suggested from the SQ
   await expect(tab("Report")).toHaveAttribute("aria-selected", "true");
   await page.keyboard.press("[");
   await expect(tab("Plan")).toHaveAttribute("aria-selected", "true");
+
+  // Workstream 3 (UI_UX §3.15): from a run, ⌘K searches that run first; Backspace widens the scope.
+  await page.keyboard.press("ControlOrMeta+k");
+  const palette = page.getByRole("dialog", { name: "Command palette" });
+  const scoped = palette.getByRole("combobox", { name: "Search Run #1 and commands" });
+  await expect(scoped).toBeFocused();
+  await expect(palette.getByRole("button", { name: "Leave Run #1 scope and search everywhere" })).toBeVisible();
+  await page.keyboard.type("stub finding");
+  const finding = palette.getByRole("group", { name: "Findings" }).getByRole("option", { name: /Stub finding/ }).first();
+  // The run may still be finishing: results join the open palette as they are recorded.
+  await expect(finding).toBeVisible({ timeout: 30_000 });
+  for (const scheme of ["light", "dark"] as const) {
+    await applyTheme(page, scheme);
+    const result = await new AxeBuilder({ page }).include('[role="dialog"]').withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]).analyze();
+    expect(result.violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(" ")).join(" | ")}`), `scoped palette, ${scheme}`).toEqual([]);
+  }
+  await page.keyboard.press("Enter");
+  await expect(palette).toBeHidden();
+  await expect(tab("Findings")).toHaveAttribute("aria-selected", "true");
+  await expect(page.locator("[data-claim]:focus")).toContainText("Stub finding");
+
+  // Nothing in the run matches: the first option searches every investigation with the same query.
+  await page.keyboard.press("ControlOrMeta+k");
+  await expect(scoped).toBeFocused();
+  await page.keyboard.type("zz no such thing");
+  await expect(palette.getByText("Nothing in Run #1 matches.")).toBeVisible();
+  const widen = palette.getByRole("option", { name: "Search all investigations for “zz no such thing”" });
+  await expect(widen).toHaveAttribute("aria-selected", "true");
+  await page.keyboard.press("Enter");
+  const everywhere = palette.getByRole("combobox", { name: "Search commands and investigations" });
+  await expect(everywhere).toBeFocused();
+  await expect(everywhere).toHaveValue("zz no such thing");
+  await expect(palette.getByText("No matching investigations.")).toBeVisible({ timeout: 10_000 });
+  await page.keyboard.press("Escape");
+  await expect(palette).toBeHidden();
+
+  await page.keyboard.press("ControlOrMeta+k");
+  await expect(scoped).toBeFocused();
+  await page.keyboard.press("Backspace");
+  await expect(palette.getByRole("combobox", { name: "Search commands and investigations" })).toBeFocused();
+  await expect(palette.getByRole("group", { name: "Recent investigations" })).toBeVisible({ timeout: 10_000 });
+  await page.keyboard.press("Escape");
+  await expect(palette).toBeHidden();
 });
 
 test("keyboard - palette navigates and searches; shortcuts dialog; g sequences; axe with the palette open", async ({ page }) => {

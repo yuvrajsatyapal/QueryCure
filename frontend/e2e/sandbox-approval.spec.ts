@@ -190,4 +190,38 @@ test("sandbox - approve the candidate SQL, then see the benchmarked tournament",
   }
   await page.setViewportSize({ width: 390, height: 844 });
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+
+  // Workstream 3 (UI_UX §3.15): the run-scoped palette lists the candidate with its recorded status
+  // (no speed-up figure) and jumps to its plan diff, opening the folded phone section.
+  await page.keyboard.press("ControlOrMeta+k");
+  const palette = page.getByRole("dialog", { name: "Command palette" });
+  await expect(palette.getByRole("combobox", { name: "Search Run #1 and commands" })).toBeFocused();
+  const candidate = palette.getByRole("group", { name: "Candidates" }).getByRole("option", { name: /Composite index on orders/ });
+  await expect(candidate).toContainText(/Verified · tested scope|Verified · noise warning|Inconclusive|Rejected|Benchmarking/);
+  await expect(candidate).not.toContainText("×");
+  const box = await palette.boundingBox();
+  expect(box && box.x >= 0 && box.x + box.width <= 390).toBe(true);
+  for (const scheme of ["light", "dark"] as const) {
+    await applyTheme(page, scheme);
+    const result = await new AxeBuilder({ page }).include('[role="dialog"]').withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]).analyze();
+    expect(result.violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(" ")).join(" | ")}`), `sandbox palette, ${scheme}`).toEqual([]);
+  }
+  await page.keyboard.type("plan diff");
+  await expect(palette.getByRole("group", { name: "Plan diffs" }).getByRole("option", { name: /baseline → oc_/ })).toBeVisible({ timeout: 10_000 });
+  await page.keyboard.press("Enter");
+  await expect(palette).toBeHidden();
+  await expect(page.getByRole("tab", { name: "Tournament" })).toHaveAttribute("aria-selected", "true");
+  await expect(page.locator("details[data-bench-section][open]").filter({ hasText: "Execution-plan differences" })).toBeVisible();
+  const heading = page.getByRole("heading", { name: /^Plan diff · baseline → oc_/ });
+  await expect(heading).toBeFocused();
+  // Chosen by keyboard: a visible ring, flush to the heading so it stays off the description below.
+  const ring = await heading.evaluate((h) => {
+    const s = getComputedStyle(h);
+    const next = h.nextElementSibling?.getBoundingClientRect().top ?? Infinity;
+    return { style: s.outlineStyle, width: parseFloat(s.outlineWidth), offset: parseFloat(s.outlineOffset), gap: next - h.getBoundingClientRect().bottom };
+  });
+  expect(ring.style).toBe("solid");
+  expect(ring.offset).toBe(0);
+  expect(ring.gap).toBeGreaterThanOrEqual(ring.width);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
 });

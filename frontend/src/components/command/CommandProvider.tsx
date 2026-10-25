@@ -13,6 +13,7 @@ import {
   useSyncExternalStore,
   type ReactNode,
 } from "react";
+import type { RunScopeItem } from "@/lib/command/runScope";
 import { createSequenceMatcher, isTypingTarget } from "@/lib/keyboard/keyboard";
 import { CommandPalette } from "./CommandPalette";
 import { ShortcutsDialog } from "./ShortcutsDialog";
@@ -30,9 +31,30 @@ export interface Command {
   run: () => void;
 }
 
+/** How a palette option was chosen, so a target can skip a focus ring the pointer did not ask for. */
+export type PickSource = "keyboard" | "pointer";
+
+/** A run-scoped result: what to show (built by `buildRunScopeItems`) and what selecting it does. */
+export interface ScopedItem extends RunScopeItem {
+  run: (via: PickSource) => void;
+}
+
+/** The run the palette searches by default while an investigation page shows it. */
+export interface RunScope {
+  runId: string;
+  label: string;
+  /** The run's results are still loading: the palette says so instead of showing older results. */
+  loading: boolean;
+  /** Part of the run's results could not be loaded; said in the palette, never shown as "nothing". */
+  notice?: string;
+  items: ScopedItem[];
+}
+
 interface CommandContextValue {
   openPalette: () => void;
   register: (owner: string, commands: Command[]) => () => void;
+  registerScope: (scope: RunScope) => () => void;
+  paletteOpen: boolean;
   mac: boolean;
 }
 
@@ -55,6 +77,18 @@ export function useContextCommands(owner: string, commands: Command[]) {
   useEffect(() => (register ? register(owner, commands) : undefined), [register, owner, commands]);
 }
 
+/** Offers `scope` as the palette's default search scope while the calling page is mounted. */
+export function useRunScope(scope: RunScope | null) {
+  const value = useContext(CommandContext);
+  const registerScope = value?.registerScope;
+  useEffect(() => (registerScope && scope ? registerScope(scope) : undefined), [registerScope, scope]);
+}
+
+/** True while the palette is open, so a page can load what only the palette needs. */
+export function usePaletteOpen(): boolean {
+  return useContext(CommandContext)?.paletteOpen ?? false;
+}
+
 export function CommandProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
   const { resolvedTheme, setTheme } = useTheme();
@@ -63,6 +97,7 @@ export function CommandProvider({ children }: { children: ReactNode }) {
   const [help, setHelp] = useState(false);
   const [announcement, setAnnouncement] = useState("");
   const [contextual, setContextual] = useState<Record<string, Command[]>>({});
+  const [runScope, setRunScope] = useState<RunScope | null>(null);
 
   const register = useCallback((owner: string, commands: Command[]) => {
     setContextual((current) => ({ ...current, [owner]: commands }));
@@ -72,6 +107,11 @@ export function CommandProvider({ children }: { children: ReactNode }) {
         delete next[owner];
         return next;
       });
+  }, []);
+
+  const registerScope = useCallback((scope: RunScope) => {
+    setRunScope(scope);
+    return () => setRunScope((current) => (current === scope ? null : current));
   }, []);
 
   const base = useMemo<Command[]>(() => {
@@ -130,12 +170,15 @@ export function CommandProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, []);
 
-  const value = useMemo(() => ({ openPalette: () => setPalette(true), register, mac }), [register, mac]);
+  const value = useMemo(
+    () => ({ openPalette: () => setPalette(true), register, registerScope, paletteOpen: palette, mac }),
+    [register, registerScope, palette, mac],
+  );
 
   return (
     <CommandContext.Provider value={value}>
       {children}
-      {palette ? <CommandPalette commands={commands} mac={mac} onClose={() => setPalette(false)} /> : null}
+      {palette ? <CommandPalette commands={commands} scope={runScope} mac={mac} onClose={() => setPalette(false)} /> : null}
       {help ? <ShortcutsDialog commands={commands} mac={mac} onClose={() => setHelp(false)} /> : null}
       <p role="status" aria-live="polite" className="sr-only">
         {announcement}

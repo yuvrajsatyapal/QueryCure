@@ -18,7 +18,7 @@ import {
   investigationKeys,
 } from "@/lib/api/investigations";
 import { ApiError } from "@/lib/api/client";
-import { getApprovals, getCandidates, getExperiments, optimizationKeys } from "@/lib/api/optimization";
+import { getApprovals, getCandidates, getExperiment, getExperiments, optimizationKeys } from "@/lib/api/optimization";
 import type { EvidenceDetail, Verification } from "@/lib/api/types";
 import { EvidenceExplorer } from "@/components/evidence/EvidenceExplorer";
 import type { GraphNode as EvidenceNode } from "@/lib/evidence/graph";
@@ -28,7 +28,9 @@ import { ResultSummary } from "@/components/report/ResultSummary";
 import { SUPPORTED_REPORT_SCHEMAS, getReport, getVerifications, reportKeys } from "@/lib/api/reports";
 import type { ReportV1 } from "@/lib/report/types";
 import { ApprovalReview } from "@/components/tournament/ApprovalReview";
-import { TournamentPanel } from "@/components/tournament/TournamentPanel";
+import { armsWithPlans } from "@/components/tournament/PlanCompare";
+import { TournamentPanel, type SectionFocus } from "@/components/tournament/TournamentPanel";
+import { buildRunScopeItems, type RunScopeTarget } from "@/lib/command/runScope";
 import { buildTrace } from "@/lib/events/trace";
 import { runRefetchInterval } from "@/lib/events/runEvents";
 import { useRunEvents } from "@/lib/events/useRunEvents";
@@ -42,7 +44,7 @@ import {
   planTargetOfEvidence,
   stepForClaim,
 } from "@/lib/investigation/links";
-import { useContextCommands, type Command } from "@/components/command/CommandProvider";
+import { useContextCommands, usePaletteOpen, useRunScope, type Command, type PickSource, type RunScope } from "@/components/command/CommandProvider";
 import { BottomSheet } from "@/components/ui/BottomSheet";
 import { ContextMenu, type MenuItem } from "@/components/ui/ContextMenu";
 import { Icon } from "@/components/ui/Icon";
@@ -123,6 +125,9 @@ export function InvestigationView({ id, requestedRunId }: { id: string; requeste
   const [tab, setTab] = useState<Tab>("findings");
   // "Open in benchmark" from the evidence tab: the tournament selects this arm.
   const [focusArm, setFocusArm] = useState<string | null>(null);
+  // A studio section to open and focus once the tournament renders (a plan diff from the palette).
+  const [focusSection, setFocusSection] = useState<SectionFocus | null>(null);
+  const sectionDone = useCallback(() => setFocusSection(null), []);
   const tabRef = useRef(tab);
   useEffect(() => {
     tabRef.current = tab;
@@ -171,6 +176,7 @@ export function InvestigationView({ id, requestedRunId }: { id: string; requeste
     setMenu(null);
     setSheet(false);
     setReviewing(null);
+    setFocusSection(null);
     router.replace(`/app/investigations/${id}?run=${next}`, { scroll: false });
   }
   const run = useQuery({ queryKey: investigationKeys.run(runId ?? ""), queryFn: ({ signal }) => getRun(runId ?? "", signal), enabled: runId !== null, refetchInterval: (q) => runRefetchInterval(q.state.data?.status) });
@@ -181,6 +187,15 @@ export function InvestigationView({ id, requestedRunId }: { id: string; requeste
   const approvals = useQuery({ queryKey: optimizationKeys.approvals(runId ?? ""), queryFn: ({ signal }) => getApprovals(runId ?? "", signal), enabled: runId !== null && sandbox });
   const experiments = useQuery({ queryKey: optimizationKeys.experiments(runId ?? ""), queryFn: ({ signal }) => getExperiments(runId ?? "", signal), enabled: runId !== null && sandbox });
   const verifications = useQuery({ queryKey: reportKeys.verifications(runId ?? ""), queryFn: ({ signal }) => getVerifications(runId ?? "", signal), enabled: runId !== null && sandbox && tab === "evidence" });
+  // The palette's plan-diff results need the latest round's plan captures: read (once, cached and
+  // shared with the tournament tab) only while the palette is open.
+  const paletteOpen = usePaletteOpen();
+  const latestRound = (experiments.data?.items ?? []).filter((e) => e.replicate === 0).at(-1) ?? null;
+  const roundDetail = useQuery({
+    queryKey: optimizationKeys.experiment(latestRound?.id ?? ""),
+    queryFn: ({ signal }) => getExperiment(latestRound?.id ?? "", signal),
+    enabled: paletteOpen && latestRound !== null,
+  });
   const pending = approvals.data?.items.find((a) => a.status === "pending") ?? null;
   const reviewed = reviewing ? (approvals.data?.items.find((a) => a.id === reviewing) ?? null) : null;
   const { events, live, stream } = useRunEvents(runId);
@@ -236,6 +251,33 @@ export function InvestigationView({ id, requestedRunId }: { id: string; requeste
       return map;
     },
   });
+
+  // Run-scoped palette results (UI_UX §3.15). Every input is keyed by `runId`, so a newly selected
+  // run shows its loading state rather than the previous run's results.
+  const scopeTarget = useRef<(target: RunScopeTarget, via: PickSource) => void>(() => {});
+  const runLabel = summary ? `Run #${summary.runNumber}` : "This run";
+  const roundData = latestRound ? roundDetail.data : undefined;
+  const planArms = roundData ? (roundData.result ? armsWithPlans(roundData) : []) : null;
+  const runScope = useMemo<RunScope | null>(() => {
+    if (!investigation.data || !runId) return null;
+    const notice = findings.isError
+      ? `${runLabel}'s findings could not be loaded.`
+      : sandbox && candidates.isError
+        ? `${runLabel}'s candidates could not be loaded.`
+        : undefined;
+    const items = buildRunScopeItems({
+      runId,
+      findings: claims?.findings,
+      hypotheses: claims?.hypotheses,
+      candidates: sandbox ? candidates.data?.items : [],
+      evidence: resolved,
+      planArms,
+    }).map((item) => ({ ...item, run: (via: PickSource) => scopeTarget.current(item.target, via) }));
+    return { runId, label: runLabel, loading: findings.isPending || (sandbox && candidates.isPending), notice, items };
+    // planArms is derived from roundData; listing it would rebuild the scope on every render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [investigation.data, runId, runLabel, findings.isError, findings.isPending, sandbox, candidates.isError, candidates.isPending, candidates.data, claims, resolved, roundData]);
+  useRunScope(runScope);
 
   // The sticky header (md and up; on phones it is too tall to pin) offsets the sticky trace column,
   // so neither covers the other.
@@ -351,6 +393,36 @@ export function InvestigationView({ id, requestedRunId }: { id: string; requeste
     setFocusArm(arm);
     setTab("tournament");
   }
+
+  /** A palette result: show the run results with that item, and move focus to it. */
+  function showTarget(target: RunScopeTarget, via: PickSource) {
+    setStep(RUN_ROW);
+    setGraphPick(null);
+    setSheet(false);
+    if (target.kind === "finding" || target.kind === "hypothesis") {
+      setEvidence(null);
+      setTab("findings");
+      requestAnimationFrame(() => {
+        const el = [...(page.current?.querySelectorAll<HTMLElement>("[data-claim]") ?? [])].find((x) => x.dataset.claim === target.key);
+        el?.scrollIntoView?.({ block: "center" });
+        el?.focus({ preventScroll: true });
+      });
+    } else if (target.kind === "evidence") {
+      // Plan-node evidence moves on to the Plan tab, as an evidence chip does.
+      setTab("evidence");
+      void openEvidence(target.id);
+    } else if (target.kind === "candidate") {
+      openBenchmark(target.key);
+      requestAnimationFrame(() => page.current?.querySelector<HTMLElement>('[role="tab"][aria-selected="true"]')?.focus());
+    } else {
+      setFocusArm(target.arm);
+      setFocusSection({ section: "plan-diff", arm: target.arm, via });
+      setTab("tournament");
+    }
+  }
+  useEffect(() => {
+    scopeTarget.current = showTarget;
+  });
 
   function evidenceActions(node: EvidenceNode): ReactNode {
     const btn = (label: string, run: () => void) => (
@@ -475,7 +547,14 @@ export function InvestigationView({ id, requestedRunId }: { id: string; requeste
           }}
         />
       ) : tab === "tournament" ? (
-        <TournamentPanel experiments={experiments.data?.items ?? []} candidates={candidates.data?.items ?? []} runId={runId ?? undefined} focusArm={focusArm} />
+        <TournamentPanel
+          experiments={experiments.data?.items ?? []}
+          candidates={candidates.data?.items ?? []}
+          runId={runId ?? undefined}
+          focusArm={focusArm}
+          focusSection={focusSection}
+          onFocusDone={sectionDone}
+        />
       ) : tab === "evidence" ? (
         <EvidenceExplorer
           findings={claims?.findings ?? []}

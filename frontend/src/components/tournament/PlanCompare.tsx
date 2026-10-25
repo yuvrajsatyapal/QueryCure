@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { PlanDiffView, type BenchmarkMedians, type DiffLayout } from "@/components/plan/PlanDiffView";
+import type { PickSource } from "@/components/command/CommandProvider";
 import type { ExperimentDetail, OptimizationCandidate } from "@/lib/api/types";
 import { describeCandidate } from "@/lib/benchmark/candidate";
 
@@ -19,6 +20,8 @@ export function PlanCompare({
   arm,
   onSelectArm,
   compact,
+  focusRequest = null,
+  onFocusDone,
 }: {
   runId: string;
   detail: ExperimentDetail;
@@ -26,7 +29,31 @@ export function PlanCompare({
   arm: string;
   onSelectArm: (arm: string) => void;
   compact: boolean;
+  /** Focus this candidate (its picker, or the heading naming it when there is only one), then report done.
+   * A pointer request focuses without the ring (`data-pointer-focus`) until focus moves on. */
+  focusRequest?: PickSource | null;
+  onFocusDone?: () => void;
 }) {
+  const heading = useRef<HTMLHeadingElement>(null);
+  const picker = useRef<HTMLSelectElement>(null);
+  useEffect(() => {
+    if (!focusRequest) return;
+    // After the frame: the palette that asked has restored focus on close, and an opened
+    // disclosure has laid out its content.
+    const frame = requestAnimationFrame(() => {
+      const target = picker.current && !picker.current.disabled ? picker.current : heading.current;
+      if (target) {
+        target.scrollIntoView?.({ block: "center" });
+        if (focusRequest === "pointer") {
+          target.dataset.pointerFocus = "";
+          target.addEventListener("blur", () => delete target.dataset.pointerFocus, { once: true });
+        }
+        target.focus({ preventScroll: true });
+      }
+      onFocusDone?.();
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [focusRequest, onFocusDone]);
   const plans = detail.blocks.filter((b) => b.phase === "plan" && b.planSha256);
   const arms = armsWithPlans(detail);
   const sets = [...new Set(plans.filter((b) => b.arm === arm).map((b) => b.paramSet))];
@@ -49,14 +76,18 @@ export function PlanCompare({
   return (
     <section aria-label="Plan diff" className="flex min-w-0 flex-col gap-3">
       <header className="flex flex-col gap-2">
-        <div className="flex min-w-0 flex-col">
-          <h3 className="text-sm font-semibold">Plan diff · baseline → {arm}</h3>
+        {/* The gap and a flush outline keep the heading's focus ring off the description. */}
+        <div className="flex min-w-0 flex-col gap-0.5">
+          <h3 ref={heading} tabIndex={-1} className="-mx-1 rounded-sm px-1 text-sm font-semibold" data-focus-flush="">
+            Plan diff · baseline → {arm}
+          </h3>
           <p className="text-xs text-muted">EXPLAIN ANALYZE captured in the sandbox after timing, one capture per arm and parameter set.</p>
         </div>
         <div className="flex min-w-0 flex-wrap items-end gap-3">
           <label className="flex min-w-0 max-w-full flex-col gap-1">
             <span className="qc-label">Candidate</span>
             <select
+              ref={picker}
               value={arm}
               onChange={(e) => onSelectArm(e.target.value)}
               disabled={arms.length < 2}

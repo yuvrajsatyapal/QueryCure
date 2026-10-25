@@ -246,3 +246,51 @@ test("a replicated round shows the replication verdict, its range and every repl
   expect(within(note).getByText(/43\.7× – 67\.4×/)).toBeDefined();
   expect(within(note).getByText(/across 3 independent experiments/)).toBeDefined();
 });
+
+// Workstream 3: a plan diff chosen in the command palette (UI_UX §3.15).
+const withPlans = {
+  ...detail,
+  blocks: [
+    { arm: "baseline", phase: "plan", paramSet: "hot", planSha256: "base" },
+    { arm: "oc_000000000001", phase: "plan", paramSet: "hot", planSha256: "c1" },
+    { arm: "oc_000000000002", phase: "plan", paramSet: "hot", planSha256: "c2" },
+  ],
+} as unknown as ExperimentDetail;
+
+test("focusSection selects the arm and focuses its candidate picker, then reports done once", async () => {
+  const done = vi.fn();
+  renderWithQuery(
+    <ExperimentView detail={withPlans} candidates={candidates} runId="run-1" focusSection={{ section: "plan-diff", arm: "oc_000000000002" }} onFocusDone={done} />,
+  );
+  const picker = screen.getByRole("combobox", { name: "Candidate" }) as HTMLSelectElement;
+  expect(picker.value).toBe("oc_000000000002");
+  await vi.waitFor(() => expect(document.activeElement).toBe(picker));
+  expect(done).toHaveBeenCalledTimes(1);
+});
+
+test("focusSection for an arm without a captured plan focuses nothing and still reports done", async () => {
+  const done = vi.fn();
+  renderWithQuery(<ExperimentView detail={detail} candidates={candidates} runId="run-1" focusSection={{ section: "plan-diff", arm: "oc_000000000001" }} onFocusDone={done} />);
+  await vi.waitFor(() => expect(done).toHaveBeenCalledTimes(1));
+  expect(screen.queryByRole("region", { name: "Plan diff" })).toBeNull();
+});
+
+test("a plan-diff jump by keyboard keeps the focus ring; by pointer it focuses without one, until focus leaves", async () => {
+  const done = vi.fn();
+  const view = renderWithQuery(
+    <ExperimentView detail={withPlans} candidates={candidates} runId="run-1" focusSection={{ section: "plan-diff", arm: "oc_000000000002", via: "keyboard" }} onFocusDone={done} />,
+  );
+  const picker = screen.getByRole("combobox", { name: "Candidate" });
+  await vi.waitFor(() => expect(document.activeElement).toBe(picker));
+  expect(picker.hasAttribute("data-pointer-focus")).toBe(false);
+  view.unmount();
+
+  renderWithQuery(
+    <ExperimentView detail={withPlans} candidates={candidates} runId="run-1" focusSection={{ section: "plan-diff", arm: "oc_000000000002", via: "pointer" }} onFocusDone={done} />,
+  );
+  const again = screen.getByRole("combobox", { name: "Candidate" });
+  await vi.waitFor(() => expect(document.activeElement).toBe(again));
+  expect(again.hasAttribute("data-pointer-focus")).toBe(true);
+  again.blur();
+  expect(again.hasAttribute("data-pointer-focus")).toBe(false);
+});

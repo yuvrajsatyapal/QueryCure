@@ -1,7 +1,8 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import type { PickSource } from "@/components/command/CommandProvider";
 import { AuditSummary } from "@/components/report/ReportView";
 import { getExperiment, optimizationKeys } from "@/lib/api/optimization";
 import { getVerifications, reportKeys } from "@/lib/api/reports";
@@ -158,24 +159,42 @@ function AuditList({ audits, experimentId }: { audits: Verification[]; experimen
   );
 }
 
+/** A studio section to open and focus, e.g. a plan diff chosen in the command palette. */
+export interface SectionFocus {
+  section: "plan-diff";
+  arm: string;
+  /** How it was chosen; a pointer choice is focused without a focus ring. Defaults to keyboard. */
+  via?: PickSource;
+}
+
 export function ExperimentView({
   detail,
   candidates,
   runId,
   focusArm = null,
+  focusSection = null,
+  onFocusDone,
 }: {
   detail: ExperimentDetail;
   candidates: OptimizationCandidate[];
   runId?: string;
   /** Arm to select, e.g. from "Open in benchmark" on the evidence tab. */
   focusArm?: string | null;
+  focusSection?: SectionFocus | null;
+  /** Called once `focusSection` has been focused, or found to have nothing to focus. */
+  onFocusDone?: () => void;
 }) {
   const result = detail.result;
-  const [selected, setSelected] = useState<string | null>(focusArm);
+  const [selected, setSelected] = useState<string | null>(focusSection?.arm ?? focusArm);
   const [seenFocus, setSeenFocus] = useState(focusArm);
   if (focusArm !== seenFocus) {
     setSeenFocus(focusArm);
     if (focusArm) setSelected(focusArm);
+  }
+  const [seenSection, setSeenSection] = useState(focusSection);
+  if (focusSection !== seenSection) {
+    setSeenSection(focusSection);
+    if (focusSection) setSelected(focusSection.arm);
   }
   const [tables, setTables] = useState(false);
   const compact = useCompactStudio();
@@ -185,6 +204,11 @@ export function ExperimentView({
     enabled: runId !== undefined,
   });
   const audits = verifications.data?.items ?? [];
+  const planArms = armsWithPlans(detail);
+  const diffShown = result !== null && runId !== undefined && focusSection !== null && planArms.includes(focusSection.arm);
+  useEffect(() => {
+    if (focusSection && !diffShown) onFocusDone?.();
+  }, [focusSection, diffShown, onFocusDone]);
   if (!result) {
     return (
       <p className="text-sm text-muted">
@@ -222,9 +246,23 @@ export function ExperimentView({
       </header>
       {replication ? <ReplicationNote replication={replication} /> : null}
       <BenchmarkAnalytics detail={detail} candidates={candidates} audits={audits} selected={active} onSelect={setSelected} />
-      {active && runId && armsWithPlans(detail).includes(active) ? (
-        <StudioSection compact={compact} title="Execution-plan differences" summary={`baseline → ${active} · EXPLAIN ANALYZE captured after timing`}>
-          <PlanCompare runId={runId} detail={detail} candidates={candidates} arm={active} onSelectArm={setSelected} compact={compact} />
+      {active && runId && planArms.includes(active) ? (
+        <StudioSection
+          compact={compact}
+          title="Execution-plan differences"
+          summary={`baseline → ${active} · EXPLAIN ANALYZE captured after timing`}
+          reveal={diffShown && focusSection?.arm === active}
+        >
+          <PlanCompare
+            runId={runId}
+            detail={detail}
+            candidates={candidates}
+            arm={active}
+            onSelectArm={setSelected}
+            compact={compact}
+            focusRequest={diffShown && focusSection?.arm === active ? (focusSection.via ?? "keyboard") : null}
+            onFocusDone={onFocusDone}
+          />
         </StudioSection>
       ) : null}
       {tables ? (
@@ -316,11 +354,15 @@ export function TournamentPanel({
   candidates,
   runId,
   focusArm = null,
+  focusSection = null,
+  onFocusDone,
 }: {
   experiments: ExperimentSummary[];
   candidates: OptimizationCandidate[];
   runId?: string;
   focusArm?: string | null;
+  focusSection?: SectionFocus | null;
+  onFocusDone?: () => void;
 }) {
   // Replicates (ADR-0019) are independent experiments of their round: each is shown on its
   // own, never pooled with the approved experiment (UI_UX §3.17).
@@ -378,7 +420,7 @@ export function TournamentPanel({
         </div>
       ) : null}
       {detail.data ? (
-        <ExperimentView detail={detail.data} candidates={candidates} runId={runId} focusArm={focusArm} />
+        <ExperimentView detail={detail.data} candidates={candidates} runId={runId} focusArm={focusArm} focusSection={focusSection} onFocusDone={onFocusDone} />
       ) : (
         <ul className="flex flex-col gap-2">
           {candidates.map((c) => (

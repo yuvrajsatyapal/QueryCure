@@ -19,15 +19,23 @@ export function StudioSection({
   summary,
   compact,
   attention = false,
+  reveal = false,
   children,
 }: {
   title: string;
   summary: string;
   compact: boolean;
   attention?: boolean;
+  /** Opens the disclosure when it turns true (a jump from the command palette); the user can close it again. */
+  reveal?: boolean;
   children: ReactNode;
 }) {
-  const [open, setOpen] = useState(attention);
+  const [open, setOpen] = useState(attention || reveal);
+  const [revealed, setRevealed] = useState(reveal);
+  if (reveal !== revealed) {
+    setRevealed(reveal);
+    if (reveal) setOpen(true);
+  }
   if (!compact) return <>{children}</>;
   return (
     <details data-bench-section open={open} onToggle={(e) => setOpen(e.currentTarget.open)} className="group min-w-0 rounded-lg border border-border bg-surface">

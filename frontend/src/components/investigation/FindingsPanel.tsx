@@ -1,15 +1,9 @@
 import { Icon } from "@/components/ui/Icon";
 import type { Finding, FindingsResponse } from "@/lib/api/types";
+import { agentLabel } from "@/lib/investigation/agents";
 import type { StepMatch } from "@/lib/investigation/links";
 import { ClaimBadge } from "./ClaimBadge";
 import { EvidenceChip } from "./EvidenceChip";
-
-const AGENT_LABEL: Record<string, string> = {
-  query_analyzer: "Query Analyzer",
-  index_strategist: "Index Strategist",
-  workload_investigator: "Workload Investigator",
-  supervisor: "Supervisor",
-};
 
 /** Jumps to the trace row that recorded this claim; says so when no event carries its key. */
 function ShowStep({ match, onShowStep }: { match: StepMatch; onShowStep: (spanId: string) => void }) {
@@ -62,7 +56,7 @@ export function FindingsPanel({
         ) : (
           <ol className="flex flex-col gap-3">
             {data.hypotheses.map((h) => (
-              <li key={h.key} className="qc-panel p-4">
+              <li key={h.key} data-claim={h.key} tabIndex={-1} className="qc-panel scroll-mt-24 p-4">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="font-mono text-xs text-muted">#{h.rank}</span>
                   <span className="font-mono text-xs">{h.category}</span>
@@ -89,10 +83,10 @@ export function FindingsPanel({
         </h2>
         {Object.entries(byAgent).map(([agent, findings]) => (
           <div key={agent} className="mb-4">
-            <h3 className="mb-1 qc-eyebrow">{AGENT_LABEL[agent] ?? agent}</h3>
+            <h3 className="mb-1 qc-eyebrow">{agentLabel(agent)}</h3>
             <ul className="flex flex-col gap-2">
               {findings.map((f) => (
-                <li key={f.key} className="rounded-md border border-border bg-surface p-3">
+                <li key={f.key} data-claim={f.key} tabIndex={-1} className="scroll-mt-24 rounded-md border border-border bg-surface p-3">
                   <div className="flex flex-wrap items-start gap-2">
                     <p className="font-medium">
                       {f.title} <span className="font-mono text-[11px] text-muted">({f.severity})</span>
