@@ -1,37 +1,42 @@
 "use client";
 
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import type { Ref } from "react";
 import { ErrorNotice } from "@/components/common/ErrorNotice";
 import { Icon } from "@/components/ui/Icon";
 import { StatusPill } from "@/components/ui/StatusPill";
-import { investigationKeys } from "@/lib/api/investigations";
-import { decideApproval, optimizationKeys } from "@/lib/api/optimization";
-import type { Approval, DecisionInput } from "@/lib/api/types";
+import type { Approval } from "@/lib/api/types";
+import { decisionFor, DECLINE_ALL } from "@/lib/approval/review";
 import { describeCandidate } from "@/lib/benchmark/candidate";
+import { useApprovalDecision, type ApprovalDecision } from "./useApprovalDecision";
 
 /** The human-in-the-loop step (AGENT_SYSTEM §8): shows exactly the SQL that will run in the
- * sandbox. Nothing runs until one of these buttons records a decision. */
-export function ApprovalCard({ approval, runId }: { approval: Approval; runId: string }) {
-  const client = useQueryClient();
+ * sandbox. Nothing runs until one of these buttons records a decision. With `review` the card
+ * shares its selection and request with the review drawer, which `onReview` opens. */
+export function ApprovalCard({
+  approval,
+  runId,
+  review,
+  onReview,
+  reviewRef,
+}: {
+  approval: Approval;
+  runId: string;
+  review?: ApprovalDecision;
+  onReview?: () => void;
+  reviewRef?: Ref<HTMLButtonElement>;
+}) {
+  return review ? <Card review={review} onReview={onReview} reviewRef={reviewRef} /> : <OwnCard approval={approval} runId={runId} />;
+}
+
+function OwnCard({ approval, runId }: { approval: Approval; runId: string }) {
+  return <Card review={useApprovalDecision(approval, runId)} />;
+}
+
+function Card({ review, onReview, reviewRef }: { review: ApprovalDecision; onReview?: () => void; reviewRef?: Ref<HTMLButtonElement> }) {
+  const { approval, chosen, toggle, decide, submit, phase, offered } = review;
   const candidates = approval.payload.candidates;
-  const [chosen, setChosen] = useState<Set<string>>(() => new Set(candidates.map((c) => c.candidateId)));
-  const decide = useMutation({
-    mutationFn: (input: DecisionInput) => decideApproval(approval.id, input),
-    onSuccess: () => {
-      void client.invalidateQueries({ queryKey: optimizationKeys.approvals(runId) });
-      void client.invalidateQueries({ queryKey: optimizationKeys.candidates(runId) });
-      void client.invalidateQueries({ queryKey: investigationKeys.run(runId), exact: true });
-    },
-  });
-  const toggle = (id: string) =>
-    setChosen((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
   const all = chosen.size === candidates.length;
+  const open = phase.kind === "pending";
 
   return (
     <section aria-label="Approval required" className="flex flex-col gap-3 rounded-lg border border-approval/40 bg-surface p-4 shadow-[inset_3px_0_0_var(--approval)]">
@@ -45,8 +50,10 @@ export function ApprovalCard({ approval, runId }: { approval: Approval; runId: s
         </div>
         <p className="text-sm text-muted">
           The SQL below would run only in {approval.payload.sandbox}, on workload{" "}
-          <span className="font-mono">{approval.payload.workloadId}</span>. Nothing has run yet. Expires{" "}
-          {new Date(approval.expiresAt).toLocaleString()}. If the measurements are too noisy to decide, the same approved SQL
+          <span className="font-mono break-all">{approval.payload.workloadId}</span>. Nothing has run yet. Expires{" "}
+          {new Date(approval.expiresAt).toLocaleString()}
+          {phase.kind === "expired" ? " (expiry time passed; no decision can be recorded)" : ""}
+          {phase.kind === "refused" ? " (the server refused the decision; none was recorded)" : ""}. If the measurements are too noisy to decide, the same approved SQL
           may be re-measured up to two more times in new disposable clones.
         </p>
       </div>
@@ -84,24 +91,24 @@ export function ApprovalCard({ approval, runId }: { approval: Approval; runId: s
       <div className="flex flex-wrap gap-2">
         <button
           type="button"
-          disabled={decide.isPending || chosen.size === 0}
-          onClick={() =>
-            decide.mutate(
-              all ? { decision: "approve", candidateIds: [] } : { decision: "partial", candidateIds: [...chosen] },
-            )
-          }
+          disabled={!open || decide.isPending || chosen.size === 0}
+          onClick={() => {
+            const input = decisionFor(chosen, offered);
+            if (input) submit(input);
+          }}
           className="qc-btn-primary"
         >
           {all ? "Approve and run" : `Approve ${chosen.size} selected`}
         </button>
-        <button
-          type="button"
-          disabled={decide.isPending}
-          onClick={() => decide.mutate({ decision: "decline", candidateIds: [] })}
-          className="qc-btn-secondary"
-        >
+        <button type="button" disabled={!open || decide.isPending} onClick={() => submit(DECLINE_ALL)} className="qc-btn-secondary">
           Decline
         </button>
+        {onReview ? (
+          <button ref={reviewRef} type="button" onClick={onReview} aria-haspopup="dialog" className="qc-btn-ghost sm:ml-auto">
+            <Icon name="expand" size={14} />
+            Review details
+          </button>
+        ) : null}
       </div>
     </section>
   );

@@ -27,7 +27,7 @@ import { ReportPanel } from "@/components/report/ReportPanel";
 import { ResultSummary } from "@/components/report/ResultSummary";
 import { SUPPORTED_REPORT_SCHEMAS, getReport, getVerifications, reportKeys } from "@/lib/api/reports";
 import type { ReportV1 } from "@/lib/report/types";
-import { ApprovalCard } from "@/components/tournament/ApprovalCard";
+import { ApprovalReview } from "@/components/tournament/ApprovalReview";
 import { TournamentPanel } from "@/components/tournament/TournamentPanel";
 import { buildTrace } from "@/lib/events/trace";
 import { runRefetchInterval } from "@/lib/events/runEvents";
@@ -137,6 +137,8 @@ export function InvestigationView({ id, requestedRunId }: { id: string; requeste
   const [graphPick, setGraphPick] = useState<string | null>(null);
   const [menu, setMenu] = useState<{ spanId: string; at: { x: number; y: number } } | null>(null);
   const [sheet, setSheet] = useState(false);
+  // The approval whose review drawer is open; it stays open after the decision is recorded.
+  const [reviewing, setReviewing] = useState<string | null>(null);
   // Set when a menu switches views ("Show in graph"): the pane focuses its selection, then clears it.
   const [paneFocus, setPaneFocus] = useState(false);
   const focusDone = useCallback(() => setPaneFocus(false), []);
@@ -168,6 +170,7 @@ export function InvestigationView({ id, requestedRunId }: { id: string; requeste
     setGraphPick(null);
     setMenu(null);
     setSheet(false);
+    setReviewing(null);
     router.replace(`/app/investigations/${id}?run=${next}`, { scroll: false });
   }
   const run = useQuery({ queryKey: investigationKeys.run(runId ?? ""), queryFn: ({ signal }) => getRun(runId ?? "", signal), enabled: runId !== null, refetchInterval: (q) => runRefetchInterval(q.state.data?.status) });
@@ -179,6 +182,7 @@ export function InvestigationView({ id, requestedRunId }: { id: string; requeste
   const experiments = useQuery({ queryKey: optimizationKeys.experiments(runId ?? ""), queryFn: ({ signal }) => getExperiments(runId ?? "", signal), enabled: runId !== null && sandbox });
   const verifications = useQuery({ queryKey: reportKeys.verifications(runId ?? ""), queryFn: ({ signal }) => getVerifications(runId ?? "", signal), enabled: runId !== null && sandbox && tab === "evidence" });
   const pending = approvals.data?.items.find((a) => a.status === "pending") ?? null;
+  const reviewed = reviewing ? (approvals.data?.items.find((a) => a.id === reviewing) ?? null) : null;
   const { events, live, stream } = useRunEvents(runId);
   const cancel = useMutation({
     mutationFn: () => cancelRun(runId ?? ""),
@@ -243,6 +247,14 @@ export function InvestigationView({ id, requestedRunId }: { id: string; requeste
     ro.observe(el);
     return () => ro.disconnect();
   }, [investigation.data]);
+
+  // After a decision the card (the drawer's opener) is gone, so focus goes to the page heading.
+  function closeReview() {
+    setReviewing(null);
+    requestAnimationFrame(() => {
+      if (document.activeElement === document.body || !document.activeElement) page.current?.querySelector<HTMLElement>("h1")?.focus();
+    });
+  }
 
   async function openEvidence(evidenceId: string) {
     if (!runId) return;
@@ -677,7 +689,7 @@ export function InvestigationView({ id, requestedRunId }: { id: string; requeste
         <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-2">
           <div className="flex min-w-0 flex-col gap-1">
             <div className="flex flex-wrap items-center gap-2">
-              <h1 className="qc-page-title min-w-0 break-words">{investigation.data.title}</h1>
+              <h1 tabIndex={-1} className="qc-page-title min-w-0 break-words outline-none">{investigation.data.title}</h1>
               {r ? <RunStatusPill status={r.status} /> : null}
             </div>
             {r ? (
@@ -734,7 +746,29 @@ export function InvestigationView({ id, requestedRunId }: { id: string; requeste
 
       {sealedSummary}
 
-      {pending && runId && r?.status === "awaiting_approval" ? <ApprovalCard key={pending.id} approval={pending} runId={runId} /> : null}
+      {(() => {
+        const inline = pending && r?.status === "awaiting_approval" ? pending : null;
+        const shown = reviewed ?? inline;
+        if (!shown || !runId) return null;
+        return (
+          <ApprovalReview
+            key={shown.id}
+            approval={shown}
+            runId={runId}
+            showCard={inline?.id === shown.id}
+            open={reviewing === shown.id}
+            onOpen={() => setReviewing(shown.id)}
+            onClose={closeReview}
+            investigationTitle={investigation.data?.title ?? ""}
+            candidates={candidates.data?.items ?? []}
+            hypotheses={claims?.hypotheses ?? []}
+            onEvidence={(ev) => {
+              setReviewing(null);
+              void openEvidence(ev);
+            }}
+          />
+        );
+      })()}
 
       <div className="flex flex-wrap items-center gap-3">
         <div role="group" aria-label="Workspace view" className="inline-flex rounded-md bg-surface-2 p-0.5">

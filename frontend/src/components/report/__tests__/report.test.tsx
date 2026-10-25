@@ -266,7 +266,10 @@ test("plan diff summary reads like the design", () => {
 
   expect(diffSummary(diff)).toBe("Seq Scan → Index Scan on orders; Sort removed; new index used: o_idx");
   render(<PlanDiffTable diff={diff} />);
-  expect(screen.getByText("Seq Scan → Index Scan")).toBeTruthy();
+  // Side by side: each plan's node in its own column, the change named between them.
+  expect(screen.getByRole("button", { name: "Seq Scan → Index Scan, type changed: show recorded metrics" })).toBeTruthy();
+  expect(screen.getByText("Seq Scan")).toBeTruthy();
+  expect(screen.getByText("Index Scan")).toBeTruthy();
 });
 
 test("the standalone report page links its run, the replay page and the original run, with a contents list", async () => {

@@ -27,7 +27,7 @@ const approval = {
   status: "pending",
   decidedBy: null,
   decidedAt: null,
-  expiresAt: "2026-10-13T10:00:00Z",
+  expiresAt: "2099-10-13T10:00:00Z",
   approvedCandidateIds: [],
   comment: "",
   createdAt: "2026-10-12T10:00:00Z",
@@ -186,6 +186,13 @@ test("a noise-warning verification is labelled as such, never as plain verified"
 
   expect(screen.getByText("Verified · noise warning, 3 runs agree")).toBeDefined();
   expect(screen.queryByText("Verified · tested scope")).toBeNull();
+});
+
+test("approval card offers no decision once the expiry time has passed", () => {
+  renderWithQuery(<ApprovalCard approval={{ ...approval, expiresAt: "2020-01-01T00:00:00Z" }} runId="run-1" />);
+  expect(screen.getByText(/expiry time passed; no decision can be recorded/)).toBeTruthy();
+  expect((screen.getByRole("button", { name: "Approve and run" }) as HTMLButtonElement).disabled).toBe(true);
+  expect((screen.getByRole("button", { name: "Decline" }) as HTMLButtonElement).disabled).toBe(true);
 });
 
 test("approval card says a noisy result may be re-measured", () => {

@@ -3,7 +3,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { AuditSummary } from "@/components/report/ReportView";
-import { PlanDiffView } from "@/components/plan/PlanDiffView";
 import { getExperiment, optimizationKeys } from "@/lib/api/optimization";
 import { getVerifications, reportKeys } from "@/lib/api/reports";
 import type { CandidateAudit } from "@/lib/report/types";
@@ -13,6 +12,7 @@ import { formatNs as ms, formatSpeedup as x } from "@/lib/format";
 import { describeCandidate } from "@/lib/benchmark/candidate";
 import { BenchmarkAnalytics } from "./BenchmarkAnalytics";
 import { CorrectnessPanel } from "./CorrectnessPanel";
+import { armsWithPlans, PlanCompare } from "./PlanCompare";
 import { StatsGlossary } from "./StatsGlossary";
 import { StudioSection, useCompactStudio } from "./StudioSection";
 import { VerdictBadge } from "./VerdictBadge";
@@ -158,31 +158,6 @@ function AuditList({ audits, experimentId }: { audits: Verification[]; experimen
   );
 }
 
-/** Baseline vs candidate plan for one parameter set, from the post-timing EXPLAIN ANALYZE captures. */
-function PlanCompare({ runId, detail, arm }: { runId: string; detail: ExperimentDetail; arm: string }) {
-  const plans = detail.blocks.filter((b) => b.phase === "plan" && b.planSha256);
-  const sets = [...new Set(plans.filter((b) => b.arm === arm).map((b) => b.paramSet))];
-  const [ps, setPs] = useState<string | null>(null);
-  const chosen = ps ?? sets[0] ?? null;
-  const from = plans.find((b) => b.arm === "baseline" && b.paramSet === chosen)?.planSha256;
-  const to = plans.find((b) => b.arm === arm && b.paramSet === chosen)?.planSha256;
-  if (!chosen || !from || !to) return null;
-  return (
-    <section aria-label="Plan diff" className="flex flex-col gap-2">
-      <div className="flex flex-wrap items-center gap-2">
-        <h3 className="text-sm font-semibold">Plan diff · baseline → {arm}</h3>
-        {sets.map((s) => (
-          <button key={s} type="button" aria-pressed={s === chosen} onClick={() => setPs(s)}
-            className={`rounded-md px-2 py-0.5 font-mono text-xs ${s === chosen ? "bg-accent-tint" : "text-muted"}`}>
-            {s}
-          </button>
-        ))}
-      </div>
-      <PlanDiffView runId={runId} from={from} to={to} />
-    </section>
-  );
-}
-
 export function ExperimentView({
   detail,
   candidates,
@@ -247,9 +222,9 @@ export function ExperimentView({
       </header>
       {replication ? <ReplicationNote replication={replication} /> : null}
       <BenchmarkAnalytics detail={detail} candidates={candidates} audits={audits} selected={active} onSelect={setSelected} />
-      {active && runId && detail.blocks.some((b) => b.phase === "plan" && b.planSha256 && b.arm === active) ? (
-        <StudioSection key={active} compact={compact} title="Execution-plan differences" summary={`baseline → ${active} · EXPLAIN ANALYZE captured after timing`}>
-          <PlanCompare runId={runId} detail={detail} arm={active} />
+      {active && runId && armsWithPlans(detail).includes(active) ? (
+        <StudioSection compact={compact} title="Execution-plan differences" summary={`baseline → ${active} · EXPLAIN ANALYZE captured after timing`}>
+          <PlanCompare runId={runId} detail={detail} candidates={candidates} arm={active} onSelectArm={setSelected} compact={compact} />
         </StudioSection>
       ) : null}
       {tables ? (
