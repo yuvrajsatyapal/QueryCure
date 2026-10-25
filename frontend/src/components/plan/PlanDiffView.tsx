@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { useRef, useState, type ReactNode } from "react";
+import { useId, useRef, useState, type ReactNode } from "react";
 import { ErrorNotice } from "@/components/common/ErrorNotice";
 import { Icon } from "@/components/ui/Icon";
 import { Skeleton } from "@/components/ui/Skeleton";
@@ -340,27 +340,34 @@ function NodeMetrics({ row, id, onClose }: { row: DiffRow; id: string; onClose: 
   );
 }
 
-/** Baseline → candidate on one line when the card has room; stacked and labelled when it does
- * not, so a value never breaks between its number and its unit. */
+/** One summary figure: title and source tag, then baseline and candidate as two labelled
+ * columns. A value never breaks between its number and its unit; when the two values cannot sit
+ * side by side, the candidate wraps under the baseline instead of being clipped. */
 function Figure({ label, from, to, source, kind }: { label: string; from: string; to: string; source: string; kind: Provenance }) {
+  const id = useId();
   return (
-    <div className="@container/fig flex min-w-0 flex-col gap-1 rounded-lg border border-border bg-surface px-3 py-2.5">
+    <div role="group" aria-labelledby={id} className="flex min-w-0 flex-col gap-2.5 rounded-lg border border-border bg-surface p-3">
       <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
-        <span className="qc-eyebrow text-[11px]">{label}</span>
+        <span id={id} className="qc-eyebrow text-[11px]">{label}</span>
         <KindTag kind={kind} />
       </span>
-      <span className="hidden font-mono text-sm whitespace-nowrap @[16rem]/fig:block">
-        {from} → {to}
-      </span>
-      <dl className="grid grid-cols-[auto_minmax(0,1fr)] items-baseline gap-x-2 @[16rem]/fig:hidden">
-        <dt className="text-[11px] text-muted">baseline</dt>
-        <dd className="font-mono text-sm whitespace-nowrap">{from}</dd>
-        <dt className="text-[11px] text-muted">candidate</dt>
-        <dd className="font-mono text-sm whitespace-nowrap">{to}</dd>
+      <dl className="flex flex-wrap gap-x-6 gap-y-2">
+        {([["Baseline", from], ["Candidate", to]] as const).map(([side, value]) => (
+          <div key={side} className="flex grow basis-0 flex-col gap-0.5">
+            <dt className="text-[11px] text-muted">{side}</dt>
+            <dd className="font-mono text-sm font-medium whitespace-nowrap tabular-nums">{value}</dd>
+          </div>
+        ))}
       </dl>
-      <span className="text-[11px] text-muted">{source}</span>
+      <p className="text-xs text-muted">{source}</p>
     </div>
   );
+}
+
+/** Long snake_case identifiers (index names) may break after an underscore before they break
+ * mid-word; `<wbr>` adds no text, so the summary reads the same. */
+function breakAfterUnderscores(text: string): ReactNode {
+  return text.split(/(?<=_)/).map((part, i) => (i ? [<wbr key={i} />, part] : part));
 }
 
 const withUnit = (unit: MetricUnit, v: number | null) => (v !== null && unit === "blocks" ? `${format(unit, v)} blocks` : format(unit, v));
@@ -407,10 +414,12 @@ export function PlanDiffTable({
 
   return (
     <div className="@container/diff flex min-w-0 flex-col gap-3">
-      <div className="grid grid-cols-2 gap-2 @2xl/diff:grid-cols-4">
-        <div className="col-span-2 flex min-w-0 flex-col gap-1 rounded-lg border border-border bg-surface px-3 py-2.5 @2xl/diff:col-span-1 @2xl/diff:row-span-2">
+      {/* One card per row until two fit at ≥ 16 rem each; chosen by the diff's own width, since the
+          studio panel is narrower than the viewport suggests. */}
+      <div className="grid grid-cols-1 gap-2 @[33rem]/diff:grid-cols-2">
+        <div className="col-span-full flex min-w-0 flex-col gap-1 rounded-lg border border-border bg-surface p-3">
           <span className="qc-eyebrow text-[11px]">What changed</span>
-          <span className="text-sm [overflow-wrap:anywhere]">{diffSummary(diff)}</span>
+          <span className="text-sm [overflow-wrap:anywhere]">{breakAfterUnderscores(diffSummary(diff))}</span>
           <span className="text-[11px] text-muted">
             Structural match · {s.changed} changed, {s.removed} removed, {s.added} added, {s.same} same
           </span>

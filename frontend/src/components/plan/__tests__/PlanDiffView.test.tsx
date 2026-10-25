@@ -100,18 +100,52 @@ test("plans without EXPLAIN ANALYZE actuals say their rows are estimates", () =>
 
 test("the benchmark median is shown beside, and labelled apart from, the plan capture", () => {
   render(<PlanDiffTable diff={analyzed} benchmark={{ baselineNs: 4_100_000, candidateNs: 310_000, nBaseline: 30, nCandidate: 30 }} />);
-  expect(screen.getByText("Benchmark median")).toBeTruthy();
-  expect(screen.getByText("4.10 ms → 0.31 ms")).toBeTruthy();
-  expect(screen.getByText(/n 30 \/ 30; this decides the verdict/)).toBeTruthy();
+  const card = screen.getByRole("group", { name: "Benchmark median" });
+  expect(within(card).getByText("4.10 ms")).toBeTruthy();
+  expect(within(card).getByText("0.31 ms")).toBeTruthy();
+  expect(within(card).getByText("measured")).toBeTruthy();
+  expect(within(card).getByText(/n 30 \/ 30; this decides the verdict/)).toBeTruthy();
+  // Recorded medians only: no speed-up or percentage is derived on the card.
+  expect(card.textContent).not.toMatch(/×|%|faster|slower/);
 });
 
-test("summary figures also carry stacked baseline and candidate values with units for narrow cards", () => {
+test("each summary figure is a card: title and source tag, labelled baseline and candidate values, then its source", () => {
+  render(<PlanDiffTable diff={analyzed} benchmark={{ baselineNs: 4_100_000, candidateNs: 310_000, nBaseline: 30, nCandidate: 30 }} />);
+  const expected: [string, string, string, string][] = [
+    ["Benchmark median", "measured", "4.10 ms", "0.31 ms"],
+    ["Execution time", "measured", "0.32 ms", "0.04 ms"],
+    ["Root cost", "estimate", "1,500.00", "12.00"],
+  ];
+  for (const [title, kind, from, to] of expected) {
+    const card = screen.getByRole("group", { name: title });
+    expect(within(card).getByText(kind)).toBeTruthy();
+    const terms = within(card).getAllByRole("term").map((t) => t.textContent);
+    expect(terms).toEqual(["Baseline", "Candidate"]);
+    const values = within(card).getAllByRole("definition");
+    expect(values.map((v) => v.textContent)).toEqual([from, to]);
+    // Number and unit stay on one line; figures use tabular numerals.
+    for (const v of values) expect(v.className).toMatch(/whitespace-nowrap.*tabular-nums|tabular-nums.*whitespace-nowrap/);
+    // Values wrap as whole columns (candidate under baseline) rather than being clipped.
+    expect(values[0]?.parentElement?.parentElement?.className).toContain("flex-wrap");
+  }
+  // Card heights are never fixed, so long descriptions are not cut off.
+  for (const card of screen.getAllByRole("group")) expect(card.className).not.toMatch(/\bh-\d|max-h|line-clamp|truncate|overflow-hidden/);
+});
+
+test("the figure grid follows the diff's own width, not the viewport: one card per row, two from 33 rem", () => {
   render(<PlanDiffTable diff={analyzed} />);
-  const card = screen.getByText("Execution time").closest("div.\\@container\\/fig") as HTMLElement;
-  const stacked = card.querySelector("dl") as HTMLElement;
-  expect(within(stacked).getByText("baseline")).toBeTruthy();
-  expect(within(stacked).getByText("0.32 ms")).toBeTruthy();
-  expect(within(stacked).getByText("0.04 ms")).toBeTruthy();
+  const grid = screen.getByRole("group", { name: "Execution time" }).parentElement as HTMLElement;
+  expect(grid.className).toContain("grid-cols-1");
+  expect(grid.className).toContain("@[33rem]/diff:grid-cols-2");
+  expect(grid.className).not.toMatch(/(^|\s)(sm|md|lg|xl):/);
+  expect(grid.closest(".\\@container\\/diff")).toBeTruthy();
+});
+
+test("the change summary may break an index name after an underscore without changing its text", () => {
+  const diff = { ...analyzed, summary: { ...analyzed.summary, newIndexesUsed: ["orders_customer_id_created_at_idx"] } } as PlanDiff;
+  render(<PlanDiffTable diff={diff} />);
+  const summary = screen.getByText((_, el) => el?.tagName === "SPAN" && el.textContent === "Seq Scan, Sort removed; Index Scan added; new index used: orders_customer_id_created_at_idx");
+  expect(summary.querySelectorAll("wbr")).toHaveLength(5);
 });
 
 test("a long index name is truncated in the row and given in full in the node panel", async () => {
