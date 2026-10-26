@@ -1,5 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
+import { waitForShortcuts } from "./shortcuts";
 import { applyTheme } from "./theme";
 
 /** UI Pass 3 (UI_UX §3.14–3.15): the guided New investigation flow and the command palette,
@@ -91,7 +92,7 @@ test("keyboard - palette navigates and searches; shortcuts dialog; g sequences; 
   // A short window makes the palette's results overflow, so axe always checks the scroll region.
   await page.setViewportSize({ width: 1280, height: 420 });
   await page.goto("/app");
-  await expect(page.getByRole("navigation", { name: "Main" })).toBeVisible({ timeout: 30_000 });
+  await waitForShortcuts(page);
 
   await page.keyboard.press("ControlOrMeta+k");
   const palette = page.getByRole("dialog", { name: "Command palette" });
@@ -133,6 +134,57 @@ test("keyboard - palette navigates and searches; shortcuts dialog; g sequences; 
   await page.keyboard.press("c");
   await expect(page).toHaveURL(/\/app\/history$/);
   await expect(page.getByLabel("Search titles")).toHaveValue("c");
+});
+
+test("keyboard - ⌘K under 6x CPU throttling once shortcuts are ready; Esc restores focus; one listener across pages; both themes", async ({ page }) => {
+  const cdp = await page.context().newCDPSession(page);
+  // Slow enough that hydration trails the server-rendered shell (the CI race), on a cold cache.
+  await cdp.send("Emulation.setCPUThrottlingRate", { rate: 6 });
+  const keydownListeners = async () => {
+    const { result } = await cdp.send("Runtime.evaluate", { expression: "window" });
+    const { listeners } = await cdp.send("DOMDebugger.getEventListeners", { objectId: result.objectId ?? "" });
+    return listeners.filter((l) => l.type === "keydown").length;
+  };
+  const palette = page.getByRole("dialog", { name: "Command palette" });
+  const nav = page.getByRole("navigation", { name: "Main" });
+
+  await page.goto("/app");
+  await waitForShortcuts(page);
+  const baseline = await keydownListeners();
+  await expect(page.getByRole("heading", { level: 1, name: "Dashboard" })).toBeVisible({ timeout: 30_000 });
+  const history = nav.getByRole("link", { name: "History" });
+  await history.focus();
+  await page.keyboard.press("ControlOrMeta+k");
+  await expect(palette).toBeVisible();
+  await expect(palette.getByRole("combobox")).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(palette).toBeHidden();
+  await expect(history).toBeFocused();
+
+  // Client-side navigation keeps the one provider: still ready, one press still opens the palette
+  // (it toggles, so a duplicate listener would close it again), and no listener piles up.
+  for (const [key, url] of [["h", /\/app\/history$/], ["c", /\/app\/connections$/], ["d", /\/app$/]] as const) {
+    await page.locator("body").focus();
+    await page.keyboard.press("g");
+    await page.keyboard.press(key);
+    await expect(page).toHaveURL(url);
+    await waitForShortcuts(page);
+    await page.keyboard.press("ControlOrMeta+k");
+    await expect(palette).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(palette).toBeHidden();
+  }
+  await expect(page.getByRole("heading", { level: 1, name: "Dashboard" })).toBeVisible();
+  expect(await keydownListeners()).toBe(baseline);
+
+  for (const scheme of ["light", "dark"] as const) {
+    await applyTheme(page, scheme);
+    await page.keyboard.press("ControlOrMeta+k");
+    await expect(palette, scheme).toBeVisible();
+    await expect(palette.getByRole("combobox"), scheme).toBeFocused();
+    await page.keyboard.press("Escape");
+    await expect(palette, scheme).toBeHidden();
+  }
 });
 
 test("keyboard - mobile width: the drawer opens the palette and the guided flow has no sideways scroll", async ({ page }) => {

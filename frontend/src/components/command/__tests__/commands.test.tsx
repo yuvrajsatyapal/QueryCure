@@ -63,6 +63,49 @@ test("Ctrl+K opens the palette with focus in its combobox; Esc closes it and ret
   expect(document.activeElement).toBe(before);
 });
 
+test("the shortcut listener is attached once, marked ready only after it exists, and removed with the provider", async () => {
+  const root = document.documentElement;
+  const attach = window.addEventListener.bind(window);
+  const add = vi.spyOn(window, "addEventListener");
+  const remove = vi.spyOn(window, "removeEventListener");
+  const markerWhenAttached: (string | null)[] = [];
+  add.mockImplementation((...args: Parameters<Window["addEventListener"]>) => {
+    if (args[0] === "keydown") markerWhenAttached.push(root.getAttribute("data-shortcuts"));
+    attach(...args);
+  });
+  function Changing() {
+    const [n, setN] = useState(0);
+    const run = useMemo(() => () => n, [n]);
+    return (
+      <>
+        <button type="button" onClick={() => setN((v) => v + 1)}>
+          change commands
+        </button>
+        <Contextual run={run} />
+      </>
+    );
+  }
+  expect(root.hasAttribute("data-shortcuts")).toBe(false);
+  const view = setup(<Changing />);
+  expect(markerWhenAttached).toEqual([null]);
+  expect(root.getAttribute("data-shortcuts")).toBe("ready");
+
+  // New page commands re-register in the key map, never as a second window listener.
+  fireEvent.click(screen.getByRole("button", { name: "change commands" }));
+  await act(async () => {});
+  expect(add.mock.calls.filter(([type]) => type === "keydown")).toHaveLength(1);
+  // ⌘K toggles, so a duplicated listener would open and close the palette in one press.
+  fireEvent.keyDown(document.body, { key: "k", ctrlKey: true });
+  expect(screen.getByRole("dialog", { name: "Command palette" })).toBeDefined();
+
+  view.unmount();
+  const handler = add.mock.calls.find(([type]) => type === "keydown")?.[1];
+  expect(remove.mock.calls.filter(([type, fn]) => type === "keydown" && fn === handler)).toHaveLength(1);
+  expect(root.hasAttribute("data-shortcuts")).toBe(false);
+  add.mockRestore();
+  remove.mockRestore();
+});
+
 test("Ctrl+K also works from inside a text field", () => {
   setup();
   fireEvent.keyDown(screen.getByLabelText("Some field"), { key: "k", ctrlKey: true });

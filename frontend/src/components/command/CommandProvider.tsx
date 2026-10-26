@@ -167,7 +167,14 @@ export function CommandProvider({ children }: { children: ReactNode }) {
       }
     }
     window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
+    // The server-rendered shell is visible before hydration attaches this listener, and keys pressed
+    // in between are lost. This marker is set only once the listener exists, so e2e can wait on it.
+    const root = document.documentElement;
+    root.setAttribute("data-shortcuts", "ready");
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      root.removeAttribute("data-shortcuts");
+    };
   }, []);
 
   const value = useMemo(
