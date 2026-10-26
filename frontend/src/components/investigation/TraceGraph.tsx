@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type PointerEvent as ReactPointerEvent } from "react";
+import { StatusOrb } from "@/components/ui/StatusPill";
 import type { Span } from "@/lib/events/trace";
 import { formatDuration } from "@/lib/format";
 import { ANALYST_GROUP, CANVAS, END, GRAPH_LAYOUT, NODE_H, REPORT, START, TOPOLOGY, edgePath, graphRun, nodeWidth, type GraphNode, type NodeState } from "@/lib/trace/graph";
@@ -49,6 +50,7 @@ function meta(name: string, g: GraphNode, active: boolean): string {
 export function TraceGraph({
   trace,
   active,
+  live = false,
   selectedNode,
   onSelectNode,
   fillHeight = false,
@@ -57,6 +59,8 @@ export function TraceGraph({
 }: {
   trace: Span;
   active: boolean;
+  /** The stream is confirmed live: a running node is executing now and its orb may move. */
+  live?: boolean;
   selectedNode: string | null;
   onSelectNode: (node: string) => void;
   /** The pane has a fixed height (the split): fit to it as well as to the width. */
@@ -308,7 +312,7 @@ export function TraceGraph({
                   }}
                 >
                   <span aria-hidden="true" className={`absolute inset-y-0 left-0 w-[3px] ${STATE_BAR[g.state]}`} />
-                  {g.state === "running" ? <span aria-hidden="true" className="qc-pulse absolute top-2 right-2 size-1.5 rounded-full bg-running" /> : null}
+                  {g.state === "running" ? <StatusOrb tone="running" live={live} size={12} className="absolute top-1 right-1" /> : null}
                   <span className={`flex items-center gap-1.5 font-mono text-xs leading-4 font-medium whitespace-nowrap ${reached ? "text-ink" : "text-muted"}`}>{name}</span>
                   <span className="truncate text-xs leading-4 text-muted">{meta(name, g, active)}</span>
                 </button>

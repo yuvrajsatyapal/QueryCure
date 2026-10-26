@@ -60,10 +60,11 @@ export function kindIcon(s: Span): IconName {
   return EVENT_ICON[s.events[0]?.type ?? ""] ?? "circle";
 }
 
-export function SpanGlyph({ span }: { span: Span }) {
+/** `live`: the stream is confirmed live, so an open span is executing now and its orb may move. */
+export function SpanGlyph({ span, live = false }: { span: Span; live?: boolean }) {
   const tone = STATUS_TONE[span.status];
   // The status this glyph shows is also written out for screen readers (never color alone).
-  if (tone && tone !== "success" && tone !== "neutral") return <StatusIcon tone={tone} size={14} />;
+  if (tone && tone !== "success" && tone !== "neutral") return <StatusIcon tone={tone} live={live && span.status === "running"} size={14} />;
   return <Icon name={kindIcon(span)} size={14} className={span.kind === "event" ? "text-faint" : "text-muted"} />;
 }
 
@@ -250,7 +251,7 @@ export function TraceTree({
           Trace
         </h2>
         <span className={`flex items-center gap-1.5 text-xs ${live ? "text-running" : "text-muted"}`}>
-          <span aria-hidden="true" className={`size-1.5 rounded-full ${live ? "qc-pulse bg-running" : "bg-faint"}`} />
+          <span aria-hidden="true" className={`size-1.5 rounded-full ${live ? "bg-running" : "bg-faint"}`} />
           {streamWord}
         </span>
         <p className="font-mono text-xs text-muted tabular-nums">
@@ -412,7 +413,7 @@ export function TraceTree({
                       <span aria-hidden="true" className="size-5 shrink-0" />
                     )}
                     <span className="flex min-w-0 flex-1 items-center gap-2 py-1">
-                      {span.kind === "run" ? <Icon name="play" size={14} className="text-accent" /> : <SpanGlyph span={span} />}
+                      {span.kind === "run" ? <Icon name="play" size={14} className="text-accent" /> : <SpanGlyph span={span} live={live} />}
                       <span className={`min-w-0 truncate text-sm ${nameClass}`} title={name}>
                         {name}
                       </span>
@@ -441,7 +442,7 @@ export function TraceTree({
                       spanSegments(span, win, clock).map((g, i) => (
                         <span
                           key={i}
-                          className={`absolute ${SEGMENT_CLASS[g.kind]} ${g.clipStart ? "" : "rounded-l-[3px]"} ${g.clipEnd ? "" : "rounded-r-[3px]"}`}
+                          className={`absolute ${SEGMENT_CLASS[g.kind]} ${g.kind === "live" && live ? "qc-seg-moving" : ""} ${g.clipStart ? "" : "rounded-l-[3px]"} ${g.clipEnd ? "" : "rounded-r-[3px]"}`}
                           style={{ left: `${g.leftPct}%`, width: `${g.widthPct}%` }}
                         />
                       ))

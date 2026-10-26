@@ -45,7 +45,7 @@ The five meanings color may carry in the app chrome. Tints are the same token at
 
 | Meaning | Token | Light | Dark | Icon |
 |---|---|---|---|---|
-| Running | `--running` | `#1F5FBF` | `#6EA8FE` | spinning `loader` |
+| Running | `--running` | `#1F5FBF` | `#6EA8FE` | dotted orb (`StatusOrb`); still unless live, UI_UX §3.6b |
 | Completed | `--verified` | `#1E7240` | `#5BC584` | `check-circle` |
 | Failed | `--rejected` | `#B3261E` | `#F2837A` | `x-circle` |
 | Warning | `--inconclusive` | `#8F5300` | `#E0A84A` | `alert-triangle` |
@@ -110,7 +110,8 @@ Shared Tailwind utilities in `globals.css` (`@utility`): `qc-btn-primary`, `qc-b
 | **MeasurementWarnings** (UI Pass 4) | `--surface-2` panel; warnings in `--inconclusive` with `!`, notes in `--muted` with `·`; screen readers hear "Warning:" / "Note:". Only recorded facts; unrecorded host contention is stated as a note. |
 | **PlanNode** (React Flow) | Node type (mono), relation, est vs actual rows with error ratio badge (≥10× `--inconclusive`, ≥100× `--rejected`; "never executed" and "LIMIT above" are not flagged), self-time bar. Hottest node gets the accent border (only one); other nodes ≥ 20% self time get an `expensive` tag. |
 | **PlanExplorer** (UI Pass 4) | Toolbar (Tree/Graph segment, Expand all, Collapse all, Hottest node, Full width), a mono summary line (nodes, ANALYZE or estimates only, planning/execution time, expensive and misestimate counts), a "How nodes are flagged" disclosure stating the thresholds, then the tree-table or graph and node details. Tree-table columns: node, est/actual rows per loop, loops, estimate (ratio + direction + `significant`/`severe`/`small rows`/`LIMIT above` in words), est. cost (`startup..total`; a cumulative bar for plain EXPLAIN), time per loop, self time, buffers. Full width = modal dialog over the page (`bg-bg`, focus to Close, Esc returns focus); details sit beside the tree from `xl`. |
-| **StatusPill** | Tinted pill: status icon + word, tone from the run-status table. Used in page headers and the approval card. |
+| **StatusOrb** | The one status indicator allowed to move (UI_UX §3.6b). Dotted disc in `--running` (`qc-orb`, dot grid a quarter of the orb's size); other tones a solid dot at 4/7 of the box. Moves (`qc-orb-live`, 2.4 s drift) only with `live` + tone `running` + size ≥ 12 px; still by default, still under reduced motion. `data-motion="live"\|"still"`. |
+| **StatusPill** | Tinted pill: status icon + word, tone from the run-status table. Running is the orb; still unless the caller passes `live`. `RunStatusPill` is always still. Used in page headers and the approval card. |
 | **Trace** (LangSmith-style split) | Left: span tree built client-side from run events (`lib/events/trace.ts`), a WAI-ARIA `tree` with roving focus (↑/↓, →/←, Home/End; selection follows focus). The first row is the run. Each row: chevron (pointer only), glyph (status or kind), mono name, evidence count, latency waterfall, duration. Right: run results tabs when the run row is selected, otherwise **StepDetails** with Input · Output · Metadata · Evidence, where data the browser does not have (prompts, redacted tool arguments, raw model output) is stated in a dashed "unavailable" row, never filled in. |
 | **RunSelector** | Header dropdown wrapping the run list; trigger text is the run meta (`run 2 · Experiment replay of run #1`); a single run is a plain label. Closes on select, Escape (focus returns), outside click. |
 | **Usage meters** | Three compact meters (LLM calls, tokens, tool calls) against the run budget from `GET /runs/{id}`; bar turns `--inconclusive` at 80%. |
@@ -156,5 +157,6 @@ Touch targets ≥ 44×44 on mobile. Horizontal scroll only inside tables/plan ca
 - Plan graph has an equivalent **tree-table** (keyboard navigable, `role="treegrid"`), because canvas graphs aren't accessible.
 - Charts have a data-table toggle and `aria-describedby` summaries ("Candidate A median 3.1 ms vs baseline 41 ms, CI 11.2–14.0×").
 - SSE timeline is an `aria-live="polite"` region, throttled to one announcement per 5 s.
-- Respect `prefers-reduced-motion`: disable graph auto-fit animation and progress shimmer.
+- Respect `prefers-reduced-motion`: disable graph auto-fit animation and progress shimmer. Live status motion (`qc-orb-live`, `qc-seg-moving`, `qc-pulse`) is set to `animation: none`, not shortened, because a 0.01 ms infinite loop jumps frames on every paint.
+- Motion never stands for a status by itself: an indicator moves only for confirmed live activity (UI_UX §3.6b) and always sits beside words.
 - Status never conveyed by color alone (icon + text).

@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { cleanup, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { moving } from "@/test/motion";
 import { renderWithQuery } from "@/test/render";
 
 vi.mock("@/lib/api/investigations", () => ({
@@ -120,4 +121,13 @@ test("rows are grouped under a heading for their creation month, with the order 
   const group = await screen.findByRole("region", { name: "October 2026" });
   expect(group.querySelectorAll("li")).toHaveLength(2);
   expect(screen.getByText(/2 shown · more available · newest first/)).toBeDefined();
+});
+
+test("a row whose last snapshot says running reads Running and stays still", async () => {
+  const running = { ...item(7), latestRun: { ...item(7).latestRun, status: "running", outcome: null } };
+  vi.mocked(listInvestigations).mockResolvedValue({ items: [running], nextCursor: null });
+  const { container } = renderWithQuery(<HistoryView />);
+  const row = (await screen.findByText("Investigation 7")).closest("li")!;
+  expect(within(row).getByText("Running", { selector: ".sr-only" })).toBeDefined();
+  expect(moving(container)).toEqual([]);
 });

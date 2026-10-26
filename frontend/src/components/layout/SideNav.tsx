@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 import { useCommands } from "@/components/command/CommandProvider";
 import { KeyHint } from "@/components/command/KeyHint";
 import { Icon, type IconName } from "@/components/ui/Icon";
-import { StatusIcon, TONE_TEXT, runStatusMeta } from "@/components/ui/StatusPill";
+import { StatusIcon, StatusOrb, TONE_TEXT, runStatusMeta } from "@/components/ui/StatusPill";
 import { investigationKeys, listInvestigations } from "@/lib/api/investigations";
 import type { InvestigationPage } from "@/lib/api/types";
 import { activeFirst } from "@/lib/investigations/dashboard";
@@ -92,11 +92,8 @@ function ActiveRuns({ collapsed, onNavigate }: { collapsed: boolean; onNavigate?
                 aria-label={collapsed ? `${item.title}, ${meta.label}` : undefined}
                 className={`flex min-h-[30px] items-center gap-2.5 rounded-md text-[13px] text-ink hover:bg-hover ${collapsed ? "w-9 justify-center" : "px-2 pointer-coarse:py-1.5"}`}
               >
-                {collapsed ? (
-                  <StatusIcon tone={meta.tone} size={15} />
-                ) : (
-                  <span aria-hidden="true" className={`size-2 shrink-0 rounded-full bg-current ${TONE_TEXT[meta.tone]} ${meta.tone === "running" ? "qc-pulse" : ""}`} />
-                )}
+                {/* A polled snapshot, never confirmed activity: always still (UI_UX §3.6b). */}
+                {collapsed ? <StatusIcon tone={meta.tone} size={15} /> : <StatusOrb tone={meta.tone} size={8} />}
                 {collapsed ? null : (
                   <>
                     <span className="min-w-0 flex-1 truncate pointer-coarse:line-clamp-2 pointer-coarse:whitespace-normal pointer-coarse:break-words">{item.title}</span>

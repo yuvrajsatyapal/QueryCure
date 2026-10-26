@@ -49,7 +49,7 @@ import { BottomSheet } from "@/components/ui/BottomSheet";
 import { ContextMenu, type MenuItem } from "@/components/ui/ContextMenu";
 import { Icon } from "@/components/ui/Icon";
 import { Skeleton } from "@/components/ui/Skeleton";
-import { RunStatusPill, TONE_TEXT } from "@/components/ui/StatusPill";
+import { RunStatusPill, StatusOrb } from "@/components/ui/StatusPill";
 import { activityOf } from "@/lib/trace/activity";
 import { graphRun } from "@/lib/trace/graph";
 import type { Span } from "@/lib/events/trace";
@@ -649,6 +649,7 @@ export function InvestigationView({ id, requestedRunId }: { id: string; requeste
       <TraceGraph
         trace={trace}
         active={active}
+        live={live}
         selectedNode={graphPick ?? nodeOf(trace, selectedSpan)}
         onSelectNode={selectNode}
         fillHeight={wide}
@@ -773,9 +774,7 @@ export function InvestigationView({ id, requestedRunId }: { id: string; requeste
             </div>
             {r ? (
               <p className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 text-[13px]">
-                <span aria-hidden="true" className={`flex size-3.5 shrink-0 items-center justify-center ${TONE_TEXT[activity.tone]}`}>
-                  {activity.animate ? <span className="qc-orb qc-orb-live size-3.5" /> : <span className="size-2 rounded-full bg-current" />}
-                </span>
+                <StatusOrb tone={activity.tone} live={activity.animate} size={14} />
                 <span className="font-medium text-ink">{activity.label}</span>
                 <span className="text-muted">{activity.detail}</span>
               </p>

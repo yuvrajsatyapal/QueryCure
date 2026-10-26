@@ -1,6 +1,7 @@
 import { afterEach, expect, test, vi } from "vitest";
 import { cleanup, screen, within } from "@testing-library/react";
 import { CommandProvider } from "@/components/command/CommandProvider";
+import { moving } from "@/test/motion";
 import { renderWithQuery } from "@/test/render";
 import { SideNav } from "../SideNav";
 
@@ -51,6 +52,18 @@ test("active runs list only in-flight investigations, approvals first, with the 
   expect(links.map((l) => l.getAttribute("href"))).toEqual(["/app/investigations/a", "/app/investigations/r"]);
   expect(within(links[0]!).getByText("approval")).toBeDefined();
   expect(within(links[1]!).getByText("running")).toBeDefined();
+});
+
+test("a polled running entry is shown as running but never animates, expanded or collapsed", async () => {
+  items.push(inv("r", "running"), inv("q", "queued"));
+  const { container, unmount } = renderNav();
+  const list = await screen.findByRole("list", { name: "Active runs" });
+  expect(within(list).getByText("running")).toBeDefined();
+  expect(moving(container)).toEqual([]);
+  unmount();
+  const rail = renderNav(true);
+  expect(await screen.findByRole("link", { name: "Investigation r, Running" })).toBeDefined();
+  expect(moving(rail.container)).toEqual([]);
 });
 
 test("the collapsed rail keeps every destination reachable by name", async () => {

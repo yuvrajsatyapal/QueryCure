@@ -1,6 +1,7 @@
 import { afterEach, beforeAll, expect, test, vi } from "vitest";
-import { cleanup, screen, within } from "@testing-library/react";
+import { cleanup, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { moving } from "@/test/motion";
 import { renderWithQuery } from "@/test/render";
 import { metrics, plan } from "@/components/plan/__tests__/fixture";
 import type { RunEvent } from "@/lib/api/types";
@@ -19,7 +20,9 @@ const events: RunEvent[] = [
 ] as RunEvent[];
 
 vi.mock("next/navigation", () => ({ useRouter: () => ({ replace: vi.fn(), push: vi.fn() }) }));
-vi.mock("@/lib/events/useRunEvents", () => ({ useRunEvents: () => ({ events, live: true }) }));
+// Tests may override the stream; by default it is live with the events above.
+const runEvents = vi.hoisted(() => ({ override: null as null | { events: unknown[]; live: boolean; stream: string } }));
+vi.mock("@/lib/events/useRunEvents", () => ({ useRunEvents: () => runEvents.override ?? { events, live: true } }));
 vi.mock("@/lib/api/investigations", () => ({
   investigationKeys: {
     detail: (id: string) => ["investigations", id],
@@ -88,7 +91,10 @@ beforeAll(() => {
     disconnect() {}
   } as unknown as typeof ResizeObserver;
 });
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  runEvents.override = null;
+});
 
 test("hypotheses are shown as unverified claims with their evidence", async () => {
   renderWithQuery(<InvestigationView id="inv-1" />);
@@ -198,4 +204,43 @@ test("evidence that fails to load is reported with its ID", async () => {
   vi.mocked(getEvidence).mockRejectedValueOnce(new Error("network down"));
   await user.click(chip!);
   expect(await screen.findByText(/Evidence ev_aaaaaaaaaaaa could not be loaded/)).toBeDefined();
+});
+
+const openStep: RunEvent[] = [
+  ...events,
+  { runId: "run-1", seq: 5, ts: "2026-10-12T10:00:04.000Z", type: "node.started", payload: { node: "collect_context", agent: null, attempt: 1 } },
+] as RunEvent[];
+// The trace toolbar can show the same words; the activity line is the one in the page header.
+const headerLine = (label: string) =>
+  waitFor(() => {
+    const line = screen.getAllByText(label).map((el) => el.closest("header p")).find(Boolean);
+    expect(line).toBeTruthy();
+    return line as HTMLElement;
+  });
+
+test("the header's activity orb moves only while the stream is live and a step is executing", async () => {
+  runEvents.override = { events: openStep, live: true, stream: "live" };
+  renderWithQuery(<InvestigationView id="inv-1" />);
+  const line = await headerLine("Collecting plan and schema context");
+  expect(moving(line)).toHaveLength(1);
+  // The status pill beside the title is the recorded status, still.
+  expect(moving(line.closest("header")!.querySelector("h1")!.parentElement!)).toEqual([]);
+});
+
+test("a running run whose stream is reconnecting keeps its status and stops moving", async () => {
+  runEvents.override = { events: openStep, live: false, stream: "reconnecting" };
+  renderWithQuery(<InvestigationView id="inv-1" />);
+  const line = await headerLine("Reconnecting…");
+  expect(within(line.closest("header")!).getByText("Running")).toBeDefined();
+  expect(moving(line.closest("header")!)).toEqual([]);
+});
+
+test("a running run whose stream went offline does not read as completed and does not move", async () => {
+  runEvents.override = { events: openStep, live: false, stream: "offline" };
+  renderWithQuery(<InvestigationView id="inv-1" />);
+  const line = await headerLine("Live updates stopped");
+  const header = line.closest("header")!;
+  expect(within(header).getByText("Running")).toBeDefined();
+  expect(within(header).queryByText("Completed")).toBeNull();
+  expect(moving(header)).toEqual([]);
 });

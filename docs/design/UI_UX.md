@@ -108,7 +108,7 @@ Implemented as a LangSmith-style **split trace** ([ADR-0030](../engineering/adr/
 
 Supersedes the layout above where they differ; evidence navigation and the results tabs are unchanged.
 
-- **Header:** breadcrumb, title, run status, and an **activity line** in words (`lib/trace/activity.ts`) taken only from the run status and recorded events (open node, latest `benchmark.progress`, pending approval). The orb moves only while the run is running, the stream is live and a step is open; reconnecting and a dropped stream are said in words. Below it a figures strip: duration from the run's own timestamps, LLM calls / tokens / tool calls against budget, evidence and error counts from events.
+- **Header:** breadcrumb, title, run status, and an **activity line** in words (`lib/trace/activity.ts`) taken only from the run status and recorded events (open node, latest `benchmark.progress`, pending approval). The orb moves only while the run is running, the stream is live and a step is open; reconnecting and a dropped stream are said in words (rules in §3.6b). Below it a figures strip: duration from the run's own timestamps, LLM calls / tokens / tool calls against budget, evidence and error counts from events.
 - **View switch:** Waterfall · Graph · Results. Results shows the results tabs full width.
 - **Result summary** (`ResultSummary`): outcome, headline, verdict, candidate and primary interval, and every provenance note (sandbox only, prerecorded, stub model, partial), always shown and compact; the limitations and the verdict explanation sit behind a labelled disclosure ("Limitations (n)"), remembered per browser. The full text stays in the Report tab.
 - **Waterfall** (`TraceTree`, `lib/trace/waterfall.ts`): the WAI-ARIA tree with a shared time axis, round-step ticks and zoom (1–16×, centred on the selection). Axis labels are laid out by their width and never overlap.
@@ -117,6 +117,25 @@ Supersedes the layout above where they differ; evidence navigation and the resul
 - **Inspector:** the selected step's Input · Output · Metadata · Evidence (unchanged rules: prompts, tool arguments and raw output are named as unavailable), with an execution switcher for nodes that ran more than once and the recorded approval wait. The run row shows the results tabs. A separator between trace and inspector resizes it (pointer or arrow keys); its default is 38% of the workspace (340–640 px).
 - **Context menu:** right-click, Shift+F10, the context-menu key or the inspector's Actions button: Inspect, Show in graph / waterfall, copy step name or event seqs, back to the run. "Show in graph" / "Show in waterfall" move focus to the node or row in the other view.
 - **Width:** the split needs 900px of the workspace's own width (so it follows the collapsed or expanded sidebar). Narrower, the trace stacks above the results and a row's details open in a modal **bottom sheet** on click/Enter (arrow keys only move the selection). The sheet has one header row: step name, Actions, and a single Close (focused on open; Esc closes and focus returns to the row).
+
+#### 3.6b Status orb and activity indicators (UI rebuild Phase 4, Workstream 4 Stage 1, 2026-10-26)
+
+One rule for every status indicator: **motion means confirmed live activity, nothing else.** A status that is merely *running* in some record is drawn still.
+
+| What the page knows | Example | Indicator |
+|---|---|---|
+| **Recorded status** — stored on a finished or historical run | History rows, completed run header, demo gallery | Still, always |
+| **Polled status** — a snapshot refreshed on an interval | Sidebar *Active runs*, dashboard count tiles and in-flight rows, History list | Still, always, including `running`. Polling proves the status was true at the last poll, not that work is happening now |
+| **Confirmed live stream** — the run's SSE stream is open (`StreamState` `live`) | Investigation page while connected | Necessary but not enough: a live stream with no open step (between steps, waiting on approval) stays still |
+| **Actively executing operation** — live stream **and** an open span (`node.started` / `tool.started` with no end) on a `running` run | The header activity orb; each open trace row (glyph, waterfall stripe); the graph's running node | The only state that moves |
+| **Reduced motion** (`prefers-reduced-motion: reduce`) | Any of the above | Still. The words (*Measuring · block 3 of 12*, *Live*, *running*) carry the state |
+
+- **`StatusOrb`** (`components/ui/StatusPill.tsx`): `tone`, `live`, `size`, `label`. Still by default; it moves only with `live` **and** tone `running` **and** a size of at least 12 px (below that the dot texture has too little ink, so a small orb is a plain dot). Terminal, approval, warning and neutral tones never move whatever `live` says. A `label` makes it `role="img"` with that name; otherwise it is decorative and the visible word names the state. The DOM says `data-motion="live"` or `"still"`.
+- **`StatusIcon` / `StatusPill` / `RunStatusPill`**: `running` is drawn as the orb (no spinner anywhere); every other tone keeps its own icon shape, so color is never the only signal. Both take `live` (default `false`); `RunStatusPill` is always still — it names the recorded status beside the activity line, which is the header's one live indicator.
+- **Investigation header:** the activity orb follows `activityOf().animate` (running status, `live` stream, an open step). Reconnecting shows a still neutral dot and *Reconnecting…*; a dropped stream shows *Live updates stopped* (warning). The status pill keeps the backend's status (*Running*), so a disconnected run never reads as completed.
+- **Trace:** open spans move only while the stream is live; closed spans, recorded traces (open spans become *did not finish*) and the legend swatch are still. The toolbar's *Live* dot is still: it states the connection, not activity.
+- **Sidebar, History, Dashboard:** still in every state.
+- **Busy buttons** (e.g. the approval drawer's submit spinner) are request feedback for the user's own click, not run status; they keep `motion-reduce:animate-none`.
 
 ### 3.7 Optimization tournament (tab)
 Charts, verdict classes, warnings and replicate selection: §3.17.

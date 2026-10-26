@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { cleanup, screen, within } from "@testing-library/react";
+import { moving } from "@/test/motion";
 import { renderWithQuery } from "@/test/render";
 import { DashboardView } from "../DashboardView";
 
@@ -123,6 +124,16 @@ test("run outcomes count only concluded runs, in words with an icon", async () =
   expect(within(panel).getByText("Sample · 25 most recent")).toBeDefined();
   expect(within(panel).queryByText(/24 h/)).toBeNull();
   expect(within(panel).getByRole("img", { name: "1 Verified recommendation, 1 Inconclusive, 1 Failed" })).toBeDefined();
+});
+
+test("running counts and in-flight rows are polled snapshots, so nothing animates", async () => {
+  recent.items = [run("r", "running", { startedAt: "2026-10-19T10:00:00Z" }), run("q", "queued")];
+  const { container } = renderWithQuery(<DashboardView />);
+  const tiles = await screen.findByRole("region", { name: "Investigations by status" });
+  expect(within(tiles).getByText("Running")).toBeDefined();
+  const panel = await screen.findByRole("region", { name: "Active investigations" });
+  expect(await within(panel).findAllByText("Running")).not.toHaveLength(0);
+  expect(moving(container)).toEqual([]);
 });
 
 test("when the list can't load, panels say so instead of showing empty states", async () => {

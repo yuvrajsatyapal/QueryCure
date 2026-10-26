@@ -96,8 +96,8 @@ body {
   animation: qc-pulse 1.6s ease-in-out infinite;
 }
 
-/* Waterfall trace segments (UI_UX §3.6). The live stripe moves only while a step is open; with
- * reduced motion it is a still stripe. */
+/* Waterfall trace segments (UI_UX §3.6). An open step is a still stripe; it moves (`qc-seg-moving`)
+ * only while the stream is confirmed live (UI_UX §3.6b), and never with reduced motion. */
 @keyframes qc-stripe {
   from { background-position: 0 0; }
   to { background-position: 24px 0; }
@@ -106,6 +106,8 @@ body {
   background-color: var(--running);
   background-image: repeating-linear-gradient(135deg, rgb(0 0 0 / 0.28) 0 6px, transparent 6px 12px);
   background-size: 24px 100%;
+}
+.qc-seg-moving {
   animation: qc-stripe 1s linear infinite;
 }
 .qc-seg-wait {
@@ -123,15 +125,18 @@ body {
   border-inline: 1px dashed color-mix(in srgb, var(--approval) 55%, transparent);
   background: color-mix(in srgb, var(--approval) 6%, transparent);
 }
-/* The live orb (prototype "activity states"): dots drift only while the backend reports a step running. */
+/* The status orb (StatusOrb, UI_UX §3.6b): a dotted disc that means "running". It is still unless
+ * the caller confirms a live stream and an executing step; then the dots drift. The dot grid scales
+ * with the orb (`--qc-orb-step`, a quarter of its size) so small and large orbs read the same. */
 @keyframes qc-orb {
-  to { background-position: 7px 3.5px; }
+  to { background-position: calc(var(--qc-orb-step) * 2) var(--qc-orb-step); }
 }
 .qc-orb {
+  --qc-orb-step: 3.5px;
   display: inline-block;
   border-radius: 9999px;
-  background-image: radial-gradient(currentColor 0.9px, transparent 1.3px);
-  background-size: 3.5px 3.5px;
+  background-image: radial-gradient(currentColor 36%, transparent 53%);
+  background-size: var(--qc-orb-step) var(--qc-orb-step);
   mask: radial-gradient(circle, #000 58%, transparent 72%);
 }
 .qc-orb-live {
@@ -170,6 +175,13 @@ li p a {
   *::after {
     animation-duration: 0.01ms !important;
     transition-duration: 0.01ms !important;
+  }
+  /* A 0.01 ms infinite loop would jump to a random frame every paint; status motion stops outright.
+   * The words beside each indicator still say what is live. */
+  .qc-orb-live,
+  .qc-seg-moving,
+  .qc-pulse {
+    animation: none !important;
   }
 }
 
