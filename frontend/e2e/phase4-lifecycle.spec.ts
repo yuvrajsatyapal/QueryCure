@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { waitForShortcuts } from "./shortcuts";
 import { advanceTo } from "./wizard";
 
 /** Phase 4 lifecycle through the real stack (API, worker, metadata DB, sandbox PostgreSQL) with
@@ -70,18 +71,31 @@ test("lifecycle - approve, audit, report, verify, replay the experiment", async 
 
   // Run history (Phase 5): the investigation lists both runs; the replay links to its source.
   await page.goto(investigationUrl);
-  // The run list lives in the header's run selector (UI_UX §3.6): open it first.
-  const picker = page.getByRole("navigation", { name: "Runs of this investigation" });
+  // The run list is the header's run selector menu (UI_UX §3.6c): investigation runs and
+  // experiment replays in labelled groups.
+  const picker = page.getByRole("menu", { name: "Runs of this investigation" });
   const runSelector = (name: RegExp) => page.getByRole("button", { name });
   // Without ?run= the page shows the investigation's latest run, the original.
   await runSelector(/^run 1 · Original run/).click({ timeout: 15_000 });
-  await expect(picker.getByText("Runs (2)")).toBeVisible();
-  await picker.getByRole("button", { name: /^#2 Experiment replay of run #1/ }).click();
+  await expect(picker.getByRole("group", { name: "Investigation runs" }).getByRole("menuitemradio", { name: /^#1 Original run/ })).toHaveAttribute("aria-checked", "true");
+  await expect(picker.getByRole("menuitemradio", { name: /^#1 Original run/ })).toBeFocused();
+  await page.keyboard.press("ArrowDown");
+  const replayItem = picker.getByRole("group", { name: "Experiment replays" }).getByRole("menuitemradio", { name: /^#2 Experiment replay of run #1/ });
+  await expect(replayItem).toBeFocused();
+  await page.keyboard.press("Enter");
+  await expect(picker).toBeHidden();
   await expect(page).toHaveURL(/\?run=[0-9a-f-]{36}$/);
   await expect(page.getByText(/run 2 · Experiment replay of run #1/)).toBeVisible();
-  await runSelector(/^run 2 · Experiment replay of run #1/).click();
-  await expect(picker.getByRole("link", { name: "Open this run's report" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Open this run's report" })).toBeVisible();
+  // The palette follows the newly selected run (Workstream 3 scope).
+  await waitForShortcuts(page);
+  await page.keyboard.press("ControlOrMeta+k");
+  await expect(page.getByRole("dialog", { name: "Command palette" }).getByRole("combobox", { name: "Search Run #2 and commands" })).toBeVisible();
   await page.keyboard.press("Escape");
+  await runSelector(/^run 2 · Experiment replay of run #1/).click();
+  await expect(replayItem).toHaveAttribute("aria-checked", "true");
+  await page.keyboard.press("Escape");
+  await expect(runSelector(/^run 2 · Experiment replay of run #1/)).toBeFocused();
   await page.getByRole("button", { name: "Go to run #1 (original run)" }).click();
   await expect(page.getByText(/run 1 · Original run/)).toBeVisible({ timeout: 15_000 });
 
@@ -89,6 +103,12 @@ test("lifecycle - approve, audit, report, verify, replay the experiment", async 
   await page.setViewportSize({ width: 375, height: 812 });
   await runSelector(/^run 1 · Original run/).click();
   await expect(picker).toBeVisible();
+  // Below 480px the menu is a sheet at the bottom of the screen, inside the viewport.
+  // (Polled: the sheet slides in for 200 ms.)
+  await expect.poll(async () => {
+    const sheet = await picker.boundingBox();
+    return sheet ? Math.round(sheet.y + sheet.height) : null;
+  }).toBe(812 - 8);
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   expect(overflow).toBeLessThanOrEqual(0);
 });

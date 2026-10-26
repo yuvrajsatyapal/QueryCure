@@ -84,7 +84,7 @@ Implemented embedded (Plan tab, New investigation preview); controls, flags and 
 
 Implemented as a LangSmith-style **split trace** ([ADR-0030](../engineering/adr/ADR-0030-linear-langsmith-ui-direction.md); DESIGN_SYSTEM §5 "Trace"). Frontend only: everything shown comes from run events and existing endpoints; nothing is inferred or filled in.
 
-**Header (sticky).** Breadcrumb, title, run status pill, run selector dropdown (all runs of the investigation, newest first, kind, relation, status, report link), compact usage meters (LLM calls, tokens, tool calls against the run budget, from `GET /runs/{id}`), model, Replay / Cancel. Sticks to the top of the viewport with an opaque background and a bottom hairline; content scrolls beneath it and never under it (the trace column offsets by the header height). The objective and notices sit below the sticky part.
+**Header (sticky).** Breadcrumb, title, run status pill, run selector menu (§3.6c) with the selected sealed run's report link beside it, compact usage meters (LLM calls, tokens, tool calls against the run budget, from `GET /runs/{id}`), model, Replay / Cancel. Sticks to the top of the viewport with an opaque background and a bottom hairline; content scrolls beneath it and never under it (the trace column offsets by the header height). The objective and notices sit below the sticky part.
 
 **Split layout.** Left: the step tree (region "Agent timeline"). Right: details of the selection (region "Selection details").
 - The tree's first row is the **run**. Selecting it (the default) shows the run results tabs: Findings · Plan · Tournament · Report.
@@ -136,6 +136,22 @@ One rule for every status indicator: **motion means confirmed live activity, not
 - **Trace:** open spans move only while the stream is live; closed spans, recorded traces (open spans become *did not finish*) and the legend swatch are still. The toolbar's *Live* dot is still: it states the connection, not activity.
 - **Sidebar, History, Dashboard:** still in every state.
 - **Busy buttons** (e.g. the approval drawer's submit spinner) are request feedback for the user's own click, not run status; they keep `motion-reduce:animate-none`.
+
+#### 3.6c Run selector (UI rebuild Phase 4, Workstream 4 Stage 2, 2026-10-27; implemented, visually approved)
+
+The header's run switcher (`components/investigation/RunSelector.tsx`, menu content and run helpers in `RunPicker.tsx`). Reference: Component Kit artboard *Run selector menu* (its *This investigation / Replays* tabs replaced by labelled groups, owner decision).
+
+- **Trigger:** a menu button (`aria-haspopup="menu"`, `aria-expanded`) reading `run 2 · Experiment replay of run #1 of 3`. A single run is a plain label; no runs, nothing.
+- **Groups**, both visible together, each newest first, a group shown only when it has runs:
+  - **Investigation runs** — the original run and AI re-investigations (and any kind that is not an experiment replay);
+  - **Experiment replays** — runs of kind `experiment_replay`.
+  Report replays are not runs and never appear. Grouping reads only the run's `kind`.
+- **Row:** a still `StatusOrb` in the recorded status's tone; `#N`, kind and relation (`runRelation`: *of run #1*, or *of a run that is no longer available* when the parent is not listed); the status word (`runStatusMeta`), outcome and replay result in words; *followed by #2 (experiment replay), …* for runs with children; the age from `created_at` (`timeAgo`, full date in the `title`). Nothing is inferred: no parent, replay status or timestamp is invented.
+- **Selected run:** `aria-checked="true"`, the accent tint and a check icon, so it never rests on color alone.
+- **Motion:** the menu fades and lifts 4 px over 160 ms on open (the sheet rises 12 px over 200 ms), once, no overshoot; nothing under reduced motion. The orbs never move: the selector has only recorded statuses (§3.6b).
+- **Layout:** fixed-position popover, portaled to `body` so the sticky header's backdrop filter cannot clip or re-anchor it; up to 416 px wide, clamped 8 px inside the viewport; opens below the trigger, or above when the space below is under 240 px and the space above is larger; the height is capped by the space available and the list scrolls inside (`overscroll-contain`). It follows the trigger on scroll and resize. Below 480 px it is a sheet pinned 8 px from the bottom and sides (up to 70 dvh) over a scrim, and the page behind does not scroll. Rows are compact on desktop and at least 44 px on coarse pointers; long relations wrap, and so does a long trigger label (the trigger overrides the button's `nowrap`).
+- **Keyboard (WAI-ARIA menu button with `menuitemradio` rows in labelled `group`s):** Enter, Space or ArrowDown/ArrowUp on the trigger open the menu and focus the selected run (or the first); ArrowUp/ArrowDown move with wrapping across both groups; Home/End go to the first/last run; Enter or Space choose the focused run; Escape closes and returns focus to the trigger; Tab closes, returns focus to the trigger and lets the browser move on (no focus trap). A click or tap outside closes. Only the selected row is a tab stop (roving tabindex, which also keeps a scrolling list keyboard-reachable); the focus ring is drawn inside the row so the scroll box cannot clip it. Choosing a run calls the investigation page's existing `selectRun` (URL `?run=`), so the command palette's run scope follows it.
+- **Report link:** *This run's report* (accessible name *Open this run's report*) sits beside the trigger, outside the menu, under the same rule as before: the selected run is sealed (`finalized`) and the investigation has more than one run.
 
 ### 3.7 Optimization tournament (tab)
 Charts, verdict classes, warnings and replicate selection: §3.17.
