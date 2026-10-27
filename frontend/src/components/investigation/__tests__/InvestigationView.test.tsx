@@ -137,6 +137,25 @@ test("budget and model are shown, and a running run can be cancelled", async () 
   expect(screen.getByText(/nemotron-3-super-120b-a12b:free via openrouter/)).toBeDefined();
 });
 
+test.each([
+  { name: "an experiment replay says it made no model calls", run: { kind: "experiment_replay", status: "completed" }, label: "No model calls · Sandbox replay" },
+  { name: "a running experiment replay says it makes no model calls", run: { kind: "experiment_replay", status: "running" }, label: "No model calls · Sandbox replay" },
+  { name: "a completed run without a model used none", run: { kind: "initial", status: "completed" }, label: "No model used" },
+  { name: "a failed run without a model used none", run: { kind: "reinvestigation", status: "failed" }, label: "No model used" },
+  { name: "a queued run has no model yet", run: { kind: "initial", status: "queued" }, label: "Model not assigned yet" },
+])("header model label: $name", async ({ run, label }) => {
+  const { getRun } = await import("@/lib/api/investigations");
+  const real = await vi.mocked(getRun)("run-1");
+  vi.mocked(getRun).mockResolvedValue({ ...real, ...run, llmModel: null, llmProvider: null });
+  try {
+    renderWithQuery(<InvestigationView id="inv-1" />);
+    expect(await screen.findByText(label)).toBeDefined();
+    expect(screen.queryByText(/not assigned yet/i) === null).toBe(label !== "Model not assigned yet");
+  } finally {
+    vi.mocked(getRun).mockResolvedValue(real);
+  }
+});
+
 test("a run-level model failure states its reason, not only a code", async () => {
   const { getRun } = await import("@/lib/api/investigations");
   vi.mocked(getRun).mockResolvedValueOnce({

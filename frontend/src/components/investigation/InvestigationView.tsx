@@ -31,6 +31,7 @@ import { ApprovalReview } from "@/components/tournament/ApprovalReview";
 import { armsWithPlans } from "@/components/tournament/PlanCompare";
 import { TournamentPanel, type SectionFocus } from "@/components/tournament/TournamentPanel";
 import { buildRunScopeItems, type RunScopeTarget } from "@/lib/command/runScope";
+import { runModelLabel } from "@/lib/investigation/model";
 import { buildTrace } from "@/lib/events/trace";
 import { runRefetchInterval } from "@/lib/events/runEvents";
 import { useRunEvents } from "@/lib/events/useRunEvents";
@@ -783,7 +784,7 @@ export function InvestigationView({ id, requestedRunId }: { id: string; requeste
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
             <RunSelector runs={runs} selectedId={runId} onSelect={selectRun} />
             {!summary && r ? <span className="font-mono text-xs text-muted">run {r.runNumber}</span> : null}
-            <span className="font-mono text-xs text-muted">{r ? (r.llmModel ? `${r.llmModel} via ${r.llmProvider}` : "model not assigned yet") : ""}</span>
+            <span className="font-mono text-xs text-muted">{r ? runModelLabel(r) : ""}</span>
           </div>
         </div>
       </header>
