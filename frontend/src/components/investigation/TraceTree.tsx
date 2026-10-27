@@ -349,7 +349,9 @@ export function TraceTree({
             </div>
             <span className="qc-eyebrow text-right">Time</span>
           </div>
-          <ol ref={list} role="tree" aria-label="Run steps" onKeyDown={onKeyDown} className="min-h-0 flex-1 overflow-y-auto py-1">
+          {/* `relative`: the rows' sr-only status words are absolutely positioned; without a positioned
+              list they escape its scroll clip and stretch the page (UI_UX §3.6, sidebar fix). */}
+          <ol ref={list} role="tree" aria-label="Run steps" onKeyDown={onKeyDown} className="relative min-h-0 flex-1 overflow-y-auto py-1">
             {rows.map(({ span, depth }) => {
               const selected = span.id === selectedId;
               const expandable = depth > 0 && span.children.length > 0;
