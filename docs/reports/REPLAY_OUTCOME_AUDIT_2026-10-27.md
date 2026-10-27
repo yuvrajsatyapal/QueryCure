@@ -1,0 +1,263 @@
+# Experiment replay outcome audit and correction proposal (2026-10-27)
+
+Read-only audit at `dd63b24` (`main`, local). It traces how an experiment replay run gets its sealed outcome and recommendation, checks the reported inconsistency against the code and the local Docker metadata DB, and proposes a versioned correction. **Status: proposal, awaiting owner approval. Nothing in the backend, API, schema, report builders, renderers, replay engine or any sealed artifact was changed.** The local DB was queried only inside `BEGIN READ ONLY … ROLLBACK`. No production or Neon access.
+
+## 1. Executive summary
+
+A sealed experiment replay report can say *Verified recommendation* in its headline, *No change is recommended* under Recommendation, and *inconclusive* under Experiment replay, all at once. The cause is that three different questions are answered from three unrelated sources, and none of them is the one the replay is about:
+
+| Report field | Answers | Source today |
+|---|---|---|
+| `outcome` / `headline` | "Did this replay verify a recommendation?" | `execute_experiment_replay` → `_close(outcome=VERIFIED_RECOMMENDATION if result.winner else INCONCLUSIVE)`: the replay's **own single engine run** has any `verified` arm |
+| `recommendation` | "Which candidate is recommended?" | `report-builder@1` `_winner()` over the **replay run's own** `optimization_candidates`, which never exist for a replay → always `status: "none"` |
+| `replay.comparison.status` | "Did the replay reproduce the original?" | `compare_experiments` (REPLAY_ENGINE §9) — the only replay-specific answer, but it decides nothing else |
+
+Neither the source run's sealed outcome nor the comparison status feeds the replay's outcome. So a replay can **upgrade** an inconclusive investigation to `verified_recommendation` on the strength of one sandbox experiment that skipped replication (ADR-0019), the Benchmark Auditor (ADR-0009) and the materiality gate (ADR-0017). Locally this happened 28 times.
+
+Recommended correction (smallest complete one): **(a)** classify a new replay run's outcome from the source run's sealed outcome and the comparison status, so a replay can confirm or fail to confirm the original but never upgrade it; **(b)** snapshot the source run's verified outcome and recommendation into the replay run's own records at start; **(c)** release `report-builder@2` + `report-md@2` (report schema 2, additive) that build replay reports from (a) and (b) and reference the original candidate with its provenance; **(d)** let the frontend render schema 2 and annotate, without changing, sealed `report-builder@1` replay reports. No migration, no API change, no new dependency, no rewrite of any sealed report.
+
+## 2. Verified findings
+
+### 2.1 Local data (metadata DB, read only, 2026-10-27)
+
+The earlier count of 91 is now **94** replay runs (3 were added by this session's screenshot harness, all sealed `inconclusive`). The ratios hold:
+
+| Check | Result |
+|---|---|
+| Replay runs / sealed | 94 / 94, all `report-builder@1`, none deleted |
+| `optimization_candidates` / `verification_results` rows owned by replay runs | **0 / 0** |
+| Sealed `verified_recommendation` | **56** (47 comparison `inconclusive` + 9 `reproduced`) |
+| Sealed `inconclusive` | 38 (all comparison `inconclusive`) |
+| Sealed JSON `recommendation.status` / `candidate_key` | **`none` / null on all 94**, whatever the outcome |
+| Comparison statuses seen | only `reproduced` (9) and `inconclusive` (85: `insufficient_evidence` 60, `drift_undetermined` 10, `verdict_inconclusive` 15) — `not_reproduced`, `not_replayable` and `failed` comparisons are **code paths only, no local data** |
+
+Replay outcome against the source run and the two engine results:
+
+| Replay sealed outcome | Source sealed outcome | Replay engine winner | Source engine winner | Source replicated | Source candidate status | Runs |
+|---|---|---|---|---|---|---|
+| `verified_recommendation` | `inconclusive` | yes | no | no | `inconclusive` | **25** |
+| `verified_recommendation` | `inconclusive` | yes | no | yes | `inconclusive` | **3** |
+| `verified_recommendation` | `verified_recommendation` | yes | yes | no | `verified` | 19 |
+| `verified_recommendation` | `verified_recommendation` | yes | no | yes | `verified_with_noise_warning` | 9 |
+| `inconclusive` | `verified_recommendation` | no | yes | no | `verified` | 8 |
+| `inconclusive` | `inconclusive` | no | no | no / yes | `inconclusive` | 22 + 8 |
+
+Of the 56 `verified_recommendation` replays: 28 replayed an investigation that verified nothing (an upgrade by one experiment), and 47 did not reproduce the original (comparison `inconclusive`). Only the 9 `reproduced` replays of verified sources are defensible, and even those seal an empty recommendation. Example: run `bcecb985…` (source outcome `inconclusive`, comparison `inconclusive: insufficient_evidence`); its sealed Markdown reads *"**Verified recommendation.** A candidate change was verified…"*, then *"No change is recommended."*, then *"Comparison: **inconclusive**"*, and its only next step is *"Re-run this experiment (experiment replay)…"* on a run that is itself a replay.
+
+These numbers describe this developer database (stub and free-model runs at sf=0.01, mostly harness-driven). They show which code paths fire; they are not a reproduction rate.
+
+### 2.2 Where each defect originates
+
+| Affected field | Layer | Defect |
+|---|---|---|
+| Run/manifest/report `outcome` | **Classification** (`experiment_replay.py:535-537`) | Uses `result.winner` of the replay experiment. Ignores `comparison["status"]` and the source run's outcome. A comparison of `not_reproduced` or `not_replayable` (compare-time precondition) also seals `verified_recommendation` when the replay found a winner. |
+| `headline`, `next_steps` | **Report building** (`builders/v1.py:358-391`) | Keyed only by `outcome`, written for investigation runs: claims "verified in an isolated sandbox", and proposes an experiment replay of the replay. |
+| `recommendation` | **Report building** (`builders/v1.py:200-212, 279-303`) | Derived from the run's own candidates; replays have none, so always `none`. The original candidate is never referenced. |
+| Contradictory Markdown | **Presentation of a built report** (`md_v1.py:62-90, 272-296, 298-330`) | Faithfully renders the three inconsistent fields. Not a renderer bug. |
+| Result card / report page | **Presentation** (`ResultSummary.tsx:69,104`; `ReportView.tsx:306,320,419`) | Faithfully renders the sealed report. Not a frontend bug. |
+| Run picker, trace events | **Presentation of the run row / events** (`RunPicker.tsx:106`; `lib/events/describe.ts:14,56`) | Show `verified recommendation` for these replays because the run row and `run.concluded` carry it. |
+| Investigation list / dashboard | not affected | `start_replay` does not move `investigations.latest_run_id`, so lists keep showing the source run's outcome. |
+| Execution, measurements, comparison | not defective | The replay experiment, engine verdicts and §9 comparison behave as specified. |
+
+Secondary observations (not causes of the contradiction):
+
+- `compare_experiments` applies `winner_changed` only when the original had a winner (`comparison.py:275-277`); a replay winner that the original never had is not flagged. Harmless once the outcome no longer comes from the replay winner.
+- A replay re-runs only the source's primary experiment. For a `verified_with_noise_warning` source (three replicates, ADR-0019) the comparison is usually `insufficient_evidence` by construction. A known limitation, not addressed here.
+- No test asserts a replay run's outcome or its sealed recommendation (`tests/integration/test_experiment_replay.py`, `tests/unit/reports/test_report_v1.py`), which is how this shipped.
+
+## 3. Lifecycle and authoritative fields
+
+```
+POST /experiments/{id}/replay (api/routers/runs.py)
+└─ experiment_replay.start_replay                          experiment_replay.py:165
+   ├─ check_preconditions                                  :96   verify_report(source) must be ok; approval digests; sandbox
+   ├─ INSERT investigation_runs (kind=experiment_replay, parent_run_id=source run)   :198
+   ├─ link input.experiment_config / input.query / input.param_sets                  :210-230
+   ├─ INSERT approval_requests (approved, round 0)                                   :232
+   ├─ insert_attempt (replay_attempts, queued)                                       :255
+   └─ queue.enqueue(experiment_replay)                                               :274
+worker: jobs/handlers.py → execute_experiment_replay                                 :361
+   ├─ create_experiment(replay_of_experiment_id=source)                              :410
+   ├─ benchmark.engine.run_experiment (same config + seed, same engine version)      :436
+   │    └─ verdicts per arm → tournament.rank → result.winner   (engine.py:406, tournament.py:58)
+   ├─ store experiment.result, record evidence                                       :463-482
+   ├─ comparison.compare_experiments → pairs, status, failure_code                   comparison.py:162, :287
+   ├─ store replay.comparison, emit replay.compared                                  :502-525
+   └─ _close(outcome = winner ? verified_recommendation : inconclusive)  ◄ DEFECT    :305, :526-540
+        └─ finalize.finalize_run                                                     finalize.py:199
+             ├─ emit run.concluded {final_status, outcome, …}  (last sealed event)   :227
+             ├─ reports.inputs.load_report_inputs (records + events ≤ cutoff)         inputs.py:67
+             ├─ registry.build(report-builder@1) → report JSON  ◄ DEFECT (rec/headline) builders/v1.py:215
+             ├─ RENDERERS[report-md@1] → Markdown                                    md_v1.py
+             ├─ investigation_reports (outcome, builder_version, …)                  :277
+             ├─ manifest (final_status, outcome, report digests) + replay_manifests  :299-322
+             └─ run row status/outcome, report.ready
+read path:  GET /runs/{id}/report → ResultSummary / ReportView (frontend/src/components/report)
+            report replay: replay/report_replay.verify_report rebuilds with the *stored* builder_version (:305-338)
+```
+
+Authoritative sources (REPLAY_ENGINE §5): a finalized run's terminal status and outcome are `final_status`/`outcome` **in its manifest**, which `finalize_run` copies from the `Conclusion`; the report JSON's `outcome` comes from the sealed `run.concluded` event; the run row and `investigation_reports.outcome` are copies. `recommendation` is computed only by the builder. The comparison is a stored artifact (`replay.comparison`) and the `replay_attempts.status`.
+
+## 4. Semantics (proposed invariants)
+
+Four distinct concepts. None implies another.
+
+| Concept | Question | Authority | Lives in |
+|---|---|---|---|
+| **Original investigation outcome** | Did the investigation verify a recommendation from its own evidence? | Source run's sealed manifest `outcome` | Source run |
+| **Candidate verification** | Did candidate *k* pass correctness and performance rules, after auditor downgrade and replication? | `optimization_candidates.status` / `verification_results` of the run that proposed *k* | Investigation runs only |
+| **Recommendation** | Is a candidate supported well enough to recommend? | Builder, from a verified candidate of an investigation run | Investigation runs; a replay may only *reference* one |
+| **Experiment replay outcome** | Did a new measurement reproduce the original experiment under §9? | `comparison.status` (= terminal `replay_attempts.status`) | Replay run |
+
+Invariants:
+
+- **I1. A replay never upgrades.** A replay run's outcome is never more favourable than its source run's sealed outcome.
+- **I2. A replay never verifies a candidate and never creates a recommendation.** A replay engine verdict is a measurement (`verified` arm in this experiment), not a candidate verification: no auditor, no replication, no materiality gate.
+- **I3. A replay confirms only by reproduction.** A replay may carry its source's outcome only when the comparison is a reproduction; otherwise it is `inconclusive`, and the comparison status says why.
+- **I4. Every replay report names its source.** Source run, experiment, report digest and outcome, and the referenced candidate, all labelled with provenance `source_run`.
+- **I5. Self-contained rebuild.** A replay report is a pure function of the replay run's own sealed records (the source facts are snapshotted into them), so report replay never depends on the parent run staying available.
+- **I6. Sealed is sealed.** Existing reports, manifests, events and run rows are not edited; corrected semantics apply to new runs through a new builder version.
+
+## 5. Options considered
+
+| Option | Correctness | Migration risk | Complexity | Backward compat. | Replay determinism |
+|---|---|---|---|---|---|
+| A. Fix `_close` classification only | Outcome right; report still seals an empty recommendation and self-referential next steps, so a reproduced verified replay still reads *Verified* over *No change is recommended* | None | Small | Full | Unaffected |
+| B. `report-builder@2` only | Report would disagree with the manifest/run-row outcome (builder reads `run.concluded`); overriding it breaks the §5 single authority | None | Medium | Full | Breaks authority rule |
+| C. New outcome values (`replay_reproduced`, …) | Most expressive | **Migration**: CHECK constraints on `investigation_runs.outcome` and `investigation_reports.outcome` (0003, 0011), API enum, filters, labels | Large | Needs care in every outcome consumer | Unaffected |
+| D. Frontend-only (hide the headline/recommendation on replays) | Hides, does not fix; sealed JSON/Markdown and exports still contradict | None | Small | — | — |
+| **E. A + snapshot + `report-builder@2`/`report-md@2` + frontend schema 2 (recommended)** | Fixes outcome, recommendation and wording at their source | None (no DDL; one new artifact role, which is free text) | Medium | Full: v1 stays registered, old reports rebuild byte-identical | Preserved; replay reports become more self-contained |
+
+## 6. Proposed architecture (option E)
+
+### 6.1 Source snapshot at replay start
+
+In `start_replay`, after `check_preconditions` has verified the source report (`verify_report` ok), store a canonical `qc-json-v1` artifact `kind = replay_source` and link it to the replay run as role `input.replay_source`:
+
+```json
+{
+  "schema_version": 1,
+  "source_run_id": "…", "source_experiment_id": "…",
+  "source_manifest_sha256": "sha256:…", "source_report_json_sha256": "sha256:…",
+  "source_builder_version": "report-builder@1",
+  "source_final_status": "completed", "source_outcome": "verified_recommendation",
+  "source_recommendation": { "status": "verified", "candidate_key": "c1", "kind": "create_index",
+    "sql_sha256": "…", "ddl": ["…"], "query_sql": null, "round": 0,
+    "primary_measurement": { "...": "copied from the source report, with its source evidence_id" } }
+}
+```
+
+Values are copied from the source's stored, just-verified report JSON and manifest, never recomputed. It is part of the replay's manifest (`artifacts`), so its digest is sealed with the replay.
+
+### 6.2 Replay outcome classification (new runs)
+
+A pure function `replay_run_outcome(source_outcome, comparison_status)` used by `_close`:
+
+| Comparison status | Run status | Run outcome |
+|---|---|---|
+| `reproduced` | completed | **source outcome** (I3) |
+| `reproduced_with_drift` | completed | source outcome — **decision D1** |
+| `inconclusive` | completed | `inconclusive` |
+| `not_reproduced` | completed | `inconclusive` — **decision D2** |
+| `not_replayable` (compare-time) | completed | `inconclusive` — **decision D3** |
+| `failed` | failed | none (unchanged) |
+| execution failure / cancel | failed / cancelled | none (unchanged) |
+
+`result.winner` no longer influences the outcome. The source outcome comes from the snapshot (6.1).
+
+### 6.3 `report-builder@2`, report schema 2, `report-md@2`
+
+- New `reports/builders/v2.py` and `reports/renderers/md_v2.py`; `registry.CURRENT_BUILDER/RENDERER/SCHEMA_VERSION` move to `@2`/`2`. `v1` and `md_v1` stay registered and untouched, so sealed v1 reports still rebuild byte-identical.
+- For non-replay runs, v2 output equals v1 except `schema_version`/`builder_version` (v2 may reuse v1's frozen helpers; v1 is never edited).
+- `ReportInputs` gains `replay_source: dict | None = None`, loaded from `input.replay_source`. v1 never reads it, so v1 rebuilds are unaffected (guarded by a golden test).
+- For `experiment_replay` runs, schema 2 adds a top-level `replay_result` (additive; all schema-1 fields keep their types):
+
+```json
+"replay_result": {
+  "status": "reproduced", "failure_code": null, "comparison_mode": "same_environment",
+  "source": { "run_id": "…", "experiment_id": "…", "outcome": "verified_recommendation",
+              "report_json_sha256": "sha256:…", "provenance": "source_run" },
+  "replay_engine_winner": "c1", "replay_engine_winner_provenance": "measured"
+}
+```
+
+- `recommendation` on a replay: when the run outcome is `verified_recommendation` (only possible via I3), it is the **source** recommendation with `"origin": "source_run"`, `source_run_id` and its source evidence IDs; otherwise `status: "none"`. Never derived from the replay's own engine winner — **decision D4**.
+- Headline and next steps keyed by (comparison status × source outcome), e.g. *"The original verified recommendation was reproduced by a new sandbox measurement."*, *"The replay could not confirm the original result (insufficient evidence)."*, *"The original investigation verified no recommendation; this replay re-measured it and makes none."* No self-referential "replay this experiment" step except after an `inconclusive` comparison.
+- Missing comparison (`replay.comparison` absent) or missing snapshot (should be impossible for v2 runs) → headline says so, `recommendation.status: "none"`, entry in `missing`.
+
+### 6.4 Frontend
+
+- `SUPPORTED_REPORT_SCHEMAS = [1, 2]`; types for `replayResult`. Until this ships, schema 2 already falls back to the stored Markdown (REPLAY_ENGINE §7.4), so deploying the frontend first or together is safe.
+- `ResultSummary` / `ReportView`: on replay reports show the replay status as its own line (*Reproduced*, *Reproduced with drift*, *Not reproduced*, *Inconclusive*) with a link to the source run, and the referenced candidate labelled *from run N*.
+- Sealed `report-builder@1` replay reports: rendered exactly as stored, plus a fixed, clearly separated note derived only from stored metadata (`builder_version == report-builder@1 && run.kind == experiment_replay`): *"Built by report-builder@1: this headline comes from the replay's own measurement, not from the comparison with the original. See Experiment replay for reproducibility."* — **decision D5**. No value in the report is changed or recomputed.
+
+### 6.5 Not changed
+
+No migration, no DB schema change, no API endpoint or response-model change (the report JSON is passed through), no change to the benchmark engine, comparison algorithm, margin (ADR-0023), canonicalization profiles or finalization protocol. New docs: REPLAY_ENGINE §8.2 gains "Replay run outcome and report", §7 lists `report-builder@2`/`report-md@2`; a new ADR-0032 records I1–I6 and the decisions below; DECISIONS.md indexes it.
+
+## 7. Historical sealed reports
+
+- All 94 local replay reports (and any elsewhere) stay as sealed: same JSON/Markdown bytes, digests, manifests, `run.concluded` events and run rows. Report replay keeps rebuilding them with `report-builder@1`/`report-md@1` and they keep verifying.
+- Their stored `outcome` is not reinterpreted. The only addition is the UI note in 6.4 (outside the sealed artifacts, decision D5).
+- `run_row_differs_from_manifest` cannot fire, because no row is touched.
+- No backfill, no re-finalization. A user who wants a corrected replay starts a new experiment replay, which is sealed by v2.
+
+## 8. Test matrix
+
+All new-path cases: run outcome = `_close` result; recommendation/summary = builder@2 + md@2; provenance requirements apply to every case: `replay_result.source` names the source run, experiment and report digest with provenance `source_run`; replay measurements carry `measured`/`prerecorded`; the report rebuilds byte-identical under report replay.
+
+| # | Case | Comparison | Run outcome | `recommendation` | Displayed summary |
+|---|---|---|---|---|---|
+| 1 | Source verified, replay reproduces | `reproduced` | `verified_recommendation` | source candidate, `origin: source_run` | Reproduced; original recommendation of run N reproduced |
+| 2 | Source verified, replay drifts | `reproduced_with_drift` | per **D1** | per D1 (source candidate if D1 = source outcome) | Reproduced with drift: same verdict, effect size changed beyond ±25% |
+| 3 | Source verified, replay contradicts (`verdict_changed`, `direction_reversed`, `winner_changed`) | `not_reproduced` | `inconclusive` (**D2**) | `none` | Not reproduced: reason code; original recommendation not confirmed |
+| 4 | Source verified, replay inconclusive (`insufficient_evidence`, `drift_undetermined`, `verdict_inconclusive`) | `inconclusive` | `inconclusive` | `none` | Inconclusive: reason; original recommendation neither confirmed nor contradicted |
+| 5 | Source inconclusive, replay engine has a winner | any | `inconclusive` (never verified; today 28 local cases seal verified) | `none` | Original verified nothing; replay measurement noted with provenance, makes no recommendation (**D4**) |
+| 6 | Replay engine has no winner | any | as rows 1–4 by comparison | as rows 1–4 | Unchanged by the missing winner |
+| 7 | Candidate correctness failure in the replay (fingerprint differs) | `not_reproduced: result_fingerprint_changed` | `inconclusive` | `none` | Not reproduced: result rows changed |
+| 7b | Same correctness rejection on both sides | `reproduced` | source outcome (`inconclusive`) | `none` | Reproduced the original rejection |
+| 8 | Source run or candidate unavailable at start | — | no run (`not_replayable`) | — | Precondition failure (**D6**: new code `source_unavailable` vs existing codes) |
+| 9 | Compare-time precondition (workload digest / row profile changed) | `not_replayable` | `inconclusive` (**D3**) | `none` | Not comparable: precondition field |
+| 10 | DDL fails in replay only | `failed: ddl_failed` | run failed, no outcome | `none` | Failed: ddl_failed |
+| 11 | Comparison missing at finalization | — | `inconclusive` | `none` | No comparison recorded; `missing` entry |
+| 12 | Existing sealed `report-builder@1` replay report | stored | stored (unchanged) | stored | Rendered as stored + v1 note (D5); report replay `verified` |
+| 13 | New v2 report sealing | any | — | — | report replay rebuilds JSON and Markdown byte-identical; manifest contains `input.replay_source` |
+| 14 | Non-replay run sealed by v2 | — | unchanged | unchanged | v2 JSON equals v1 except `schema_version`/`builder_version` (golden) |
+| 15 | v1 golden rebuild with the new `ReportInputs.replay_source` field | — | — | — | every existing v1 fixture rebuilds byte-identical |
+| 16 | Frontend schema 2 / schema 1 / unknown schema | — | — | — | renders 2, renders 1 (+ note for replays), Markdown fallback for 3 |
+
+Placement: pure classification and builder cases as unit tests (`tests/unit/replay/`, `tests/unit/reports/test_report_v2.py`) written first; snapshot, `_close` and sealing cases in `tests/integration/test_experiment_replay.py` with stub engine results; report replay for both builder versions in the existing report-replay integration tests; frontend in Vitest plus one e2e assertion on a replay report.
+
+## 9. Decisions requiring approval
+
+| # | Question | Recommendation |
+|---|---|---|
+| D1 | Does `reproduced_with_drift` confirm the source outcome? Same verdict and code, but the speed-up changed beyond ±25%. | Confirm the source outcome, and state the drift in the headline. The verdict reproduced; the size did not. |
+| D2 | `not_reproduced` → `inconclusive`? The vocabulary has no "contradicted" outcome without a migration (option C). | Yes, `inconclusive` now; the replay status carries *not reproduced* explicitly. Revisit with option C if a distinct outcome is wanted. |
+| D3 | Compare-time `not_replayable`: run `completed`/`inconclusive`, or `failed`? | `completed`/`inconclusive`: the measurement exists and is sealed; only the comparison is impossible. |
+| D4 | May a replay report mention its own engine winner when the source verified nothing? | Yes, only in `replay_result` as a labelled measurement, never in headline/outcome/recommendation. |
+| D5 | Annotate sealed v1 replay reports in the UI? | Yes, a fixed note from stored metadata only; no recomputation. |
+| D6 | Precondition when the source run is soft-deleted or its report is unreadable | Treat as the existing `source_integrity_failed` unless a separate `source_unavailable` code is wanted (that would change REPLAY_ENGINE §8.2's code table). |
+| D7 | Source outcome `no_action_needed` with a reproduced comparison | Carry it (I3 applies uniformly). Flagged because no local data exercises it. |
+| D8 | Replays of noise-warning sources re-run only the primary experiment | Out of scope; document as a limitation in the v2 replay limitations text. |
+
+## 10. Risks
+
+- **Two builder versions in circulation.** Mitigated by the golden tests (14, 15) and by report replay already dispatching on the stored version.
+- **v2 reusing v1 helpers.** Safe only while v1 is frozen (it is, ADR-0015); retiring v1 must not delete its code while v2 imports it.
+- **Deploy skew.** A backend sealing schema 2 before the frontend accepts it shows the Markdown fallback, which is correct but plainer. Ship the frontend first or together.
+- **Run picker and trace events** keep showing `verified recommendation` for old replays (run row and sealed events). Accepted under I6; the replay status could be added to the run picker later from `replay_attempts`.
+- **Wording.** The new headlines are product copy; review them with the owner before release.
+
+## 11. Implementation sequence (after approval)
+
+Each step committed separately on `main`, with tests first and the verification commands from CLAUDE.md §7:
+
+1. `replay_run_outcome` pure function + unit tests (cases 1–7, 9). No caller yet.
+2. `input.replay_source` snapshot in `start_replay`; `ReportInputs.replay_source`; integration tests (8, 13 partial) and the v1 golden guard (15).
+3. `_close` uses `replay_run_outcome`; integration tests per comparison status (1–7, 9–11).
+4. `report-builder@2`, `report-md@2`, schema 2, registry bump; unit tests (1–11, 14) and report-replay tests for v1 and v2 (12, 13).
+5. Frontend: schema 2 types and rendering, v1 replay note; Vitest + e2e (16).
+6. Docs: REPLAY_ENGINE §7/§8.2, ADR-0032, DECISIONS.md, UI_UX §3.6, CURRENT_PHASE.
+
+Steps 5 can land before 4 (it is safe against schema 1). Workstream 4 Stage 3 stays paused until the owner decides.
