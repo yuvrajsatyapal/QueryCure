@@ -494,3 +494,122 @@ These notices ship with frontend step 4 and need no backend change. Run rows, ev
 2. Classifier `replay/outcome.py`, test first, with no caller in the execution path.
 3. Source snapshot, test first, captured in `start_replay`'s transaction.
 4. Verification, then a review checkpoint. Implementation stays uncommitted until the owner reviews it.
+
+## 14. Implementation checkpoint (2026-10-30)
+
+**Status: Classifier and snapshot implemented locally — awaiting review. Replay correction not activated.** Uncommitted on `main` until the owner reviews the code and results. `_close` still seals the legacy winner-based outcome; `report-builder@1` / `report-md@1` stay current; no sealed report, digest, migration, API model or frontend file changed.
+
+### 14.1 Classifier contract (`backend/src/querycure/replay/outcome.py`)
+
+`classify_replay_outcome(snapshot: ReplaySourceSnapshot | None, comparison: Mapping | None) -> ReplayClassification(run_status, outcome, basis, source_outcome, comparison_status, comparison_mode)`, with `claims_reproduction` and `as_basis()` (the future `run.concluded.replay_basis` payload). Pure: it reads only its two arguments and never the replay's engine winner. No caller in the execution path.
+
+Rules, first match wins:
+
+| # | Condition | Run status / outcome | Basis |
+|---|---|---|---|
+| 1 | no comparison | completed / `inconclusive` | `comparison_missing` |
+| 2 | comparison `failed` (replay execution) | failed / none | `comparison_failed` |
+| 3 | no snapshot | completed / `inconclusive` | `source_snapshot_missing` |
+| 4 | comparison's `original_experiment_id` ≠ snapshot's source experiment | `inconclusive` | `source_snapshot_mismatch` |
+| 5 | unknown status / not `reproduced` | `inconclusive` | `comparison_unrecognized` / `comparison_<status>` |
+| 6 | mode ≠ `same_environment` | `inconclusive` | `cross_environment` |
+| 7 | source run kind `experiment_replay` | `inconclusive` | `source_is_replay` |
+| 8 | source outcome `NULL` or final status ≠ `completed` | `inconclusive` | `source_not_completed` |
+| 9 | source `verified_recommendation`: recommendation missing, not verified, no candidate or no measured result digest → `source_recommendation_missing`; `verified_with_noise_warning` → `source_noise_warning`; measured result digest ≠ replayed experiment's `result_sha256` → `recommendation_from_other_experiment`; candidate absent from the comparison pairs or a pair not `reproduced` → `recommended_candidate_not_compared`; else | `inconclusive`, else **`verified_recommendation`** | …, else `reproduced_source_recommendation` |
+| 10 | source `no_action_needed` | `no_action_needed` | `reproduced_source_no_action` |
+| 11 | otherwise (`inconclusive`, `unverified_recommendations`) | `inconclusive` | `source_not_verified` |
+
+### 14.2 Snapshot contract (`backend/src/querycure/replay/source_snapshot.py`)
+
+- **Storage (deviation, see 14.4):** no copy. In the transaction that creates the replay run, `start_replay` links the source run's own sealed manifest and report JSON artifacts to the replay run as `input.replay_source.manifest` and `input.replay_source.report_json`. Both are content-addressed, digest-checked on every read (`get_artifact`), never updated by the app role and never deleted by retention, and the replay's own manifest lists them with their digests when it is sealed.
+- **Capture:** inside `check_preconditions`, after `verify_report(source)` passed and the approval digests matched, `capture_source_snapshot` reads exactly the manifest and report digests that report replay verified and derives the typed `ReplaySourceSnapshot` (`snapshot_from_sealed`, pure). Fields: `schema_version`, source run id and kind, source experiment id, its sealed `result_sha256` and environment digest, manifest and report digests, builder version, final status, outcome, and the report's `recommendation` restricted to `status`, `candidate_key`, `kind`, `ddl`, `query_sql`, `primary_measurement`, `scope`. No evidence lists, hypotheses, summaries, LLM text or credentials.
+- **Validation (fails closed as the existing `source_integrity_failed`, D6):** manifest schema 1; manifest and report belong to the source run; the manifest names this report; final status and outcome agree between them; run kind and outcome are known values; the replayed experiment is in the manifest with a result digest equal to the stored experiment row's result; the report has a complete recommendation. For a non-replay source that sealed `verified_recommendation`: the recommendation is verified (or noise-warning), names a candidate and a measured result digest, that digest is one of the source's sealed experiment results, and when it is the replayed experiment the candidate is one of its arms. A missing source run row (D6a) is `source_integrity_failed: source run missing` instead of an exception. Replay-kind sources are recorded as sealed, including the empty recommendation of upgraded v1 replays; the classifier never passes their outcome on (D10).
+- **Atomicity:** the run, its links (config, query, parameters, snapshot), approval, attempt and job are one transaction. A fault at link or attempt insertion leaves no run, attempt, job or snapshot link (tested).
+- **Reconstruction:** `load_source_snapshot(conn, replay_run_id)` re-derives the snapshot from the replay's own links (snapshot roles plus `input.experiment_config`, which holds the source experiment's config) and its `parent_run_id`. It returns `None` for runs without a snapshot (every replay started before this change, and non-replay runs) and raises `SourceSnapshotError` for incomplete or inconsistent links. Derivation is deterministic; deleting or changing the source run, its report rows, manifest row, links or experiments afterwards does not change it (tested inside a rolled-back owner transaction).
+- **Not added yet:** `ReportInputs.replay_source`. The v1 loader is untouched; the field is added with `report-builder@2`.
+
+### 14.3 Tests
+
+| File | Covers |
+|---|---|
+| `tests/unit/replay/test_replay_outcome.py` (43) | 32 decision-table rows (every §12.3 row, D1–D12, the fail-closed additions); basis payload; replay winner not an input; determinism and no mutation; invariants over 15,523 input combinations: no upgrade, only the fully eligible case verifies, no replay-of-replay laundering, drift and environment mismatch never reproduce, missing provenance never verifies, only a failed comparison fails the run, `claims_reproduction` ⇔ reproducing basis |
+| `tests/unit/replay/test_source_snapshot.py` (24) | exact field set, nothing extra copied, deterministic canonical bytes and round trip, isolation from later input changes, other-experiment and inconclusive/failed/replay-kind sources, 16 rejected inconsistencies (run, report, outcome, schema, kind, recommendation, experiment hash, unsealed or mismatched measured result, candidate not an arm) |
+| `tests/integration/test_experiment_replay.py` (+7 cases, real sandbox PG 17) | valid finalized source linked and sealed in the replay manifest, snapshot equals the source's records, replay report still `report-builder@1` schema 1 and verifies, legacy outcome still sealed (not activated), classifier gives a contract-valid basis on real records; snapshot unchanged after source run changes and deletion; missing source run; source integrity failure (tampered report); inconsistent records → `not_replayable`, no run; rollback on a fault at snapshot link and at attempt insert. Unfinalized sources stay covered by the existing test. |
+
+Results: see 14.6.
+
+### 14.4 Deviations from the approved design
+
+1. **Snapshot stored by link, not as a new `replay_source` artifact.** `artifacts.kind` has a CHECK constraint (migrations 0008/0010/0012), so a new kind needs a migration, which is not authorized. Linking the source's own sealed manifest and report JSON needs none, copies nothing, and leaves one source of truth. The snapshot becomes a typed view derived from sealed records instead of a stored JSON document. Starting a replay already links source artifacts (`input.query`, `input.param_sets`), so this follows an existing pattern.
+2. **Extra fail-closed rules** (I14): `source_snapshot_mismatch`, `comparison_unrecognized`, `source_recommendation_missing`, `recommended_candidate_not_compared`; an unknown comparison mode is treated as cross-environment; a source with an outcome but a non-`completed` final status is `source_not_completed`.
+3. **Basis codes split:** §12.3's `reproduced_source_outcome` became `reproduced_source_no_action` (D7) and `source_not_verified` (rule 11), so `claims_reproduction` is true only for the two reproducing bases.
+4. **Start path behaviour (active now, outcome unchanged):** new replays carry the two snapshot links (one more manifest entry each), and a source whose sealed records are inconsistent is refused with `source_integrity_failed` and a detail. Previously such a source started a replay.
+5. `ReportInputs.replay_source` deferred to step 3 (14.2).
+
+### 14.5 Remaining work and limitations
+
+- **Not started, needs approval:** `_close` activation and `run.concluded.replay_basis`; `report-builder@2`, `report-md@2`, report schema 2 (`replay_result`, `recommendation.origin`, the §13.3 headlines); frontend schema 2 and the §13.4 legacy notices; REPLAY_ENGINE §7/§8.2, ADR-0032, DECISIONS.md.
+- **Historical replays have no snapshot.** Replays started before this change (all 94 local ones) return `None` from `load_source_snapshot`; if one were finalized after activation it would seal `inconclusive: source_snapshot_missing`. Their sealed v1 reports stay byte-identical and are only annotated in the UI (§13.4).
+- **Shared artifacts.** The snapshot artifacts are shared with the source run, as `input.query` already is. Artifacts are never deleted today; a future artifact retention design must treat linked artifacts as live while any run links them.
+- **Demo bundles** export a fixed role list that does not include the snapshot roles. That only matters if a replay run is ever exported as a demo bundle; none is today.
+- **Deploy skew:** an attempt queued by an old API has no snapshot; after activation it would seal `inconclusive` (rule 3), which is safe.
+
+### 14.6 Verification (2026-10-30, local Docker only)
+
+| Check | Result |
+|---|---|
+| `ruff check .`, `ruff format --check .` | clean (392 files) |
+| `mypy src` (strict) | no issues, 219 files |
+| Classifier unit tests | 43 passed |
+| Snapshot unit tests | 24 passed |
+| `tests/integration/test_experiment_replay.py` + idempotency | all passed (the 6 earlier replay tests unchanged and green) |
+| Report replay, finalization, report v1 goldens (`test_report_replay.py`, `test_finalize.py`, `tests/unit/reports`) | 57 passed, no fixture changed |
+| Full backend `pytest` (unit 1085 + integration 488 + security 162 collected) | **1732 passed, 2 skipped, 1 xfailed** (pre-existing skip and documented xfail) |
+| Smoke evals (recorded, local scratch DB) | 5/5, no quota ledger entry (no real model requests) |
+| Frontend | not run: no frontend file or shared type changed |
+
+One new integration test failed on its first run because it expected HTTP 202 for a refused replay; the API already answers 422 `EXPERIMENT_NOT_REPLAYABLE` with the code in `details`. The test was corrected to the existing contract; no code changed for it. Mypy reports 23 pre-existing errors when run on `tests/integration/test_experiment_replay.py` directly (unchanged by this work; CI runs `mypy src`).
+
+## 15. Snapshot integrity review and legacy compatibility (2026-10-30)
+
+**Status: hardened and committed locally. Replay correction still not activated.** `_close`, report builders, frontend, migrations and API are unchanged.
+
+### 15.1 Integrity gaps found and fixed (test first)
+
+| Gap in §14 | Fix in `source_snapshot.py` | Test |
+|---|---|---|
+| Artifact kind not checked: any digest-valid JSON could sit under a snapshot role | `_verified` requires `replay_manifest`, `report_json`, `experiment_config` per role | `test_snapshot_artifact_of_the_wrong_kind_fails_closed` |
+| A corrupted artifact raised `ArtifactIntegrityError` instead of failing closed as a snapshot error (start path: 500 instead of `source_integrity_failed`) | wrapped as `SourceSnapshotError` | `test_corrupted_snapshot_artifact_fails_closed[manifest, report_json]` |
+| A non-terminal or unknown `final_status` was accepted | must be `completed`, `failed` or `cancelled` | 2 new unit rows |
+| Legacy vs. corrupted decided by link presence alone | see 15.2 | `test_historical_…`, `test_sealed_new_replay_with_missing_snapshot_links_fails_closed[manifest, report, both]` |
+| Snapshot links on a run that is not a replay were ignored if both were missing, otherwise misattributed | raises | covered by the discriminator branch |
+
+Unchanged and confirmed: both links must exist exactly once with their roles; digests are re-checked on every read through the existing `get_artifact` (no second hashing or canonicalization); manifest and report must name the same source run; the manifest must name this report; final status and outcome must agree; the replayed experiment's sealed result digest must match; recommendation, candidate and measured-result checks as in §14.2.
+
+### 15.2 Legacy versus new replays
+
+The discriminator is the replay's **own sealed manifest** (existing, append-only, digest-verified). For a finalized replay, the snapshot roles it lists must equal the current links: listed but missing or different → error; not listed and not linked → legacy (`None`); linked but not listed → error. No heuristic (dates, counts) is used.
+
+For an **unsealed** replay there is no sealed record yet, so the links are the only evidence. They are written in the start transaction together with the run (all or nothing, tested), and `qc_app` can neither UPDATE nor DELETE `artifacts` or `run_artifacts` (new security test). A replay with one link is an error. A replay that lost both links before sealing is indistinguishable from a pre-snapshot replay without a new persisted marker (that would need a field or event-schema change, not authorized). Both cases return `None`, which the classifier maps to `inconclusive: source_snapshot_missing`, so neither can produce a verified outcome. This is the residual item to settle before activation.
+
+Local data (read-only, local Docker): all 94 historical replays return `None` and report replay `verified`, all `report-builder@1`.
+
+### 15.3 Retention
+
+No path can remove a snapshot artifact: `qc_app` has only SELECT and INSERT on `artifacts` and `run_artifacts` (no soft delete, no rewrite); the only DELETE role, `qc_retention`, is used solely by `ops/retention.py`, which never touches evidence tables; investigation deletion is a soft delete on `investigations` only; there are no foreign keys or cascades (ADR-0006). New tests pin the grants and that the sweep keeps artifacts and links. A future artifact-retention design must treat any `run_artifacts` link as a live reference.
+
+### 15.4 Reconstruction
+
+`load_source_snapshot` reads only the replay's own row (`kind`, `parent_run_id`, `finalized_at`), its links and its sealed manifest. Tested on unsealed and sealed replays with the source run's report, manifest, links, experiments and run row deleted (rolled-back owner transaction): the snapshot is identical. Two replays of one experiment link the same two content-addressed rows and load equal snapshots.
+
+### 15.5 Start-path behaviour (active now)
+
+New refusal conditions, all reported as the existing `source_integrity_failed` (HTTP 422 `EXPERIMENT_NOT_REPLAYABLE`, code in `details`, attempt `not_replayable`, no run): snapshot artifact missing, corrupted or of the wrong kind; manifest schema not 1; manifest or report of another run; manifest naming another report; final status or outcome differing or not terminal; unknown run kind or outcome; replayed experiment absent from the manifest or with another result digest; report without a complete recommendation; for a non-replay `verified_recommendation` source, recommendation evidence missing, measured result unsealed, or candidate not an arm. A missing source run row is now a refusal instead of an exception.
+
+Historical sources: a read-only sweep of all 595 local experiments through `check_preconditions` (sandbox disabled, which is checked after the snapshot) refused none for snapshot reasons: 579 reached `sandbox_disabled`, 10 `source_not_finalized`, 6 `source_experiment_incomplete`, as before.
+
+Visibility: the two links appear only in the replay's sealed manifest `artifacts` list. The run plan listing, demo export and artifact download (already owner-scoped through the source run) do not add exposure; `get_run_inputs` reads `input.%` but only for LLM runs, and re-investigations copy links from `latest_run_id`, which is never a replay. Safe to keep enabled before activation.
+
+### 15.6 Verification
+
+ruff, format (392 files), mypy strict (219 files) clean. Classifier 43, snapshot unit 26, `test_experiment_replay.py` 24, report replay / finalize / report goldens / artifact store / ops integrity 71, security 168. Full backend: **1750 passed, 2 skipped, 1 xfailed**. Smoke evals 5/5 recorded, no quota ledger entry. No golden fixture changed.

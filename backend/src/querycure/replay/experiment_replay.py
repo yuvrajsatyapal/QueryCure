@@ -66,6 +66,12 @@ from querycure.replay.artifact_store import get_artifact_by_id, link, load_json,
 from querycure.replay.comparison import compare_experiments
 from querycure.replay.finalize import Conclusion, finalize_run
 from querycure.replay.report_replay import verify_report
+from querycure.replay.source_snapshot import (
+    CapturedSnapshot,
+    SourceSnapshotError,
+    capture_source_snapshot,
+    link_source_snapshot,
+)
 from querycure.sandbox.provisioner import SandboxProvisioner
 from querycure.sql.ddl_allowlist import validate_candidate
 from querycure.workloads.registry import WorkloadRef
@@ -86,6 +92,7 @@ class Precondition:
     payload: ApprovalPayload | None = None
     source_run_id: uuid.UUID | None = None
     investigation_id: uuid.UUID | None = None
+    snapshot: CapturedSnapshot | None = None
 
 
 def replay_experiment_id(replay_run_id: uuid.UUID) -> uuid.UUID:
@@ -105,7 +112,11 @@ async def check_preconditions(
             text("SELECT finalized_at, investigation_id FROM investigation_runs WHERE id = :id"),
             {"id": experiment.run_id},
         )
-    ).one()
+    ).first()
+    if run is None:  # only through an integrity bug: the API's ownership query joins the run
+        return Precondition(
+            "source_integrity_failed", "source run missing", source_run_id=experiment.run_id
+        )
     base = {"source_run_id": experiment.run_id, "investigation_id": run.investigation_id}
     if run.finalized_at is None:
         return Precondition("source_not_finalized", "the source run was never finalized", **base)
@@ -154,12 +165,27 @@ async def check_preconditions(
             return Precondition(
                 "source_integrity_failed", f"{arm.arm} differs from what was approved", **base
             )
+    result = await get_artifact_by_id(conn, experiment.result_artifact_id)
+    if result is None:
+        return Precondition("source_integrity_failed", "source experiment result missing", **base)
+    try:  # from the digests report replay just verified
+        snapshot = await capture_source_snapshot(
+            conn,
+            source_run_id=experiment.run_id,
+            source_experiment_id=experiment.id,
+            manifest_sha256=verified.manifest_sha256,
+            report_json_sha256=verified.report_json_sha256,
+            source_experiment_result_sha256=result.sha256,
+            source_arms=[a.arm for a in config.candidates],
+        )
+    except SourceSnapshotError as exc:
+        return Precondition("source_integrity_failed", exc.detail[:200], **base)
     if not settings.feature_sandbox or settings.sandbox_admin_url is None:
         return Precondition("sandbox_disabled", "no live sandbox in this deployment", **base)
     payload = approval.payload.model_copy(
         update={"candidates": [approved[a.arm] for a in config.candidates]}
     )
-    return Precondition(None, config=config, payload=payload, **base)
+    return Precondition(None, config=config, payload=payload, snapshot=snapshot, **base)
 
 
 async def start_replay(
@@ -178,7 +204,7 @@ async def start_replay(
     source_run = pre.source_run_id
     if source_run is None:  # pragma: no cover - only for an experiment without a run
         raise InvalidStateError("Experiment has no source run.")
-    if pre.code is not None or pre.config is None or pre.payload is None:
+    if pre.code is not None or pre.config is None or pre.payload is None or pre.snapshot is None:
         return await insert_attempt(
             conn,
             user_id=user_id,
@@ -228,6 +254,8 @@ async def start_replay(
         await link(
             conn, run_id=replay_run, artifact_id=r.artifact_id, role=r.role, produced_by="api"
         )
+    # Same transaction as the run: a replay run never exists without its source snapshot.
+    await link_source_snapshot(conn, replay_run, pre.snapshot)
     ids = [c.candidate_id for c in pre.payload.candidates]
     approval_id = (
         await conn.execute(

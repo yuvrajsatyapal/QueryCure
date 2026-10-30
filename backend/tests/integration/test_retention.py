@@ -1,5 +1,7 @@
 """Retention sweep (Phase 5): runs as qc_retention and removes only bookkeeping rows."""
 
+import uuid
+
 import psycopg
 import pytest
 
@@ -24,6 +26,17 @@ async def test_sweep_removes_only_stale_bookkeeping(
         "INSERT INTO rate_limit_buckets (bucket_key, tokens, refilled_at) VALUES "
         "('idle', 1, now() - interval '3 days'), ('busy', 1, now())"
     )
+    artifact = owner.execute(
+        "INSERT INTO artifacts (sha256, kind, media_type, canonicalization, content) VALUES "
+        "(%s, 'replay_manifest', 'application/json', 'qc-json-v1', '{}') RETURNING id",
+        (uuid.uuid4().hex * 2,),
+    ).fetchone()
+    assert artifact is not None
+    owner.execute(
+        "INSERT INTO run_artifacts (run_id, artifact_id, role) VALUES "
+        "(uuid_generate_v4(), %s, 'input.replay_source.manifest')",
+        (artifact[0],),
+    )
     owner.execute(
         "INSERT INTO investigations (user_id, title, objective, modes) "
         "VALUES (%s, 'kept', 'o', ARRAY['offline'])",
@@ -45,3 +58,7 @@ async def test_sweep_removes_only_stale_bookkeeping(
     assert owner.execute("SELECT count(*) FROM investigations WHERE title = 'kept'").fetchone() == (
         1,
     )
+    # Evidence is never swept: replay snapshots link source artifacts (REPLAY_OUTCOME_AUDIT §14).
+    assert owner.execute(
+        "SELECT count(*) FROM run_artifacts WHERE artifact_id = %s", (artifact[0],)
+    ).fetchone() == (1,)

@@ -17,6 +17,7 @@ import httpx2 as httpx
 import psycopg
 import pytest
 from pydantic import SecretStr
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from querycure.agents.run import RunServices, execute_run
@@ -26,7 +27,18 @@ from querycure.benchmark.engine import EngineOptions
 from querycure.core.config import Settings
 from querycure.db.engine import make_engine
 from querycure.db.repositories.investigations import RunInputs
-from querycure.replay.experiment_replay import execute_experiment_replay
+from querycure.domain.runs import RunKind
+from querycure.replay import experiment_replay
+from querycure.replay.experiment_replay import check_preconditions, execute_experiment_replay
+from querycure.replay.outcome import BASIS_CODES, classify_replay_outcome
+from querycure.replay.report_replay import verify_report
+from querycure.replay.source_snapshot import (
+    RECOMMENDATION_KEYS,
+    ROLE_MANIFEST,
+    ROLE_REPORT_JSON,
+    SourceSnapshotError,
+    load_source_snapshot,
+)
 from querycure.sandbox.provisioner import SandboxProvisioner
 from tests.fake_llm import RoleClient
 from tests.integration.sandbox_fixtures import SANDBOX_URL, clone_names
@@ -402,3 +414,516 @@ async def test_dead_lettered_replay_fails_its_attempt_and_seals_the_run(
         "SELECT status, finalized_at IS NOT NULL FROM investigation_runs WHERE id = %s",
         (replay_run,),
     ).fetchone() == ("failed", True)
+
+
+# --- Source snapshot (REPLAY_OUTCOME_AUDIT §12.4, §13) ------------------------------------
+
+SNAPSHOT_ROLES = (ROLE_MANIFEST, ROLE_REPORT_JSON)
+
+
+def sealed_shas(owner: psycopg.Connection, run_id: str) -> tuple[str, str]:
+    row = owner.execute(
+        "SELECT m.manifest_sha256, r.report_json_sha256 FROM replay_manifests m "
+        "JOIN investigation_reports r ON r.run_id = m.run_id WHERE m.run_id = %s",
+        (run_id,),
+    ).fetchone()
+    assert row is not None
+    return row[0], row[1]
+
+
+def snapshot_links(owner: psycopg.Connection, run_id: str) -> dict[str, str]:
+    return {
+        r[0]: r[1]
+        for r in owner.execute(
+            "SELECT ra.role, a.sha256 FROM run_artifacts ra JOIN artifacts a "
+            "ON a.id = ra.artifact_id WHERE ra.run_id = %s AND ra.role = ANY(%s)",
+            (run_id, list(SNAPSHOT_ROLES)),
+        )
+    }
+
+
+def counts(owner: psycopg.Connection, run_id: str, experiment_id: str) -> tuple[Any, ...]:
+    return tuple(
+        owner.execute(sql, params).fetchone()
+        for sql, params in (
+            (
+                "SELECT count(*) FROM investigation_runs WHERE investigation_id = "
+                "(SELECT investigation_id FROM investigation_runs WHERE id = %s)",
+                (run_id,),
+            ),
+            (
+                "SELECT count(*) FROM replay_attempts WHERE source_experiment_id = %s",
+                (experiment_id,),
+            ),
+            ("SELECT count(*) FROM jobs WHERE kind = 'experiment_replay'", ()),
+            (
+                "SELECT count(*) FROM run_artifacts WHERE role = ANY(%s)",
+                (list(SNAPSHOT_ROLES),),
+            ),
+        )
+    )
+
+
+def user_of(owner: psycopg.Connection, run_id: str) -> uuid.UUID:
+    row = owner.execute(
+        "SELECT i.user_id FROM investigations i JOIN investigation_runs r "
+        "ON r.investigation_id = i.id WHERE r.id = %s",
+        (run_id,),
+    ).fetchone()
+    assert row is not None
+    return uuid.UUID(str(row[0]))
+
+
+async def test_replay_links_the_verified_source_snapshot_and_seals_it(
+    api: httpx.AsyncClient,
+    app_engine: AsyncEngine,
+    owner: psycopg.Connection,
+    migrated_db: str,
+    provisioner: SandboxProvisioner,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    run_id, experiment_id = await finalized_sandbox_run(api, app_engine, migrated_db, provisioner)
+    manifest_sha, report_sha = sealed_shas(owner, run_id)
+    source_report = (await api.get(f"/api/v1/runs/{run_id}/report")).json()["report"]
+    source_outcome = owner.execute(
+        "SELECT outcome FROM investigation_reports WHERE run_id = %s", (run_id,)
+    ).fetchone()
+    result_sha = owner.execute(
+        "SELECT a.sha256 FROM experiments e JOIN artifacts a ON a.id = e.result_artifact_id "
+        "WHERE e.id = %s",
+        (experiment_id,),
+    ).fetchone()
+    assert source_outcome is not None
+    assert result_sha is not None
+    async with app_engine.connect() as conn:
+        assert await load_source_snapshot(conn, uuid.UUID(run_id)) is None  # not a replay
+    no_llm(monkeypatch)
+
+    started = await api.post(
+        f"/api/v1/experiments/{experiment_id}/replay", json={"confirm_ddl": True}
+    )
+    assert started.status_code == 202, started.text
+    replay_run = started.json()["replay_run_id"]
+    # The source's own sealed manifest and report are linked, not copied.
+    assert snapshot_links(owner, replay_run) == {
+        ROLE_MANIFEST: manifest_sha,
+        ROLE_REPORT_JSON: report_sha,
+    }
+    async with app_engine.connect() as conn:
+        captured = await load_source_snapshot(conn, uuid.UUID(replay_run))
+    assert captured is not None
+    assert captured.source_run_id == run_id
+    assert captured.source_run_kind is RunKind.INITIAL
+    assert captured.source_experiment_id == experiment_id
+    assert captured.source_experiment_result_sha256 == result_sha[0]
+    assert captured.source_manifest_sha256 == manifest_sha
+    assert captured.source_report_json_sha256 == report_sha
+    assert captured.source_builder_version == "report-builder@1"
+    assert captured.source_final_status == "completed"
+    assert captured.source_outcome == source_outcome[0]
+    assert captured.source_recommendation is not None
+    assert captured.source_recommendation.model_dump() == {
+        k: source_report["recommendation"][k] for k in RECOMMENDATION_KEYS
+    }
+
+    await execute_experiment_replay(
+        app_engine, uuid.UUID(replay_run), sandbox=provisioner, options=EngineOptions(),
+        reclaimed=False,
+    )  # fmt: skip
+    replay_manifest = owner.execute(
+        "SELECT convert_from(a.content, 'UTF8')::jsonb FROM replay_manifests m "
+        "JOIN artifacts a ON a.id = m.manifest_artifact_id WHERE m.run_id = %s",
+        (replay_run,),
+    ).fetchone()
+    assert replay_manifest is not None
+    sealed = {(a["role"], a["digest"]) for a in replay_manifest[0]["artifacts"]}
+    assert (ROLE_MANIFEST, f"sha256:{manifest_sha}") in sealed
+    assert (ROLE_REPORT_JSON, f"sha256:{report_sha}") in sealed
+    # Deterministic reconstruction from the replay's sealed records.
+    async with app_engine.connect() as conn:
+        again = await load_source_snapshot(conn, uuid.UUID(replay_run))
+        verified = await verify_report(conn, uuid.UUID(replay_run))
+    assert again == captured
+    assert verified.status == "verified", verified.result_json()
+    # Historical compatibility: still report-builder@1, which never reads the snapshot.
+    replay_report = (await api.get(f"/api/v1/runs/{replay_run}/report")).json()["report"]
+    assert replay_report["builder_version"] == "report-builder@1"
+    assert replay_report["schema_version"] == 1
+    assert "replay_source" not in replay_report
+    # Not activated: the sealed outcome still follows the legacy rule (the replay's winner).
+    stored = owner.execute(
+        "SELECT r.outcome, convert_from(a.content, 'UTF8')::jsonb -> 'winner' FROM "
+        "investigation_runs r JOIN experiments e ON e.run_id = r.id JOIN artifacts a "
+        "ON a.id = e.result_artifact_id WHERE r.id = %s",
+        (replay_run,),
+    ).fetchone()
+    assert stored is not None
+    assert stored[0] == ("verified_recommendation" if stored[1] else "inconclusive")
+    # The pure classifier gives a contract-valid answer on these real records.
+    attempt = (await api.get(f"/api/v1/replay-attempts/{started.json()['id']}")).json()
+    decided = classify_replay_outcome(again, attempt["result"])
+    assert decided.basis in BASIS_CODES
+    assert sealed_shas(owner, run_id) == (manifest_sha, report_sha)
+
+
+async def test_snapshot_survives_later_source_changes_and_deletion(
+    api: httpx.AsyncClient,
+    app_engine: AsyncEngine,
+    owner: psycopg.Connection,
+    migrated_db: str,
+    provisioner: SandboxProvisioner,
+) -> None:
+    run_id, experiment_id = await finalized_sandbox_run(api, app_engine, migrated_db, provisioner)
+    started = await api.post(
+        f"/api/v1/experiments/{experiment_id}/replay", json={"confirm_ddl": True}
+    )
+    replay_run = uuid.UUID(started.json()["replay_run_id"])
+    async with app_engine.connect() as conn:
+        captured = await load_source_snapshot(conn, replay_run)
+    assert captured is not None
+
+    owner_engine = make_engine(migrated_db)
+    try:
+        async with owner_engine.connect() as conn:
+            trans = await conn.begin()
+            for sql in (
+                "UPDATE investigation_runs SET outcome = 'inconclusive', deleted_at = now() "
+                "WHERE id = :id",
+                "DELETE FROM investigation_reports WHERE run_id = :id",
+                "DELETE FROM replay_manifests WHERE run_id = :id",
+                "DELETE FROM run_artifacts WHERE run_id = :id",
+                "DELETE FROM experiments WHERE run_id = :id",
+                "DELETE FROM investigation_runs WHERE id = :id",
+            ):
+                await conn.execute(text(sql), {"id": run_id})
+            assert await load_source_snapshot(conn, replay_run) == captured
+            await trans.rollback()
+    finally:
+        await owner_engine.dispose()
+
+
+async def test_missing_source_run_is_source_integrity_failed(
+    app_engine: AsyncEngine, owner: psycopg.Connection
+) -> None:
+    """D6a: an experiment whose run row is gone (integrity bug) is refused, not a crash."""
+    experiment_id = uuid.uuid4()
+    owner.execute(
+        "INSERT INTO experiments (id, run_id, round, kind, approval_request_id, "
+        "config_artifact_id, engine_version, row_profile, seed, status) VALUES "
+        "(%s, uuid_generate_v4(), 0, 'single', uuid_generate_v4(), uuid_generate_v4(), "
+        "'bench@2', 'qc-row-v1', 1, 'completed')",
+        (experiment_id,),
+    )
+    async with app_engine.connect() as conn:
+        pre = await check_preconditions(conn, SETTINGS, experiment_id)
+    assert (pre.code, pre.detail) == ("source_integrity_failed", "source run missing")
+    assert pre.snapshot is None
+
+
+async def test_source_failing_integrity_gets_no_snapshot(
+    api: httpx.AsyncClient,
+    app_engine: AsyncEngine,
+    migrated_db: str,
+    provisioner: SandboxProvisioner,
+) -> None:
+    run_id, experiment_id = await finalized_sandbox_run(api, app_engine, migrated_db, provisioner)
+    owner_engine = make_engine(migrated_db)
+    try:
+        async with owner_engine.connect() as conn:
+            trans = await conn.begin()
+            await conn.execute(
+                text(
+                    "UPDATE artifacts SET content = content || ' '::bytea WHERE id = "
+                    "(SELECT report_json_artifact_id FROM investigation_reports WHERE run_id = :r)"
+                ),
+                {"r": run_id},
+            )
+            pre = await check_preconditions(conn, SETTINGS, uuid.UUID(experiment_id))
+            await trans.rollback()
+    finally:
+        await owner_engine.dispose()
+    assert pre.code == "source_integrity_failed"
+    assert pre.snapshot is None
+
+
+async def test_inconsistent_source_records_are_not_replayable_and_create_no_run(
+    api: httpx.AsyncClient,
+    app_engine: AsyncEngine,
+    owner: psycopg.Connection,
+    migrated_db: str,
+    provisioner: SandboxProvisioner,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Missing recommendation evidence or a candidate/experiment hash mismatch in the source's
+    sealed records (SourceSnapshotError) maps to the existing `source_integrity_failed`."""
+    run_id, experiment_id = await finalized_sandbox_run(api, app_engine, migrated_db, provisioner)
+    before = counts(owner, run_id, experiment_id)
+
+    async def inconsistent(*a: Any, **k: Any) -> Any:
+        raise SourceSnapshotError("source recommendation evidence is missing")
+
+    monkeypatch.setattr("querycure.replay.experiment_replay.capture_source_snapshot", inconsistent)
+    r = await api.post(f"/api/v1/experiments/{experiment_id}/replay", json={"confirm_ddl": True})
+    assert r.status_code == 422, r.text
+    detail = r.json()["error"]["details"][0]
+    assert detail["code"] == "source_integrity_failed"
+    assert detail["detail"] == "source recommendation evidence is missing"
+    attempt = owner.execute(
+        "SELECT status, replay_run_id FROM replay_attempts WHERE id = %s",
+        (detail["replay_attempt_id"],),
+    ).fetchone()
+    assert attempt == ("not_replayable", None)
+    after = counts(owner, run_id, experiment_id)
+    assert after[0] == before[0]  # no run
+    assert after[2:] == before[2:]  # no job, no snapshot link
+
+
+@pytest.mark.parametrize("fault", ["link_source_snapshot", "insert_attempt"])
+async def test_a_fault_during_start_rolls_back_the_run_and_its_snapshot(
+    fault: str,
+    api: httpx.AsyncClient,
+    app_engine: AsyncEngine,
+    owner: psycopg.Connection,
+    migrated_db: str,
+    provisioner: SandboxProvisioner,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    run_id, experiment_id = await finalized_sandbox_run(api, app_engine, migrated_db, provisioner)
+    before = counts(owner, run_id, experiment_id)
+    original = getattr(experiment_replay, fault)
+
+    async def boom(*a: Any, **k: Any) -> Any:
+        if fault == "insert_attempt" and k.get("status") == "not_replayable":
+            return await original(*a, **k)
+        raise RuntimeError(f"injected fault in {fault}")
+
+    monkeypatch.setattr(experiment_replay, fault, boom)
+    with pytest.raises(RuntimeError, match="injected fault"):
+        async with app_engine.begin() as conn:
+            await experiment_replay.start_replay(
+                conn,
+                settings=SETTINGS,
+                user_id=user_of(owner, run_id),
+                experiment_id=uuid.UUID(experiment_id),
+            )
+    assert counts(owner, run_id, experiment_id) == before
+
+
+# --- Snapshot integrity and legacy compatibility (checkpoint 2026-10-30) -----------------
+
+
+async def start_and_seal(
+    api: httpx.AsyncClient,
+    app_engine: AsyncEngine,
+    provisioner: SandboxProvisioner,
+    experiment_id: str,
+    *,
+    seal: bool,
+) -> uuid.UUID:
+    started = await api.post(
+        f"/api/v1/experiments/{experiment_id}/replay", json={"confirm_ddl": True}
+    )
+    assert started.status_code == 202, started.text
+    replay_run = uuid.UUID(started.json()["replay_run_id"])
+    if seal:
+        await execute_experiment_replay(
+            app_engine, replay_run, sandbox=provisioner, options=EngineOptions(), reclaimed=False
+        )
+    return replay_run
+
+
+async def load_as_owner(migrated_db: str, replay_run: uuid.UUID, *sql: str) -> Any:
+    """`load_source_snapshot` after owner-only tampering, inside a rolled-back transaction.
+    Returns the snapshot or the exception it raised."""
+    owner_engine = make_engine(migrated_db)
+    try:
+        async with owner_engine.connect() as conn:
+            trans = await conn.begin()
+            try:
+                for statement in sql:
+                    await conn.execute(text(statement), {"r": replay_run})
+                return await load_source_snapshot(conn, replay_run)
+            except SourceSnapshotError as exc:
+                return exc
+            finally:
+                await trans.rollback()
+    finally:
+        await owner_engine.dispose()
+
+
+def drop_link(role: str) -> str:
+    return f"DELETE FROM run_artifacts WHERE run_id = :r AND role = '{role}'"
+
+
+def corrupt(role: str) -> str:
+    return (
+        "UPDATE artifacts SET content = content || ' '::bytea WHERE id = "
+        f"(SELECT artifact_id FROM run_artifacts WHERE run_id = :r AND role = '{role}')"
+    )
+
+
+async def test_historical_replay_without_snapshot_keeps_its_v1_contract(
+    api: httpx.AsyncClient,
+    app_engine: AsyncEngine,
+    owner: psycopg.Connection,
+    migrated_db: str,
+    provisioner: SandboxProvisioner,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A replay started by the pre-snapshot code (no links) stays readable: its sealed manifest
+    lists no snapshot role, so it is legacy (None), and its v1 report still verifies."""
+    run_id, experiment_id = await finalized_sandbox_run(api, app_engine, migrated_db, provisioner)
+    no_llm(monkeypatch)
+
+    async def old_start(*a: Any, **k: Any) -> None:
+        return None
+
+    monkeypatch.setattr(experiment_replay, "link_source_snapshot", old_start)
+    replay_run = await start_and_seal(api, app_engine, provisioner, experiment_id, seal=True)
+    assert snapshot_links(owner, str(replay_run)) == {}
+    async with app_engine.connect() as conn:
+        assert await load_source_snapshot(conn, replay_run) is None
+        verified = await verify_report(conn, replay_run)
+    assert verified.status == "verified", verified.result_json()
+    report = (await api.get(f"/api/v1/runs/{replay_run}/report")).json()["report"]
+    assert (report["builder_version"], report["schema_version"]) == ("report-builder@1", 1)
+    # A link appearing after the seal (only possible outside the app role) is not legacy.
+    tampered = await load_as_owner(
+        migrated_db,
+        replay_run,
+        "INSERT INTO run_artifacts (run_id, artifact_id, role) SELECT :r, manifest_artifact_id, "
+        f"'{ROLE_MANIFEST}' FROM replay_manifests WHERE run_id = '{run_id}'",
+        "INSERT INTO run_artifacts (run_id, artifact_id, role) SELECT :r, "
+        f"report_json_artifact_id, '{ROLE_REPORT_JSON}' FROM investigation_reports "
+        f"WHERE run_id = '{run_id}'",
+    )
+    assert isinstance(tampered, SourceSnapshotError)
+
+
+@pytest.mark.parametrize(
+    "dropped",
+    [(ROLE_MANIFEST,), (ROLE_REPORT_JSON,), (ROLE_MANIFEST, ROLE_REPORT_JSON)],
+    ids=["manifest", "report", "both"],
+)
+async def test_sealed_new_replay_with_missing_snapshot_links_fails_closed(
+    dropped: tuple[str, ...],
+    api: httpx.AsyncClient,
+    app_engine: AsyncEngine,
+    migrated_db: str,
+    provisioner: SandboxProvisioner,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The replay's own sealed manifest is the discriminator: it lists the snapshot roles, so
+    a replay that lost its links is corrupted, never legacy, even when both links are gone."""
+    _, experiment_id = await finalized_sandbox_run(api, app_engine, migrated_db, provisioner)
+    no_llm(monkeypatch)
+    replay_run = await start_and_seal(api, app_engine, provisioner, experiment_id, seal=True)
+    async with app_engine.connect() as conn:
+        assert await load_source_snapshot(conn, replay_run) is not None
+    result = await load_as_owner(migrated_db, replay_run, *(drop_link(r) for r in dropped))
+    assert isinstance(result, SourceSnapshotError)
+
+
+async def test_unsealed_new_replay_with_one_missing_link_fails_closed(
+    api: httpx.AsyncClient,
+    app_engine: AsyncEngine,
+    migrated_db: str,
+    provisioner: SandboxProvisioner,
+) -> None:
+    _, experiment_id = await finalized_sandbox_run(api, app_engine, migrated_db, provisioner)
+    replay_run = await start_and_seal(api, app_engine, provisioner, experiment_id, seal=False)
+    for role in (ROLE_MANIFEST, ROLE_REPORT_JSON):
+        result = await load_as_owner(migrated_db, replay_run, drop_link(role))
+        assert isinstance(result, SourceSnapshotError)
+
+
+@pytest.mark.parametrize("role", [ROLE_MANIFEST, ROLE_REPORT_JSON])
+async def test_corrupted_snapshot_artifact_fails_closed(
+    role: str,
+    api: httpx.AsyncClient,
+    app_engine: AsyncEngine,
+    migrated_db: str,
+    provisioner: SandboxProvisioner,
+) -> None:
+    _, experiment_id = await finalized_sandbox_run(api, app_engine, migrated_db, provisioner)
+    replay_run = await start_and_seal(api, app_engine, provisioner, experiment_id, seal=False)
+    result = await load_as_owner(migrated_db, replay_run, corrupt(role))
+    assert isinstance(result, SourceSnapshotError)
+
+
+async def test_snapshot_artifact_of_the_wrong_kind_fails_closed(
+    api: httpx.AsyncClient,
+    app_engine: AsyncEngine,
+    migrated_db: str,
+    provisioner: SandboxProvisioner,
+) -> None:
+    """A digest-valid JSON artifact of another kind under a snapshot role is rejected."""
+    _, experiment_id = await finalized_sandbox_run(api, app_engine, migrated_db, provisioner)
+    replay_run = await start_and_seal(api, app_engine, provisioner, experiment_id, seal=False)
+    for role in (ROLE_MANIFEST, ROLE_REPORT_JSON):
+        result = await load_as_owner(
+            migrated_db,
+            replay_run,
+            "UPDATE run_artifacts SET artifact_id = (SELECT artifact_id FROM run_artifacts "
+            "WHERE run_id = :r AND role = 'input.experiment_config') "
+            f"WHERE run_id = :r AND role = '{role}'",
+        )
+        assert isinstance(result, SourceSnapshotError)
+
+
+async def test_sealed_replay_reconstructs_without_its_source_run(
+    api: httpx.AsyncClient,
+    app_engine: AsyncEngine,
+    migrated_db: str,
+    provisioner: SandboxProvisioner,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    run_id, experiment_id = await finalized_sandbox_run(api, app_engine, migrated_db, provisioner)
+    no_llm(monkeypatch)
+    replay_run = await start_and_seal(api, app_engine, provisioner, experiment_id, seal=True)
+    async with app_engine.connect() as conn:
+        captured = await load_source_snapshot(conn, replay_run)
+    assert captured is not None
+    after = await load_as_owner(
+        migrated_db,
+        replay_run,
+        *(
+            sql.replace(":id", f"'{run_id}'")
+            for sql in (
+                "DELETE FROM investigation_reports WHERE run_id = :id",
+                "DELETE FROM replay_manifests WHERE run_id = :id",
+                "DELETE FROM run_artifacts WHERE run_id = :id",
+                "DELETE FROM experiments WHERE run_id = :id",
+                "DELETE FROM investigation_runs WHERE id = :id",
+            )
+        ),
+    )
+    assert after == captured
+
+
+async def test_two_replays_share_the_source_artifacts_without_copying(
+    api: httpx.AsyncClient,
+    app_engine: AsyncEngine,
+    owner: psycopg.Connection,
+    migrated_db: str,
+    provisioner: SandboxProvisioner,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    run_id, experiment_id = await finalized_sandbox_run(api, app_engine, migrated_db, provisioner)
+    no_llm(monkeypatch)
+    artifacts_before = owner.execute("SELECT count(*) FROM artifacts").fetchone()
+    first = await start_and_seal(api, app_engine, provisioner, experiment_id, seal=True)
+    second = await start_and_seal(api, app_engine, provisioner, experiment_id, seal=False)
+    assert snapshot_links(owner, str(first)) == snapshot_links(owner, str(second))
+    assert set(snapshot_links(owner, str(first)).values()) == set(sealed_shas(owner, run_id))
+    async with app_engine.connect() as conn:
+        a = await load_source_snapshot(conn, first)
+        b = await load_source_snapshot(conn, second)
+    assert a is not None
+    assert a == b
+    # Content-addressed: one row per digest, however many runs link it.
+    for sha in sealed_shas(owner, run_id):
+        assert owner.execute(
+            "SELECT count(*) FROM artifacts WHERE sha256 = %s", (sha,)
+        ).fetchone() == (1,)
+    assert artifacts_before is not None
