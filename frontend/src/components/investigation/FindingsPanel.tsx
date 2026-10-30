@@ -28,16 +28,18 @@ export function FindingsPanel({
   activeEvidence,
   stepFor,
   onShowStep,
+  emptyText = "No findings yet.",
 }: {
   data: FindingsResponse | undefined;
   onEvidence: (id: string) => void;
   activeEvidence: string | null;
   stepFor?: (key: string) => StepMatch;
   onShowStep?: (spanId: string) => void;
+  emptyText?: string;
 }) {
   const step = (key: string) => (stepFor && onShowStep ? <ShowStep match={stepFor(key)} onShowStep={onShowStep} /> : null);
   if (!data || (data.hypotheses.length === 0 && data.findings.length === 0)) {
-    return <p className="qc-panel p-6 text-muted">No findings yet.</p>;
+    return <p className="qc-panel p-6 text-muted">{emptyText}</p>;
   }
   const byAgent = data.findings.reduce<Record<string, Finding[]>>((acc, f) => {
     (acc[f.agent] ??= []).push(f);

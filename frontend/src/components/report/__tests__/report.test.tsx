@@ -518,3 +518,56 @@ test("reproduced replay: candidate and verification scope lead; source IDs and d
   // the lead sentence carries no IDs
   expect(within(result).getByText(/^Re-measured one experiment of the original investigation/).textContent).not.toMatch(/[0-9a-f]{8}/);
 });
+
+// Mobile readability (2026-10-31): identifiers and digests sit in a collapsed, labelled
+// disclosure; every value stays complete in the DOM and can be copied in full.
+test("source details are a collapsed, labelled disclosure that keeps every value complete", () => {
+  render(<ReportView report={v2("1_reproduced_original")} />);
+  const result = screen.getByRole("region", { name: "Experiment replay result" });
+  const summary = within(result).getByText(/^Source details/, { selector: "summary > span" });
+  const details = summary.closest("details");
+  expect(details?.open).toBe(false);
+  expect(summary.textContent).toMatch(/8 IDs and digests/);
+  // the primary facts stay outside the disclosure
+  expect(details?.contains(within(result).getByText("Correctness reproduced"))).toBe(false);
+  const list = within(result).getByRole("list", { name: "Source details", hidden: true });
+  for (const value of ["00000000-0000-4000-8000-0000000000bb", `sha256:${"1".repeat(64)}`, `sha256:${"2".repeat(64)}`]) {
+    expect(list.textContent).toContain(value);
+  }
+});
+
+test("each technical value copies in full and announces it", async () => {
+  const writeText = vi.fn().mockResolvedValue(undefined);
+  const user = userEvent.setup();
+  Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
+  render(<ReportView report={v2("1_reproduced_original")} />);
+  const result = screen.getByRole("region", { name: "Experiment replay result" });
+  await user.click(within(result).getByText(/^Source details/, { selector: "summary > span" }));
+  await user.click(within(result).getByRole("button", { name: "Copy Source manifest" }));
+  expect(writeText).toHaveBeenLastCalledWith(`sha256:${"1".repeat(64)}`);
+  expect(within(result).getByRole("status").textContent).toBe("Copied Source manifest");
+});
+
+test("a round keeps its full experiment ID and environment in a disclosure", () => {
+  render(<ReportView report={report()} />);
+  const summary = screen.getByText(/^Experiment details/, { selector: "summary > span" });
+  const list = within(summary.closest("details") as HTMLElement).getByRole("list", { hidden: true });
+  expect(list.textContent).toContain("exp-1");
+  expect(list.textContent).toContain(`sha256:${"ab".repeat(32)}`);
+});
+
+test("the report toolbar offers the complete manifest digest, not only its prefix", async () => {
+  getReport.mockResolvedValue({ reportSchemaVersion: 1, manifestSha256: "f".repeat(64), report: report() });
+  renderWithQuery(<ReportPanel runId="run-1" />);
+  const summary = await screen.findByText(/^Report integrity/, { selector: "summary > span" });
+  const list = within(summary.closest("details") as HTMLElement).getByRole("list", { hidden: true });
+  expect(list.textContent).toContain(`sha256:${"f".repeat(64)}`);
+});
+
+test("collapsed technical details open for printing so nothing is left out", () => {
+  render(<ReportView report={v2("1_reproduced_original")} />);
+  const all = () => [...document.querySelectorAll<HTMLDetailsElement>("details[data-print-open]")];
+  expect(all().length).toBeGreaterThan(0);
+  window.dispatchEvent(new Event("beforeprint"));
+  expect(all().every((d) => d.open)).toBe(true);
+});

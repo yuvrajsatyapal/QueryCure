@@ -296,3 +296,39 @@ test("a running run whose stream went offline does not read as completed and doe
   expect(within(header).queryByText("Completed")).toBeNull();
   expect(moving(header)).toEqual([]);
 });
+
+// Experiment replays re-measure one experiment without rerunning the agents (UI_UX §3.6,
+// 2026-10-31): an empty graph and empty findings must not read as a failed or stalled run.
+test("a completed experiment replay explains why the graph and findings are empty", async () => {
+  const { getRun, getFindings } = await import("@/lib/api/investigations");
+  const real = await vi.mocked(getRun)("run-1");
+  vi.mocked(getRun).mockResolvedValue({ ...real, kind: "experiment_replay", status: "completed", outcome: "verified_recommendation", finalized: true });
+  vi.mocked(getFindings).mockResolvedValueOnce({ hypotheses: [], findings: [] } as never);
+  runEvents.override = {
+    events: [
+      { runId: "run-1", seq: 1, ts: "2026-10-12T10:00:00.000Z", type: "run.status_changed", payload: { from: null, to: "queued" } },
+      { runId: "run-1", seq: 2, ts: "2026-10-12T10:00:01.000Z", type: "run.status_changed", payload: { from: "queued", to: "running" } },
+    ],
+    live: false,
+    stream: "closed",
+  };
+  try {
+    const user = userEvent.setup();
+    renderWithQuery(<InvestigationView id="inv-1" />);
+    expect(await screen.findByText("No agent steps: an experiment replay re-measures the benchmark without rerunning the agents")).toBeDefined();
+    expect(screen.queryByText(/graph steps reached/)).toBeNull();
+    expect(await screen.findByText(/An experiment replay does not rerun the agents, so it has no findings of its own/)).toBeDefined();
+    expect(screen.queryByText("No findings yet.")).toBeNull();
+    await user.click(screen.getByRole("button", { name: "Graph" }));
+    const graph = screen.getByRole("region", { name: "Agent graph" });
+    expect(within(graph).getByRole("note").textContent).toMatch(/did not rerun the agents, so no graph step was reached.*Waterfall/);
+  } finally {
+    vi.mocked(getRun).mockResolvedValue(real);
+  }
+});
+
+test("an ordinary run keeps its graph step count and has no replay note", async () => {
+  renderWithQuery(<InvestigationView id="inv-1" />);
+  expect(await screen.findByText(/of \d+ graph steps reached/)).toBeDefined();
+  expect(screen.queryByText(/without rerunning the agents/)).toBeNull();
+});

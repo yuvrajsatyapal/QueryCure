@@ -117,6 +117,8 @@ test("rehearsal - activated replay outcome through the real stack, no intercepti
   await expect(article.getByText("Verified recommendation", { exact: true })).toHaveCount(0);
   const original = article.getByRole("region", { name: "Original recommendation" });
   await expect(original.getByText(/reproduced by this replay/)).toBeVisible();
+  // IDs and digests are one disclosure away (UI_UX §3.11); open it as a reader would.
+  await original.locator("summary", { hasText: "Source details" }).click();
   await expect(original.getByRole("list", { name: "Source details" })).toContainText(sourceRun);
   await expect(article.getByRole("region", { name: "Experiment replay result" }).getByText(/replay measurement, not a verification/)).toBeVisible();
   await expect(article.getByRole("region", { name: "Comparison with the original" })).toBeVisible();

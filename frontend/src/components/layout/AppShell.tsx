@@ -83,7 +83,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     <CommandProvider>
       <div className="flex min-h-full flex-1">
         <aside
-          className={`sticky top-0 hidden h-screen shrink-0 flex-col gap-5 border-r border-border bg-sidebar py-3 md:flex ${rail ? "w-14 px-2" : "w-60 px-3"}`}
+          className={`sticky top-0 hidden h-screen shrink-0 flex-col gap-5 overflow-y-auto border-r border-border bg-sidebar py-3 md:flex ${rail ? "w-14 px-2" : "w-60 px-3"}`}
         >
           <SidebarBody collapsed={rail} onToggle={() => setRail(!rail)} />
         </aside>

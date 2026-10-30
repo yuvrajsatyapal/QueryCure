@@ -806,3 +806,10 @@ Defaults are chosen so implementation can proceed; change any before the listed 
     - production worker logs need scanning after deploy;
     - plain-worker replays on this host were all `comparison_inconclusive` (reproduced and drift proven with the virtual clock).
 
+
+- [x] **Final UI polish and release-readiness checkpoint (2026-10-31, [report](../reports/FINAL_UI_POLISH_RELEASE_READINESS_2026-10-31.md)). Ready for deployment review — verified locally, not deployed.** Frontend only; no backend, API, schema, builder, fixture or sealed-report change; nothing pushed.
+  - **Sidebar:** the nav no longer shrinks under the account footer on short viewports (a real bug in production builds too; Settings was unreachable at 1024×360); the desktop sidebar scrolls. The Next dev badge that covered the sign-in links is hidden (`devIndicators: false`; it never appears in production).
+  - **Reports:** IDs and digests sit in collapsed, labelled *Source details*, *Experiment details* and *Report integrity* disclosures with complete, copyable values (the 16-character manifest prefix and 8-character experiment IDs are gone); they open for printing.
+  - **Replay workspace:** experiment replays explain that the agents are not rerun (view strip, Graph note, Findings) instead of "0 of 13 graph steps reached" / "No findings yet."
+  - **Verified:** lint, typecheck, Vitest 607, build; Playwright 36/36 (run 1: 2 failures from a first `bottom-right` badge attempt, fixed); rehearsal 1/1; backend report unit 290 + cutover 13; local cutover gate exit 0; local `verify-integrity` 782/782 reports, 9,076 artifacts.
+  - **Next:** owner review; deployment steps (DEPLOYMENT, ADR-0032 cutover) need separate approval. The landing page can follow.

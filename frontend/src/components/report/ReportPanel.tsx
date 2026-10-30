@@ -19,6 +19,7 @@ import { REPLAY_CODE_TEXT, REPORT_REPLAY_STATUS } from "@/lib/report/labels";
 import { LEGACY_REPLAY_NOTICE, LEGACY_REPLAY_TITLE, isLegacyReplayReport } from "@/lib/report/replay";
 import type { ReportV1 } from "@/lib/report/types";
 import { ReportView } from "./ReportView";
+import { TechnicalDetails } from "./TechnicalDetails";
 
 /** Report tab / page: the stored, digest-verified report JSON rendered for reading; the stored
  * Markdown when this client does not know the report schema (REPLAY_ENGINE §7 rule 4). */
@@ -120,7 +121,17 @@ export function ReportPanel({
         >
           {verify.isPending ? "Verifying…" : "Verify report"}
         </button>
-        <span className="break-all font-mono text-[11px] text-muted">manifest sha256:{report.data.manifestSha256.slice(0, 16)}…</span>
+      </div>
+      <div className="print:hidden">
+        <TechnicalDetails
+          label="Report integrity"
+          rows={[
+            ["Manifest", `sha256:${report.data.manifestSha256}`],
+            ["Report JSON", report.data.reportJsonSha256 ? `sha256:${report.data.reportJsonSha256}` : null],
+            ["Report Markdown", report.data.reportMdSha256 ? `sha256:${report.data.reportMdSha256}` : null],
+            ["Sealed by", report.data.builderVersion ? `${report.data.builderVersion} · ${report.data.mdRendererVersion ?? ""}`.replace(/ · $/, "") : null],
+          ]}
+        />
       </div>
       <ErrorNotice error={verify.error} />
       {attempt ? (

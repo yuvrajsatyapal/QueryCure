@@ -121,7 +121,9 @@ export function SideNav({ collapsed = false, onNavigate }: { collapsed?: boolean
     </div>
   );
   return (
-    <nav aria-label="Main" className="flex min-h-0 flex-1 flex-col gap-5">
+    // No `min-h-0`: on short viewports the nav keeps its content height and the sidebar scrolls,
+    // instead of the nav shrinking and its links painting over the account footer.
+    <nav aria-label="Main" className="flex flex-1 flex-col gap-5">
       <div className={`flex flex-col gap-1.5 ${collapsed ? "items-center" : ""}`}>
         <button
           type="button"

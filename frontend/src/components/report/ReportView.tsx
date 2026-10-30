@@ -7,6 +7,7 @@ import { VerdictBadge } from "@/components/tournament/VerdictBadge";
 import { describeCandidate } from "@/lib/benchmark/candidate";
 import { REASON_TEXT, VERDICT_EXPLANATION, ms, x } from "@/lib/report/labels";
 import { REPLAY_TONE, YES_NO, headlineBody, replayResultOf, reportTitle } from "@/lib/report/replay";
+import { TechnicalDetails, useOpenDetailsForPrint } from "./TechnicalDetails";
 import { reportSections, sectionId, type ReportSection } from "@/lib/report/sections";
 import type { CandidateAudit, Measurement, ReplayResult, ReportRound, ReportV1 } from "@/lib/report/types";
 
@@ -259,10 +260,19 @@ function Round({ rnd, onWhy }: { rnd: ReportRound; onWhy?: Why }) {
       {exp ? (
         <>
           <p className="text-xs text-muted">
-            Experiment <span className="font-mono">{exp.id.slice(0, 8)}</span> · {exp.status} · engine {exp.engineVersion} · seed {exp.seed} ·
-            samples {exp.provenance ?? "none"}
+            Experiment {exp.status} · engine {exp.engineVersion} · seed {exp.seed} · samples {exp.provenance ?? "none"}
             {exp.environment.pgVersion ? ` · PostgreSQL ${exp.environment.pgVersion}, ${exp.environment.cpuArch}, ${exp.environment.containerRuntime}` : ""}
           </p>
+          <TechnicalDetails
+            label="Experiment details"
+            rows={[
+              ["Experiment", exp.id],
+              ["Result", exp.resultSha256 ? `sha256:${exp.resultSha256}` : null],
+              ["Environment", exp.environment.digest],
+              ["Sandbox image", exp.environment.sandboxImageDigest],
+              ["Workload data", exp.environment.workloadDataDigest],
+            ]}
+          />
           {exp.errorCode ? <p className="text-sm text-rejected">Experiment error: {exp.errorCode}</p> : null}
           {exp.measurements.length ? <MeasurementTable rows={exp.measurements} onWhy={onWhy} /> : null}
           {exp.correctness.length ? (
@@ -295,21 +305,6 @@ function Round({ rnd, onWhy }: { rnd: ReportRound; onWhy?: Why }) {
 }
 
 const TONE_TEXT = { verified: "text-verified", inconclusive: "text-inconclusive", rejected: "text-rejected", muted: "text-muted" } as const;
-
-/** Identifiers and digests for reproducing a claim: always shown in full, set small and after the
- * content they support so they do not compete with it on narrow screens. */
-function SourceDetails({ rows }: { rows: [string, string | null | undefined][] }) {
-  return (
-    <ul aria-label="Source details" className="flex flex-col gap-1 rounded-md border border-border px-3 py-2 text-xs text-muted">
-      {rows.map(([k, v]) => (
-        <li key={k} className="flex min-w-0 flex-col sm:flex-row sm:gap-2">
-          <span className="shrink-0 sm:w-40">{k}</span>
-          <span className="min-w-0 font-mono break-all text-ink">{v ?? "not recorded"}</span>
-        </li>
-      ))}
-    </ul>
-  );
-}
 
 /** Schema 2, experiment replays: the builder's sealed facts about the replay and its source. */
 function ReplayResultSection({ rr, n }: { rr: ReplayResult; n: number }) {
@@ -347,7 +342,8 @@ function ReplayResultSection({ rr, n }: { rr: ReplayResult; n: number }) {
           "none"
         )}
       </p>
-      <SourceDetails
+      <TechnicalDetails
+        label="Source details"
         rows={[
           ["Source run", src ? `${src.runId} (${src.runKind.replaceAll("_", " ")})` : "no source snapshot was read"],
           ["Source experiment", src?.experimentId ?? rr.experimentMatch.replayedExperimentId],
@@ -372,6 +368,7 @@ export function ReportView({ report, onWhy, toc = false }: { report: ReportV1; o
   const rr = replayResultOf(r);
   const fromSource = rr !== null && rec.origin === "source_run";
   const n = (title: string) => sections.findIndex((s) => s.title === title) + 1;
+  useOpenDetailsForPrint();
   const article = (
     <article className="flex min-w-0 max-w-[46rem] flex-col gap-6" aria-label="Final report">
       <header className="flex flex-col gap-3 qc-panel p-5">
@@ -519,7 +516,8 @@ export function ReportView({ report, onWhy, toc = false }: { report: ReportV1; o
                   />
                 </p>
               ) : null}
-              <SourceDetails
+              <TechnicalDetails
+                label="Source details"
                 rows={[
                   ["Candidate", rec.candidateKey],
                   ["Source run", rec.sourceRunId],

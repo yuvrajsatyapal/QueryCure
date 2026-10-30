@@ -44,6 +44,10 @@ export default function config(phase: string): NextConfig {
       if (process.env.NODE_ENV !== "production") return [];
       return [{ source: "/:path*", headers: securityHeaders(apiOrigin) }];
     },
+    // Dev only (absent from production builds). Every corner covers a control: bottom-left the
+    // sidebar's sign-in links, bottom-right the approval drawer's Close. Errors still open the
+    // dev overlay; only the corner badge is hidden.
+    devIndicators: false,
     cacheComponents: true,
     partialPrefetching: true,
     turbopack: {

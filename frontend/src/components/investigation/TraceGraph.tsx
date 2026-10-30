@@ -56,6 +56,7 @@ export function TraceGraph({
   fillHeight = false,
   focusRequest = false,
   onFocusDone,
+  note,
 }: {
   trace: Span;
   active: boolean;
@@ -69,6 +70,8 @@ export function TraceGraph({
    * graph is already shown or mounts with the request; `onFocusDone` acknowledges it. */
   focusRequest?: boolean;
   onFocusDone?: () => void;
+  /** Why the graph is empty when that is expected (an experiment replay runs no agents). */
+  note?: string;
 }) {
   const { nodes, taken } = graphRun(trace);
   const [zoom, setZoom] = useState<number | "fit">("fit");
@@ -219,6 +222,11 @@ export function TraceGraph({
           </div>
         </div>
       </header>
+      {note ? (
+        <p role="note" className="border-b border-border px-3 py-2 text-xs text-muted">
+          {note}
+        </p>
+      ) : null}
       <div
         ref={box}
         tabIndex={-1}

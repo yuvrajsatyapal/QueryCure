@@ -235,6 +235,8 @@ export function InvestigationView({ id, requestedRunId }: { id: string; requeste
   const graph = useMemo(() => graphRun(trace), [trace]);
   const clock = useClock(active);
   // A completed replay's header uses the shared classification of its sealed report (§18.1).
+  // Experiment replays run no agents (REPLAY_ENGINE): their graph and findings are empty by design.
+  const replayRun = r?.kind === "experiment_replay";
   const replayOutcome = r?.kind === "experiment_replay" && r.status === "completed" ? runOutcomeText(classifyRunOutcome(r, replayReportState(sealed))) : undefined;
   const activity = activityOf({
     status: r?.status ?? "queued",
@@ -595,6 +597,7 @@ export function InvestigationView({ id, requestedRunId }: { id: string; requeste
           activeEvidence={evidence?.evidence.id ?? null}
           stepFor={(key) => stepForClaim(claimIndex, key)}
           onShowStep={showStep}
+          emptyText={replayRun ? "An experiment replay does not rerun the agents, so it has no findings of its own. The original run keeps its findings." : undefined}
         />
       ) : currentPlan ? (
         <PlanExplorer
@@ -679,6 +682,7 @@ export function InvestigationView({ id, requestedRunId }: { id: string; requeste
         fillHeight={wide}
         focusRequest={paneFocus}
         onFocusDone={focusDone}
+        note={replayRun ? "This experiment replay did not rerun the agents, so no graph step was reached. Its recorded benchmark events are in the Waterfall." : undefined}
       />
     ) : (
       <TraceTree
@@ -887,7 +891,11 @@ export function InvestigationView({ id, requestedRunId }: { id: string; requeste
           ))}
         </div>
         <span className="text-[13px] text-muted">
-          {graph.nodes.size ? `${[...graph.nodes.values()].filter((n) => n.state !== "not_reached").length} of ${graph.nodes.size} graph steps reached` : ""}
+          {replayRun
+            ? "No agent steps: an experiment replay re-measures the benchmark without rerunning the agents"
+            : graph.nodes.size
+              ? `${[...graph.nodes.values()].filter((n) => n.state !== "not_reached").length} of ${graph.nodes.size} graph steps reached`
+              : ""}
         </span>
         {mode !== "results" && wide ? <span className="ml-auto hidden text-xs text-muted @4xl:inline">Right-click or Shift+F10 on a step for actions</span> : null}
       </div>
