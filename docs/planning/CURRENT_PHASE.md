@@ -4,7 +4,7 @@
 |---|---|
 | Phase | **5 — Production polish** (authorized by the owner 2026-10-16). Phase 1: [PHASE_1_REPORT](reports/PHASE_1_REPORT.md); Phase 2: [PHASE_2_REPORT](reports/PHASE_2_REPORT.md); Phase 3: [PHASE_3_REPORT](reports/PHASE_3_REPORT.md); Phase 4 owner-reviewed 2026-10-16: [PHASE_4_REPORT](reports/PHASE_4_REPORT.md) |
 | Status | **Phase 5 implementation complete and verified locally (2026-10-16); not publicly deployed; awaiting owner review** ([PHASE_5_REPORT](reports/PHASE_5_REPORT.md)). Exit criterion "deployed" not met by design (needs owner approval, domain, accounts) |
-| Last updated | 2026-10-27 |
+| Last updated | 2026-10-30 |
 | Application code | Phases 1–3 (API, metadata DB, parsing, inspection gateway, artifact store, six demo workloads, multi-agent graph, approval gate, sandbox benchmark engine `bench@2`, tournament, web workspace) plus Phase 4: Benchmark Auditor (deterministic checks + downgrade-only review), atomic finalization with versioned reports (`report-builder@1`, `report-md@1`), report replay, experiment replay with statistical comparison, re-investigation start, plan diff; migrations 0001–0012; web app adds Report tab, report and replay pages, lineage drawer, audit panel and plan diff |
 
 ## Post-Phase-5 addition (2026-10-16)
@@ -742,4 +742,17 @@ Defaults are chosen so implementation can proceed; change any before the listed 
 - [x] **Experiment replay outcome audit (2026-10-27): read-only audit completed; backend correction proposed and awaiting owner approval. The defect is NOT resolved.** Report: [REPLAY_OUTCOME_AUDIT_2026-10-27](../reports/REPLAY_OUTCOME_AUDIT_2026-10-27.md). No backend, API, schema, migration, builder, renderer, replay-engine or sealed-artifact change; local metadata DB read only (`BEGIN READ ONLY`); no Neon access; nothing pushed or deployed.
   - **Root cause (confirmed):** a replay run's outcome comes from its own engine winner (`experiment_replay._close`, `result.winner`), not from the comparison or the source run's sealed outcome; `report-builder@1` derives `recommendation` from the replay run's own candidates, which never exist. So 56 of 94 local replays (was 91 earlier; 3 added by this session's harness) seal `verified_recommendation`, all 94 seal an empty recommendation, 47 of the 56 have an `inconclusive` comparison, and 28 of the 56 replayed an investigation that verified nothing (an upgrade by one experiment without replication, auditor or materiality gate).
   - **Proposed (needs approval, decisions D1–D8 in the report):** classify new replay outcomes from (source sealed outcome × comparison status) so a replay never upgrades; snapshot the verified source outcome and recommendation into the replay run (`input.replay_source`); `report-builder@2` + `report-md@2` (schema 2, additive) referencing the original candidate with provenance; frontend renders schema 2 and annotates, without changing, sealed v1 replay reports. No migration, no API change. Existing sealed reports stay byte-identical.
-  - **Next:** owner review of the proposal. Workstream 4 Stage 3 stays paused until then.
+  - **Design review (2026-10-27): Design finalized — awaiting explicit backend implementation approval.** The report's §12 holds the final D1–D8, new D9–D12, the replay outcome contract (a 10-rule classifier and a 16-row decision table), the architecture review and the test-first implementation sequence. The backend defect is **not** resolved, and nothing was implemented or committed.
+    - **Changes to the proposal:**
+      - ±25% is ADR-0023's accepted margin, not a new one.
+      - A drifted replay seals `inconclusive`, reversing the earlier D1 recommendation.
+      - A cross-environment comparison never confirms the source (D9).
+      - A replay of a replay never passes its source's outcome on (D10).
+      - The source outcome is carried only when the replayed experiment is the one the recommendation measured (D11).
+      - Failed or cancelled sources seal `inconclusive` (D12).
+      - The classification basis is sealed in `run.concluded` (`replay_basis`, only on replay runs), so the builder never re-classifies.
+      - `report-builder@2` wraps the frozen v1.
+    - **Facts:** `no_action_needed` sources cannot reach a replay today (`write_report.decide`). D6 needs no new code.
+    - **Order once approved:** classifier → snapshot → v2 builder and renderer registered but not current → frontend → one activation commit → docs (ADR-0032). The emergency fallback A′ seals every replay `inconclusive`.
+  - **Owner approval (2026-10-30): design approved (9.4/10).** D1–D12, the §12.3 contract and the §12.5 order, plus the report's §13: invariants I7–I14 (a replay never creates a recommendation or improves its original's verification; it confirms one re-measured experiment only; cross-environment, replay-of-replay, mismatched-experiment and noise-warning cases never confirm; missing provenance fails closed), D1 tied to ADR-0023's 95% interval and `m = 1.25`, headlines that say *reproduced by replay* instead of *verified*, and planned non-mutating legacy notices for v1 replay reports in the report view, result summary and run selector.
+  - **Authorized now:** test-first classifier (`replay/outcome.py`, no caller in `_close`) and the immutable source snapshot. **Not authorized:** activation, `report-builder@2`, `report-md@2`, schema 2, frontend replay changes, migrations, API changes. Workstream 4 Stage 3 stays paused.
