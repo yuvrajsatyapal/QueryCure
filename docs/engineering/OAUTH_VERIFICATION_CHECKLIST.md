@@ -40,7 +40,7 @@
 |---|---|---|
 | 1 | Open the web app; start one investigation anonymously; note its URL | Investigation visible |
 | 2 | DevTools → Application → Cookies: note that `qc_session` exists (do not copy the value anywhere) | `HttpOnly`, `Secure`, `SameSite=Lax`, domain `.<domain>` |
-| 3 | Click "Sign in with <provider>" | Redirect to the provider; the URL has `code_challenge_method=S256`, a `state`, and the exact registered `redirect_uri`. `qc_oauth` is set on the API path |
+| 3 | Click **Sign in** in the sidebar, then "Continue with <provider>" (on the restricted-trial screen: "Sign in with <provider>") | Redirect to the provider; the URL has `code_challenge_method=S256`, a `state`, and the exact registered `redirect_uri`. `qc_oauth` is set on the API path |
 | 4 | Approve on the provider | Redirect back to `https://app.<domain>/app` (or the `return_to` path) |
 | 5 | Inspect cookies | `qc_session` **value changed**; `qc_oauth` gone |
 | 6 | `GET https://api.<domain>/api/v1/me` from the app | The account kind is the provider and the display name is shown; no email |

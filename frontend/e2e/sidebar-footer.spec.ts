@@ -4,7 +4,7 @@ import { applyTheme } from "./theme";
 /** Layout regression (UI_UX §3.6, 2026-10-31). On short viewports the sidebar's nav shrank below
  * its content (`min-h-0`, no overflow), so Connections, Demo gallery and Settings painted over the
  * account footer and Settings could not be reached. Separately, the Next dev indicator (fixed,
- * bottom-left in dev only) sat on the sign-in links. Every footer control must be the topmost
+ * bottom-left in dev only) sat on the footer's sign-in controls. Every footer control must be the topmost
  * element at its own centre once scrolled into view, and no nav link may intersect the footer. */
 
 const SIZES = [
@@ -42,7 +42,9 @@ async function topmost(page: Page, selector: string, index: number) {
   );
 }
 
-const FOOTER_CONTROLS = ['a[href="/app/settings"]', 'button[aria-label*="theme" i]', 'a[aria-label^="Sign in with"]'];
+// The Sign in button exists only where a provider is configured (not in CI); sidebar-auth.spec
+// covers it with a mocked session.
+const FOOTER_CONTROLS = ['a[href="/app/settings"]', 'button[aria-label*="theme" i]', "[data-sidebar-footer] button"];
 
 for (const scheme of ["dark", "light"] as const) {
   test(`sidebar footer - controls stay reachable and uncovered (${scheme})`, async ({ page }) => {

@@ -12,19 +12,26 @@ export interface MenuItem {
 }
 
 const MARGIN = 8;
+const GAP = 4;
 
 /** A WAI-ARIA menu at a point (right-click, Shift+F10, the context-menu key, or a long press).
- * Arrow keys move, Enter/Space choose, Esc and Tab close; focus returns to the opener. */
+ * Arrow keys move, Enter/Space choose, Esc and Tab close; focus returns to the opener.
+ *
+ * With `anchor` it is a menu button's popup instead: it opens upward from `at` (the anchor's
+ * top-left), and a press on the anchor is left to the anchor's own toggle. Fixed positioning keeps
+ * it from being clipped by a scrolling ancestor such as the sidebar. */
 export function ContextMenu({
   label,
   at,
   items,
   onClose,
+  anchor,
 }: {
   label: string;
   at: { x: number; y: number };
   items: MenuItem[];
   onClose: () => void;
+  anchor?: HTMLElement | null;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   // The opener, read before the menu takes focus, so focus can go back to it.
@@ -40,26 +47,36 @@ export function ContextMenu({
     const el = ref.current;
     if (!el) return;
     const { width, height } = el.getBoundingClientRect();
+    const y = anchor ? at.y - height - GAP : at.y;
     setPos({
       x: Math.max(MARGIN, Math.min(at.x, window.innerWidth - width - MARGIN)),
-      y: Math.max(MARGIN, Math.min(at.y, window.innerHeight - height - MARGIN)),
+      y: Math.max(MARGIN, Math.min(y, window.innerHeight - height - MARGIN)),
     });
-    el.querySelector<HTMLElement>('[role="menuitem"]:not([aria-disabled="true"])')?.focus();
-  }, [at]);
+    // No scroll: inside the sidebar, focusing a fixed child would scroll its container.
+    el.querySelector<HTMLElement>('[role="menuitem"]:not([aria-disabled="true"])')?.focus({ preventScroll: true });
+  }, [at, anchor]);
 
   useEffect(() => {
     const outside = (e: PointerEvent) => {
-      if (!ref.current?.contains(e.target as Node)) close.current();
+      const target = e.target as Node;
+      if (!ref.current?.contains(target) && !anchor?.contains(target)) close.current();
     };
     const away = () => close.current();
+    // An anchored menu would drift off its button if the sidebar (or page) scrolled it away.
+    const scrolled = () => {
+      const r = anchor?.getBoundingClientRect();
+      if (r && (Math.abs(r.left - at.x) > 1 || Math.abs(r.top - at.y) > 1)) close.current();
+    };
     document.addEventListener("pointerdown", outside, true);
     window.addEventListener("resize", away);
+    if (anchor) document.addEventListener("scroll", scrolled, true);
     return () => {
       document.removeEventListener("pointerdown", outside, true);
       window.removeEventListener("resize", away);
+      document.removeEventListener("scroll", scrolled, true);
       if (opener?.isConnected) opener.focus();
     };
-  }, [opener]);
+  }, [opener, anchor, at]);
 
   function onKeyDown(e: KeyboardEvent<HTMLDivElement>) {
     const all = Array.from(ref.current?.querySelectorAll<HTMLElement>('[role="menuitem"]:not([aria-disabled="true"])') ?? []);
