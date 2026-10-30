@@ -28,6 +28,7 @@ from querycure.events.types import EventType
 from querycure.evidence.store import list_evidence
 from querycure.replay.artifact_store import get_artifact_by_id, load_json
 from querycure.replay.canonical import to_canonical
+from querycure.replay.source_snapshot import SourceSnapshotError, load_source_snapshot
 
 
 @dataclass(frozen=True)
@@ -49,6 +50,10 @@ class ReportInputs:
     llm_calls: list[dict[str, Any]]
     comparison: dict[str, Any] | None = None
     replay_of: dict[str, Any] | None = field(default=None)
+    # report-builder@2 only (report-builder@1 never reads them): an experiment replay's
+    # source snapshot (`ReplaySourceSnapshot`, JSON), or why it could not be loaded.
+    replay_source: dict[str, Any] | None = None
+    replay_source_error: str | None = None
 
 
 async def _role(conn: AsyncConnection, run_id: uuid.UUID, role: str) -> Any:
@@ -145,6 +150,13 @@ async def load_report_inputs(
             {"run": run_id},
         )
     ).all()
+    replay_source, replay_source_error = None, None
+    if run.kind == "experiment_replay":
+        try:  # derived from the replay's own sealed links, never from the source run's rows
+            snapshot = await load_source_snapshot(conn, run_id)
+            replay_source = None if snapshot is None else snapshot.model_dump(mode="json")
+        except SourceSnapshotError as exc:
+            replay_source_error = exc.detail
     return ReportInputs(
         run={
             "id": str(run.id),
@@ -199,4 +211,6 @@ async def load_report_inputs(
         ],
         comparison=None if comparison_art is None else json.loads(comparison_art.content),
         replay_of=replay_of,
+        replay_source=replay_source,
+        replay_source_error=replay_source_error,
     )

@@ -16,6 +16,7 @@ import {
   verifyReport,
 } from "@/lib/api/reports";
 import { REPLAY_CODE_TEXT, REPORT_REPLAY_STATUS } from "@/lib/report/labels";
+import { LEGACY_REPLAY_NOTICE, LEGACY_REPLAY_TITLE, isLegacyReplayReport } from "@/lib/report/replay";
 import type { ReportV1 } from "@/lib/report/types";
 import { ReportView } from "./ReportView";
 
@@ -153,7 +154,18 @@ export function ReportPanel({
           <pre className="whitespace-pre-wrap rounded-md border border-border bg-surface p-3 font-mono text-xs">{markdown.data ?? "Loading…"}</pre>
         </section>
       ) : (
-        <ReportView report={report.data.report as unknown as ReportV1} onWhy={setWhy} toc={standalone} />
+        <>
+          {sealed && isLegacyReplayReport(sealed) ? (
+            // Outside the sealed report: the stored report and outcome are never rewritten.
+            <p role="note" aria-label="Historical replay report" className="flex items-start gap-2 rounded-md border border-inconclusive/40 bg-inconclusive/10 px-3 py-2 text-sm print:hidden">
+              <Icon name="alert" size={14} className="mt-0.5 shrink-0 text-inconclusive" />
+              <span>
+                <span className="font-medium">{LEGACY_REPLAY_TITLE}</span> {LEGACY_REPLAY_NOTICE}
+              </span>
+            </p>
+          ) : null}
+          <ReportView report={report.data.report as unknown as ReportV1} onWhy={setWhy} toc={standalone} />
+        </>
       )}
       {why ? (
         <LineageDrawer

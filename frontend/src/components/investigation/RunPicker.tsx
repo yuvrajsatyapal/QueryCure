@@ -4,6 +4,7 @@ import { Icon } from "@/components/ui/Icon";
 import { StatusOrb, runStatusMeta } from "@/components/ui/StatusPill";
 import { timeAgo } from "@/components/history/InvestigationRow";
 import type { RunSummary } from "@/lib/api/types";
+import { LEGACY_REPLAY_NOTICE, LEGACY_REPLAY_TITLE, runOutcomeLabel, type ReplayReportMeta } from "@/lib/report/replay";
 
 /** What each run kind is, in the user's words (GLOSSARY: run, replay, re-investigation). */
 export const RUN_KIND_LABEL: Record<string, string> = {
@@ -59,7 +60,18 @@ export function groupRuns(runs: RunSummary[]): RunGroup[] {
 /** The run selector's menu content (UI_UX §3.6c): labelled groups of `menuitemradio` rows. Focus
  * and keys are the RunSelector's; only the selected row is a tab stop. Orbs are still: these are
  * recorded statuses (UI_UX §3.6b). */
-export function RunPicker({ runs, selectedId, onSelect }: { runs: RunSummary[]; selectedId: string | null; onSelect: (runId: string) => void }) {
+export function RunPicker({
+  runs,
+  selectedId,
+  onSelect,
+  replayReports,
+}: {
+  runs: RunSummary[];
+  selectedId: string | null;
+  onSelect: (runId: string) => void;
+  /** Sealed replays' report metadata, by run ID (REPLAY_OUTCOME_AUDIT §13.3–§13.4). */
+  replayReports?: ReadonlyMap<string, ReplayReportMeta>;
+}) {
   return (
     <>
       {groupRuns(runs).map((group, gi) => (
@@ -69,7 +81,7 @@ export function RunPicker({ runs, selectedId, onSelect }: { runs: RunSummary[]; 
             <span className="font-mono text-[11px] text-muted">{group.runs.length}</span>
           </div>
           {group.runs.map((run) => (
-            <RunItem key={run.id} run={run} runs={runs} selected={run.id === selectedId} onSelect={onSelect} />
+            <RunItem key={run.id} run={run} runs={runs} selected={run.id === selectedId} onSelect={onSelect} label={runOutcomeLabel(run, replayReports?.get(run.id))} />
           ))}
         </div>
       ))}
@@ -77,7 +89,19 @@ export function RunPicker({ runs, selectedId, onSelect }: { runs: RunSummary[]; 
   );
 }
 
-function RunItem({ run, runs, selected, onSelect }: { run: RunSummary; runs: RunSummary[]; selected: boolean; onSelect: (runId: string) => void }) {
+function RunItem({
+  run,
+  runs,
+  selected,
+  onSelect,
+  label,
+}: {
+  run: RunSummary;
+  runs: RunSummary[];
+  selected: boolean;
+  onSelect: (runId: string) => void;
+  label: { outcome: string | null; legacy: boolean };
+}) {
   const status = runStatusMeta(run.status);
   const relation = runRelation(run, runs);
   const children = runs.filter((r) => r.parentRunId === run.id).sort((a, b) => a.runNumber - b.runNumber);
@@ -103,8 +127,13 @@ function RunItem({ run, runs, selected, onSelect }: { run: RunSummary; runs: Run
         </span>
         <span className="flex min-w-0 flex-wrap gap-x-1.5 text-xs text-muted">
           <span>{status.label}</span>
-          {run.outcome ? <span>· {run.outcome.replaceAll("_", " ")}</span> : null}
+          {label.outcome ? <span>· {label.outcome}</span> : null}
           {run.replay ? <span>· {REPLAY_STATUS_TEXT[run.replay.status] ?? run.replay.status.replaceAll("_", " ")}</span> : null}
+          {label.legacy ? (
+            <span title={`${LEGACY_REPLAY_TITLE} ${LEGACY_REPLAY_NOTICE}`} className="rounded border border-inconclusive/50 px-1 font-mono text-[10px] leading-4 text-inconclusive">
+              legacy replay
+            </span>
+          ) : null}
         </span>
         {children.length ? (
           <span className="text-xs break-words text-muted">

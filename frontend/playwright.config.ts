@@ -11,6 +11,8 @@ const METADATA_URL = "postgresql://qc_app:qc_local_dev_only@127.0.0.1:5432/query
  * offline stub LLM: no model calls, deterministic output (LLM_PROVIDER=stub, local only). */
 export default defineConfig({
   testDir: "./e2e",
+  // Needs the rehearsal worker (simulated replay-outcome activation): playwright.rehearsal.config.ts.
+  testIgnore: ["**/replay-rehearsal.spec.ts"],
   timeout: 90_000,
   fullyParallel: false,
   // One spec at a time: the local profile allows 2 active runs per user, and sandbox

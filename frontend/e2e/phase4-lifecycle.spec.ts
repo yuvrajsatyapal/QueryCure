@@ -68,6 +68,10 @@ test("lifecycle - approve, audit, report, verify, replay the experiment", async 
   await page.getByRole("link", { name: "Open the replay run's report" }).click();
   await expect(page.getByRole("article", { name: "Final report" })).toBeVisible({ timeout: 15_000 });
   await expect(page.getByText(/experiment replay · run 2/)).toBeVisible();
+  // report-builder@1 still seals replays (the correction is not active), so this real replay
+  // report gets the historical notice, outside the sealed report body.
+  await expect(page.getByRole("note", { name: "Historical replay report" })).toBeVisible();
+  await expect(page.getByRole("article", { name: "Final report" }).getByText(/earlier replay rules|report-builder@1, which set/)).toHaveCount(0);
 
   // Run history (Phase 5): the investigation lists both runs; the replay links to its source.
   await page.goto(investigationUrl);

@@ -193,6 +193,61 @@ export interface Comparison {
   replayExperimentId?: string;
 }
 
+/** Report schema 2 (`report-builder@2`), experiment replays only: what the replay showed about
+ * its source investigation. Every value is the builder's; the page renders it and decides
+ * nothing (REPLAY_OUTCOME_AUDIT §12.3–§13.3). */
+export type ReplayResultKind =
+  | "original_reproduced"
+  | "performance_drift"
+  | "not_reproduced"
+  | "inconclusive"
+  | "not_comparable"
+  | "not_confirmed"
+  | "unavailable"
+  | "failed"
+  | "cancelled"
+  | "unclassified";
+
+export interface ReplayResult {
+  result: ReplayResultKind;
+  title: string;
+  claimsReproduction: boolean;
+  originalReproduced: boolean;
+  basis: { code: string; sourceOutcome: string | null; comparisonStatus: string | null; comparisonMode: string | null } | null;
+  explanation: string;
+  failureCode: string | null;
+  comparisonStatus: string | null;
+  comparisonFailureCode: string | null;
+  comparisonMode: string | null;
+  margin: number | null;
+  correctnessReproduced: boolean | null;
+  performanceReproduced: boolean | null;
+  materialDrift: boolean | null;
+  environmentComparable: boolean | null;
+  materialDifferences: string[];
+  experimentMatch: {
+    replayedExperimentId: string | null;
+    replayedResultSha256: string | null;
+    recommendationResultSha256: string | null;
+    matches: boolean | null;
+  };
+  source: {
+    runId: string;
+    runKind: string;
+    experimentId: string;
+    finalStatus: string;
+    outcome: string | null;
+    manifestSha256: string;
+    reportJsonSha256: string;
+    builderVersion: string;
+    provenance: "source_run";
+  } | null;
+  sourceRecommendation: (ReportV1["recommendation"] & { provenance: "source_run" }) | null;
+  replayMeasurement: { engineWinner: string | null; provenance: string | null; label: string };
+  snapshotError: string | null;
+}
+
+/** Report schema 1 and the additive schema 2 (optional fields below). */
 export interface ReportV1 {
   schemaVersion: number;
   builderVersion: string;
@@ -233,6 +288,9 @@ export interface ReportV1 {
     querySql: string | null;
     primaryMeasurement: Measurement | null;
     scope: string;
+    /** Schema 2: `source_run` = the source investigation's recommendation, reproduced by this replay. */
+    origin?: "run" | "source_run";
+    sourceRunId?: string;
   };
   limitations: string[];
   nextSteps: string[];
@@ -245,4 +303,6 @@ export interface ReportV1 {
   missing: { section: string; reason: string }[];
   errors: { node?: string; code?: string; message?: string }[];
   usage: Record<string, number> | null;
+  /** Schema 2, experiment replays only. */
+  replayResult?: ReplayResult;
 }

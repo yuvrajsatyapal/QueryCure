@@ -1,0 +1,4834 @@
+{
+ "11_source_is_replay": {
+  "builderVersion": "report-builder@2",
+  "errors": [],
+  "events": {
+   "cutoffSeq": 42,
+   "digest": "sha256:cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+   "profile": "qc-events-v1"
+  },
+  "evidence": [],
+  "finalStatus": "completed",
+  "finalizedAt": "2026-10-13T12:00:00.000000Z",
+  "findings": [],
+  "headline": "Re-measurement only: this replays another replay; only an investigation's own outcome can be confirmed.",
+  "hypotheses": [],
+  "investigation": {
+   "liveConnection": false,
+   "modes": [
+    "sandbox_benchmark"
+   ],
+   "objective": "Make it fast for 30 users",
+   "title": "Slow orders page",
+   "workloadId": "stale_stats@v1:sf=0.1:seed=42"
+  },
+  "limitations": [
+   "Measured in a disposable sandbox copy of the demo workload `stale_stats@v1:sf=0.1:seed=42`, not on your database. No change was applied to any database you own.",
+   "Warm cache, one session, interleaved runs: production concurrency, cache state and data distribution may change the result.",
+   "Only the listed parameter sets were tested; other inputs may behave differently. A sandbox verification is not a guarantee for every workload.",
+   "This run re-measured an earlier experiment: agreement means consistency in this pair of runs, not portability.",
+   "A replay re-measures one experiment. It runs no diagnosis, candidate generation, auditor, replication or materiality check, so it can at most reproduce what the source investigation verified."
+  ],
+  "missing": [
+   {
+    "reason": "no hypotheses were produced",
+    "section": "hypotheses"
+   }
+  ],
+  "nextSteps": [
+   "Replay the original investigation's experiment instead."
+  ],
+  "outcome": "inconclusive",
+  "partial": false,
+  "problem": {
+   "evidence": [],
+   "materiality": null
+  },
+  "provenance": {
+   "llm": [],
+   "measurements": [
+    "measured"
+   ],
+   "stubModel": false
+  },
+  "query": {
+   "paramSets": [
+    {
+     "edgeCase": false,
+     "name": "purchases",
+     "values": [
+      "purchase"
+     ]
+    },
+    {
+     "edgeCase": false,
+     "name": "views",
+     "values": [
+      "view"
+     ]
+    }
+   ],
+   "sha256": "1212121212121212121212121212121212121212121212121212121212121212",
+   "sql": "SELECT count(*), sum(e.amount) FROM events e JOIN accounts a ON a.id = e.account_id WHERE e.kind = $1"
+  },
+  "recommendation": {
+   "candidateKey": null,
+   "ddl": [],
+   "kind": null,
+   "origin": "run",
+   "primaryMeasurement": null,
+   "querySql": null,
+   "scope": "sandbox",
+   "status": "none"
+  },
+  "replay": {
+   "comparison": {
+    "comparisonMode": "same_environment",
+    "config": {
+     "confidence": 0.95,
+     "margin": 1.25,
+     "resamples": 2000,
+     "seed": 7
+    },
+    "environment": {
+     "differences": []
+    },
+    "failureCode": null,
+    "originalExperimentId": "00000000-0000-4000-8000-0000000000e1",
+    "pairs": [
+     {
+      "arm": "oc_0000000000a3",
+      "code": null,
+      "drift": 0.97,
+      "driftCiHigh": 1.05,
+      "driftCiLow": 0.9,
+      "originalSpeedup": 3.0,
+      "paramSet": "p1",
+      "replaySpeedup": 2.9,
+      "status": "reproduced"
+     }
+    ],
+    "replayExperimentId": "00000000-0000-4000-8000-0000000000e9",
+    "status": "reproduced",
+    "winner": {
+     "original": "oc_0000000000a3",
+     "replay": "oc_0000000000a3"
+    }
+   },
+   "replayOf": {
+    "experimentId": "00000000-0000-4000-8000-0000000000e1",
+    "runId": "00000000-0000-4000-8000-0000000000bb"
+   }
+  },
+  "replayResult": {
+   "basis": {
+    "code": "source_is_replay",
+    "comparisonMode": "same_environment",
+    "comparisonStatus": "reproduced",
+    "sourceOutcome": "verified_recommendation"
+   },
+   "claimsReproduction": false,
+   "comparisonFailureCode": null,
+   "comparisonMode": "same_environment",
+   "comparisonStatus": "reproduced",
+   "correctnessReproduced": true,
+   "environmentComparable": true,
+   "experimentMatch": {
+    "matches": null,
+    "recommendationResultSha256": null,
+    "replayedExperimentId": "00000000-0000-4000-8000-0000000000e1",
+    "replayedResultSha256": "5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a"
+   },
+   "explanation": "The new measurement is shown for reference; it cannot confirm the original recommendation.",
+   "failureCode": null,
+   "margin": 1.25,
+   "materialDifferences": [],
+   "materialDrift": false,
+   "originalReproduced": false,
+   "performanceReproduced": true,
+   "replayMeasurement": {
+    "engineWinner": "oc_0000000000a3",
+    "label": "replay measurement, not a verification",
+    "provenance": "measured"
+   },
+   "result": "not_confirmed",
+   "snapshotError": null,
+   "source": {
+    "builderVersion": "report-builder@1",
+    "experimentId": "00000000-0000-4000-8000-0000000000e1",
+    "finalStatus": "completed",
+    "manifestSha256": "1111111111111111111111111111111111111111111111111111111111111111",
+    "outcome": "verified_recommendation",
+    "provenance": "source_run",
+    "reportJsonSha256": "2222222222222222222222222222222222222222222222222222222222222222",
+    "runId": "00000000-0000-4000-8000-0000000000bb",
+    "runKind": "experiment_replay"
+   },
+   "sourceRecommendation": null,
+   "title": "Re-measurement only"
+  },
+  "rounds": [
+   {
+    "approval": {
+     "approvedCandidateIds": [
+      "8986847e-6bbb-5b75-b0d2-d98780425b21"
+     ],
+     "decidedAt": "2026-10-13T11:00:00.000000Z",
+     "decidedBy": "user:1",
+     "id": "35375679-1997-5d89-a949-9ec9d0aac67b",
+     "round": 0,
+     "status": "approved"
+    },
+    "candidates": [],
+    "experiment": {
+     "audit": [],
+     "builds": [
+      {
+       "arm": "oc_0000000000a3",
+       "buildNs": 73960208,
+       "indexSizeBytes": 0,
+       "ok": true,
+       "provenance": "measured",
+       "reason": null
+      }
+     ],
+     "config": {
+      "blockSize": 5,
+      "maxCv": 0.25,
+      "maxRegression": 0.95,
+      "measuredRuns": 30,
+      "minEffect": 1.1,
+      "provenance": "configured",
+      "warmupRuns": 5
+     },
+     "correctness": [
+      {
+       "arm": "oc_0000000000a3",
+       "baselineRows": 1,
+       "evidenceId": null,
+       "paramSet": "purchases",
+       "provenance": "measured",
+       "rows": 1,
+       "sameRows": true
+      },
+      {
+       "arm": "oc_0000000000a3",
+       "baselineRows": 1,
+       "evidenceId": null,
+       "paramSet": "views",
+       "provenance": "measured",
+       "rows": 1,
+       "sameRows": true
+      }
+     ],
+     "engineVersion": "bench@1",
+     "environment": {
+      "containerRuntime": "docker",
+      "cpuArch": "arm64",
+      "cpuCount": 8,
+      "cpuModel": "arm",
+      "digest": "sha256:9999999999999999999999999999999999999999999999999999999999999999",
+      "memoryBytes": 8589934592,
+      "os": "Darwin 25.6.0",
+      "pgVersion": "170011",
+      "provenance": "recorded",
+      "sandboxImageDigest": "unrecorded",
+      "workloadDataDigest": "8e79c1c9db1f0ad467fe543e9d0a64d20e8186d43ea8e8a32c7a25c7f3d666b8",
+      "workloadId": "stale_stats@v1:sf=0.1:seed=42"
+     },
+     "errorCode": null,
+     "id": "40812e6a-443b-478c-aabd-d560b72bb079",
+     "measurements": [
+      {
+       "arm": "oc_0000000000a3",
+       "baseline": {
+        "medianNs": 15657145.5,
+        "n": 30,
+        "p95Ns": 18629333,
+        "robustCv": 0.10790947171571581
+       },
+       "candidate": {
+        "medianNs": 4502250.0,
+        "n": 30,
+        "p95Ns": 5444041,
+        "robustCv": 0.10134809870412788
+       },
+       "ciHigh": 3.6630852351601977,
+       "ciLow": 3.2869577496235736,
+       "evidenceId": "ev_4e653e508733",
+       "paramSet": "purchases",
+       "provenance": "measured",
+       "source": {
+        "artifactSha256": "abababababababababababababababababababababababababababababababab",
+        "pointer": "/stats/0"
+       },
+       "speedup": 3.4776268532400465
+      },
+      {
+       "arm": "oc_0000000000a3",
+       "baseline": {
+        "medianNs": 5286750.5,
+        "n": 30,
+        "p95Ns": 6474750,
+        "robustCv": 0.10464524871724183
+       },
+       "candidate": {
+        "medianNs": 4708208.5,
+        "n": 30,
+        "p95Ns": 6353250,
+        "robustCv": 0.1409227520481141
+       },
+       "ciHigh": 1.2304361214432549,
+       "ciLow": 1.0247525326521516,
+       "evidenceId": "ev_37f42e0b412c",
+       "paramSet": "views",
+       "provenance": "measured",
+       "source": {
+        "artifactSha256": "abababababababababababababababababababababababababababababababab",
+        "pointer": "/stats/1"
+       },
+       "speedup": 1.122879434927319
+      }
+     ],
+     "provenance": "measured",
+     "replicate": 0,
+     "replication": null,
+     "resultSha256": "abababababababababababababababababababababababababababababababab",
+     "round": 0,
+     "rowProfile": "qc-row-v1",
+     "seed": 42,
+     "status": "completed",
+     "tournament": [
+      {
+       "arm": "oc_0000000000a3",
+       "primaryCiLow": 3.2869577496235736,
+       "rank": 1,
+       "verdict": "verified"
+      }
+     ],
+     "verdicts": [
+      {
+       "arm": "oc_0000000000a3",
+       "gate": null,
+       "reasons": [],
+       "verdict": "verified"
+      }
+     ],
+     "winner": "oc_0000000000a3"
+    },
+    "replicates": [],
+    "round": 0
+   }
+  ],
+  "run": {
+   "id": "00000000-0000-4000-8000-0000000000aa",
+   "investigationId": "8f7d60a5-f02f-5114-a93f-e1f6f8c80fd9",
+   "kind": "experiment_replay",
+   "parentRunId": "00000000-0000-4000-8000-0000000000bb",
+   "runNumber": 3
+  },
+  "schemaVersion": 2,
+  "stopReason": null,
+  "summary": "",
+  "usage": {
+   "llmCalls": 7,
+   "toolCalls": 2
+  }
+ },
+ "14_not_replayable": {
+  "builderVersion": "report-builder@2",
+  "errors": [],
+  "events": {
+   "cutoffSeq": 42,
+   "digest": "sha256:cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+   "profile": "qc-events-v1"
+  },
+  "evidence": [],
+  "finalStatus": "completed",
+  "finalizedAt": "2026-10-13T12:00:00.000000Z",
+  "findings": [],
+  "headline": "No comparison with the original was possible: the workload data changed.",
+  "hypotheses": [],
+  "investigation": {
+   "liveConnection": false,
+   "modes": [
+    "sandbox_benchmark"
+   ],
+   "objective": "Make it fast for 30 users",
+   "title": "Slow orders page",
+   "workloadId": "stale_stats@v1:sf=0.1:seed=42"
+  },
+  "limitations": [
+   "Measured in a disposable sandbox copy of the demo workload `stale_stats@v1:sf=0.1:seed=42`, not on your database. No change was applied to any database you own.",
+   "Warm cache, one session, interleaved runs: production concurrency, cache state and data distribution may change the result.",
+   "Only the listed parameter sets were tested; other inputs may behave differently. A sandbox verification is not a guarantee for every workload.",
+   "This run re-measured an earlier experiment: agreement means consistency in this pair of runs, not portability.",
+   "A replay re-measures one experiment. It runs no diagnosis, candidate generation, auditor, replication or materiality check, so it can at most reproduce what the source investigation verified."
+  ],
+  "missing": [
+   {
+    "reason": "no hypotheses were produced",
+    "section": "hypotheses"
+   }
+  ],
+  "nextSteps": [
+   "Start a new replay once the comparison precondition holds."
+  ],
+  "outcome": "inconclusive",
+  "partial": false,
+  "problem": {
+   "evidence": [],
+   "materiality": null
+  },
+  "provenance": {
+   "llm": [],
+   "measurements": [
+    "measured"
+   ],
+   "stubModel": false
+  },
+  "query": {
+   "paramSets": [
+    {
+     "edgeCase": false,
+     "name": "purchases",
+     "values": [
+      "purchase"
+     ]
+    },
+    {
+     "edgeCase": false,
+     "name": "views",
+     "values": [
+      "view"
+     ]
+    }
+   ],
+   "sha256": "1212121212121212121212121212121212121212121212121212121212121212",
+   "sql": "SELECT count(*), sum(e.amount) FROM events e JOIN accounts a ON a.id = e.account_id WHERE e.kind = $1"
+  },
+  "recommendation": {
+   "candidateKey": null,
+   "ddl": [],
+   "kind": null,
+   "origin": "run",
+   "primaryMeasurement": null,
+   "querySql": null,
+   "scope": "sandbox",
+   "status": "none"
+  },
+  "replay": {
+   "comparison": {
+    "comparisonMode": "same_environment",
+    "config": {
+     "confidence": 0.95,
+     "margin": 1.25,
+     "resamples": 2000,
+     "seed": 7
+    },
+    "environment": {
+     "differences": []
+    },
+    "failureCode": "workload_snapshot_changed",
+    "originalExperimentId": "00000000-0000-4000-8000-0000000000e1",
+    "pairs": [],
+    "replayExperimentId": "00000000-0000-4000-8000-0000000000e9",
+    "status": "not_replayable",
+    "winner": {
+     "original": "oc_0000000000a3",
+     "replay": "oc_0000000000a3"
+    }
+   },
+   "replayOf": {
+    "experimentId": "00000000-0000-4000-8000-0000000000e1",
+    "runId": "00000000-0000-4000-8000-0000000000bb"
+   }
+  },
+  "replayResult": {
+   "basis": {
+    "code": "comparison_not_replayable",
+    "comparisonMode": "same_environment",
+    "comparisonStatus": "not_replayable",
+    "sourceOutcome": "verified_recommendation"
+   },
+   "claimsReproduction": false,
+   "comparisonFailureCode": "workload_snapshot_changed",
+   "comparisonMode": "same_environment",
+   "comparisonStatus": "not_replayable",
+   "correctnessReproduced": null,
+   "environmentComparable": null,
+   "experimentMatch": {
+    "matches": true,
+    "recommendationResultSha256": "5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a",
+    "replayedExperimentId": "00000000-0000-4000-8000-0000000000e1",
+    "replayedResultSha256": "5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a"
+   },
+   "explanation": "The new measurement is sealed, but the comparison with the original was not possible or not recorded.",
+   "failureCode": "workload_snapshot_changed",
+   "margin": 1.25,
+   "materialDifferences": [],
+   "materialDrift": null,
+   "originalReproduced": false,
+   "performanceReproduced": null,
+   "replayMeasurement": {
+    "engineWinner": "oc_0000000000a3",
+    "label": "replay measurement, not a verification",
+    "provenance": "measured"
+   },
+   "result": "unavailable",
+   "snapshotError": null,
+   "source": {
+    "builderVersion": "report-builder@1",
+    "experimentId": "00000000-0000-4000-8000-0000000000e1",
+    "finalStatus": "completed",
+    "manifestSha256": "1111111111111111111111111111111111111111111111111111111111111111",
+    "outcome": "verified_recommendation",
+    "provenance": "source_run",
+    "reportJsonSha256": "2222222222222222222222222222222222222222222222222222222222222222",
+    "runId": "00000000-0000-4000-8000-0000000000bb",
+    "runKind": "initial"
+   },
+   "sourceRecommendation": {
+    "candidateKey": "oc_0000000000a3",
+    "ddl": [
+     "CREATE INDEX qc_i ON orders (customer_id)"
+    ],
+    "kind": "create_index",
+    "primaryMeasurement": {
+     "arm": "oc_0000000000a3",
+     "baseline": {
+      "medianNs": 9000000,
+      "n": 30,
+      "p95Ns": 9500000,
+      "robustCv": 0.02
+     },
+     "candidate": {
+      "medianNs": 3000000,
+      "n": 30,
+      "p95Ns": 3100000,
+      "robustCv": 0.02
+     },
+     "ciHigh": 3.2,
+     "ciLow": 2.8,
+     "evidenceId": "ev_777777777777",
+     "paramSet": "p1",
+     "provenance": "measured",
+     "source": {
+      "artifactSha256": "5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a",
+      "pointer": "/stats/0"
+     },
+     "speedup": 3.0
+    },
+    "provenance": "source_run",
+    "querySql": null,
+    "scope": "sandbox",
+    "status": "verified"
+   },
+   "title": "No comparison with the original was possible"
+  },
+  "rounds": [
+   {
+    "approval": {
+     "approvedCandidateIds": [
+      "8986847e-6bbb-5b75-b0d2-d98780425b21"
+     ],
+     "decidedAt": "2026-10-13T11:00:00.000000Z",
+     "decidedBy": "user:1",
+     "id": "35375679-1997-5d89-a949-9ec9d0aac67b",
+     "round": 0,
+     "status": "approved"
+    },
+    "candidates": [],
+    "experiment": {
+     "audit": [],
+     "builds": [
+      {
+       "arm": "oc_0000000000a3",
+       "buildNs": 73960208,
+       "indexSizeBytes": 0,
+       "ok": true,
+       "provenance": "measured",
+       "reason": null
+      }
+     ],
+     "config": {
+      "blockSize": 5,
+      "maxCv": 0.25,
+      "maxRegression": 0.95,
+      "measuredRuns": 30,
+      "minEffect": 1.1,
+      "provenance": "configured",
+      "warmupRuns": 5
+     },
+     "correctness": [
+      {
+       "arm": "oc_0000000000a3",
+       "baselineRows": 1,
+       "evidenceId": null,
+       "paramSet": "purchases",
+       "provenance": "measured",
+       "rows": 1,
+       "sameRows": true
+      },
+      {
+       "arm": "oc_0000000000a3",
+       "baselineRows": 1,
+       "evidenceId": null,
+       "paramSet": "views",
+       "provenance": "measured",
+       "rows": 1,
+       "sameRows": true
+      }
+     ],
+     "engineVersion": "bench@1",
+     "environment": {
+      "containerRuntime": "docker",
+      "cpuArch": "arm64",
+      "cpuCount": 8,
+      "cpuModel": "arm",
+      "digest": "sha256:9999999999999999999999999999999999999999999999999999999999999999",
+      "memoryBytes": 8589934592,
+      "os": "Darwin 25.6.0",
+      "pgVersion": "170011",
+      "provenance": "recorded",
+      "sandboxImageDigest": "unrecorded",
+      "workloadDataDigest": "8e79c1c9db1f0ad467fe543e9d0a64d20e8186d43ea8e8a32c7a25c7f3d666b8",
+      "workloadId": "stale_stats@v1:sf=0.1:seed=42"
+     },
+     "errorCode": null,
+     "id": "40812e6a-443b-478c-aabd-d560b72bb079",
+     "measurements": [
+      {
+       "arm": "oc_0000000000a3",
+       "baseline": {
+        "medianNs": 15657145.5,
+        "n": 30,
+        "p95Ns": 18629333,
+        "robustCv": 0.10790947171571581
+       },
+       "candidate": {
+        "medianNs": 4502250.0,
+        "n": 30,
+        "p95Ns": 5444041,
+        "robustCv": 0.10134809870412788
+       },
+       "ciHigh": 3.6630852351601977,
+       "ciLow": 3.2869577496235736,
+       "evidenceId": "ev_4e653e508733",
+       "paramSet": "purchases",
+       "provenance": "measured",
+       "source": {
+        "artifactSha256": "abababababababababababababababababababababababababababababababab",
+        "pointer": "/stats/0"
+       },
+       "speedup": 3.4776268532400465
+      },
+      {
+       "arm": "oc_0000000000a3",
+       "baseline": {
+        "medianNs": 5286750.5,
+        "n": 30,
+        "p95Ns": 6474750,
+        "robustCv": 0.10464524871724183
+       },
+       "candidate": {
+        "medianNs": 4708208.5,
+        "n": 30,
+        "p95Ns": 6353250,
+        "robustCv": 0.1409227520481141
+       },
+       "ciHigh": 1.2304361214432549,
+       "ciLow": 1.0247525326521516,
+       "evidenceId": "ev_37f42e0b412c",
+       "paramSet": "views",
+       "provenance": "measured",
+       "source": {
+        "artifactSha256": "abababababababababababababababababababababababababababababababab",
+        "pointer": "/stats/1"
+       },
+       "speedup": 1.122879434927319
+      }
+     ],
+     "provenance": "measured",
+     "replicate": 0,
+     "replication": null,
+     "resultSha256": "abababababababababababababababababababababababababababababababab",
+     "round": 0,
+     "rowProfile": "qc-row-v1",
+     "seed": 42,
+     "status": "completed",
+     "tournament": [
+      {
+       "arm": "oc_0000000000a3",
+       "primaryCiLow": 3.2869577496235736,
+       "rank": 1,
+       "verdict": "verified"
+      }
+     ],
+     "verdicts": [
+      {
+       "arm": "oc_0000000000a3",
+       "gate": null,
+       "reasons": [],
+       "verdict": "verified"
+      }
+     ],
+     "winner": "oc_0000000000a3"
+    },
+    "replicates": [],
+    "round": 0
+   }
+  ],
+  "run": {
+   "id": "00000000-0000-4000-8000-0000000000aa",
+   "investigationId": "8f7d60a5-f02f-5114-a93f-e1f6f8c80fd9",
+   "kind": "experiment_replay",
+   "parentRunId": "00000000-0000-4000-8000-0000000000bb",
+   "runNumber": 3
+  },
+  "schemaVersion": 2,
+  "stopReason": null,
+  "summary": "",
+  "usage": {
+   "llmCalls": 7,
+   "toolCalls": 2
+  }
+ },
+ "14_snapshot_missing": {
+  "builderVersion": "report-builder@2",
+  "errors": [],
+  "events": {
+   "cutoffSeq": 42,
+   "digest": "sha256:cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+   "profile": "qc-events-v1"
+  },
+  "evidence": [],
+  "finalStatus": "completed",
+  "finalizedAt": "2026-10-13T12:00:00.000000Z",
+  "findings": [],
+  "headline": "No comparison with the original was possible: the source snapshot is missing.",
+  "hypotheses": [],
+  "investigation": {
+   "liveConnection": false,
+   "modes": [
+    "sandbox_benchmark"
+   ],
+   "objective": "Make it fast for 30 users",
+   "title": "Slow orders page",
+   "workloadId": "stale_stats@v1:sf=0.1:seed=42"
+  },
+  "limitations": [
+   "Measured in a disposable sandbox copy of the demo workload `stale_stats@v1:sf=0.1:seed=42`, not on your database. No change was applied to any database you own.",
+   "Warm cache, one session, interleaved runs: production concurrency, cache state and data distribution may change the result.",
+   "Only the listed parameter sets were tested; other inputs may behave differently. A sandbox verification is not a guarantee for every workload.",
+   "This run re-measured an earlier experiment: agreement means consistency in this pair of runs, not portability.",
+   "A replay re-measures one experiment. It runs no diagnosis, candidate generation, auditor, replication or materiality check, so it can at most reproduce what the source investigation verified."
+  ],
+  "missing": [
+   {
+    "reason": "no hypotheses were produced",
+    "section": "hypotheses"
+   }
+  ],
+  "nextSteps": [
+   "Start a new replay once the comparison precondition holds."
+  ],
+  "outcome": "inconclusive",
+  "partial": false,
+  "problem": {
+   "evidence": [],
+   "materiality": null
+  },
+  "provenance": {
+   "llm": [],
+   "measurements": [
+    "measured"
+   ],
+   "stubModel": false
+  },
+  "query": {
+   "paramSets": [
+    {
+     "edgeCase": false,
+     "name": "purchases",
+     "values": [
+      "purchase"
+     ]
+    },
+    {
+     "edgeCase": false,
+     "name": "views",
+     "values": [
+      "view"
+     ]
+    }
+   ],
+   "sha256": "1212121212121212121212121212121212121212121212121212121212121212",
+   "sql": "SELECT count(*), sum(e.amount) FROM events e JOIN accounts a ON a.id = e.account_id WHERE e.kind = $1"
+  },
+  "recommendation": {
+   "candidateKey": null,
+   "ddl": [],
+   "kind": null,
+   "origin": "run",
+   "primaryMeasurement": null,
+   "querySql": null,
+   "scope": "sandbox",
+   "status": "none"
+  },
+  "replay": {
+   "comparison": {
+    "comparisonMode": "same_environment",
+    "config": {
+     "confidence": 0.95,
+     "margin": 1.25,
+     "resamples": 2000,
+     "seed": 7
+    },
+    "environment": {
+     "differences": []
+    },
+    "failureCode": null,
+    "originalExperimentId": "00000000-0000-4000-8000-0000000000e1",
+    "pairs": [
+     {
+      "arm": "oc_0000000000a3",
+      "code": null,
+      "drift": 0.97,
+      "driftCiHigh": 1.05,
+      "driftCiLow": 0.9,
+      "originalSpeedup": 3.0,
+      "paramSet": "p1",
+      "replaySpeedup": 2.9,
+      "status": "reproduced"
+     }
+    ],
+    "replayExperimentId": "00000000-0000-4000-8000-0000000000e9",
+    "status": "reproduced",
+    "winner": {
+     "original": "oc_0000000000a3",
+     "replay": "oc_0000000000a3"
+    }
+   },
+   "replayOf": {
+    "experimentId": "00000000-0000-4000-8000-0000000000e1",
+    "runId": "00000000-0000-4000-8000-0000000000bb"
+   }
+  },
+  "replayResult": {
+   "basis": {
+    "code": "source_snapshot_missing",
+    "comparisonMode": "same_environment",
+    "comparisonStatus": "reproduced",
+    "sourceOutcome": null
+   },
+   "claimsReproduction": false,
+   "comparisonFailureCode": null,
+   "comparisonMode": "same_environment",
+   "comparisonStatus": "reproduced",
+   "correctnessReproduced": true,
+   "environmentComparable": true,
+   "experimentMatch": {
+    "matches": null,
+    "recommendationResultSha256": null,
+    "replayedExperimentId": null,
+    "replayedResultSha256": null
+   },
+   "explanation": "The new measurement is sealed, but the comparison with the original was not possible or not recorded.",
+   "failureCode": null,
+   "margin": 1.25,
+   "materialDifferences": [],
+   "materialDrift": false,
+   "originalReproduced": false,
+   "performanceReproduced": true,
+   "replayMeasurement": {
+    "engineWinner": "oc_0000000000a3",
+    "label": "replay measurement, not a verification",
+    "provenance": "measured"
+   },
+   "result": "unavailable",
+   "snapshotError": null,
+   "source": null,
+   "sourceRecommendation": null,
+   "title": "No comparison with the original was possible"
+  },
+  "rounds": [
+   {
+    "approval": {
+     "approvedCandidateIds": [
+      "8986847e-6bbb-5b75-b0d2-d98780425b21"
+     ],
+     "decidedAt": "2026-10-13T11:00:00.000000Z",
+     "decidedBy": "user:1",
+     "id": "35375679-1997-5d89-a949-9ec9d0aac67b",
+     "round": 0,
+     "status": "approved"
+    },
+    "candidates": [],
+    "experiment": {
+     "audit": [],
+     "builds": [
+      {
+       "arm": "oc_0000000000a3",
+       "buildNs": 73960208,
+       "indexSizeBytes": 0,
+       "ok": true,
+       "provenance": "measured",
+       "reason": null
+      }
+     ],
+     "config": {
+      "blockSize": 5,
+      "maxCv": 0.25,
+      "maxRegression": 0.95,
+      "measuredRuns": 30,
+      "minEffect": 1.1,
+      "provenance": "configured",
+      "warmupRuns": 5
+     },
+     "correctness": [
+      {
+       "arm": "oc_0000000000a3",
+       "baselineRows": 1,
+       "evidenceId": null,
+       "paramSet": "purchases",
+       "provenance": "measured",
+       "rows": 1,
+       "sameRows": true
+      },
+      {
+       "arm": "oc_0000000000a3",
+       "baselineRows": 1,
+       "evidenceId": null,
+       "paramSet": "views",
+       "provenance": "measured",
+       "rows": 1,
+       "sameRows": true
+      }
+     ],
+     "engineVersion": "bench@1",
+     "environment": {
+      "containerRuntime": "docker",
+      "cpuArch": "arm64",
+      "cpuCount": 8,
+      "cpuModel": "arm",
+      "digest": "sha256:9999999999999999999999999999999999999999999999999999999999999999",
+      "memoryBytes": 8589934592,
+      "os": "Darwin 25.6.0",
+      "pgVersion": "170011",
+      "provenance": "recorded",
+      "sandboxImageDigest": "unrecorded",
+      "workloadDataDigest": "8e79c1c9db1f0ad467fe543e9d0a64d20e8186d43ea8e8a32c7a25c7f3d666b8",
+      "workloadId": "stale_stats@v1:sf=0.1:seed=42"
+     },
+     "errorCode": null,
+     "id": "40812e6a-443b-478c-aabd-d560b72bb079",
+     "measurements": [
+      {
+       "arm": "oc_0000000000a3",
+       "baseline": {
+        "medianNs": 15657145.5,
+        "n": 30,
+        "p95Ns": 18629333,
+        "robustCv": 0.10790947171571581
+       },
+       "candidate": {
+        "medianNs": 4502250.0,
+        "n": 30,
+        "p95Ns": 5444041,
+        "robustCv": 0.10134809870412788
+       },
+       "ciHigh": 3.6630852351601977,
+       "ciLow": 3.2869577496235736,
+       "evidenceId": "ev_4e653e508733",
+       "paramSet": "purchases",
+       "provenance": "measured",
+       "source": {
+        "artifactSha256": "abababababababababababababababababababababababababababababababab",
+        "pointer": "/stats/0"
+       },
+       "speedup": 3.4776268532400465
+      },
+      {
+       "arm": "oc_0000000000a3",
+       "baseline": {
+        "medianNs": 5286750.5,
+        "n": 30,
+        "p95Ns": 6474750,
+        "robustCv": 0.10464524871724183
+       },
+       "candidate": {
+        "medianNs": 4708208.5,
+        "n": 30,
+        "p95Ns": 6353250,
+        "robustCv": 0.1409227520481141
+       },
+       "ciHigh": 1.2304361214432549,
+       "ciLow": 1.0247525326521516,
+       "evidenceId": "ev_37f42e0b412c",
+       "paramSet": "views",
+       "provenance": "measured",
+       "source": {
+        "artifactSha256": "abababababababababababababababababababababababababababababababab",
+        "pointer": "/stats/1"
+       },
+       "speedup": 1.122879434927319
+      }
+     ],
+     "provenance": "measured",
+     "replicate": 0,
+     "replication": null,
+     "resultSha256": "abababababababababababababababababababababababababababababababab",
+     "round": 0,
+     "rowProfile": "qc-row-v1",
+     "seed": 42,
+     "status": "completed",
+     "tournament": [
+      {
+       "arm": "oc_0000000000a3",
+       "primaryCiLow": 3.2869577496235736,
+       "rank": 1,
+       "verdict": "verified"
+      }
+     ],
+     "verdicts": [
+      {
+       "arm": "oc_0000000000a3",
+       "gate": null,
+       "reasons": [],
+       "verdict": "verified"
+      }
+     ],
+     "winner": "oc_0000000000a3"
+    },
+    "replicates": [],
+    "round": 0
+   }
+  ],
+  "run": {
+   "id": "00000000-0000-4000-8000-0000000000aa",
+   "investigationId": "8f7d60a5-f02f-5114-a93f-e1f6f8c80fd9",
+   "kind": "experiment_replay",
+   "parentRunId": "00000000-0000-4000-8000-0000000000bb",
+   "runNumber": 3
+  },
+  "schemaVersion": 2,
+  "stopReason": null,
+  "summary": "",
+  "usage": {
+   "llmCalls": 7,
+   "toolCalls": 2
+  }
+ },
+ "15_execution_failed": {
+  "builderVersion": "report-builder@2",
+  "errors": [],
+  "events": {
+   "cutoffSeq": 42,
+   "digest": "sha256:cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+   "profile": "qc-events-v1"
+  },
+  "evidence": [],
+  "finalStatus": "failed",
+  "finalizedAt": "2026-10-13T12:00:00.000000Z",
+  "findings": [],
+  "headline": "Replay failed (sandbox_unavailable): nothing was compared with the original.",
+  "hypotheses": [],
+  "investigation": {
+   "liveConnection": false,
+   "modes": [
+    "sandbox_benchmark"
+   ],
+   "objective": "Make it fast for 30 users",
+   "title": "Slow orders page",
+   "workloadId": "stale_stats@v1:sf=0.1:seed=42"
+  },
+  "limitations": [
+   "Nothing in this report was benchmarked: hypotheses are unverified.",
+   "This run re-measured an earlier experiment: agreement means consistency in this pair of runs, not portability.",
+   "A replay re-measures one experiment. It runs no diagnosis, candidate generation, auditor, replication or materiality check, so it can at most reproduce what the source investigation verified."
+  ],
+  "missing": [
+   {
+    "reason": "no hypotheses were produced",
+    "section": "hypotheses"
+   },
+   {
+    "reason": "not benchmarked",
+    "section": "benchmark"
+   }
+  ],
+  "nextSteps": [
+   "Start a new replay once the failure is resolved."
+  ],
+  "outcome": null,
+  "partial": true,
+  "problem": {
+   "evidence": [],
+   "materiality": null
+  },
+  "provenance": {
+   "llm": [],
+   "measurements": [],
+   "stubModel": false
+  },
+  "query": {
+   "paramSets": [
+    {
+     "edgeCase": false,
+     "name": "purchases",
+     "values": [
+      "purchase"
+     ]
+    },
+    {
+     "edgeCase": false,
+     "name": "views",
+     "values": [
+      "view"
+     ]
+    }
+   ],
+   "sha256": "1212121212121212121212121212121212121212121212121212121212121212",
+   "sql": "SELECT count(*), sum(e.amount) FROM events e JOIN accounts a ON a.id = e.account_id WHERE e.kind = $1"
+  },
+  "recommendation": {
+   "candidateKey": null,
+   "ddl": [],
+   "kind": null,
+   "origin": "run",
+   "primaryMeasurement": null,
+   "querySql": null,
+   "scope": "none",
+   "status": "none"
+  },
+  "replay": {
+   "comparison": null,
+   "replayOf": {
+    "experimentId": "00000000-0000-4000-8000-0000000000e1",
+    "runId": "00000000-0000-4000-8000-0000000000bb"
+   }
+  },
+  "replayResult": {
+   "basis": null,
+   "claimsReproduction": false,
+   "comparisonFailureCode": null,
+   "comparisonMode": null,
+   "comparisonStatus": null,
+   "correctnessReproduced": null,
+   "environmentComparable": null,
+   "experimentMatch": {
+    "matches": true,
+    "recommendationResultSha256": "5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a",
+    "replayedExperimentId": "00000000-0000-4000-8000-0000000000e1",
+    "replayedResultSha256": "5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a"
+   },
+   "explanation": "Nothing was compared with the original.",
+   "failureCode": "sandbox_unavailable",
+   "margin": null,
+   "materialDifferences": [],
+   "materialDrift": null,
+   "originalReproduced": false,
+   "performanceReproduced": null,
+   "replayMeasurement": {
+    "engineWinner": null,
+    "label": "replay measurement, not a verification",
+    "provenance": null
+   },
+   "result": "failed",
+   "snapshotError": null,
+   "source": {
+    "builderVersion": "report-builder@1",
+    "experimentId": "00000000-0000-4000-8000-0000000000e1",
+    "finalStatus": "completed",
+    "manifestSha256": "1111111111111111111111111111111111111111111111111111111111111111",
+    "outcome": "verified_recommendation",
+    "provenance": "source_run",
+    "reportJsonSha256": "2222222222222222222222222222222222222222222222222222222222222222",
+    "runId": "00000000-0000-4000-8000-0000000000bb",
+    "runKind": "initial"
+   },
+   "sourceRecommendation": {
+    "candidateKey": "oc_0000000000a3",
+    "ddl": [
+     "CREATE INDEX qc_i ON orders (customer_id)"
+    ],
+    "kind": "create_index",
+    "primaryMeasurement": {
+     "arm": "oc_0000000000a3",
+     "baseline": {
+      "medianNs": 9000000,
+      "n": 30,
+      "p95Ns": 9500000,
+      "robustCv": 0.02
+     },
+     "candidate": {
+      "medianNs": 3000000,
+      "n": 30,
+      "p95Ns": 3100000,
+      "robustCv": 0.02
+     },
+     "ciHigh": 3.2,
+     "ciLow": 2.8,
+     "evidenceId": "ev_777777777777",
+     "paramSet": "p1",
+     "provenance": "measured",
+     "source": {
+      "artifactSha256": "5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a",
+      "pointer": "/stats/0"
+     },
+     "speedup": 3.0
+    },
+    "provenance": "source_run",
+    "querySql": null,
+    "scope": "sandbox",
+    "status": "verified"
+   },
+   "title": "Replay failed"
+  },
+  "rounds": [],
+  "run": {
+   "id": "00000000-0000-4000-8000-0000000000aa",
+   "investigationId": "8f7d60a5-f02f-5114-a93f-e1f6f8c80fd9",
+   "kind": "experiment_replay",
+   "parentRunId": "00000000-0000-4000-8000-0000000000bb",
+   "runNumber": 3
+  },
+  "schemaVersion": 2,
+  "stopReason": "failed",
+  "summary": "",
+  "usage": {
+   "llmCalls": 7,
+   "toolCalls": 2
+  }
+ },
+ "1_reproduced_original": {
+  "builderVersion": "report-builder@2",
+  "errors": [],
+  "events": {
+   "cutoffSeq": 42,
+   "digest": "sha256:cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+   "profile": "qc-events-v1"
+  },
+  "evidence": [],
+  "finalStatus": "completed",
+  "finalizedAt": "2026-10-13T12:00:00.000000Z",
+  "findings": [],
+  "headline": "Original recommendation reproduced. A new sandbox measurement of the same experiment matched the original within the equivalence margin. The recommendation was verified by the source investigation; this replay re-measured one experiment and verified nothing new.",
+  "hypotheses": [],
+  "investigation": {
+   "liveConnection": false,
+   "modes": [
+    "sandbox_benchmark"
+   ],
+   "objective": "Make it fast for 30 users",
+   "title": "Slow orders page",
+   "workloadId": "stale_stats@v1:sf=0.1:seed=42"
+  },
+  "limitations": [
+   "Measured in a disposable sandbox copy of the demo workload `stale_stats@v1:sf=0.1:seed=42`, not on your database. No change was applied to any database you own.",
+   "Warm cache, one session, interleaved runs: production concurrency, cache state and data distribution may change the result.",
+   "Only the listed parameter sets were tested; other inputs may behave differently. A sandbox verification is not a guarantee for every workload.",
+   "This run re-measured an earlier experiment: agreement means consistency in this pair of runs, not portability.",
+   "A replay re-measures one experiment. It runs no diagnosis, candidate generation, auditor, replication or materiality check, so it can at most reproduce what the source investigation verified."
+  ],
+  "missing": [
+   {
+    "reason": "no hypotheses were produced",
+    "section": "hypotheses"
+   }
+  ],
+  "nextSteps": [
+   "Review the original recommendation's exact SQL and test it on a staging copy of your own data and workload; a sandbox reproduction is not a guarantee for your workload."
+  ],
+  "outcome": "verified_recommendation",
+  "partial": false,
+  "problem": {
+   "evidence": [],
+   "materiality": null
+  },
+  "provenance": {
+   "llm": [],
+   "measurements": [
+    "measured"
+   ],
+   "stubModel": false
+  },
+  "query": {
+   "paramSets": [
+    {
+     "edgeCase": false,
+     "name": "purchases",
+     "values": [
+      "purchase"
+     ]
+    },
+    {
+     "edgeCase": false,
+     "name": "views",
+     "values": [
+      "view"
+     ]
+    }
+   ],
+   "sha256": "1212121212121212121212121212121212121212121212121212121212121212",
+   "sql": "SELECT count(*), sum(e.amount) FROM events e JOIN accounts a ON a.id = e.account_id WHERE e.kind = $1"
+  },
+  "recommendation": {
+   "candidateKey": "oc_0000000000a3",
+   "ddl": [
+    "CREATE INDEX qc_i ON orders (customer_id)"
+   ],
+   "kind": "create_index",
+   "origin": "source_run",
+   "primaryMeasurement": {
+    "arm": "oc_0000000000a3",
+    "baseline": {
+     "medianNs": 9000000,
+     "n": 30,
+     "p95Ns": 9500000,
+     "robustCv": 0.02
+    },
+    "candidate": {
+     "medianNs": 3000000,
+     "n": 30,
+     "p95Ns": 3100000,
+     "robustCv": 0.02
+    },
+    "ciHigh": 3.2,
+    "ciLow": 2.8,
+    "evidenceId": "ev_777777777777",
+    "paramSet": "p1",
+    "provenance": "measured",
+    "source": {
+     "artifactSha256": "5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a",
+     "pointer": "/stats/0"
+    },
+    "speedup": 3.0
+   },
+   "querySql": null,
+   "scope": "sandbox",
+   "sourceRunId": "00000000-0000-4000-8000-0000000000bb",
+   "status": "verified"
+  },
+  "replay": {
+   "comparison": {
+    "comparisonMode": "same_environment",
+    "config": {
+     "confidence": 0.95,
+     "margin": 1.25,
+     "resamples": 2000,
+     "seed": 7
+    },
+    "environment": {
+     "differences": []
+    },
+    "failureCode": null,
+    "originalExperimentId": "00000000-0000-4000-8000-0000000000e1",
+    "pairs": [
+     {
+      "arm": "oc_0000000000a3",
+      "code": null,
+      "drift": 0.97,
+      "driftCiHigh": 1.05,
+      "driftCiLow": 0.9,
+      "originalSpeedup": 3.0,
+      "paramSet": "p1",
+      "replaySpeedup": 2.9,
+      "status": "reproduced"
+     }
+    ],
+    "replayExperimentId": "00000000-0000-4000-8000-0000000000e9",
+    "status": "reproduced",
+    "winner": {
+     "original": "oc_0000000000a3",
+     "replay": "oc_0000000000a3"
+    }
+   },
+   "replayOf": {
+    "experimentId": "00000000-0000-4000-8000-0000000000e1",
+    "runId": "00000000-0000-4000-8000-0000000000bb"
+   }
+  },
+  "replayResult": {
+   "basis": {
+    "code": "reproduced_source_recommendation",
+    "comparisonMode": "same_environment",
+    "comparisonStatus": "reproduced",
+    "sourceOutcome": "verified_recommendation"
+   },
+   "claimsReproduction": true,
+   "comparisonFailureCode": null,
+   "comparisonMode": "same_environment",
+   "comparisonStatus": "reproduced",
+   "correctnessReproduced": true,
+   "environmentComparable": true,
+   "experimentMatch": {
+    "matches": true,
+    "recommendationResultSha256": "5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a",
+    "replayedExperimentId": "00000000-0000-4000-8000-0000000000e1",
+    "replayedResultSha256": "5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a"
+   },
+   "explanation": "The replay confirms what the source investigation concluded, within its scope: one experiment, re-measured. It ran no diagnosis, candidate generation, auditor, replication or materiality check.",
+   "failureCode": null,
+   "margin": 1.25,
+   "materialDifferences": [],
+   "materialDrift": false,
+   "originalReproduced": true,
+   "performanceReproduced": true,
+   "replayMeasurement": {
+    "engineWinner": "oc_0000000000a3",
+    "label": "replay measurement, not a verification",
+    "provenance": "measured"
+   },
+   "result": "original_reproduced",
+   "snapshotError": null,
+   "source": {
+    "builderVersion": "report-builder@1",
+    "experimentId": "00000000-0000-4000-8000-0000000000e1",
+    "finalStatus": "completed",
+    "manifestSha256": "1111111111111111111111111111111111111111111111111111111111111111",
+    "outcome": "verified_recommendation",
+    "provenance": "source_run",
+    "reportJsonSha256": "2222222222222222222222222222222222222222222222222222222222222222",
+    "runId": "00000000-0000-4000-8000-0000000000bb",
+    "runKind": "initial"
+   },
+   "sourceRecommendation": {
+    "candidateKey": "oc_0000000000a3",
+    "ddl": [
+     "CREATE INDEX qc_i ON orders (customer_id)"
+    ],
+    "kind": "create_index",
+    "primaryMeasurement": {
+     "arm": "oc_0000000000a3",
+     "baseline": {
+      "medianNs": 9000000,
+      "n": 30,
+      "p95Ns": 9500000,
+      "robustCv": 0.02
+     },
+     "candidate": {
+      "medianNs": 3000000,
+      "n": 30,
+      "p95Ns": 3100000,
+      "robustCv": 0.02
+     },
+     "ciHigh": 3.2,
+     "ciLow": 2.8,
+     "evidenceId": "ev_777777777777",
+     "paramSet": "p1",
+     "provenance": "measured",
+     "source": {
+      "artifactSha256": "5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a",
+      "pointer": "/stats/0"
+     },
+     "speedup": 3.0
+    },
+    "provenance": "source_run",
+    "querySql": null,
+    "scope": "sandbox",
+    "status": "verified"
+   },
+   "title": "Original recommendation reproduced"
+  },
+  "rounds": [
+   {
+    "approval": {
+     "approvedCandidateIds": [
+      "8986847e-6bbb-5b75-b0d2-d98780425b21"
+     ],
+     "decidedAt": "2026-10-13T11:00:00.000000Z",
+     "decidedBy": "user:1",
+     "id": "35375679-1997-5d89-a949-9ec9d0aac67b",
+     "round": 0,
+     "status": "approved"
+    },
+    "candidates": [],
+    "experiment": {
+     "audit": [],
+     "builds": [
+      {
+       "arm": "oc_0000000000a3",
+       "buildNs": 73960208,
+       "indexSizeBytes": 0,
+       "ok": true,
+       "provenance": "measured",
+       "reason": null
+      }
+     ],
+     "config": {
+      "blockSize": 5,
+      "maxCv": 0.25,
+      "maxRegression": 0.95,
+      "measuredRuns": 30,
+      "minEffect": 1.1,
+      "provenance": "configured",
+      "warmupRuns": 5
+     },
+     "correctness": [
+      {
+       "arm": "oc_0000000000a3",
+       "baselineRows": 1,
+       "evidenceId": null,
+       "paramSet": "purchases",
+       "provenance": "measured",
+       "rows": 1,
+       "sameRows": true
+      },
+      {
+       "arm": "oc_0000000000a3",
+       "baselineRows": 1,
+       "evidenceId": null,
+       "paramSet": "views",
+       "provenance": "measured",
+       "rows": 1,
+       "sameRows": true
+      }
+     ],
+     "engineVersion": "bench@1",
+     "environment": {
+      "containerRuntime": "docker",
+      "cpuArch": "arm64",
+      "cpuCount": 8,
+      "cpuModel": "arm",
+      "digest": "sha256:9999999999999999999999999999999999999999999999999999999999999999",
+      "memoryBytes": 8589934592,
+      "os": "Darwin 25.6.0",
+      "pgVersion": "170011",
+      "provenance": "recorded",
+      "sandboxImageDigest": "unrecorded",
+      "workloadDataDigest": "8e79c1c9db1f0ad467fe543e9d0a64d20e8186d43ea8e8a32c7a25c7f3d666b8",
+      "workloadId": "stale_stats@v1:sf=0.1:seed=42"
+     },
+     "errorCode": null,
+     "id": "40812e6a-443b-478c-aabd-d560b72bb079",
+     "measurements": [
+      {
+       "arm": "oc_0000000000a3",
+       "baseline": {
+        "medianNs": 15657145.5,
+        "n": 30,
+        "p95Ns": 18629333,
+        "robustCv": 0.10790947171571581
+       },
+       "candidate": {
+        "medianNs": 4502250.0,
+        "n": 30,
+        "p95Ns": 5444041,
+        "robustCv": 0.10134809870412788
+       },
+       "ciHigh": 3.6630852351601977,
+       "ciLow": 3.2869577496235736,
+       "evidenceId": "ev_4e653e508733",
+       "paramSet": "purchases",
+       "provenance": "measured",
+       "source": {
+        "artifactSha256": "abababababababababababababababababababababababababababababababab",
+        "pointer": "/stats/0"
+       },
+       "speedup": 3.4776268532400465
+      },
+      {
+       "arm": "oc_0000000000a3",
+       "baseline": {
+        "medianNs": 5286750.5,
+        "n": 30,
+        "p95Ns": 6474750,
+        "robustCv": 0.10464524871724183
+       },
+       "candidate": {
+        "medianNs": 4708208.5,
+        "n": 30,
+        "p95Ns": 6353250,
+        "robustCv": 0.1409227520481141
+       },
+       "ciHigh": 1.2304361214432549,
+       "ciLow": 1.0247525326521516,
+       "evidenceId": "ev_37f42e0b412c",
+       "paramSet": "views",
+       "provenance": "measured",
+       "source": {
+        "artifactSha256": "abababababababababababababababababababababababababababababababab",
+        "pointer": "/stats/1"
+       },
+       "speedup": 1.122879434927319
+      }
+     ],
+     "provenance": "measured",
+     "replicate": 0,
+     "replication": null,
+     "resultSha256": "abababababababababababababababababababababababababababababababab",
+     "round": 0,
+     "rowProfile": "qc-row-v1",
+     "seed": 42,
+     "status": "completed",
+     "tournament": [
+      {
+       "arm": "oc_0000000000a3",
+       "primaryCiLow": 3.2869577496235736,
+       "rank": 1,
+       "verdict": "verified"
+      }
+     ],
+     "verdicts": [
+      {
+       "arm": "oc_0000000000a3",
+       "gate": null,
+       "reasons": [],
+       "verdict": "verified"
+      }
+     ],
+     "winner": "oc_0000000000a3"
+    },
+    "replicates": [],
+    "round": 0
+   }
+  ],
+  "run": {
+   "id": "00000000-0000-4000-8000-0000000000aa",
+   "investigationId": "8f7d60a5-f02f-5114-a93f-e1f6f8c80fd9",
+   "kind": "experiment_replay",
+   "parentRunId": "00000000-0000-4000-8000-0000000000bb",
+   "runNumber": 3
+  },
+  "schemaVersion": 2,
+  "stopReason": null,
+  "summary": "",
+  "usage": {
+   "llmCalls": 7,
+   "toolCalls": 2
+  }
+ },
+ "2_performance_drift": {
+  "builderVersion": "report-builder@2",
+  "errors": [],
+  "events": {
+   "cutoffSeq": 42,
+   "digest": "sha256:cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+   "profile": "qc-events-v1"
+  },
+  "evidence": [],
+  "finalStatus": "completed",
+  "finalizedAt": "2026-10-13T12:00:00.000000Z",
+  "findings": [],
+  "headline": "Performance drift detected. Correctness held, but the speed-up changed beyond the equivalence margin, so the original result is not confirmed.",
+  "hypotheses": [],
+  "investigation": {
+   "liveConnection": false,
+   "modes": [
+    "sandbox_benchmark"
+   ],
+   "objective": "Make it fast for 30 users",
+   "title": "Slow orders page",
+   "workloadId": "stale_stats@v1:sf=0.1:seed=42"
+  },
+  "limitations": [
+   "Measured in a disposable sandbox copy of the demo workload `stale_stats@v1:sf=0.1:seed=42`, not on your database. No change was applied to any database you own.",
+   "Warm cache, one session, interleaved runs: production concurrency, cache state and data distribution may change the result.",
+   "Only the listed parameter sets were tested; other inputs may behave differently. A sandbox verification is not a guarantee for every workload.",
+   "This run re-measured an earlier experiment: agreement means consistency in this pair of runs, not portability.",
+   "A replay re-measures one experiment. It runs no diagnosis, candidate generation, auditor, replication or materiality check, so it can at most reproduce what the source investigation verified."
+  ],
+  "missing": [
+   {
+    "reason": "no hypotheses were produced",
+    "section": "hypotheses"
+   }
+  ],
+  "nextSteps": [
+   "Replay again on a quieter host before relying on the size of the original effect."
+  ],
+  "outcome": "inconclusive",
+  "partial": false,
+  "problem": {
+   "evidence": [],
+   "materiality": null
+  },
+  "provenance": {
+   "llm": [],
+   "measurements": [
+    "measured"
+   ],
+   "stubModel": false
+  },
+  "query": {
+   "paramSets": [
+    {
+     "edgeCase": false,
+     "name": "purchases",
+     "values": [
+      "purchase"
+     ]
+    },
+    {
+     "edgeCase": false,
+     "name": "views",
+     "values": [
+      "view"
+     ]
+    }
+   ],
+   "sha256": "1212121212121212121212121212121212121212121212121212121212121212",
+   "sql": "SELECT count(*), sum(e.amount) FROM events e JOIN accounts a ON a.id = e.account_id WHERE e.kind = $1"
+  },
+  "recommendation": {
+   "candidateKey": null,
+   "ddl": [],
+   "kind": null,
+   "origin": "run",
+   "primaryMeasurement": null,
+   "querySql": null,
+   "scope": "sandbox",
+   "status": "none"
+  },
+  "replay": {
+   "comparison": {
+    "comparisonMode": "same_environment",
+    "config": {
+     "confidence": 0.95,
+     "margin": 1.25,
+     "resamples": 2000,
+     "seed": 7
+    },
+    "environment": {
+     "differences": []
+    },
+    "failureCode": null,
+    "originalExperimentId": "00000000-0000-4000-8000-0000000000e1",
+    "pairs": [
+     {
+      "arm": "oc_0000000000a3",
+      "code": null,
+      "drift": 0.97,
+      "driftCiHigh": 1.05,
+      "driftCiLow": 0.9,
+      "originalSpeedup": 3.0,
+      "paramSet": "p1",
+      "replaySpeedup": 2.9,
+      "status": "reproduced_with_drift"
+     }
+    ],
+    "replayExperimentId": "00000000-0000-4000-8000-0000000000e9",
+    "status": "reproduced_with_drift",
+    "winner": {
+     "original": "oc_0000000000a3",
+     "replay": "oc_0000000000a3"
+    }
+   },
+   "replayOf": {
+    "experimentId": "00000000-0000-4000-8000-0000000000e1",
+    "runId": "00000000-0000-4000-8000-0000000000bb"
+   }
+  },
+  "replayResult": {
+   "basis": {
+    "code": "comparison_reproduced_with_drift",
+    "comparisonMode": "same_environment",
+    "comparisonStatus": "reproduced_with_drift",
+    "sourceOutcome": "verified_recommendation"
+   },
+   "claimsReproduction": false,
+   "comparisonFailureCode": null,
+   "comparisonMode": "same_environment",
+   "comparisonStatus": "reproduced_with_drift",
+   "correctnessReproduced": true,
+   "environmentComparable": true,
+   "experimentMatch": {
+    "matches": true,
+    "recommendationResultSha256": "5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a",
+    "replayedExperimentId": "00000000-0000-4000-8000-0000000000e1",
+    "replayedResultSha256": "5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a"
+   },
+   "explanation": "The direction and correctness held; the size of the effect did not, so the original claim is not confirmed.",
+   "failureCode": null,
+   "margin": 1.25,
+   "materialDifferences": [],
+   "materialDrift": true,
+   "originalReproduced": false,
+   "performanceReproduced": false,
+   "replayMeasurement": {
+    "engineWinner": "oc_0000000000a3",
+    "label": "replay measurement, not a verification",
+    "provenance": "measured"
+   },
+   "result": "performance_drift",
+   "snapshotError": null,
+   "source": {
+    "builderVersion": "report-builder@1",
+    "experimentId": "00000000-0000-4000-8000-0000000000e1",
+    "finalStatus": "completed",
+    "manifestSha256": "1111111111111111111111111111111111111111111111111111111111111111",
+    "outcome": "verified_recommendation",
+    "provenance": "source_run",
+    "reportJsonSha256": "2222222222222222222222222222222222222222222222222222222222222222",
+    "runId": "00000000-0000-4000-8000-0000000000bb",
+    "runKind": "initial"
+   },
+   "sourceRecommendation": {
+    "candidateKey": "oc_0000000000a3",
+    "ddl": [
+     "CREATE INDEX qc_i ON orders (customer_id)"
+    ],
+    "kind": "create_index",
+    "primaryMeasurement": {
+     "arm": "oc_0000000000a3",
+     "baseline": {
+      "medianNs": 9000000,
+      "n": 30,
+      "p95Ns": 9500000,
+      "robustCv": 0.02
+     },
+     "candidate": {
+      "medianNs": 3000000,
+      "n": 30,
+      "p95Ns": 3100000,
+      "robustCv": 0.02
+     },
+     "ciHigh": 3.2,
+     "ciLow": 2.8,
+     "evidenceId": "ev_777777777777",
+     "paramSet": "p1",
+     "provenance": "measured",
+     "source": {
+      "artifactSha256": "5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a",
+      "pointer": "/stats/0"
+     },
+     "speedup": 3.0
+    },
+    "provenance": "source_run",
+    "querySql": null,
+    "scope": "sandbox",
+    "status": "verified"
+   },
+   "title": "Performance drift detected"
+  },
+  "rounds": [
+   {
+    "approval": {
+     "approvedCandidateIds": [
+      "8986847e-6bbb-5b75-b0d2-d98780425b21"
+     ],
+     "decidedAt": "2026-10-13T11:00:00.000000Z",
+     "decidedBy": "user:1",
+     "id": "35375679-1997-5d89-a949-9ec9d0aac67b",
+     "round": 0,
+     "status": "approved"
+    },
+    "candidates": [],
+    "experiment": {
+     "audit": [],
+     "builds": [
+      {
+       "arm": "oc_0000000000a3",
+       "buildNs": 73960208,
+       "indexSizeBytes": 0,
+       "ok": true,
+       "provenance": "measured",
+       "reason": null
+      }
+     ],
+     "config": {
+      "blockSize": 5,
+      "maxCv": 0.25,
+      "maxRegression": 0.95,
+      "measuredRuns": 30,
+      "minEffect": 1.1,
+      "provenance": "configured",
+      "warmupRuns": 5
+     },
+     "correctness": [
+      {
+       "arm": "oc_0000000000a3",
+       "baselineRows": 1,
+       "evidenceId": null,
+       "paramSet": "purchases",
+       "provenance": "measured",
+       "rows": 1,
+       "sameRows": true
+      },
+      {
+       "arm": "oc_0000000000a3",
+       "baselineRows": 1,
+       "evidenceId": null,
+       "paramSet": "views",
+       "provenance": "measured",
+       "rows": 1,
+       "sameRows": true
+      }
+     ],
+     "engineVersion": "bench@1",
+     "environment": {
+      "containerRuntime": "docker",
+      "cpuArch": "arm64",
+      "cpuCount": 8,
+      "cpuModel": "arm",
+      "digest": "sha256:9999999999999999999999999999999999999999999999999999999999999999",
+      "memoryBytes": 8589934592,
+      "os": "Darwin 25.6.0",
+      "pgVersion": "170011",
+      "provenance": "recorded",
+      "sandboxImageDigest": "unrecorded",
+      "workloadDataDigest": "8e79c1c9db1f0ad467fe543e9d0a64d20e8186d43ea8e8a32c7a25c7f3d666b8",
+      "workloadId": "stale_stats@v1:sf=0.1:seed=42"
+     },
+     "errorCode": null,
+     "id": "40812e6a-443b-478c-aabd-d560b72bb079",
+     "measurements": [
+      {
+       "arm": "oc_0000000000a3",
+       "baseline": {
+        "medianNs": 15657145.5,
+        "n": 30,
+        "p95Ns": 18629333,
+        "robustCv": 0.10790947171571581
+       },
+       "candidate": {
+        "medianNs": 4502250.0,
+        "n": 30,
+        "p95Ns": 5444041,
+        "robustCv": 0.10134809870412788
+       },
+       "ciHigh": 3.6630852351601977,
+       "ciLow": 3.2869577496235736,
+       "evidenceId": "ev_4e653e508733",
+       "paramSet": "purchases",
+       "provenance": "measured",
+       "source": {
+        "artifactSha256": "abababababababababababababababababababababababababababababababab",
+        "pointer": "/stats/0"
+       },
+       "speedup": 3.4776268532400465
+      },
+      {
+       "arm": "oc_0000000000a3",
+       "baseline": {
+        "medianNs": 5286750.5,
+        "n": 30,
+        "p95Ns": 6474750,
+        "robustCv": 0.10464524871724183
+       },
+       "candidate": {
+        "medianNs": 4708208.5,
+        "n": 30,
+        "p95Ns": 6353250,
+        "robustCv": 0.1409227520481141
+       },
+       "ciHigh": 1.2304361214432549,
+       "ciLow": 1.0247525326521516,
+       "evidenceId": "ev_37f42e0b412c",
+       "paramSet": "views",
+       "provenance": "measured",
+       "source": {
+        "artifactSha256": "abababababababababababababababababababababababababababababababab",
+        "pointer": "/stats/1"
+       },
+       "speedup": 1.122879434927319
+      }
+     ],
+     "provenance": "measured",
+     "replicate": 0,
+     "replication": null,
+     "resultSha256": "abababababababababababababababababababababababababababababababab",
+     "round": 0,
+     "rowProfile": "qc-row-v1",
+     "seed": 42,
+     "status": "completed",
+     "tournament": [
+      {
+       "arm": "oc_0000000000a3",
+       "primaryCiLow": 3.2869577496235736,
+       "rank": 1,
+       "verdict": "verified"
+      }
+     ],
+     "verdicts": [
+      {
+       "arm": "oc_0000000000a3",
+       "gate": null,
+       "reasons": [],
+       "verdict": "verified"
+      }
+     ],
+     "winner": "oc_0000000000a3"
+    },
+    "replicates": [],
+    "round": 0
+   }
+  ],
+  "run": {
+   "id": "00000000-0000-4000-8000-0000000000aa",
+   "investigationId": "8f7d60a5-f02f-5114-a93f-e1f6f8c80fd9",
+   "kind": "experiment_replay",
+   "parentRunId": "00000000-0000-4000-8000-0000000000bb",
+   "runNumber": 3
+  },
+  "schemaVersion": 2,
+  "stopReason": null,
+  "summary": "",
+  "usage": {
+   "llmCalls": 7,
+   "toolCalls": 2
+  }
+ },
+ "3_not_reproduced_rows": {
+  "builderVersion": "report-builder@2",
+  "errors": [],
+  "events": {
+   "cutoffSeq": 42,
+   "digest": "sha256:cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+   "profile": "qc-events-v1"
+  },
+  "evidence": [],
+  "finalStatus": "completed",
+  "finalizedAt": "2026-10-13T12:00:00.000000Z",
+  "findings": [],
+  "headline": "Original result not reproduced: the result rows changed. The original result is not confirmed by this replay.",
+  "hypotheses": [],
+  "investigation": {
+   "liveConnection": false,
+   "modes": [
+    "sandbox_benchmark"
+   ],
+   "objective": "Make it fast for 30 users",
+   "title": "Slow orders page",
+   "workloadId": "stale_stats@v1:sf=0.1:seed=42"
+  },
+  "limitations": [
+   "Measured in a disposable sandbox copy of the demo workload `stale_stats@v1:sf=0.1:seed=42`, not on your database. No change was applied to any database you own.",
+   "Warm cache, one session, interleaved runs: production concurrency, cache state and data distribution may change the result.",
+   "Only the listed parameter sets were tested; other inputs may behave differently. A sandbox verification is not a guarantee for every workload.",
+   "This run re-measured an earlier experiment: agreement means consistency in this pair of runs, not portability.",
+   "A replay re-measures one experiment. It runs no diagnosis, candidate generation, auditor, replication or materiality check, so it can at most reproduce what the source investigation verified."
+  ],
+  "missing": [
+   {
+    "reason": "no hypotheses were produced",
+    "section": "hypotheses"
+   }
+  ],
+  "nextSteps": [
+   "Treat the original result with caution; investigate why it changed before acting on it."
+  ],
+  "outcome": "inconclusive",
+  "partial": false,
+  "problem": {
+   "evidence": [],
+   "materiality": null
+  },
+  "provenance": {
+   "llm": [],
+   "measurements": [
+    "measured"
+   ],
+   "stubModel": false
+  },
+  "query": {
+   "paramSets": [
+    {
+     "edgeCase": false,
+     "name": "purchases",
+     "values": [
+      "purchase"
+     ]
+    },
+    {
+     "edgeCase": false,
+     "name": "views",
+     "values": [
+      "view"
+     ]
+    }
+   ],
+   "sha256": "1212121212121212121212121212121212121212121212121212121212121212",
+   "sql": "SELECT count(*), sum(e.amount) FROM events e JOIN accounts a ON a.id = e.account_id WHERE e.kind = $1"
+  },
+  "recommendation": {
+   "candidateKey": null,
+   "ddl": [],
+   "kind": null,
+   "origin": "run",
+   "primaryMeasurement": null,
+   "querySql": null,
+   "scope": "sandbox",
+   "status": "none"
+  },
+  "replay": {
+   "comparison": {
+    "comparisonMode": "same_environment",
+    "config": {
+     "confidence": 0.95,
+     "margin": 1.25,
+     "resamples": 2000,
+     "seed": 7
+    },
+    "environment": {
+     "differences": []
+    },
+    "failureCode": "result_fingerprint_changed",
+    "originalExperimentId": "00000000-0000-4000-8000-0000000000e1",
+    "pairs": [
+     {
+      "arm": "oc_0000000000a3",
+      "code": "result_fingerprint_changed",
+      "drift": 0.97,
+      "driftCiHigh": 1.05,
+      "driftCiLow": 0.9,
+      "originalSpeedup": 3.0,
+      "paramSet": "p1",
+      "replaySpeedup": 2.9,
+      "status": "not_reproduced"
+     }
+    ],
+    "replayExperimentId": "00000000-0000-4000-8000-0000000000e9",
+    "status": "not_reproduced",
+    "winner": {
+     "original": "oc_0000000000a3",
+     "replay": "oc_0000000000a3"
+    }
+   },
+   "replayOf": {
+    "experimentId": "00000000-0000-4000-8000-0000000000e1",
+    "runId": "00000000-0000-4000-8000-0000000000bb"
+   }
+  },
+  "replayResult": {
+   "basis": {
+    "code": "comparison_not_reproduced",
+    "comparisonMode": "same_environment",
+    "comparisonStatus": "not_reproduced",
+    "sourceOutcome": "verified_recommendation"
+   },
+   "claimsReproduction": false,
+   "comparisonFailureCode": "result_fingerprint_changed",
+   "comparisonMode": "same_environment",
+   "comparisonStatus": "not_reproduced",
+   "correctnessReproduced": false,
+   "environmentComparable": true,
+   "experimentMatch": {
+    "matches": true,
+    "recommendationResultSha256": "5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a",
+    "replayedExperimentId": "00000000-0000-4000-8000-0000000000e1",
+    "replayedResultSha256": "5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a"
+   },
+   "explanation": "The new measurement contradicts the original. Treat the original result with caution.",
+   "failureCode": "result_fingerprint_changed",
+   "margin": 1.25,
+   "materialDifferences": [],
+   "materialDrift": false,
+   "originalReproduced": false,
+   "performanceReproduced": null,
+   "replayMeasurement": {
+    "engineWinner": "oc_0000000000a3",
+    "label": "replay measurement, not a verification",
+    "provenance": "measured"
+   },
+   "result": "not_reproduced",
+   "snapshotError": null,
+   "source": {
+    "builderVersion": "report-builder@1",
+    "experimentId": "00000000-0000-4000-8000-0000000000e1",
+    "finalStatus": "completed",
+    "manifestSha256": "1111111111111111111111111111111111111111111111111111111111111111",
+    "outcome": "verified_recommendation",
+    "provenance": "source_run",
+    "reportJsonSha256": "2222222222222222222222222222222222222222222222222222222222222222",
+    "runId": "00000000-0000-4000-8000-0000000000bb",
+    "runKind": "initial"
+   },
+   "sourceRecommendation": {
+    "candidateKey": "oc_0000000000a3",
+    "ddl": [
+     "CREATE INDEX qc_i ON orders (customer_id)"
+    ],
+    "kind": "create_index",
+    "primaryMeasurement": {
+     "arm": "oc_0000000000a3",
+     "baseline": {
+      "medianNs": 9000000,
+      "n": 30,
+      "p95Ns": 9500000,
+      "robustCv": 0.02
+     },
+     "candidate": {
+      "medianNs": 3000000,
+      "n": 30,
+      "p95Ns": 3100000,
+      "robustCv": 0.02
+     },
+     "ciHigh": 3.2,
+     "ciLow": 2.8,
+     "evidenceId": "ev_777777777777",
+     "paramSet": "p1",
+     "provenance": "measured",
+     "source": {
+      "artifactSha256": "5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a",
+      "pointer": "/stats/0"
+     },
+     "speedup": 3.0
+    },
+    "provenance": "source_run",
+    "querySql": null,
+    "scope": "sandbox",
+    "status": "verified"
+   },
+   "title": "Original result not reproduced"
+  },
+  "rounds": [
+   {
+    "approval": {
+     "approvedCandidateIds": [
+      "8986847e-6bbb-5b75-b0d2-d98780425b21"
+     ],
+     "decidedAt": "2026-10-13T11:00:00.000000Z",
+     "decidedBy": "user:1",
+     "id": "35375679-1997-5d89-a949-9ec9d0aac67b",
+     "round": 0,
+     "status": "approved"
+    },
+    "candidates": [],
+    "experiment": {
+     "audit": [],
+     "builds": [
+      {
+       "arm": "oc_0000000000a3",
+       "buildNs": 73960208,
+       "indexSizeBytes": 0,
+       "ok": true,
+       "provenance": "measured",
+       "reason": null
+      }
+     ],
+     "config": {
+      "blockSize": 5,
+      "maxCv": 0.25,
+      "maxRegression": 0.95,
+      "measuredRuns": 30,
+      "minEffect": 1.1,
+      "provenance": "configured",
+      "warmupRuns": 5
+     },
+     "correctness": [
+      {
+       "arm": "oc_0000000000a3",
+       "baselineRows": 1,
+       "evidenceId": null,
+       "paramSet": "purchases",
+       "provenance": "measured",
+       "rows": 1,
+       "sameRows": true
+      },
+      {
+       "arm": "oc_0000000000a3",
+       "baselineRows": 1,
+       "evidenceId": null,
+       "paramSet": "views",
+       "provenance": "measured",
+       "rows": 1,
+       "sameRows": true
+      }
+     ],
+     "engineVersion": "bench@1",
+     "environment": {
+      "containerRuntime": "docker",
+      "cpuArch": "arm64",
+      "cpuCount": 8,
+      "cpuModel": "arm",
+      "digest": "sha256:9999999999999999999999999999999999999999999999999999999999999999",
+      "memoryBytes": 8589934592,
+      "os": "Darwin 25.6.0",
+      "pgVersion": "170011",
+      "provenance": "recorded",
+      "sandboxImageDigest": "unrecorded",
+      "workloadDataDigest": "8e79c1c9db1f0ad467fe543e9d0a64d20e8186d43ea8e8a32c7a25c7f3d666b8",
+      "workloadId": "stale_stats@v1:sf=0.1:seed=42"
+     },
+     "errorCode": null,
+     "id": "40812e6a-443b-478c-aabd-d560b72bb079",
+     "measurements": [
+      {
+       "arm": "oc_0000000000a3",
+       "baseline": {
+        "medianNs": 15657145.5,
+        "n": 30,
+        "p95Ns": 18629333,
+        "robustCv": 0.10790947171571581
+       },
+       "candidate": {
+        "medianNs": 4502250.0,
+        "n": 30,
+        "p95Ns": 5444041,
+        "robustCv": 0.10134809870412788
+       },
+       "ciHigh": 3.6630852351601977,
+       "ciLow": 3.2869577496235736,
+       "evidenceId": "ev_4e653e508733",
+       "paramSet": "purchases",
+       "provenance": "measured",
+       "source": {
+        "artifactSha256": "abababababababababababababababababababababababababababababababab",
+        "pointer": "/stats/0"
+       },
+       "speedup": 3.4776268532400465
+      },
+      {
+       "arm": "oc_0000000000a3",
+       "baseline": {
+        "medianNs": 5286750.5,
+        "n": 30,
+        "p95Ns": 6474750,
+        "robustCv": 0.10464524871724183
+       },
+       "candidate": {
+        "medianNs": 4708208.5,
+        "n": 30,
+        "p95Ns": 6353250,
+        "robustCv": 0.1409227520481141
+       },
+       "ciHigh": 1.2304361214432549,
+       "ciLow": 1.0247525326521516,
+       "evidenceId": "ev_37f42e0b412c",
+       "paramSet": "views",
+       "provenance": "measured",
+       "source": {
+        "artifactSha256": "abababababababababababababababababababababababababababababababab",
+        "pointer": "/stats/1"
+       },
+       "speedup": 1.122879434927319
+      }
+     ],
+     "provenance": "measured",
+     "replicate": 0,
+     "replication": null,
+     "resultSha256": "abababababababababababababababababababababababababababababababab",
+     "round": 0,
+     "rowProfile": "qc-row-v1",
+     "seed": 42,
+     "status": "completed",
+     "tournament": [
+      {
+       "arm": "oc_0000000000a3",
+       "primaryCiLow": 3.2869577496235736,
+       "rank": 1,
+       "verdict": "verified"
+      }
+     ],
+     "verdicts": [
+      {
+       "arm": "oc_0000000000a3",
+       "gate": null,
+       "reasons": [],
+       "verdict": "verified"
+      }
+     ],
+     "winner": "oc_0000000000a3"
+    },
+    "replicates": [],
+    "round": 0
+   }
+  ],
+  "run": {
+   "id": "00000000-0000-4000-8000-0000000000aa",
+   "investigationId": "8f7d60a5-f02f-5114-a93f-e1f6f8c80fd9",
+   "kind": "experiment_replay",
+   "parentRunId": "00000000-0000-4000-8000-0000000000bb",
+   "runNumber": 3
+  },
+  "schemaVersion": 2,
+  "stopReason": null,
+  "summary": "",
+  "usage": {
+   "llmCalls": 7,
+   "toolCalls": 2
+  }
+ },
+ "3_not_reproduced_verdict": {
+  "builderVersion": "report-builder@2",
+  "errors": [],
+  "events": {
+   "cutoffSeq": 42,
+   "digest": "sha256:cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+   "profile": "qc-events-v1"
+  },
+  "evidence": [],
+  "finalStatus": "completed",
+  "finalizedAt": "2026-10-13T12:00:00.000000Z",
+  "findings": [],
+  "headline": "Original result not reproduced: the engine verdict changed. The original result is not confirmed by this replay.",
+  "hypotheses": [],
+  "investigation": {
+   "liveConnection": false,
+   "modes": [
+    "sandbox_benchmark"
+   ],
+   "objective": "Make it fast for 30 users",
+   "title": "Slow orders page",
+   "workloadId": "stale_stats@v1:sf=0.1:seed=42"
+  },
+  "limitations": [
+   "Measured in a disposable sandbox copy of the demo workload `stale_stats@v1:sf=0.1:seed=42`, not on your database. No change was applied to any database you own.",
+   "Warm cache, one session, interleaved runs: production concurrency, cache state and data distribution may change the result.",
+   "Only the listed parameter sets were tested; other inputs may behave differently. A sandbox verification is not a guarantee for every workload.",
+   "This run re-measured an earlier experiment: agreement means consistency in this pair of runs, not portability.",
+   "A replay re-measures one experiment. It runs no diagnosis, candidate generation, auditor, replication or materiality check, so it can at most reproduce what the source investigation verified."
+  ],
+  "missing": [
+   {
+    "reason": "no hypotheses were produced",
+    "section": "hypotheses"
+   }
+  ],
+  "nextSteps": [
+   "Treat the original result with caution; investigate why it changed before acting on it."
+  ],
+  "outcome": "inconclusive",
+  "partial": false,
+  "problem": {
+   "evidence": [],
+   "materiality": null
+  },
+  "provenance": {
+   "llm": [],
+   "measurements": [
+    "measured"
+   ],
+   "stubModel": false
+  },
+  "query": {
+   "paramSets": [
+    {
+     "edgeCase": false,
+     "name": "purchases",
+     "values": [
+      "purchase"
+     ]
+    },
+    {
+     "edgeCase": false,
+     "name": "views",
+     "values": [
+      "view"
+     ]
+    }
+   ],
+   "sha256": "1212121212121212121212121212121212121212121212121212121212121212",
+   "sql": "SELECT count(*), sum(e.amount) FROM events e JOIN accounts a ON a.id = e.account_id WHERE e.kind = $1"
+  },
+  "recommendation": {
+   "candidateKey": null,
+   "ddl": [],
+   "kind": null,
+   "origin": "run",
+   "primaryMeasurement": null,
+   "querySql": null,
+   "scope": "sandbox",
+   "status": "none"
+  },
+  "replay": {
+   "comparison": {
+    "comparisonMode": "same_environment",
+    "config": {
+     "confidence": 0.95,
+     "margin": 1.25,
+     "resamples": 2000,
+     "seed": 7
+    },
+    "environment": {
+     "differences": []
+    },
+    "failureCode": "verdict_changed",
+    "originalExperimentId": "00000000-0000-4000-8000-0000000000e1",
+    "pairs": [
+     {
+      "arm": "oc_0000000000a3",
+      "code": null,
+      "drift": 0.97,
+      "driftCiHigh": 1.05,
+      "driftCiLow": 0.9,
+      "originalSpeedup": 3.0,
+      "paramSet": "p1",
+      "replaySpeedup": 2.9,
+      "status": "not_reproduced"
+     }
+    ],
+    "replayExperimentId": "00000000-0000-4000-8000-0000000000e9",
+    "status": "not_reproduced",
+    "winner": {
+     "original": "oc_0000000000a3",
+     "replay": "oc_0000000000a3"
+    }
+   },
+   "replayOf": {
+    "experimentId": "00000000-0000-4000-8000-0000000000e1",
+    "runId": "00000000-0000-4000-8000-0000000000bb"
+   }
+  },
+  "replayResult": {
+   "basis": {
+    "code": "comparison_not_reproduced",
+    "comparisonMode": "same_environment",
+    "comparisonStatus": "not_reproduced",
+    "sourceOutcome": "verified_recommendation"
+   },
+   "claimsReproduction": false,
+   "comparisonFailureCode": "verdict_changed",
+   "comparisonMode": "same_environment",
+   "comparisonStatus": "not_reproduced",
+   "correctnessReproduced": true,
+   "environmentComparable": true,
+   "experimentMatch": {
+    "matches": true,
+    "recommendationResultSha256": "5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a",
+    "replayedExperimentId": "00000000-0000-4000-8000-0000000000e1",
+    "replayedResultSha256": "5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a"
+   },
+   "explanation": "The new measurement contradicts the original. Treat the original result with caution.",
+   "failureCode": "verdict_changed",
+   "margin": 1.25,
+   "materialDifferences": [],
+   "materialDrift": false,
+   "originalReproduced": false,
+   "performanceReproduced": false,
+   "replayMeasurement": {
+    "engineWinner": "oc_0000000000a3",
+    "label": "replay measurement, not a verification",
+    "provenance": "measured"
+   },
+   "result": "not_reproduced",
+   "snapshotError": null,
+   "source": {
+    "builderVersion": "report-builder@1",
+    "experimentId": "00000000-0000-4000-8000-0000000000e1",
+    "finalStatus": "completed",
+    "manifestSha256": "1111111111111111111111111111111111111111111111111111111111111111",
+    "outcome": "verified_recommendation",
+    "provenance": "source_run",
+    "reportJsonSha256": "2222222222222222222222222222222222222222222222222222222222222222",
+    "runId": "00000000-0000-4000-8000-0000000000bb",
+    "runKind": "initial"
+   },
+   "sourceRecommendation": {
+    "candidateKey": "oc_0000000000a3",
+    "ddl": [
+     "CREATE INDEX qc_i ON orders (customer_id)"
+    ],
+    "kind": "create_index",
+    "primaryMeasurement": {
+     "arm": "oc_0000000000a3",
+     "baseline": {
+      "medianNs": 9000000,
+      "n": 30,
+      "p95Ns": 9500000,
+      "robustCv": 0.02
+     },
+     "candidate": {
+      "medianNs": 3000000,
+      "n": 30,
+      "p95Ns": 3100000,
+      "robustCv": 0.02
+     },
+     "ciHigh": 3.2,
+     "ciLow": 2.8,
+     "evidenceId": "ev_777777777777",
+     "paramSet": "p1",
+     "provenance": "measured",
+     "source": {
+      "artifactSha256": "5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a",
+      "pointer": "/stats/0"
+     },
+     "speedup": 3.0
+    },
+    "provenance": "source_run",
+    "querySql": null,
+    "scope": "sandbox",
+    "status": "verified"
+   },
+   "title": "Original result not reproduced"
+  },
+  "rounds": [
+   {
+    "approval": {
+     "approvedCandidateIds": [
+      "8986847e-6bbb-5b75-b0d2-d98780425b21"
+     ],
+     "decidedAt": "2026-10-13T11:00:00.000000Z",
+     "decidedBy": "user:1",
+     "id": "35375679-1997-5d89-a949-9ec9d0aac67b",
+     "round": 0,
+     "status": "approved"
+    },
+    "candidates": [],
+    "experiment": {
+     "audit": [],
+     "builds": [
+      {
+       "arm": "oc_0000000000a3",
+       "buildNs": 73960208,
+       "indexSizeBytes": 0,
+       "ok": true,
+       "provenance": "measured",
+       "reason": null
+      }
+     ],
+     "config": {
+      "blockSize": 5,
+      "maxCv": 0.25,
+      "maxRegression": 0.95,
+      "measuredRuns": 30,
+      "minEffect": 1.1,
+      "provenance": "configured",
+      "warmupRuns": 5
+     },
+     "correctness": [
+      {
+       "arm": "oc_0000000000a3",
+       "baselineRows": 1,
+       "evidenceId": null,
+       "paramSet": "purchases",
+       "provenance": "measured",
+       "rows": 1,
+       "sameRows": true
+      },
+      {
+       "arm": "oc_0000000000a3",
+       "baselineRows": 1,
+       "evidenceId": null,
+       "paramSet": "views",
+       "provenance": "measured",
+       "rows": 1,
+       "sameRows": true
+      }
+     ],
+     "engineVersion": "bench@1",
+     "environment": {
+      "containerRuntime": "docker",
+      "cpuArch": "arm64",
+      "cpuCount": 8,
+      "cpuModel": "arm",
+      "digest": "sha256:9999999999999999999999999999999999999999999999999999999999999999",
+      "memoryBytes": 8589934592,
+      "os": "Darwin 25.6.0",
+      "pgVersion": "170011",
+      "provenance": "recorded",
+      "sandboxImageDigest": "unrecorded",
+      "workloadDataDigest": "8e79c1c9db1f0ad467fe543e9d0a64d20e8186d43ea8e8a32c7a25c7f3d666b8",
+      "workloadId": "stale_stats@v1:sf=0.1:seed=42"
+     },
+     "errorCode": null,
+     "id": "40812e6a-443b-478c-aabd-d560b72bb079",
+     "measurements": [
+      {
+       "arm": "oc_0000000000a3",
+       "baseline": {
+        "medianNs": 15657145.5,
+        "n": 30,
+        "p95Ns": 18629333,
+        "robustCv": 0.10790947171571581
+       },
+       "candidate": {
+        "medianNs": 4502250.0,
+        "n": 30,
+        "p95Ns": 5444041,
+        "robustCv": 0.10134809870412788
+       },
+       "ciHigh": 3.6630852351601977,
+       "ciLow": 3.2869577496235736,
+       "evidenceId": "ev_4e653e508733",
+       "paramSet": "purchases",
+       "provenance": "measured",
+       "source": {
+        "artifactSha256": "abababababababababababababababababababababababababababababababab",
+        "pointer": "/stats/0"
+       },
+       "speedup": 3.4776268532400465
+      },
+      {
+       "arm": "oc_0000000000a3",
+       "baseline": {
+        "medianNs": 5286750.5,
+        "n": 30,
+        "p95Ns": 6474750,
+        "robustCv": 0.10464524871724183
+       },
+       "candidate": {
+        "medianNs": 4708208.5,
+        "n": 30,
+        "p95Ns": 6353250,
+        "robustCv": 0.1409227520481141
+       },
+       "ciHigh": 1.2304361214432549,
+       "ciLow": 1.0247525326521516,
+       "evidenceId": "ev_37f42e0b412c",
+       "paramSet": "views",
+       "provenance": "measured",
+       "source": {
+        "artifactSha256": "abababababababababababababababababababababababababababababababab",
+        "pointer": "/stats/1"
+       },
+       "speedup": 1.122879434927319
+      }
+     ],
+     "provenance": "measured",
+     "replicate": 0,
+     "replication": null,
+     "resultSha256": "abababababababababababababababababababababababababababababababab",
+     "round": 0,
+     "rowProfile": "qc-row-v1",
+     "seed": 42,
+     "status": "completed",
+     "tournament": [
+      {
+       "arm": "oc_0000000000a3",
+       "primaryCiLow": 3.2869577496235736,
+       "rank": 1,
+       "verdict": "verified"
+      }
+     ],
+     "verdicts": [
+      {
+       "arm": "oc_0000000000a3",
+       "gate": null,
+       "reasons": [],
+       "verdict": "verified"
+      }
+     ],
+     "winner": "oc_0000000000a3"
+    },
+    "replicates": [],
+    "round": 0
+   }
+  ],
+  "run": {
+   "id": "00000000-0000-4000-8000-0000000000aa",
+   "investigationId": "8f7d60a5-f02f-5114-a93f-e1f6f8c80fd9",
+   "kind": "experiment_replay",
+   "parentRunId": "00000000-0000-4000-8000-0000000000bb",
+   "runNumber": 3
+  },
+  "schemaVersion": 2,
+  "stopReason": null,
+  "summary": "",
+  "usage": {
+   "llmCalls": 7,
+   "toolCalls": 2
+  }
+ },
+ "4_inconclusive_comparison": {
+  "builderVersion": "report-builder@2",
+  "errors": [],
+  "events": {
+   "cutoffSeq": 42,
+   "digest": "sha256:cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+   "profile": "qc-events-v1"
+  },
+  "evidence": [],
+  "finalStatus": "completed",
+  "finalizedAt": "2026-10-13T12:00:00.000000Z",
+  "findings": [],
+  "headline": "Replay comparison inconclusive: the original result was neither confirmed nor contradicted (too few samples, or measurements too noisy to decide).",
+  "hypotheses": [],
+  "investigation": {
+   "liveConnection": false,
+   "modes": [
+    "sandbox_benchmark"
+   ],
+   "objective": "Make it fast for 30 users",
+   "title": "Slow orders page",
+   "workloadId": "stale_stats@v1:sf=0.1:seed=42"
+  },
+  "limitations": [
+   "Measured in a disposable sandbox copy of the demo workload `stale_stats@v1:sf=0.1:seed=42`, not on your database. No change was applied to any database you own.",
+   "Warm cache, one session, interleaved runs: production concurrency, cache state and data distribution may change the result.",
+   "Only the listed parameter sets were tested; other inputs may behave differently. A sandbox verification is not a guarantee for every workload.",
+   "This run re-measured an earlier experiment: agreement means consistency in this pair of runs, not portability.",
+   "A replay re-measures one experiment. It runs no diagnosis, candidate generation, auditor, replication or materiality check, so it can at most reproduce what the source investigation verified."
+  ],
+  "missing": [
+   {
+    "reason": "no hypotheses were produced",
+    "section": "hypotheses"
+   }
+  ],
+  "nextSteps": [
+   "Replay again on a quieter host or with more samples; inconclusive is not a rejection."
+  ],
+  "outcome": "inconclusive",
+  "partial": false,
+  "problem": {
+   "evidence": [],
+   "materiality": null
+  },
+  "provenance": {
+   "llm": [],
+   "measurements": [
+    "measured"
+   ],
+   "stubModel": false
+  },
+  "query": {
+   "paramSets": [
+    {
+     "edgeCase": false,
+     "name": "purchases",
+     "values": [
+      "purchase"
+     ]
+    },
+    {
+     "edgeCase": false,
+     "name": "views",
+     "values": [
+      "view"
+     ]
+    }
+   ],
+   "sha256": "1212121212121212121212121212121212121212121212121212121212121212",
+   "sql": "SELECT count(*), sum(e.amount) FROM events e JOIN accounts a ON a.id = e.account_id WHERE e.kind = $1"
+  },
+  "recommendation": {
+   "candidateKey": null,
+   "ddl": [],
+   "kind": null,
+   "origin": "run",
+   "primaryMeasurement": null,
+   "querySql": null,
+   "scope": "sandbox",
+   "status": "none"
+  },
+  "replay": {
+   "comparison": {
+    "comparisonMode": "same_environment",
+    "config": {
+     "confidence": 0.95,
+     "margin": 1.25,
+     "resamples": 2000,
+     "seed": 7
+    },
+    "environment": {
+     "differences": []
+    },
+    "failureCode": "insufficient_evidence",
+    "originalExperimentId": "00000000-0000-4000-8000-0000000000e1",
+    "pairs": [
+     {
+      "arm": "oc_0000000000a3",
+      "code": null,
+      "drift": 0.97,
+      "driftCiHigh": 1.05,
+      "driftCiLow": 0.9,
+      "originalSpeedup": 3.0,
+      "paramSet": "p1",
+      "replaySpeedup": 2.9,
+      "status": "inconclusive"
+     }
+    ],
+    "replayExperimentId": "00000000-0000-4000-8000-0000000000e9",
+    "status": "inconclusive",
+    "winner": {
+     "original": "oc_0000000000a3",
+     "replay": "oc_0000000000a3"
+    }
+   },
+   "replayOf": {
+    "experimentId": "00000000-0000-4000-8000-0000000000e1",
+    "runId": "00000000-0000-4000-8000-0000000000bb"
+   }
+  },
+  "replayResult": {
+   "basis": {
+    "code": "comparison_inconclusive",
+    "comparisonMode": "same_environment",
+    "comparisonStatus": "inconclusive",
+    "sourceOutcome": "verified_recommendation"
+   },
+   "claimsReproduction": false,
+   "comparisonFailureCode": "insufficient_evidence",
+   "comparisonMode": "same_environment",
+   "comparisonStatus": "inconclusive",
+   "correctnessReproduced": true,
+   "environmentComparable": true,
+   "experimentMatch": {
+    "matches": true,
+    "recommendationResultSha256": "5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a",
+    "replayedExperimentId": "00000000-0000-4000-8000-0000000000e1",
+    "replayedResultSha256": "5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a"
+   },
+   "explanation": "Inconclusive is not a rejection: a quieter host or more samples may decide.",
+   "failureCode": "insufficient_evidence",
+   "margin": 1.25,
+   "materialDifferences": [],
+   "materialDrift": false,
+   "originalReproduced": false,
+   "performanceReproduced": null,
+   "replayMeasurement": {
+    "engineWinner": "oc_0000000000a3",
+    "label": "replay measurement, not a verification",
+    "provenance": "measured"
+   },
+   "result": "inconclusive",
+   "snapshotError": null,
+   "source": {
+    "builderVersion": "report-builder@1",
+    "experimentId": "00000000-0000-4000-8000-0000000000e1",
+    "finalStatus": "completed",
+    "manifestSha256": "1111111111111111111111111111111111111111111111111111111111111111",
+    "outcome": "verified_recommendation",
+    "provenance": "source_run",
+    "reportJsonSha256": "2222222222222222222222222222222222222222222222222222222222222222",
+    "runId": "00000000-0000-4000-8000-0000000000bb",
+    "runKind": "initial"
+   },
+   "sourceRecommendation": {
+    "candidateKey": "oc_0000000000a3",
+    "ddl": [
+     "CREATE INDEX qc_i ON orders (customer_id)"
+    ],
+    "kind": "create_index",
+    "primaryMeasurement": {
+     "arm": "oc_0000000000a3",
+     "baseline": {
+      "medianNs": 9000000,
+      "n": 30,
+      "p95Ns": 9500000,
+      "robustCv": 0.02
+     },
+     "candidate": {
+      "medianNs": 3000000,
+      "n": 30,
+      "p95Ns": 3100000,
+      "robustCv": 0.02
+     },
+     "ciHigh": 3.2,
+     "ciLow": 2.8,
+     "evidenceId": "ev_777777777777",
+     "paramSet": "p1",
+     "provenance": "measured",
+     "source": {
+      "artifactSha256": "5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a",
+      "pointer": "/stats/0"
+     },
+     "speedup": 3.0
+    },
+    "provenance": "source_run",
+    "querySql": null,
+    "scope": "sandbox",
+    "status": "verified"
+   },
+   "title": "Replay comparison inconclusive"
+  },
+  "rounds": [
+   {
+    "approval": {
+     "approvedCandidateIds": [
+      "8986847e-6bbb-5b75-b0d2-d98780425b21"
+     ],
+     "decidedAt": "2026-10-13T11:00:00.000000Z",
+     "decidedBy": "user:1",
+     "id": "35375679-1997-5d89-a949-9ec9d0aac67b",
+     "round": 0,
+     "status": "approved"
+    },
+    "candidates": [],
+    "experiment": {
+     "audit": [],
+     "builds": [
+      {
+       "arm": "oc_0000000000a3",
+       "buildNs": 73960208,
+       "indexSizeBytes": 0,
+       "ok": true,
+       "provenance": "measured",
+       "reason": null
+      }
+     ],
+     "config": {
+      "blockSize": 5,
+      "maxCv": 0.25,
+      "maxRegression": 0.95,
+      "measuredRuns": 30,
+      "minEffect": 1.1,
+      "provenance": "configured",
+      "warmupRuns": 5
+     },
+     "correctness": [
+      {
+       "arm": "oc_0000000000a3",
+       "baselineRows": 1,
+       "evidenceId": null,
+       "paramSet": "purchases",
+       "provenance": "measured",
+       "rows": 1,
+       "sameRows": true
+      },
+      {
+       "arm": "oc_0000000000a3",
+       "baselineRows": 1,
+       "evidenceId": null,
+       "paramSet": "views",
+       "provenance": "measured",
+       "rows": 1,
+       "sameRows": true
+      }
+     ],
+     "engineVersion": "bench@1",
+     "environment": {
+      "containerRuntime": "docker",
+      "cpuArch": "arm64",
+      "cpuCount": 8,
+      "cpuModel": "arm",
+      "digest": "sha256:9999999999999999999999999999999999999999999999999999999999999999",
+      "memoryBytes": 8589934592,
+      "os": "Darwin 25.6.0",
+      "pgVersion": "170011",
+      "provenance": "recorded",
+      "sandboxImageDigest": "unrecorded",
+      "workloadDataDigest": "8e79c1c9db1f0ad467fe543e9d0a64d20e8186d43ea8e8a32c7a25c7f3d666b8",
+      "workloadId": "stale_stats@v1:sf=0.1:seed=42"
+     },
+     "errorCode": null,
+     "id": "40812e6a-443b-478c-aabd-d560b72bb079",
+     "measurements": [
+      {
+       "arm": "oc_0000000000a3",
+       "baseline": {
+        "medianNs": 15657145.5,
+        "n": 30,
+        "p95Ns": 18629333,
+        "robustCv": 0.10790947171571581
+       },
+       "candidate": {
+        "medianNs": 4502250.0,
+        "n": 30,
+        "p95Ns": 5444041,
+        "robustCv": 0.10134809870412788
+       },
+       "ciHigh": 3.6630852351601977,
+       "ciLow": 3.2869577496235736,
+       "evidenceId": "ev_4e653e508733",
+       "paramSet": "purchases",
+       "provenance": "measured",
+       "source": {
+        "artifactSha256": "abababababababababababababababababababababababababababababababab",
+        "pointer": "/stats/0"
+       },
+       "speedup": 3.4776268532400465
+      },
+      {
+       "arm": "oc_0000000000a3",
+       "baseline": {
+        "medianNs": 5286750.5,
+        "n": 30,
+        "p95Ns": 6474750,
+        "robustCv": 0.10464524871724183
+       },
+       "candidate": {
+        "medianNs": 4708208.5,
+        "n": 30,
+        "p95Ns": 6353250,
+        "robustCv": 0.1409227520481141
+       },
+       "ciHigh": 1.2304361214432549,
+       "ciLow": 1.0247525326521516,
+       "evidenceId": "ev_37f42e0b412c",
+       "paramSet": "views",
+       "provenance": "measured",
+       "source": {
+        "artifactSha256": "abababababababababababababababababababababababababababababababab",
+        "pointer": "/stats/1"
+       },
+       "speedup": 1.122879434927319
+      }
+     ],
+     "provenance": "measured",
+     "replicate": 0,
+     "replication": null,
+     "resultSha256": "abababababababababababababababababababababababababababababababab",
+     "round": 0,
+     "rowProfile": "qc-row-v1",
+     "seed": 42,
+     "status": "completed",
+     "tournament": [
+      {
+       "arm": "oc_0000000000a3",
+       "primaryCiLow": 3.2869577496235736,
+       "rank": 1,
+       "verdict": "verified"
+      }
+     ],
+     "verdicts": [
+      {
+       "arm": "oc_0000000000a3",
+       "gate": null,
+       "reasons": [],
+       "verdict": "verified"
+      }
+     ],
+     "winner": "oc_0000000000a3"
+    },
+    "replicates": [],
+    "round": 0
+   }
+  ],
+  "run": {
+   "id": "00000000-0000-4000-8000-0000000000aa",
+   "investigationId": "8f7d60a5-f02f-5114-a93f-e1f6f8c80fd9",
+   "kind": "experiment_replay",
+   "parentRunId": "00000000-0000-4000-8000-0000000000bb",
+   "runNumber": 3
+  },
+  "schemaVersion": 2,
+  "stopReason": null,
+  "summary": "",
+  "usage": {
+   "llmCalls": 7,
+   "toolCalls": 2
+  }
+ },
+ "5_cross_environment": {
+  "builderVersion": "report-builder@2",
+  "errors": [],
+  "events": {
+   "cutoffSeq": 42,
+   "digest": "sha256:cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+   "profile": "qc-events-v1"
+  },
+  "evidence": [],
+  "finalStatus": "completed",
+  "finalizedAt": "2026-10-13T12:00:00.000000Z",
+  "findings": [],
+  "headline": "Results not directly comparable: the environments differ in material fields, so this is not a reproduction of the original setup.",
+  "hypotheses": [],
+  "investigation": {
+   "liveConnection": false,
+   "modes": [
+    "sandbox_benchmark"
+   ],
+   "objective": "Make it fast for 30 users",
+   "title": "Slow orders page",
+   "workloadId": "stale_stats@v1:sf=0.1:seed=42"
+  },
+  "limitations": [
+   "Measured in a disposable sandbox copy of the demo workload `stale_stats@v1:sf=0.1:seed=42`, not on your database. No change was applied to any database you own.",
+   "Warm cache, one session, interleaved runs: production concurrency, cache state and data distribution may change the result.",
+   "Only the listed parameter sets were tested; other inputs may behave differently. A sandbox verification is not a guarantee for every workload.",
+   "This run re-measured an earlier experiment: agreement means consistency in this pair of runs, not portability.",
+   "A replay re-measures one experiment. It runs no diagnosis, candidate generation, auditor, replication or materiality check, so it can at most reproduce what the source investigation verified."
+  ],
+  "missing": [
+   {
+    "reason": "no hypotheses were produced",
+    "section": "hypotheses"
+   }
+  ],
+  "nextSteps": [
+   "Replay in the original environment to check reproduction of the original setup."
+  ],
+  "outcome": "inconclusive",
+  "partial": false,
+  "problem": {
+   "evidence": [],
+   "materiality": null
+  },
+  "provenance": {
+   "llm": [],
+   "measurements": [
+    "measured"
+   ],
+   "stubModel": false
+  },
+  "query": {
+   "paramSets": [
+    {
+     "edgeCase": false,
+     "name": "purchases",
+     "values": [
+      "purchase"
+     ]
+    },
+    {
+     "edgeCase": false,
+     "name": "views",
+     "values": [
+      "view"
+     ]
+    }
+   ],
+   "sha256": "1212121212121212121212121212121212121212121212121212121212121212",
+   "sql": "SELECT count(*), sum(e.amount) FROM events e JOIN accounts a ON a.id = e.account_id WHERE e.kind = $1"
+  },
+  "recommendation": {
+   "candidateKey": null,
+   "ddl": [],
+   "kind": null,
+   "origin": "run",
+   "primaryMeasurement": null,
+   "querySql": null,
+   "scope": "sandbox",
+   "status": "none"
+  },
+  "replay": {
+   "comparison": {
+    "comparisonMode": "cross_environment",
+    "config": {
+     "confidence": 0.95,
+     "margin": 1.25,
+     "resamples": 2000,
+     "seed": 7
+    },
+    "environment": {
+     "differences": [
+      {
+       "class": "material",
+       "field": "cpu_model",
+       "original": "A",
+       "replay": "B"
+      }
+     ]
+    },
+    "failureCode": null,
+    "originalExperimentId": "00000000-0000-4000-8000-0000000000e1",
+    "pairs": [
+     {
+      "arm": "oc_0000000000a3",
+      "code": null,
+      "drift": 0.97,
+      "driftCiHigh": 1.05,
+      "driftCiLow": 0.9,
+      "originalSpeedup": 3.0,
+      "paramSet": "p1",
+      "replaySpeedup": 2.9,
+      "status": "reproduced"
+     }
+    ],
+    "replayExperimentId": "00000000-0000-4000-8000-0000000000e9",
+    "status": "reproduced",
+    "winner": {
+     "original": "oc_0000000000a3",
+     "replay": "oc_0000000000a3"
+    }
+   },
+   "replayOf": {
+    "experimentId": "00000000-0000-4000-8000-0000000000e1",
+    "runId": "00000000-0000-4000-8000-0000000000bb"
+   }
+  },
+  "replayResult": {
+   "basis": {
+    "code": "cross_environment",
+    "comparisonMode": "cross_environment",
+    "comparisonStatus": "reproduced",
+    "sourceOutcome": "verified_recommendation"
+   },
+   "claimsReproduction": false,
+   "comparisonFailureCode": null,
+   "comparisonMode": "cross_environment",
+   "comparisonStatus": "reproduced",
+   "correctnessReproduced": true,
+   "environmentComparable": false,
+   "experimentMatch": {
+    "matches": true,
+    "recommendationResultSha256": "5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a",
+    "replayedExperimentId": "00000000-0000-4000-8000-0000000000e1",
+    "replayedResultSha256": "5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a"
+   },
+   "explanation": "Ratios measured in different environments may not transfer, so the replay can only show consistency across environments.",
+   "failureCode": null,
+   "margin": 1.25,
+   "materialDifferences": [
+    "cpu_model"
+   ],
+   "materialDrift": false,
+   "originalReproduced": false,
+   "performanceReproduced": true,
+   "replayMeasurement": {
+    "engineWinner": "oc_0000000000a3",
+    "label": "replay measurement, not a verification",
+    "provenance": "measured"
+   },
+   "result": "not_comparable",
+   "snapshotError": null,
+   "source": {
+    "builderVersion": "report-builder@1",
+    "experimentId": "00000000-0000-4000-8000-0000000000e1",
+    "finalStatus": "completed",
+    "manifestSha256": "1111111111111111111111111111111111111111111111111111111111111111",
+    "outcome": "verified_recommendation",
+    "provenance": "source_run",
+    "reportJsonSha256": "2222222222222222222222222222222222222222222222222222222222222222",
+    "runId": "00000000-0000-4000-8000-0000000000bb",
+    "runKind": "initial"
+   },
+   "sourceRecommendation": {
+    "candidateKey": "oc_0000000000a3",
+    "ddl": [
+     "CREATE INDEX qc_i ON orders (customer_id)"
+    ],
+    "kind": "create_index",
+    "primaryMeasurement": {
+     "arm": "oc_0000000000a3",
+     "baseline": {
+      "medianNs": 9000000,
+      "n": 30,
+      "p95Ns": 9500000,
+      "robustCv": 0.02
+     },
+     "candidate": {
+      "medianNs": 3000000,
+      "n": 30,
+      "p95Ns": 3100000,
+      "robustCv": 0.02
+     },
+     "ciHigh": 3.2,
+     "ciLow": 2.8,
+     "evidenceId": "ev_777777777777",
+     "paramSet": "p1",
+     "provenance": "measured",
+     "source": {
+      "artifactSha256": "5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a",
+      "pointer": "/stats/0"
+     },
+     "speedup": 3.0
+    },
+    "provenance": "source_run",
+    "querySql": null,
+    "scope": "sandbox",
+    "status": "verified"
+   },
+   "title": "Results not directly comparable"
+  },
+  "rounds": [
+   {
+    "approval": {
+     "approvedCandidateIds": [
+      "8986847e-6bbb-5b75-b0d2-d98780425b21"
+     ],
+     "decidedAt": "2026-10-13T11:00:00.000000Z",
+     "decidedBy": "user:1",
+     "id": "35375679-1997-5d89-a949-9ec9d0aac67b",
+     "round": 0,
+     "status": "approved"
+    },
+    "candidates": [],
+    "experiment": {
+     "audit": [],
+     "builds": [
+      {
+       "arm": "oc_0000000000a3",
+       "buildNs": 73960208,
+       "indexSizeBytes": 0,
+       "ok": true,
+       "provenance": "measured",
+       "reason": null
+      }
+     ],
+     "config": {
+      "blockSize": 5,
+      "maxCv": 0.25,
+      "maxRegression": 0.95,
+      "measuredRuns": 30,
+      "minEffect": 1.1,
+      "provenance": "configured",
+      "warmupRuns": 5
+     },
+     "correctness": [
+      {
+       "arm": "oc_0000000000a3",
+       "baselineRows": 1,
+       "evidenceId": null,
+       "paramSet": "purchases",
+       "provenance": "measured",
+       "rows": 1,
+       "sameRows": true
+      },
+      {
+       "arm": "oc_0000000000a3",
+       "baselineRows": 1,
+       "evidenceId": null,
+       "paramSet": "views",
+       "provenance": "measured",
+       "rows": 1,
+       "sameRows": true
+      }
+     ],
+     "engineVersion": "bench@1",
+     "environment": {
+      "containerRuntime": "docker",
+      "cpuArch": "arm64",
+      "cpuCount": 8,
+      "cpuModel": "arm",
+      "digest": "sha256:9999999999999999999999999999999999999999999999999999999999999999",
+      "memoryBytes": 8589934592,
+      "os": "Darwin 25.6.0",
+      "pgVersion": "170011",
+      "provenance": "recorded",
+      "sandboxImageDigest": "unrecorded",
+      "workloadDataDigest": "8e79c1c9db1f0ad467fe543e9d0a64d20e8186d43ea8e8a32c7a25c7f3d666b8",
+      "workloadId": "stale_stats@v1:sf=0.1:seed=42"
+     },
+     "errorCode": null,
+     "id": "40812e6a-443b-478c-aabd-d560b72bb079",
+     "measurements": [
+      {
+       "arm": "oc_0000000000a3",
+       "baseline": {
+        "medianNs": 15657145.5,
+        "n": 30,
+        "p95Ns": 18629333,
+        "robustCv": 0.10790947171571581
+       },
+       "candidate": {
+        "medianNs": 4502250.0,
+        "n": 30,
+        "p95Ns": 5444041,
+        "robustCv": 0.10134809870412788
+       },
+       "ciHigh": 3.6630852351601977,
+       "ciLow": 3.2869577496235736,
+       "evidenceId": "ev_4e653e508733",
+       "paramSet": "purchases",
+       "provenance": "measured",
+       "source": {
+        "artifactSha256": "abababababababababababababababababababababababababababababababab",
+        "pointer": "/stats/0"
+       },
+       "speedup": 3.4776268532400465
+      },
+      {
+       "arm": "oc_0000000000a3",
+       "baseline": {
+        "medianNs": 5286750.5,
+        "n": 30,
+        "p95Ns": 6474750,
+        "robustCv": 0.10464524871724183
+       },
+       "candidate": {
+        "medianNs": 4708208.5,
+        "n": 30,
+        "p95Ns": 6353250,
+        "robustCv": 0.1409227520481141
+       },
+       "ciHigh": 1.2304361214432549,
+       "ciLow": 1.0247525326521516,
+       "evidenceId": "ev_37f42e0b412c",
+       "paramSet": "views",
+       "provenance": "measured",
+       "source": {
+        "artifactSha256": "abababababababababababababababababababababababababababababababab",
+        "pointer": "/stats/1"
+       },
+       "speedup": 1.122879434927319
+      }
+     ],
+     "provenance": "measured",
+     "replicate": 0,
+     "replication": null,
+     "resultSha256": "abababababababababababababababababababababababababababababababab",
+     "round": 0,
+     "rowProfile": "qc-row-v1",
+     "seed": 42,
+     "status": "completed",
+     "tournament": [
+      {
+       "arm": "oc_0000000000a3",
+       "primaryCiLow": 3.2869577496235736,
+       "rank": 1,
+       "verdict": "verified"
+      }
+     ],
+     "verdicts": [
+      {
+       "arm": "oc_0000000000a3",
+       "gate": null,
+       "reasons": [],
+       "verdict": "verified"
+      }
+     ],
+     "winner": "oc_0000000000a3"
+    },
+    "replicates": [],
+    "round": 0
+   }
+  ],
+  "run": {
+   "id": "00000000-0000-4000-8000-0000000000aa",
+   "investigationId": "8f7d60a5-f02f-5114-a93f-e1f6f8c80fd9",
+   "kind": "experiment_replay",
+   "parentRunId": "00000000-0000-4000-8000-0000000000bb",
+   "runNumber": 3
+  },
+  "schemaVersion": 2,
+  "stopReason": null,
+  "summary": "",
+  "usage": {
+   "llmCalls": 7,
+   "toolCalls": 2
+  }
+ },
+ "6_noise_warning_source": {
+  "builderVersion": "report-builder@2",
+  "errors": [],
+  "events": {
+   "cutoffSeq": 42,
+   "digest": "sha256:cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+   "profile": "qc-events-v1"
+  },
+  "evidence": [],
+  "finalStatus": "completed",
+  "finalizedAt": "2026-10-13T12:00:00.000000Z",
+  "findings": [],
+  "headline": "Noise-warning recommendation not confirmed: one experiment cannot repeat the original's agreement across three independent experiments.",
+  "hypotheses": [],
+  "investigation": {
+   "liveConnection": false,
+   "modes": [
+    "sandbox_benchmark"
+   ],
+   "objective": "Make it fast for 30 users",
+   "title": "Slow orders page",
+   "workloadId": "stale_stats@v1:sf=0.1:seed=42"
+  },
+  "limitations": [
+   "Measured in a disposable sandbox copy of the demo workload `stale_stats@v1:sf=0.1:seed=42`, not on your database. No change was applied to any database you own.",
+   "Warm cache, one session, interleaved runs: production concurrency, cache state and data distribution may change the result.",
+   "Only the listed parameter sets were tested; other inputs may behave differently. A sandbox verification is not a guarantee for every workload.",
+   "This run re-measured an earlier experiment: agreement means consistency in this pair of runs, not portability.",
+   "A replay re-measures one experiment. It runs no diagnosis, candidate generation, auditor, replication or materiality check, so it can at most reproduce what the source investigation verified."
+  ],
+  "missing": [
+   {
+    "reason": "no hypotheses were produced",
+    "section": "hypotheses"
+   }
+  ],
+  "nextSteps": [
+   "The original noise-warning verification needs replicates that a replay does not run."
+  ],
+  "outcome": "inconclusive",
+  "partial": false,
+  "problem": {
+   "evidence": [],
+   "materiality": null
+  },
+  "provenance": {
+   "llm": [],
+   "measurements": [
+    "measured"
+   ],
+   "stubModel": false
+  },
+  "query": {
+   "paramSets": [
+    {
+     "edgeCase": false,
+     "name": "purchases",
+     "values": [
+      "purchase"
+     ]
+    },
+    {
+     "edgeCase": false,
+     "name": "views",
+     "values": [
+      "view"
+     ]
+    }
+   ],
+   "sha256": "1212121212121212121212121212121212121212121212121212121212121212",
+   "sql": "SELECT count(*), sum(e.amount) FROM events e JOIN accounts a ON a.id = e.account_id WHERE e.kind = $1"
+  },
+  "recommendation": {
+   "candidateKey": null,
+   "ddl": [],
+   "kind": null,
+   "origin": "run",
+   "primaryMeasurement": null,
+   "querySql": null,
+   "scope": "sandbox",
+   "status": "none"
+  },
+  "replay": {
+   "comparison": {
+    "comparisonMode": "same_environment",
+    "config": {
+     "confidence": 0.95,
+     "margin": 1.25,
+     "resamples": 2000,
+     "seed": 7
+    },
+    "environment": {
+     "differences": []
+    },
+    "failureCode": null,
+    "originalExperimentId": "00000000-0000-4000-8000-0000000000e1",
+    "pairs": [
+     {
+      "arm": "oc_0000000000a3",
+      "code": null,
+      "drift": 0.97,
+      "driftCiHigh": 1.05,
+      "driftCiLow": 0.9,
+      "originalSpeedup": 3.0,
+      "paramSet": "p1",
+      "replaySpeedup": 2.9,
+      "status": "reproduced"
+     }
+    ],
+    "replayExperimentId": "00000000-0000-4000-8000-0000000000e9",
+    "status": "reproduced",
+    "winner": {
+     "original": "oc_0000000000a3",
+     "replay": "oc_0000000000a3"
+    }
+   },
+   "replayOf": {
+    "experimentId": "00000000-0000-4000-8000-0000000000e1",
+    "runId": "00000000-0000-4000-8000-0000000000bb"
+   }
+  },
+  "replayResult": {
+   "basis": {
+    "code": "source_noise_warning",
+    "comparisonMode": "same_environment",
+    "comparisonStatus": "reproduced",
+    "sourceOutcome": "verified_recommendation"
+   },
+   "claimsReproduction": false,
+   "comparisonFailureCode": null,
+   "comparisonMode": "same_environment",
+   "comparisonStatus": "reproduced",
+   "correctnessReproduced": true,
+   "environmentComparable": true,
+   "experimentMatch": {
+    "matches": true,
+    "recommendationResultSha256": "5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a",
+    "replayedExperimentId": "00000000-0000-4000-8000-0000000000e1",
+    "replayedResultSha256": "5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a"
+   },
+   "explanation": "The new measurement is shown for reference; it cannot confirm the original recommendation.",
+   "failureCode": null,
+   "margin": 1.25,
+   "materialDifferences": [],
+   "materialDrift": false,
+   "originalReproduced": false,
+   "performanceReproduced": true,
+   "replayMeasurement": {
+    "engineWinner": "oc_0000000000a3",
+    "label": "replay measurement, not a verification",
+    "provenance": "measured"
+   },
+   "result": "not_confirmed",
+   "snapshotError": null,
+   "source": {
+    "builderVersion": "report-builder@1",
+    "experimentId": "00000000-0000-4000-8000-0000000000e1",
+    "finalStatus": "completed",
+    "manifestSha256": "1111111111111111111111111111111111111111111111111111111111111111",
+    "outcome": "verified_recommendation",
+    "provenance": "source_run",
+    "reportJsonSha256": "2222222222222222222222222222222222222222222222222222222222222222",
+    "runId": "00000000-0000-4000-8000-0000000000bb",
+    "runKind": "initial"
+   },
+   "sourceRecommendation": {
+    "candidateKey": "oc_0000000000a3",
+    "ddl": [
+     "CREATE INDEX qc_i ON orders (customer_id)"
+    ],
+    "kind": "create_index",
+    "primaryMeasurement": {
+     "arm": "oc_0000000000a3",
+     "baseline": {
+      "medianNs": 9000000,
+      "n": 30,
+      "p95Ns": 9500000,
+      "robustCv": 0.02
+     },
+     "candidate": {
+      "medianNs": 3000000,
+      "n": 30,
+      "p95Ns": 3100000,
+      "robustCv": 0.02
+     },
+     "ciHigh": 3.2,
+     "ciLow": 2.8,
+     "evidenceId": "ev_777777777777",
+     "paramSet": "p1",
+     "provenance": "measured",
+     "source": {
+      "artifactSha256": "5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a",
+      "pointer": "/stats/0"
+     },
+     "speedup": 3.0
+    },
+    "provenance": "source_run",
+    "querySql": null,
+    "scope": "sandbox",
+    "status": "verified_with_noise_warning"
+   },
+   "title": "Noise-warning recommendation not confirmed"
+  },
+  "rounds": [
+   {
+    "approval": {
+     "approvedCandidateIds": [
+      "8986847e-6bbb-5b75-b0d2-d98780425b21"
+     ],
+     "decidedAt": "2026-10-13T11:00:00.000000Z",
+     "decidedBy": "user:1",
+     "id": "35375679-1997-5d89-a949-9ec9d0aac67b",
+     "round": 0,
+     "status": "approved"
+    },
+    "candidates": [],
+    "experiment": {
+     "audit": [],
+     "builds": [
+      {
+       "arm": "oc_0000000000a3",
+       "buildNs": 73960208,
+       "indexSizeBytes": 0,
+       "ok": true,
+       "provenance": "measured",
+       "reason": null
+      }
+     ],
+     "config": {
+      "blockSize": 5,
+      "maxCv": 0.25,
+      "maxRegression": 0.95,
+      "measuredRuns": 30,
+      "minEffect": 1.1,
+      "provenance": "configured",
+      "warmupRuns": 5
+     },
+     "correctness": [
+      {
+       "arm": "oc_0000000000a3",
+       "baselineRows": 1,
+       "evidenceId": null,
+       "paramSet": "purchases",
+       "provenance": "measured",
+       "rows": 1,
+       "sameRows": true
+      },
+      {
+       "arm": "oc_0000000000a3",
+       "baselineRows": 1,
+       "evidenceId": null,
+       "paramSet": "views",
+       "provenance": "measured",
+       "rows": 1,
+       "sameRows": true
+      }
+     ],
+     "engineVersion": "bench@1",
+     "environment": {
+      "containerRuntime": "docker",
+      "cpuArch": "arm64",
+      "cpuCount": 8,
+      "cpuModel": "arm",
+      "digest": "sha256:9999999999999999999999999999999999999999999999999999999999999999",
+      "memoryBytes": 8589934592,
+      "os": "Darwin 25.6.0",
+      "pgVersion": "170011",
+      "provenance": "recorded",
+      "sandboxImageDigest": "unrecorded",
+      "workloadDataDigest": "8e79c1c9db1f0ad467fe543e9d0a64d20e8186d43ea8e8a32c7a25c7f3d666b8",
+      "workloadId": "stale_stats@v1:sf=0.1:seed=42"
+     },
+     "errorCode": null,
+     "id": "40812e6a-443b-478c-aabd-d560b72bb079",
+     "measurements": [
+      {
+       "arm": "oc_0000000000a3",
+       "baseline": {
+        "medianNs": 15657145.5,
+        "n": 30,
+        "p95Ns": 18629333,
+        "robustCv": 0.10790947171571581
+       },
+       "candidate": {
+        "medianNs": 4502250.0,
+        "n": 30,
+        "p95Ns": 5444041,
+        "robustCv": 0.10134809870412788
+       },
+       "ciHigh": 3.6630852351601977,
+       "ciLow": 3.2869577496235736,
+       "evidenceId": "ev_4e653e508733",
+       "paramSet": "purchases",
+       "provenance": "measured",
+       "source": {
+        "artifactSha256": "abababababababababababababababababababababababababababababababab",
+        "pointer": "/stats/0"
+       },
+       "speedup": 3.4776268532400465
+      },
+      {
+       "arm": "oc_0000000000a3",
+       "baseline": {
+        "medianNs": 5286750.5,
+        "n": 30,
+        "p95Ns": 6474750,
+        "robustCv": 0.10464524871724183
+       },
+       "candidate": {
+        "medianNs": 4708208.5,
+        "n": 30,
+        "p95Ns": 6353250,
+        "robustCv": 0.1409227520481141
+       },
+       "ciHigh": 1.2304361214432549,
+       "ciLow": 1.0247525326521516,
+       "evidenceId": "ev_37f42e0b412c",
+       "paramSet": "views",
+       "provenance": "measured",
+       "source": {
+        "artifactSha256": "abababababababababababababababababababababababababababababababab",
+        "pointer": "/stats/1"
+       },
+       "speedup": 1.122879434927319
+      }
+     ],
+     "provenance": "measured",
+     "replicate": 0,
+     "replication": null,
+     "resultSha256": "abababababababababababababababababababababababababababababababab",
+     "round": 0,
+     "rowProfile": "qc-row-v1",
+     "seed": 42,
+     "status": "completed",
+     "tournament": [
+      {
+       "arm": "oc_0000000000a3",
+       "primaryCiLow": 3.2869577496235736,
+       "rank": 1,
+       "verdict": "verified"
+      }
+     ],
+     "verdicts": [
+      {
+       "arm": "oc_0000000000a3",
+       "gate": null,
+       "reasons": [],
+       "verdict": "verified"
+      }
+     ],
+     "winner": "oc_0000000000a3"
+    },
+    "replicates": [],
+    "round": 0
+   }
+  ],
+  "run": {
+   "id": "00000000-0000-4000-8000-0000000000aa",
+   "investigationId": "8f7d60a5-f02f-5114-a93f-e1f6f8c80fd9",
+   "kind": "experiment_replay",
+   "parentRunId": "00000000-0000-4000-8000-0000000000bb",
+   "runNumber": 3
+  },
+  "schemaVersion": 2,
+  "stopReason": null,
+  "summary": "",
+  "usage": {
+   "llmCalls": 7,
+   "toolCalls": 2
+  }
+ },
+ "7_other_experiment": {
+  "builderVersion": "report-builder@2",
+  "errors": [],
+  "events": {
+   "cutoffSeq": 42,
+   "digest": "sha256:cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+   "profile": "qc-events-v1"
+  },
+  "evidence": [],
+  "finalStatus": "completed",
+  "finalizedAt": "2026-10-13T12:00:00.000000Z",
+  "findings": [],
+  "headline": "Original recommendation not checked by this replay: it rests on a different experiment of the source investigation than the one re-measured here.",
+  "hypotheses": [],
+  "investigation": {
+   "liveConnection": false,
+   "modes": [
+    "sandbox_benchmark"
+   ],
+   "objective": "Make it fast for 30 users",
+   "title": "Slow orders page",
+   "workloadId": "stale_stats@v1:sf=0.1:seed=42"
+  },
+  "limitations": [
+   "Measured in a disposable sandbox copy of the demo workload `stale_stats@v1:sf=0.1:seed=42`, not on your database. No change was applied to any database you own.",
+   "Warm cache, one session, interleaved runs: production concurrency, cache state and data distribution may change the result.",
+   "Only the listed parameter sets were tested; other inputs may behave differently. A sandbox verification is not a guarantee for every workload.",
+   "This run re-measured an earlier experiment: agreement means consistency in this pair of runs, not portability.",
+   "A replay re-measures one experiment. It runs no diagnosis, candidate generation, auditor, replication or materiality check, so it can at most reproduce what the source investigation verified."
+  ],
+  "missing": [
+   {
+    "reason": "no hypotheses were produced",
+    "section": "hypotheses"
+   }
+  ],
+  "nextSteps": [
+   "Replay the recommendation's own experiment to check it."
+  ],
+  "outcome": "inconclusive",
+  "partial": false,
+  "problem": {
+   "evidence": [],
+   "materiality": null
+  },
+  "provenance": {
+   "llm": [],
+   "measurements": [
+    "measured"
+   ],
+   "stubModel": false
+  },
+  "query": {
+   "paramSets": [
+    {
+     "edgeCase": false,
+     "name": "purchases",
+     "values": [
+      "purchase"
+     ]
+    },
+    {
+     "edgeCase": false,
+     "name": "views",
+     "values": [
+      "view"
+     ]
+    }
+   ],
+   "sha256": "1212121212121212121212121212121212121212121212121212121212121212",
+   "sql": "SELECT count(*), sum(e.amount) FROM events e JOIN accounts a ON a.id = e.account_id WHERE e.kind = $1"
+  },
+  "recommendation": {
+   "candidateKey": null,
+   "ddl": [],
+   "kind": null,
+   "origin": "run",
+   "primaryMeasurement": null,
+   "querySql": null,
+   "scope": "sandbox",
+   "status": "none"
+  },
+  "replay": {
+   "comparison": {
+    "comparisonMode": "same_environment",
+    "config": {
+     "confidence": 0.95,
+     "margin": 1.25,
+     "resamples": 2000,
+     "seed": 7
+    },
+    "environment": {
+     "differences": []
+    },
+    "failureCode": null,
+    "originalExperimentId": "00000000-0000-4000-8000-0000000000e1",
+    "pairs": [
+     {
+      "arm": "oc_0000000000a3",
+      "code": null,
+      "drift": 0.97,
+      "driftCiHigh": 1.05,
+      "driftCiLow": 0.9,
+      "originalSpeedup": 3.0,
+      "paramSet": "p1",
+      "replaySpeedup": 2.9,
+      "status": "reproduced"
+     }
+    ],
+    "replayExperimentId": "00000000-0000-4000-8000-0000000000e9",
+    "status": "reproduced",
+    "winner": {
+     "original": "oc_0000000000a3",
+     "replay": "oc_0000000000a3"
+    }
+   },
+   "replayOf": {
+    "experimentId": "00000000-0000-4000-8000-0000000000e1",
+    "runId": "00000000-0000-4000-8000-0000000000bb"
+   }
+  },
+  "replayResult": {
+   "basis": {
+    "code": "recommendation_from_other_experiment",
+    "comparisonMode": "same_environment",
+    "comparisonStatus": "reproduced",
+    "sourceOutcome": "verified_recommendation"
+   },
+   "claimsReproduction": false,
+   "comparisonFailureCode": null,
+   "comparisonMode": "same_environment",
+   "comparisonStatus": "reproduced",
+   "correctnessReproduced": true,
+   "environmentComparable": true,
+   "experimentMatch": {
+    "matches": false,
+    "recommendationResultSha256": "6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b",
+    "replayedExperimentId": "00000000-0000-4000-8000-0000000000e1",
+    "replayedResultSha256": "5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a"
+   },
+   "explanation": "The new measurement is shown for reference; it cannot confirm the original recommendation.",
+   "failureCode": null,
+   "margin": 1.25,
+   "materialDifferences": [],
+   "materialDrift": false,
+   "originalReproduced": false,
+   "performanceReproduced": true,
+   "replayMeasurement": {
+    "engineWinner": "oc_0000000000a3",
+    "label": "replay measurement, not a verification",
+    "provenance": "measured"
+   },
+   "result": "not_confirmed",
+   "snapshotError": null,
+   "source": {
+    "builderVersion": "report-builder@1",
+    "experimentId": "00000000-0000-4000-8000-0000000000e1",
+    "finalStatus": "completed",
+    "manifestSha256": "1111111111111111111111111111111111111111111111111111111111111111",
+    "outcome": "verified_recommendation",
+    "provenance": "source_run",
+    "reportJsonSha256": "2222222222222222222222222222222222222222222222222222222222222222",
+    "runId": "00000000-0000-4000-8000-0000000000bb",
+    "runKind": "initial"
+   },
+   "sourceRecommendation": {
+    "candidateKey": "oc_0000000000a3",
+    "ddl": [
+     "CREATE INDEX qc_i ON orders (customer_id)"
+    ],
+    "kind": "create_index",
+    "primaryMeasurement": {
+     "arm": "oc_0000000000a3",
+     "baseline": {
+      "medianNs": 9000000,
+      "n": 30,
+      "p95Ns": 9500000,
+      "robustCv": 0.02
+     },
+     "candidate": {
+      "medianNs": 3000000,
+      "n": 30,
+      "p95Ns": 3100000,
+      "robustCv": 0.02
+     },
+     "ciHigh": 3.2,
+     "ciLow": 2.8,
+     "evidenceId": "ev_777777777777",
+     "paramSet": "p1",
+     "provenance": "measured",
+     "source": {
+      "artifactSha256": "6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b",
+      "pointer": "/stats/0"
+     },
+     "speedup": 3.0
+    },
+    "provenance": "source_run",
+    "querySql": null,
+    "scope": "sandbox",
+    "status": "verified"
+   },
+   "title": "Original recommendation not checked by this replay"
+  },
+  "rounds": [
+   {
+    "approval": {
+     "approvedCandidateIds": [
+      "8986847e-6bbb-5b75-b0d2-d98780425b21"
+     ],
+     "decidedAt": "2026-10-13T11:00:00.000000Z",
+     "decidedBy": "user:1",
+     "id": "35375679-1997-5d89-a949-9ec9d0aac67b",
+     "round": 0,
+     "status": "approved"
+    },
+    "candidates": [],
+    "experiment": {
+     "audit": [],
+     "builds": [
+      {
+       "arm": "oc_0000000000a3",
+       "buildNs": 73960208,
+       "indexSizeBytes": 0,
+       "ok": true,
+       "provenance": "measured",
+       "reason": null
+      }
+     ],
+     "config": {
+      "blockSize": 5,
+      "maxCv": 0.25,
+      "maxRegression": 0.95,
+      "measuredRuns": 30,
+      "minEffect": 1.1,
+      "provenance": "configured",
+      "warmupRuns": 5
+     },
+     "correctness": [
+      {
+       "arm": "oc_0000000000a3",
+       "baselineRows": 1,
+       "evidenceId": null,
+       "paramSet": "purchases",
+       "provenance": "measured",
+       "rows": 1,
+       "sameRows": true
+      },
+      {
+       "arm": "oc_0000000000a3",
+       "baselineRows": 1,
+       "evidenceId": null,
+       "paramSet": "views",
+       "provenance": "measured",
+       "rows": 1,
+       "sameRows": true
+      }
+     ],
+     "engineVersion": "bench@1",
+     "environment": {
+      "containerRuntime": "docker",
+      "cpuArch": "arm64",
+      "cpuCount": 8,
+      "cpuModel": "arm",
+      "digest": "sha256:9999999999999999999999999999999999999999999999999999999999999999",
+      "memoryBytes": 8589934592,
+      "os": "Darwin 25.6.0",
+      "pgVersion": "170011",
+      "provenance": "recorded",
+      "sandboxImageDigest": "unrecorded",
+      "workloadDataDigest": "8e79c1c9db1f0ad467fe543e9d0a64d20e8186d43ea8e8a32c7a25c7f3d666b8",
+      "workloadId": "stale_stats@v1:sf=0.1:seed=42"
+     },
+     "errorCode": null,
+     "id": "40812e6a-443b-478c-aabd-d560b72bb079",
+     "measurements": [
+      {
+       "arm": "oc_0000000000a3",
+       "baseline": {
+        "medianNs": 15657145.5,
+        "n": 30,
+        "p95Ns": 18629333,
+        "robustCv": 0.10790947171571581
+       },
+       "candidate": {
+        "medianNs": 4502250.0,
+        "n": 30,
+        "p95Ns": 5444041,
+        "robustCv": 0.10134809870412788
+       },
+       "ciHigh": 3.6630852351601977,
+       "ciLow": 3.2869577496235736,
+       "evidenceId": "ev_4e653e508733",
+       "paramSet": "purchases",
+       "provenance": "measured",
+       "source": {
+        "artifactSha256": "abababababababababababababababababababababababababababababababab",
+        "pointer": "/stats/0"
+       },
+       "speedup": 3.4776268532400465
+      },
+      {
+       "arm": "oc_0000000000a3",
+       "baseline": {
+        "medianNs": 5286750.5,
+        "n": 30,
+        "p95Ns": 6474750,
+        "robustCv": 0.10464524871724183
+       },
+       "candidate": {
+        "medianNs": 4708208.5,
+        "n": 30,
+        "p95Ns": 6353250,
+        "robustCv": 0.1409227520481141
+       },
+       "ciHigh": 1.2304361214432549,
+       "ciLow": 1.0247525326521516,
+       "evidenceId": "ev_37f42e0b412c",
+       "paramSet": "views",
+       "provenance": "measured",
+       "source": {
+        "artifactSha256": "abababababababababababababababababababababababababababababababab",
+        "pointer": "/stats/1"
+       },
+       "speedup": 1.122879434927319
+      }
+     ],
+     "provenance": "measured",
+     "replicate": 0,
+     "replication": null,
+     "resultSha256": "abababababababababababababababababababababababababababababababab",
+     "round": 0,
+     "rowProfile": "qc-row-v1",
+     "seed": 42,
+     "status": "completed",
+     "tournament": [
+      {
+       "arm": "oc_0000000000a3",
+       "primaryCiLow": 3.2869577496235736,
+       "rank": 1,
+       "verdict": "verified"
+      }
+     ],
+     "verdicts": [
+      {
+       "arm": "oc_0000000000a3",
+       "gate": null,
+       "reasons": [],
+       "verdict": "verified"
+      }
+     ],
+     "winner": "oc_0000000000a3"
+    },
+    "replicates": [],
+    "round": 0
+   }
+  ],
+  "run": {
+   "id": "00000000-0000-4000-8000-0000000000aa",
+   "investigationId": "8f7d60a5-f02f-5114-a93f-e1f6f8c80fd9",
+   "kind": "experiment_replay",
+   "parentRunId": "00000000-0000-4000-8000-0000000000bb",
+   "runNumber": 3
+  },
+  "schemaVersion": 2,
+  "stopReason": null,
+  "summary": "",
+  "usage": {
+   "llmCalls": 7,
+   "toolCalls": 2
+  }
+ },
+ "8_inconclusive_source_with_replay_winner": {
+  "builderVersion": "report-builder@2",
+  "errors": [],
+  "events": {
+   "cutoffSeq": 42,
+   "digest": "sha256:cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+   "profile": "qc-events-v1"
+  },
+  "evidence": [],
+  "finalStatus": "completed",
+  "finalizedAt": "2026-10-13T12:00:00.000000Z",
+  "findings": [],
+  "headline": "Re-measurement only: the original investigation verified no recommendation, and a replay cannot create one.",
+  "hypotheses": [],
+  "investigation": {
+   "liveConnection": false,
+   "modes": [
+    "sandbox_benchmark"
+   ],
+   "objective": "Make it fast for 30 users",
+   "title": "Slow orders page",
+   "workloadId": "stale_stats@v1:sf=0.1:seed=42"
+  },
+  "limitations": [
+   "Measured in a disposable sandbox copy of the demo workload `stale_stats@v1:sf=0.1:seed=42`, not on your database. No change was applied to any database you own.",
+   "Warm cache, one session, interleaved runs: production concurrency, cache state and data distribution may change the result.",
+   "Only the listed parameter sets were tested; other inputs may behave differently. A sandbox verification is not a guarantee for every workload.",
+   "This run re-measured an earlier experiment: agreement means consistency in this pair of runs, not portability.",
+   "A replay re-measures one experiment. It runs no diagnosis, candidate generation, auditor, replication or materiality check, so it can at most reproduce what the source investigation verified."
+  ],
+  "missing": [
+   {
+    "reason": "no hypotheses were produced",
+    "section": "hypotheses"
+   }
+  ],
+  "nextSteps": [
+   "Start a new investigation run to verify a recommendation."
+  ],
+  "outcome": "inconclusive",
+  "partial": false,
+  "problem": {
+   "evidence": [],
+   "materiality": null
+  },
+  "provenance": {
+   "llm": [],
+   "measurements": [
+    "measured"
+   ],
+   "stubModel": false
+  },
+  "query": {
+   "paramSets": [
+    {
+     "edgeCase": false,
+     "name": "purchases",
+     "values": [
+      "purchase"
+     ]
+    },
+    {
+     "edgeCase": false,
+     "name": "views",
+     "values": [
+      "view"
+     ]
+    }
+   ],
+   "sha256": "1212121212121212121212121212121212121212121212121212121212121212",
+   "sql": "SELECT count(*), sum(e.amount) FROM events e JOIN accounts a ON a.id = e.account_id WHERE e.kind = $1"
+  },
+  "recommendation": {
+   "candidateKey": null,
+   "ddl": [],
+   "kind": null,
+   "origin": "run",
+   "primaryMeasurement": null,
+   "querySql": null,
+   "scope": "sandbox",
+   "status": "none"
+  },
+  "replay": {
+   "comparison": {
+    "comparisonMode": "same_environment",
+    "config": {
+     "confidence": 0.95,
+     "margin": 1.25,
+     "resamples": 2000,
+     "seed": 7
+    },
+    "environment": {
+     "differences": []
+    },
+    "failureCode": null,
+    "originalExperimentId": "00000000-0000-4000-8000-0000000000e1",
+    "pairs": [
+     {
+      "arm": "oc_0000000000a3",
+      "code": null,
+      "drift": 0.97,
+      "driftCiHigh": 1.05,
+      "driftCiLow": 0.9,
+      "originalSpeedup": 3.0,
+      "paramSet": "p1",
+      "replaySpeedup": 2.9,
+      "status": "reproduced"
+     }
+    ],
+    "replayExperimentId": "00000000-0000-4000-8000-0000000000e9",
+    "status": "reproduced",
+    "winner": {
+     "original": "oc_0000000000a3",
+     "replay": "oc_0000000000a3"
+    }
+   },
+   "replayOf": {
+    "experimentId": "00000000-0000-4000-8000-0000000000e1",
+    "runId": "00000000-0000-4000-8000-0000000000bb"
+   }
+  },
+  "replayResult": {
+   "basis": {
+    "code": "source_not_verified",
+    "comparisonMode": "same_environment",
+    "comparisonStatus": "reproduced",
+    "sourceOutcome": "inconclusive"
+   },
+   "claimsReproduction": false,
+   "comparisonFailureCode": null,
+   "comparisonMode": "same_environment",
+   "comparisonStatus": "reproduced",
+   "correctnessReproduced": true,
+   "environmentComparable": true,
+   "experimentMatch": {
+    "matches": null,
+    "recommendationResultSha256": null,
+    "replayedExperimentId": "00000000-0000-4000-8000-0000000000e1",
+    "replayedResultSha256": "5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a"
+   },
+   "explanation": "The new measurement is shown for reference; it cannot confirm the original recommendation.",
+   "failureCode": null,
+   "margin": 1.25,
+   "materialDifferences": [],
+   "materialDrift": false,
+   "originalReproduced": false,
+   "performanceReproduced": true,
+   "replayMeasurement": {
+    "engineWinner": "oc_0000000000a3",
+    "label": "replay measurement, not a verification",
+    "provenance": "measured"
+   },
+   "result": "not_confirmed",
+   "snapshotError": null,
+   "source": {
+    "builderVersion": "report-builder@1",
+    "experimentId": "00000000-0000-4000-8000-0000000000e1",
+    "finalStatus": "completed",
+    "manifestSha256": "1111111111111111111111111111111111111111111111111111111111111111",
+    "outcome": "inconclusive",
+    "provenance": "source_run",
+    "reportJsonSha256": "2222222222222222222222222222222222222222222222222222222222222222",
+    "runId": "00000000-0000-4000-8000-0000000000bb",
+    "runKind": "initial"
+   },
+   "sourceRecommendation": null,
+   "title": "Re-measurement only"
+  },
+  "rounds": [
+   {
+    "approval": {
+     "approvedCandidateIds": [
+      "8986847e-6bbb-5b75-b0d2-d98780425b21"
+     ],
+     "decidedAt": "2026-10-13T11:00:00.000000Z",
+     "decidedBy": "user:1",
+     "id": "35375679-1997-5d89-a949-9ec9d0aac67b",
+     "round": 0,
+     "status": "approved"
+    },
+    "candidates": [],
+    "experiment": {
+     "audit": [],
+     "builds": [
+      {
+       "arm": "oc_0000000000a3",
+       "buildNs": 73960208,
+       "indexSizeBytes": 0,
+       "ok": true,
+       "provenance": "measured",
+       "reason": null
+      }
+     ],
+     "config": {
+      "blockSize": 5,
+      "maxCv": 0.25,
+      "maxRegression": 0.95,
+      "measuredRuns": 30,
+      "minEffect": 1.1,
+      "provenance": "configured",
+      "warmupRuns": 5
+     },
+     "correctness": [
+      {
+       "arm": "oc_0000000000a3",
+       "baselineRows": 1,
+       "evidenceId": null,
+       "paramSet": "purchases",
+       "provenance": "measured",
+       "rows": 1,
+       "sameRows": true
+      },
+      {
+       "arm": "oc_0000000000a3",
+       "baselineRows": 1,
+       "evidenceId": null,
+       "paramSet": "views",
+       "provenance": "measured",
+       "rows": 1,
+       "sameRows": true
+      }
+     ],
+     "engineVersion": "bench@1",
+     "environment": {
+      "containerRuntime": "docker",
+      "cpuArch": "arm64",
+      "cpuCount": 8,
+      "cpuModel": "arm",
+      "digest": "sha256:9999999999999999999999999999999999999999999999999999999999999999",
+      "memoryBytes": 8589934592,
+      "os": "Darwin 25.6.0",
+      "pgVersion": "170011",
+      "provenance": "recorded",
+      "sandboxImageDigest": "unrecorded",
+      "workloadDataDigest": "8e79c1c9db1f0ad467fe543e9d0a64d20e8186d43ea8e8a32c7a25c7f3d666b8",
+      "workloadId": "stale_stats@v1:sf=0.1:seed=42"
+     },
+     "errorCode": null,
+     "id": "40812e6a-443b-478c-aabd-d560b72bb079",
+     "measurements": [
+      {
+       "arm": "oc_0000000000a3",
+       "baseline": {
+        "medianNs": 15657145.5,
+        "n": 30,
+        "p95Ns": 18629333,
+        "robustCv": 0.10790947171571581
+       },
+       "candidate": {
+        "medianNs": 4502250.0,
+        "n": 30,
+        "p95Ns": 5444041,
+        "robustCv": 0.10134809870412788
+       },
+       "ciHigh": 3.6630852351601977,
+       "ciLow": 3.2869577496235736,
+       "evidenceId": "ev_4e653e508733",
+       "paramSet": "purchases",
+       "provenance": "measured",
+       "source": {
+        "artifactSha256": "abababababababababababababababababababababababababababababababab",
+        "pointer": "/stats/0"
+       },
+       "speedup": 3.4776268532400465
+      },
+      {
+       "arm": "oc_0000000000a3",
+       "baseline": {
+        "medianNs": 5286750.5,
+        "n": 30,
+        "p95Ns": 6474750,
+        "robustCv": 0.10464524871724183
+       },
+       "candidate": {
+        "medianNs": 4708208.5,
+        "n": 30,
+        "p95Ns": 6353250,
+        "robustCv": 0.1409227520481141
+       },
+       "ciHigh": 1.2304361214432549,
+       "ciLow": 1.0247525326521516,
+       "evidenceId": "ev_37f42e0b412c",
+       "paramSet": "views",
+       "provenance": "measured",
+       "source": {
+        "artifactSha256": "abababababababababababababababababababababababababababababababab",
+        "pointer": "/stats/1"
+       },
+       "speedup": 1.122879434927319
+      }
+     ],
+     "provenance": "measured",
+     "replicate": 0,
+     "replication": null,
+     "resultSha256": "abababababababababababababababababababababababababababababababab",
+     "round": 0,
+     "rowProfile": "qc-row-v1",
+     "seed": 42,
+     "status": "completed",
+     "tournament": [
+      {
+       "arm": "oc_0000000000a3",
+       "primaryCiLow": 3.2869577496235736,
+       "rank": 1,
+       "verdict": "verified"
+      }
+     ],
+     "verdicts": [
+      {
+       "arm": "oc_0000000000a3",
+       "gate": null,
+       "reasons": [],
+       "verdict": "verified"
+      }
+     ],
+     "winner": "oc_0000000000a3"
+    },
+    "replicates": [],
+    "round": 0
+   }
+  ],
+  "run": {
+   "id": "00000000-0000-4000-8000-0000000000aa",
+   "investigationId": "8f7d60a5-f02f-5114-a93f-e1f6f8c80fd9",
+   "kind": "experiment_replay",
+   "parentRunId": "00000000-0000-4000-8000-0000000000bb",
+   "runNumber": 3
+  },
+  "schemaVersion": 2,
+  "stopReason": null,
+  "summary": "",
+  "usage": {
+   "llmCalls": 7,
+   "toolCalls": 2
+  }
+ },
+ "_note": "Synthetic inputs from backend unit tests; not measurements.",
+ "legacy_v1_replay": {
+  "builderVersion": "report-builder@1",
+  "errors": [],
+  "events": {
+   "cutoffSeq": 42,
+   "digest": "sha256:cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+   "profile": "qc-events-v1"
+  },
+  "evidence": [],
+  "finalStatus": "completed",
+  "finalizedAt": "2026-10-13T12:00:00.000000Z",
+  "findings": [],
+  "headline": "A candidate change was verified in an isolated sandbox: faster, with the same result rows, on every tested parameter set.",
+  "hypotheses": [],
+  "investigation": {
+   "liveConnection": false,
+   "modes": [
+    "sandbox_benchmark"
+   ],
+   "objective": "Make it fast for 30 users",
+   "title": "Slow orders page",
+   "workloadId": "stale_stats@v1:sf=0.1:seed=42"
+  },
+  "limitations": [
+   "Measured in a disposable sandbox copy of the demo workload `stale_stats@v1:sf=0.1:seed=42`, not on your database. No change was applied to any database you own.",
+   "Warm cache, one session, interleaved runs: production concurrency, cache state and data distribution may change the result.",
+   "Only the listed parameter sets were tested; other inputs may behave differently. A sandbox verification is not a guarantee for every workload.",
+   "This run re-measured an earlier experiment: agreement means consistency in this pair of runs, not portability."
+  ],
+  "missing": [
+   {
+    "reason": "no hypotheses were produced",
+    "section": "hypotheses"
+   }
+  ],
+  "nextSteps": [
+   "Review the exact SQL and test it on a staging copy of your own data and workload.",
+   "Re-run this experiment (experiment replay) to check the result is reproducible."
+  ],
+  "outcome": "verified_recommendation",
+  "partial": false,
+  "problem": {
+   "evidence": [],
+   "materiality": null
+  },
+  "provenance": {
+   "llm": [],
+   "measurements": [
+    "measured"
+   ],
+   "stubModel": false
+  },
+  "query": {
+   "paramSets": [
+    {
+     "edgeCase": false,
+     "name": "purchases",
+     "values": [
+      "purchase"
+     ]
+    },
+    {
+     "edgeCase": false,
+     "name": "views",
+     "values": [
+      "view"
+     ]
+    }
+   ],
+   "sha256": "1212121212121212121212121212121212121212121212121212121212121212",
+   "sql": "SELECT count(*), sum(e.amount) FROM events e JOIN accounts a ON a.id = e.account_id WHERE e.kind = $1"
+  },
+  "recommendation": {
+   "candidateKey": null,
+   "ddl": [],
+   "kind": null,
+   "primaryMeasurement": null,
+   "querySql": null,
+   "scope": "sandbox",
+   "status": "none"
+  },
+  "replay": {
+   "comparison": {
+    "comparisonMode": "same_environment",
+    "config": {
+     "confidence": 0.95,
+     "margin": 1.25,
+     "resamples": 2000,
+     "seed": 7
+    },
+    "environment": {
+     "differences": []
+    },
+    "failureCode": null,
+    "originalExperimentId": "00000000-0000-4000-8000-0000000000e1",
+    "pairs": [
+     {
+      "arm": "oc_0000000000a3",
+      "code": null,
+      "drift": 0.97,
+      "driftCiHigh": 1.05,
+      "driftCiLow": 0.9,
+      "originalSpeedup": 3.0,
+      "paramSet": "p1",
+      "replaySpeedup": 2.9,
+      "status": "reproduced"
+     }
+    ],
+    "replayExperimentId": "00000000-0000-4000-8000-0000000000e9",
+    "status": "reproduced",
+    "winner": {
+     "original": "oc_0000000000a3",
+     "replay": "oc_0000000000a3"
+    }
+   },
+   "replayOf": {
+    "experimentId": "00000000-0000-4000-8000-0000000000e1",
+    "runId": "00000000-0000-4000-8000-0000000000bb"
+   }
+  },
+  "rounds": [
+   {
+    "approval": {
+     "approvedCandidateIds": [
+      "8986847e-6bbb-5b75-b0d2-d98780425b21"
+     ],
+     "decidedAt": "2026-10-13T11:00:00.000000Z",
+     "decidedBy": "user:1",
+     "id": "35375679-1997-5d89-a949-9ec9d0aac67b",
+     "round": 0,
+     "status": "approved"
+    },
+    "candidates": [],
+    "experiment": {
+     "audit": [],
+     "builds": [
+      {
+       "arm": "oc_0000000000a3",
+       "buildNs": 73960208,
+       "indexSizeBytes": 0,
+       "ok": true,
+       "provenance": "measured",
+       "reason": null
+      }
+     ],
+     "config": {
+      "blockSize": 5,
+      "maxCv": 0.25,
+      "maxRegression": 0.95,
+      "measuredRuns": 30,
+      "minEffect": 1.1,
+      "provenance": "configured",
+      "warmupRuns": 5
+     },
+     "correctness": [
+      {
+       "arm": "oc_0000000000a3",
+       "baselineRows": 1,
+       "evidenceId": null,
+       "paramSet": "purchases",
+       "provenance": "measured",
+       "rows": 1,
+       "sameRows": true
+      },
+      {
+       "arm": "oc_0000000000a3",
+       "baselineRows": 1,
+       "evidenceId": null,
+       "paramSet": "views",
+       "provenance": "measured",
+       "rows": 1,
+       "sameRows": true
+      }
+     ],
+     "engineVersion": "bench@1",
+     "environment": {
+      "containerRuntime": "docker",
+      "cpuArch": "arm64",
+      "cpuCount": 8,
+      "cpuModel": "arm",
+      "digest": "sha256:9999999999999999999999999999999999999999999999999999999999999999",
+      "memoryBytes": 8589934592,
+      "os": "Darwin 25.6.0",
+      "pgVersion": "170011",
+      "provenance": "recorded",
+      "sandboxImageDigest": "unrecorded",
+      "workloadDataDigest": "8e79c1c9db1f0ad467fe543e9d0a64d20e8186d43ea8e8a32c7a25c7f3d666b8",
+      "workloadId": "stale_stats@v1:sf=0.1:seed=42"
+     },
+     "errorCode": null,
+     "id": "40812e6a-443b-478c-aabd-d560b72bb079",
+     "measurements": [
+      {
+       "arm": "oc_0000000000a3",
+       "baseline": {
+        "medianNs": 15657145.5,
+        "n": 30,
+        "p95Ns": 18629333,
+        "robustCv": 0.10790947171571581
+       },
+       "candidate": {
+        "medianNs": 4502250.0,
+        "n": 30,
+        "p95Ns": 5444041,
+        "robustCv": 0.10134809870412788
+       },
+       "ciHigh": 3.6630852351601977,
+       "ciLow": 3.2869577496235736,
+       "evidenceId": "ev_4e653e508733",
+       "paramSet": "purchases",
+       "provenance": "measured",
+       "source": {
+        "artifactSha256": "abababababababababababababababababababababababababababababababab",
+        "pointer": "/stats/0"
+       },
+       "speedup": 3.4776268532400465
+      },
+      {
+       "arm": "oc_0000000000a3",
+       "baseline": {
+        "medianNs": 5286750.5,
+        "n": 30,
+        "p95Ns": 6474750,
+        "robustCv": 0.10464524871724183
+       },
+       "candidate": {
+        "medianNs": 4708208.5,
+        "n": 30,
+        "p95Ns": 6353250,
+        "robustCv": 0.1409227520481141
+       },
+       "ciHigh": 1.2304361214432549,
+       "ciLow": 1.0247525326521516,
+       "evidenceId": "ev_37f42e0b412c",
+       "paramSet": "views",
+       "provenance": "measured",
+       "source": {
+        "artifactSha256": "abababababababababababababababababababababababababababababababab",
+        "pointer": "/stats/1"
+       },
+       "speedup": 1.122879434927319
+      }
+     ],
+     "provenance": "measured",
+     "replicate": 0,
+     "replication": null,
+     "resultSha256": "abababababababababababababababababababababababababababababababab",
+     "round": 0,
+     "rowProfile": "qc-row-v1",
+     "seed": 42,
+     "status": "completed",
+     "tournament": [
+      {
+       "arm": "oc_0000000000a3",
+       "primaryCiLow": 3.2869577496235736,
+       "rank": 1,
+       "verdict": "verified"
+      }
+     ],
+     "verdicts": [
+      {
+       "arm": "oc_0000000000a3",
+       "gate": null,
+       "reasons": [],
+       "verdict": "verified"
+      }
+     ],
+     "winner": "oc_0000000000a3"
+    },
+    "replicates": [],
+    "round": 0
+   }
+  ],
+  "run": {
+   "id": "00000000-0000-4000-8000-0000000000aa",
+   "investigationId": "8f7d60a5-f02f-5114-a93f-e1f6f8c80fd9",
+   "kind": "experiment_replay",
+   "parentRunId": "00000000-0000-4000-8000-0000000000bb",
+   "runNumber": 3
+  },
+  "schemaVersion": 1,
+  "stopReason": null,
+  "summary": "",
+  "usage": {
+   "llmCalls": 7,
+   "toolCalls": 2
+  }
+ }
+}

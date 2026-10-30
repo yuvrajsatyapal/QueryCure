@@ -5,9 +5,10 @@ import { Icon, type IconName } from "@/components/ui/Icon";
 import type { LineageSource } from "@/components/lineage/LineageDrawer";
 import { VerdictBadge } from "@/components/tournament/VerdictBadge";
 import { describeCandidate } from "@/lib/benchmark/candidate";
-import { OUTCOME_LABEL, REASON_TEXT, VERDICT_EXPLANATION, ms, x } from "@/lib/report/labels";
+import { REASON_TEXT, VERDICT_EXPLANATION, ms, x } from "@/lib/report/labels";
+import { REPLAY_TONE, YES_NO, headlineBody, replayResultOf, reportTitle } from "@/lib/report/replay";
 import { reportSections, sectionId, type ReportSection } from "@/lib/report/sections";
-import type { CandidateAudit, Measurement, ReportRound, ReportV1 } from "@/lib/report/types";
+import type { CandidateAudit, Measurement, ReplayResult, ReportRound, ReportV1 } from "@/lib/report/types";
 
 type Why = (source: LineageSource) => void;
 
@@ -66,7 +67,10 @@ export function Callout({ tone, children }: { tone: keyof typeof CALLOUT; childr
   );
 }
 
+/** `n` is the section's 1-based position in reportSections(); 0 means the contents list omits it,
+ * so the section is not rendered. The list is the only place that decides which sections show. */
 function Section({ title, n, children }: { title: string; n: number; children: ReactNode }) {
+  if (n < 1) return null;
   return (
     <section id={sectionId(title)} aria-label={title} className="flex scroll-mt-32 flex-col gap-3 border-t border-border pt-6">
       <h2 className="flex items-baseline gap-2 text-base font-semibold">
@@ -290,12 +294,83 @@ function Round({ rnd, onWhy }: { rnd: ReportRound; onWhy?: Why }) {
   );
 }
 
+const TONE_TEXT = { verified: "text-verified", inconclusive: "text-inconclusive", rejected: "text-rejected", muted: "text-muted" } as const;
+
+/** Identifiers and digests for reproducing a claim: always shown in full, set small and after the
+ * content they support so they do not compete with it on narrow screens. */
+function SourceDetails({ rows }: { rows: [string, string | null | undefined][] }) {
+  return (
+    <ul aria-label="Source details" className="flex flex-col gap-1 rounded-md border border-border px-3 py-2 text-xs text-muted">
+      {rows.map(([k, v]) => (
+        <li key={k} className="flex min-w-0 flex-col sm:flex-row sm:gap-2">
+          <span className="shrink-0 sm:w-40">{k}</span>
+          <span className="min-w-0 font-mono break-all text-ink">{v ?? "not recorded"}</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/** Schema 2, experiment replays: the builder's sealed facts about the replay and its source. */
+function ReplayResultSection({ rr, n }: { rr: ReplayResult; n: number }) {
+  const src = rr.source;
+  const winner = rr.replayMeasurement.engineWinner;
+  const facts: [string, string][] = [
+    ["Comparison", rr.comparisonStatus ? `${rr.comparisonStatus.replaceAll("_", " ")}${rr.comparisonMode ? ` · ${rr.comparisonMode.replaceAll("_", " ")}` : ""}${rr.comparisonFailureCode ? ` · ${rr.comparisonFailureCode.replaceAll("_", " ")}` : ""}` : "None recorded"],
+    ["Correctness reproduced", YES_NO(rr.correctnessReproduced)],
+    ["Performance reproduced", YES_NO(rr.performanceReproduced)],
+    ["Material drift", YES_NO(rr.materialDrift)],
+    ["Environments comparable", YES_NO(rr.environmentComparable) + (rr.materialDifferences.length ? ` · differs in ${rr.materialDifferences.join(", ")}` : "")],
+    ["Matching experiment", rr.experimentMatch.matches === null ? "No measured original recommendation" : rr.experimentMatch.matches ? "The original recommendation was measured by this experiment" : "The original recommendation was measured by another experiment"],
+    [src?.outcome === "no_action_needed" ? "Original conclusion reproduced" : "Original recommendation reproduced", YES_NO(rr.originalReproduced)],
+  ];
+  return (
+    <Section title="Experiment replay result" n={n}>
+      <p className="text-sm">Re-measured one experiment of the original investigation with the same configuration and seed; no model calls.</p>
+      <p className={`text-sm font-medium ${TONE_TEXT[REPLAY_TONE[rr.result]]}`}>{rr.explanation}</p>
+      <dl className="grid grid-cols-1 gap-x-4 gap-y-1 text-sm sm:grid-cols-[minmax(0,14rem)_minmax(0,1fr)]">
+        {facts.map(([k, v]) => (
+          <div key={k} className="contents">
+            <dt className="text-muted">{k}</dt>
+            <dd className="max-sm:mb-1">{v}</dd>
+          </div>
+        ))}
+      </dl>
+      {rr.snapshotError ? <Callout tone="warning">Source snapshot could not be read: {rr.snapshotError}</Callout> : null}
+      <p className="text-sm text-muted">
+        Replay&apos;s own best arm:{" "}
+        {winner ? (
+          <>
+            <span className="font-mono text-ink">{winner}</span> ({rr.replayMeasurement.provenance ?? "recorded"}): {rr.replayMeasurement.label}
+          </>
+        ) : (
+          "none"
+        )}
+      </p>
+      <SourceDetails
+        rows={[
+          ["Source run", src ? `${src.runId} (${src.runKind.replaceAll("_", " ")})` : "no source snapshot was read"],
+          ["Source experiment", src?.experimentId ?? rr.experimentMatch.replayedExperimentId],
+          ["Stored source outcome", src ? (src.outcome ?? "none") : null],
+          ["Source sealed by", src?.builderVersion],
+          ["Source manifest", src ? `sha256:${src.manifestSha256}` : null],
+          ["Source report JSON", src ? `sha256:${src.reportJsonSha256}` : null],
+          ["Replayed result", rr.experimentMatch.replayedResultSha256 ? `sha256:${rr.experimentMatch.replayedResultSha256}` : null],
+          ["Classification basis", rr.basis?.code],
+        ]}
+      />
+    </Section>
+  );
+}
+
 export function ReportView({ report, onWhy, toc = false }: { report: ReportV1; onWhy?: Why; toc?: boolean }) {
   const r = report;
   const rec = r.recommendation;
   const benchmarked = r.rounds.some((rnd) => rnd.experiment);
   const prerecorded = r.provenance.measurements.includes("prerecorded");
   const sections = reportSections(r);
+  const rr = replayResultOf(r);
+  const fromSource = rr !== null && rec.origin === "source_run";
   const n = (title: string) => sections.findIndex((s) => s.title === title) + 1;
   const article = (
     <article className="flex min-w-0 max-w-[46rem] flex-col gap-6" aria-label="Final report">
@@ -303,9 +378,18 @@ export function ReportView({ report, onWhy, toc = false }: { report: ReportV1; o
         <p className="qc-eyebrow">
           Final report · {r.run.kind.replaceAll("_", " ")} · run {r.run.runNumber}
         </p>
-        <h1 className="text-2xl font-semibold tracking-tight">{OUTCOME_LABEL[r.outcome ?? ""] ?? `Run ${r.finalStatus}`}</h1>
-        <p className="text-[15px] leading-relaxed">{r.headline}</p>
-        {rec.candidateKey || rec.status in VERDICT_EXPLANATION ? (
+        <h1 className={`text-2xl font-semibold tracking-tight ${rr ? TONE_TEXT[REPLAY_TONE[rr.result]] : ""}`}>{reportTitle(r)}</h1>
+        <p className="text-[15px] leading-relaxed">{headlineBody(r)}</p>
+        {rr ? (
+          fromSource ? (
+            <p className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-border pt-3 text-sm">
+              <span className="qc-eyebrow">Original recommendation</span>
+              <VerdictBadge status={rec.status} />
+              <span className="font-mono text-xs">{rec.candidateKey}</span>
+              <span className="text-muted">from the source run, reproduced by this replay</span>
+            </p>
+          ) : null
+        ) : rec.candidateKey || rec.status in VERDICT_EXPLANATION ? (
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-border pt-3 text-sm">
             <VerdictBadge status={rec.status} />
             {rec.candidateKey ? <span className="font-mono text-xs">{rec.candidateKey}</span> : null}
@@ -317,7 +401,7 @@ export function ReportView({ report, onWhy, toc = false }: { report: ReportV1; o
             ) : null}
           </div>
         ) : null}
-        {r.recommendation.status in VERDICT_EXPLANATION ? (
+        {!rr && r.recommendation.status in VERDICT_EXPLANATION ? (
           <p className="text-sm text-muted">{VERDICT_EXPLANATION[r.recommendation.status]}</p>
         ) : null}
         {benchmarked ? (
@@ -374,7 +458,15 @@ export function ReportView({ report, onWhy, toc = false }: { report: ReportV1; o
         </ol>
       </Section>
 
-      {r.rounds.length ? (
+      {r.rounds.length && rr ? (
+        <Section title="Replay measurement" n={n("Replay measurement")}>
+          <p className="text-sm text-muted">These are the replay&apos;s own sandbox measurements: a single re-measurement, not a verification.</p>
+          {r.rounds.map((rnd) => (
+            <Round key={rnd.round} rnd={rnd} onWhy={onWhy} />
+          ))}
+        </Section>
+      ) : null}
+      {r.rounds.length && !rr ? (
         <Section title="Optimizations, approvals and benchmarks" n={n("Optimizations, approvals and benchmarks")}>
           {r.rounds.map((rnd) => (
             <Round key={rnd.round} rnd={rnd} onWhy={onWhy} />
@@ -382,42 +474,100 @@ export function ReportView({ report, onWhy, toc = false }: { report: ReportV1; o
         </Section>
       ) : null}
 
-      <Section title="Recommendation" n={n("Recommendation")}>
-        {rec.candidateKey ? (
-          <>
-            <p className="text-sm">
-              Apply <span className="font-mono">{rec.candidateKey}</span> after your own review: <VerdictBadge status={rec.status} /> in the sandbox.
+      {rr ? <ReplayResultSection rr={rr} n={n("Experiment replay result")} /> : null}
+
+      {rr && !fromSource ? (
+        <Section title="Recommendation" n={n("Recommendation")}>
+          <p className="text-sm">This replay makes no recommendation of its own.</p>
+          {rr.sourceRecommendation ? (
+            <p className="text-sm text-muted">
+              The source investigation&apos;s recommendation <span className="font-mono">{rr.sourceRecommendation.candidateKey}</span> (
+              {rr.sourceRecommendation.status.replaceAll("_", " ")}) is shown for reference and is not confirmed by this replay.
             </p>
-            <Sql lines={rec.ddl.length ? rec.ddl : rec.querySql ? [rec.querySql] : []} />
-            {rec.primaryMeasurement ? (
+          ) : null}
+        </Section>
+      ) : null}
+
+      {!rr || fromSource ? (
+        <Section title={fromSource ? "Original recommendation" : "Recommendation"} n={n(fromSource ? "Original recommendation" : "Recommendation")}>
+          {fromSource ? (
+            <>
+              <div className="flex flex-col gap-1.5">
+                <h3 className="text-[15px] font-semibold">{rec.candidateKey && rec.kind ? describeCandidate({ ...rec, kind: rec.kind }) : (rec.candidateKey ?? "Original recommendation")}</h3>
+                <p className="flex flex-wrap items-center gap-2 text-sm">
+                  <VerdictBadge status={rec.status} />
+                  <span>Verified in the sandbox by the source investigation and reproduced by this replay. Review it before applying it.</span>
+                </p>
+              </div>
+              <Sql lines={rec.ddl.length ? rec.ddl : rec.querySql ? [rec.querySql] : []} />
+              {rec.primaryMeasurement ? (
+                <p className="text-sm">
+                  Speed-up on {rec.primaryMeasurement.paramSet} in the source run: <span className="font-medium">{x(rec.primaryMeasurement.speedup)}</span>{" "}
+                  <span className="text-muted">
+                    (interval {x(rec.primaryMeasurement.ciLow)}–{x(rec.primaryMeasurement.ciHigh)})
+                  </span>{" "}
+                  <Source
+                    provenance={rec.primaryMeasurement.provenance}
+                    evidenceIds={[rec.primaryMeasurement.evidenceId]}
+                    onWhy={onWhy}
+                    claim={`Original speed-up ${x(rec.primaryMeasurement.speedup)}`}
+                    artifact={{
+                      sha256: rec.primaryMeasurement.source.artifactSha256,
+                      pointer: rec.primaryMeasurement.source.pointer,
+                      label: "Experiment result artifact",
+                    }}
+                  />
+                </p>
+              ) : null}
+              <SourceDetails
+                rows={[
+                  ["Candidate", rec.candidateKey],
+                  ["Source run", rec.sourceRunId],
+                  ["Source experiment", rr?.source?.experimentId],
+                  ["Evidence", rec.primaryMeasurement?.evidenceId],
+                  [
+                    "Result artifact",
+                    rec.primaryMeasurement ? `sha256:${rec.primaryMeasurement.source.artifactSha256} ${rec.primaryMeasurement.source.pointer}` : null,
+                  ],
+                ]}
+              />
+            </>
+          ) : rec.candidateKey ? (
+            <>
               <p className="text-sm">
-                Primary parameter set {rec.primaryMeasurement.paramSet}: {x(rec.primaryMeasurement.speedup)} (interval{" "}
-                {x(rec.primaryMeasurement.ciLow)}–{x(rec.primaryMeasurement.ciHigh)}){" "}
-                <Source
-                  provenance={rec.primaryMeasurement.provenance}
-                  evidenceIds={[rec.primaryMeasurement.evidenceId]}
-                  onWhy={onWhy}
-                  claim={`Recommended speed-up ${x(rec.primaryMeasurement.speedup)}`}
-                  artifact={{
-                    sha256: rec.primaryMeasurement.source.artifactSha256,
-                    pointer: rec.primaryMeasurement.source.pointer,
-                    label: "Experiment result artifact",
-                  }}
-                />
+                Apply <span className="font-mono">{rec.candidateKey}</span> after your own review: <VerdictBadge status={rec.status} /> in the sandbox.
               </p>
-            ) : null}
-          </>
-        ) : (
-          <p className="text-sm">
-            {rec.status === "unverified"
-              ? "No change is recommended as verified. The hypotheses and candidates above are unverified."
-              : "No change is recommended."}
-          </p>
-        )}
-      </Section>
+              <Sql lines={rec.ddl.length ? rec.ddl : rec.querySql ? [rec.querySql] : []} />
+              {rec.primaryMeasurement ? (
+                <p className="text-sm">
+                  Primary parameter set {rec.primaryMeasurement.paramSet}: {x(rec.primaryMeasurement.speedup)} (interval{" "}
+                  {x(rec.primaryMeasurement.ciLow)}–{x(rec.primaryMeasurement.ciHigh)}){" "}
+                  <Source
+                    provenance={rec.primaryMeasurement.provenance}
+                    evidenceIds={[rec.primaryMeasurement.evidenceId]}
+                    onWhy={onWhy}
+                    claim={`Recommended speed-up ${x(rec.primaryMeasurement.speedup)}`}
+                    artifact={{
+                      sha256: rec.primaryMeasurement.source.artifactSha256,
+                      pointer: rec.primaryMeasurement.source.pointer,
+                      label: "Experiment result artifact",
+                    }}
+                  />
+                </p>
+              ) : null}
+            </>
+          ) : (
+            <p className="text-sm">
+              {rec.status === "unverified"
+                ? "No change is recommended as verified. The hypotheses and candidates above are unverified."
+                : "No change is recommended."}
+            </p>
+          )}
+        </Section>
+      ) : null}
 
       {r.replay?.comparison ? (
-        <Section title="Experiment replay" n={n("Experiment replay")}>
+        <Section title={rr ? "Comparison with the original" : "Experiment replay"} n={n(rr ? "Comparison with the original" : "Experiment replay")}>
           <p className="text-sm">
             Re-measured experiment <span className="font-mono">{r.replay.replayOf?.experimentId.slice(0, 8)}</span> with the same configuration and seed, no
             model calls: <span className="font-medium">{r.replay.comparison.status.replaceAll("_", " ")}</span> (

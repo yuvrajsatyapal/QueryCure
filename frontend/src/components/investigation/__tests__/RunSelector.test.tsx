@@ -245,3 +245,46 @@ test("a long trigger label wraps instead of widening the page", () => {
   expect(trigger.className).toMatch(/whitespace-normal/);
   expect(trigger.className).toMatch(/max-w-full/);
 });
+
+test("a historical replay with a stored verified outcome is tagged legacy; the outcome text is kept", async () => {
+  const legacy = run({ id: "run-4", runNumber: 4, kind: "experiment_replay", parentRunId: "run-1", outcome: "verified_recommendation" });
+  const user = userEvent.setup();
+  render(
+    <RunSelector runs={[original, legacy]} selectedId="run-1" onSelect={vi.fn()} replayReports={new Map([["run-4", { builderVersion: "report-builder@1", replayTitle: null }]])} />,
+  );
+  await user.click(screen.getByRole("button", { name: /^run \d/ }));
+  const [row1, row4] = items();
+  expect(row4?.textContent).toContain("verified recommendation");
+  const tag = within(row4 as HTMLElement).getByText("legacy replay");
+  expect(tag.getAttribute("title")).toBe(
+    "Earlier replay classification. This report used an older outcome rule based on the replay's measurement, not its comparison with the original investigation. It does not independently verify a recommendation.",
+  );
+  expect(within(row1 as HTMLElement).queryByText("legacy replay")).toBeNull();
+});
+
+test("a schema-2 replay that reproduced the original says so, never 'verified recommendation'; the original run keeps its label", async () => {
+  const replay = run({ id: "run-4", runNumber: 4, kind: "experiment_replay", parentRunId: "run-1", outcome: "verified_recommendation" });
+  const user = userEvent.setup();
+  render(
+    <RunSelector
+      runs={[original, replay]}
+      selectedId="run-1"
+      onSelect={vi.fn()}
+      replayReports={new Map([["run-4", { builderVersion: "report-builder@2", replayTitle: "Original recommendation reproduced" }]])}
+    />,
+  );
+  await user.click(screen.getByRole("button", { name: /^run \d/ }));
+  const [row1, row4] = items();
+  expect(row4?.textContent).toContain("· Original recommendation reproduced");
+  expect(row4?.textContent?.toLowerCase()).not.toContain("verified recommendation");
+  expect(within(row4 as HTMLElement).queryByText("legacy replay")).toBeNull();
+  expect(row1?.textContent).toContain(original.outcome!.replaceAll("_", " "));
+});
+
+test("a sealed verified replay whose report is not loaded shows no outcome yet", async () => {
+  const replay = run({ id: "run-4", runNumber: 4, kind: "experiment_replay", parentRunId: "run-1", outcome: "verified_recommendation" });
+  const user = userEvent.setup();
+  render(<RunSelector runs={[original, replay]} selectedId="run-1" onSelect={vi.fn()} />);
+  await user.click(screen.getByRole("button", { name: /^run \d/ }));
+  expect(items()[1]?.textContent?.toLowerCase()).not.toContain("verified recommendation");
+});

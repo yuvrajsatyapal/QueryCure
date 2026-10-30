@@ -7,7 +7,9 @@ new samples, same seed), the comparison is recorded, the replay run gets its own
 the source run's seal is unchanged.
 """
 
+import asyncio
 import base64
+import json
 import os
 import uuid
 from collections.abc import AsyncIterator
@@ -33,6 +35,7 @@ from querycure.replay.experiment_replay import check_preconditions, execute_expe
 from querycure.replay.outcome import BASIS_CODES, classify_replay_outcome
 from querycure.replay.report_replay import verify_report
 from querycure.replay.source_snapshot import (
+    MARKER_KEY,
     RECOMMENDATION_KEYS,
     ROLE_MANIFEST,
     ROLE_REPORT_JSON,
@@ -41,8 +44,10 @@ from querycure.replay.source_snapshot import (
 )
 from querycure.sandbox.provisioner import SandboxProvisioner
 from tests.fake_llm import RoleClient
+from tests.integration import virtual_clock as vc
 from tests.integration.sandbox_fixtures import SANDBOX_URL, clone_names
 from tests.integration.test_optimization_graph import INDEX, NOTHING_MORE, candidates, scripts
+from tests.rehearsal import activation
 
 pytestmark = pytest.mark.integration
 
@@ -87,7 +92,12 @@ def no_llm(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 async def finalized_sandbox_run(
-    api: httpx.AsyncClient, engine: AsyncEngine, migrated_db: str, sandbox: SandboxProvisioner
+    api: httpx.AsyncClient,
+    engine: AsyncEngine,
+    migrated_db: str,
+    sandbox: SandboxProvisioner,
+    options: EngineOptions | None = None,
+    oe: list[Any] | None = None,
 ) -> tuple[str, str]:
     created = await api.post(
         "/api/v1/investigations",
@@ -102,7 +112,7 @@ async def finalized_sandbox_run(
     )
     assert created.status_code == 202, created.text
     run_id = created.json()["run"]["id"]
-    client = RoleClient(scripts([candidates(INDEX), NOTHING_MORE]))
+    client = RoleClient(scripts(oe or [candidates(INDEX), NOTHING_MORE]))
 
     def clients(inputs: RunInputs) -> LlmClients:
         return LlmClients(primary=client)
@@ -114,6 +124,7 @@ async def finalized_sandbox_run(
         clients=clients,
         checkpoint_role="qc_app",
         sandbox=sandbox,
+        engine_options=options,
     )
     await execute_run(services, uuid.UUID(run_id), attempt=1, reclaimed=False)
     experiments = (await api.get(f"/api/v1/runs/{run_id}/experiments")).json()["items"]
@@ -719,6 +730,7 @@ async def start_and_seal(
     experiment_id: str,
     *,
     seal: bool,
+    options: EngineOptions | None = None,
 ) -> uuid.UUID:
     started = await api.post(
         f"/api/v1/experiments/{experiment_id}/replay", json={"confirm_ddl": True}
@@ -727,7 +739,11 @@ async def start_and_seal(
     replay_run = uuid.UUID(started.json()["replay_run_id"])
     if seal:
         await execute_experiment_replay(
-            app_engine, replay_run, sandbox=provisioner, options=EngineOptions(), reclaimed=False
+            app_engine,
+            replay_run,
+            sandbox=provisioner,
+            options=options or EngineOptions(),
+            reclaimed=False,
         )
     return replay_run
 
@@ -779,6 +795,7 @@ async def test_historical_replay_without_snapshot_keeps_its_v1_contract(
         return None
 
     monkeypatch.setattr(experiment_replay, "link_source_snapshot", old_start)
+    without_marker(monkeypatch)
     replay_run = await start_and_seal(api, app_engine, provisioner, experiment_id, seal=True)
     assert snapshot_links(owner, str(replay_run)) == {}
     async with app_engine.connect() as conn:
@@ -871,7 +888,9 @@ async def test_snapshot_artifact_of_the_wrong_kind_fails_closed(
         assert isinstance(result, SourceSnapshotError)
 
 
-async def test_sealed_replay_reconstructs_without_its_source_run(
+@pytest.mark.parametrize("seal", [True, False], ids=["sealed", "unsealed"])
+async def test_replay_reconstructs_without_its_source_run(
+    seal: bool,
     api: httpx.AsyncClient,
     app_engine: AsyncEngine,
     migrated_db: str,
@@ -880,7 +899,7 @@ async def test_sealed_replay_reconstructs_without_its_source_run(
 ) -> None:
     run_id, experiment_id = await finalized_sandbox_run(api, app_engine, migrated_db, provisioner)
     no_llm(monkeypatch)
-    replay_run = await start_and_seal(api, app_engine, provisioner, experiment_id, seal=True)
+    replay_run = await start_and_seal(api, app_engine, provisioner, experiment_id, seal=seal)
     async with app_engine.connect() as conn:
         captured = await load_source_snapshot(conn, replay_run)
     assert captured is not None
@@ -927,3 +946,469 @@ async def test_two_replays_share_the_source_artifacts_without_copying(
             "SELECT count(*) FROM artifacts WHERE sha256 = %s", (sha,)
         ).fetchone() == (1,)
     assert artifacts_before is not None
+
+
+# --- Creation-time snapshot marker (Workstream 5, Phase 1) -------------------------------
+
+CREATION = "run_id = :r AND type = 'replay.status_changed' AND payload->'from' = 'null'::jsonb"
+
+
+def creation_events(owner: psycopg.Connection, run_id: str) -> list[dict[str, Any]]:
+    return [
+        r[0]
+        for r in owner.execute(
+            "SELECT payload FROM investigation_events WHERE run_id = %s "
+            "AND type = 'replay.status_changed' AND payload->'from' = 'null'::jsonb ORDER BY seq",
+            (run_id,),
+        )
+    ]
+
+
+def without_marker(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Simulate the pre-marker start code: the creation event carries no marker."""
+    original = experiment_replay.emit
+
+    async def emit(conn: Any, run_id: Any, type: Any, payload: dict[str, Any]) -> int:
+        return await original(
+            conn, run_id, type, {k: v for k, v in payload.items() if k != MARKER_KEY}
+        )
+
+    monkeypatch.setattr(experiment_replay, "emit", emit)
+
+
+def set_marker(value: str) -> str:
+    return (
+        f"UPDATE investigation_events SET payload = jsonb_set(payload, '{{{MARKER_KEY}}}', "
+        f"'{value}'::jsonb) WHERE {CREATION}"
+    )
+
+
+DROP_MARKER = f"UPDATE investigation_events SET payload = payload - '{MARKER_KEY}' WHERE {CREATION}"
+
+
+@pytest.mark.parametrize("seal", [True, False], ids=["sealed", "unsealed"])
+async def test_new_replay_records_a_creation_marker_naming_its_snapshot(
+    seal: bool,
+    api: httpx.AsyncClient,
+    app_engine: AsyncEngine,
+    owner: psycopg.Connection,
+    migrated_db: str,
+    provisioner: SandboxProvisioner,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    run_id, experiment_id = await finalized_sandbox_run(api, app_engine, migrated_db, provisioner)
+    no_llm(monkeypatch)
+    replay_run = await start_and_seal(api, app_engine, provisioner, experiment_id, seal=seal)
+    events = creation_events(owner, str(replay_run))
+    links = snapshot_links(owner, str(replay_run))
+    assert len(events) == 1
+    assert events[0][MARKER_KEY] == {
+        "schema_version": 1,
+        "manifest": f"sha256:{links[ROLE_MANIFEST]}",
+        "report_json": f"sha256:{links[ROLE_REPORT_JSON]}",
+    }
+    assert set(links.values()) == set(sealed_shas(owner, run_id))
+    # The marker is written before execution, in the event with seq 2 of the replay run.
+    seq = owner.execute(
+        "SELECT seq FROM investigation_events WHERE run_id = %s AND payload ? %s",
+        (str(replay_run), MARKER_KEY),
+    ).fetchone()
+    assert seq == (2,)
+    async with app_engine.connect() as conn:
+        snapshot = await load_source_snapshot(conn, replay_run)
+        assert snapshot is not None
+        if seal:
+            assert (await verify_report(conn, replay_run)).status == "verified"
+
+
+@pytest.mark.parametrize(
+    "dropped",
+    [(ROLE_MANIFEST,), (ROLE_REPORT_JSON,), (ROLE_MANIFEST, ROLE_REPORT_JSON)],
+    ids=["manifest", "report", "both"],
+)
+async def test_unsealed_marked_replay_with_missing_links_fails_closed(
+    dropped: tuple[str, ...],
+    api: httpx.AsyncClient,
+    app_engine: AsyncEngine,
+    migrated_db: str,
+    provisioner: SandboxProvisioner,
+) -> None:
+    """The residual case of §15.2: an unsealed replay that lost both links is no longer
+    indistinguishable from a historical one. Its creation marker says a snapshot is required."""
+    _, experiment_id = await finalized_sandbox_run(api, app_engine, migrated_db, provisioner)
+    replay_run = await start_and_seal(api, app_engine, provisioner, experiment_id, seal=False)
+    result = await load_as_owner(migrated_db, replay_run, *(drop_link(r) for r in dropped))
+    assert isinstance(result, SourceSnapshotError)
+    assert "marker" in result.detail or "incomplete" in result.detail
+
+
+@pytest.mark.parametrize("seal", [True, False], ids=["sealed", "unsealed"])
+@pytest.mark.parametrize(
+    "tamper",
+    [
+        set_marker('"yes"'),
+        set_marker("null"),
+        set_marker('{"schema_version": 2}'),
+        set_marker(
+            '{"schema_version": 1, "manifest": "sha256:' + "0" * 64 + '", "report_json": '
+            '"sha256:' + "0" * 64 + '"}'
+        ),
+    ],
+    ids=["string", "null", "schema", "other-digests"],
+)
+async def test_malformed_or_mismatched_marker_fails_closed(
+    tamper: str,
+    seal: bool,
+    api: httpx.AsyncClient,
+    app_engine: AsyncEngine,
+    migrated_db: str,
+    provisioner: SandboxProvisioner,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _, experiment_id = await finalized_sandbox_run(api, app_engine, migrated_db, provisioner)
+    no_llm(monkeypatch)
+    replay_run = await start_and_seal(api, app_engine, provisioner, experiment_id, seal=seal)
+    result = await load_as_owner(migrated_db, replay_run, tamper)
+    assert isinstance(result, SourceSnapshotError)
+
+
+@pytest.mark.parametrize("seal", [True, False], ids=["sealed", "unsealed"])
+async def test_snapshot_links_without_a_marker_fail_closed(
+    seal: bool,
+    api: httpx.AsyncClient,
+    app_engine: AsyncEngine,
+    migrated_db: str,
+    provisioner: SandboxProvisioner,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _, experiment_id = await finalized_sandbox_run(api, app_engine, migrated_db, provisioner)
+    no_llm(monkeypatch)
+    replay_run = await start_and_seal(api, app_engine, provisioner, experiment_id, seal=seal)
+    result = await load_as_owner(migrated_db, replay_run, DROP_MARKER)
+    assert isinstance(result, SourceSnapshotError)
+    # Losing marker and links together cannot pass for legacy once sealed: the sealed
+    # manifest still lists the snapshot roles.
+    if seal:
+        both = await load_as_owner(
+            migrated_db, replay_run, DROP_MARKER, *(drop_link(r) for r in SNAPSHOT_ROLES)
+        )
+        assert isinstance(both, SourceSnapshotError)
+
+
+async def test_a_second_creation_event_fails_closed(
+    api: httpx.AsyncClient,
+    app_engine: AsyncEngine,
+    migrated_db: str,
+    provisioner: SandboxProvisioner,
+) -> None:
+    _, experiment_id = await finalized_sandbox_run(api, app_engine, migrated_db, provisioner)
+    replay_run = await start_and_seal(api, app_engine, provisioner, experiment_id, seal=False)
+    result = await load_as_owner(
+        migrated_db,
+        replay_run,
+        "INSERT INTO investigation_events (run_id, seq, type, payload) SELECT run_id, 1000, "
+        "type, payload - 'source_snapshot' FROM investigation_events WHERE " + CREATION,
+    )
+    assert isinstance(result, SourceSnapshotError)
+
+
+async def test_historical_unsealed_replay_without_marker_or_links_is_legacy(
+    api: httpx.AsyncClient,
+    app_engine: AsyncEngine,
+    owner: psycopg.Connection,
+    migrated_db: str,
+    provisioner: SandboxProvisioner,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _, experiment_id = await finalized_sandbox_run(api, app_engine, migrated_db, provisioner)
+
+    async def old_start(*a: Any, **k: Any) -> None:
+        return None
+
+    monkeypatch.setattr(experiment_replay, "link_source_snapshot", old_start)
+    without_marker(monkeypatch)
+    replay_run = await start_and_seal(api, app_engine, provisioner, experiment_id, seal=False)
+    assert MARKER_KEY not in creation_events(owner, str(replay_run))[0]
+    async with app_engine.connect() as conn:
+        assert await load_source_snapshot(conn, replay_run) is None
+
+
+async def test_a_fault_after_the_marker_rolls_back_the_whole_start(
+    api: httpx.AsyncClient,
+    app_engine: AsyncEngine,
+    owner: psycopg.Connection,
+    migrated_db: str,
+    provisioner: SandboxProvisioner,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    run_id, experiment_id = await finalized_sandbox_run(api, app_engine, migrated_db, provisioner)
+    before = counts(owner, run_id, experiment_id)
+    marked_before = owner.execute(
+        "SELECT count(*) FROM investigation_events WHERE payload ? %s", (MARKER_KEY,)
+    ).fetchone()
+
+    async def boom(*a: Any, **k: Any) -> Any:
+        raise RuntimeError("injected fault in enqueue")
+
+    monkeypatch.setattr(experiment_replay.queue, "enqueue", boom)
+    with pytest.raises(RuntimeError, match="injected fault"):
+        async with app_engine.begin() as conn:
+            await experiment_replay.start_replay(
+                conn,
+                settings=SETTINGS,
+                user_id=user_of(owner, run_id),
+                experiment_id=uuid.UUID(experiment_id),
+            )
+    assert counts(owner, run_id, experiment_id) == before
+    assert (
+        owner.execute(
+            "SELECT count(*) FROM investigation_events WHERE payload ? %s", (MARKER_KEY,)
+        ).fetchone()
+        == marked_before
+    )
+
+
+async def test_concurrent_starts_each_get_a_marker_and_their_own_links(
+    api: httpx.AsyncClient,
+    app_engine: AsyncEngine,
+    owner: psycopg.Connection,
+    migrated_db: str,
+    provisioner: SandboxProvisioner,
+) -> None:
+    run_id, experiment_id = await finalized_sandbox_run(api, app_engine, migrated_db, provisioner)
+    user = user_of(owner, run_id)
+
+    async def start() -> Any:
+        async with app_engine.begin() as conn:
+            return await experiment_replay.start_replay(
+                conn, settings=SETTINGS, user_id=user, experiment_id=uuid.UUID(experiment_id)
+            )
+
+    results = await asyncio.gather(start(), start(), return_exceptions=True)
+    started = [r for r in results if not isinstance(r, BaseException)]
+    assert started, results
+    replays = [
+        str(r[0])
+        for r in owner.execute(
+            "SELECT id FROM investigation_runs WHERE kind = 'experiment_replay' "
+            "AND parent_run_id = %s",
+            (run_id,),
+        )
+    ]
+    # Every replay that exists has exactly one creation marker that names its own links; a
+    # start that lost a race left nothing behind.
+    assert sorted(replays) == sorted(str(a.replay_run_id) for a in started)
+    for replay in replays:
+        events = creation_events(owner, replay)
+        links = snapshot_links(owner, replay)
+        assert len(events) == 1
+        assert events[0][MARKER_KEY]["manifest"] == f"sha256:{links[ROLE_MANIFEST]}"
+        async with app_engine.connect() as conn:
+            assert await load_source_snapshot(conn, uuid.UUID(replay)) is not None
+
+
+# --- report-builder@2 on real sealed replays (Workstream 5, Phases 2to5) -------------------
+# Activation is simulated inside these tests only: v2 is made current and finalize_run is
+# wrapped so the replay's conclusion comes from the classifier. `_close` is unchanged.
+
+
+def simulate_activation(monkeypatch: pytest.MonkeyPatch, *, status: str | None = None) -> None:
+    """The shared test-only activation seam (`tests/rehearsal/activation.py`); `status` also
+    fixes the comparison verdict at its boundary, for rules a real comparison cannot reach."""
+    real_compare = experiment_replay.compare_experiments
+
+    def compare(**kw: Any) -> dict[str, Any]:
+        result = real_compare(**kw)
+        if status is None:
+            return result
+        pairs = [{**p, "status": status, "code": None} for p in result["pairs"]]
+        return {**result, "status": status, "failure_code": None, "pairs": pairs,
+                "comparison_mode": "same_environment"}  # fmt: skip
+
+    activation.activate(monkeypatch.setattr)
+    monkeypatch.setattr(experiment_replay, "compare_experiments", compare)
+
+
+def stored_report(owner: psycopg.Connection, run_id: str) -> tuple[dict[str, Any], str, Any]:
+    row = owner.execute(
+        "SELECT j.content, m.content, r.outcome FROM investigation_reports ir "
+        "JOIN artifacts j ON j.id = ir.report_json_artifact_id "
+        "JOIN artifacts m ON m.id = ir.report_md_artifact_id "
+        "JOIN investigation_runs r ON r.id = ir.run_id WHERE ir.run_id = %s",
+        (run_id,),
+    ).fetchone()
+    assert row is not None
+    return json.loads(bytes(row[0])), bytes(row[1]).decode(), row[2]
+
+
+@pytest.mark.parametrize(
+    ("status", "expected"),
+    [
+        ("reproduced", ("verified_recommendation", "original_reproduced")),
+        ("reproduced_with_drift", ("inconclusive", "performance_drift")),
+        ("not_reproduced", ("inconclusive", "not_reproduced")),
+        ("inconclusive", ("inconclusive", "inconclusive")),
+    ],
+)
+async def test_v2_replay_report_is_consistent_and_rebuilds_byte_identically(
+    status: str,
+    expected: tuple[str, str],
+    api: httpx.AsyncClient,
+    app_engine: AsyncEngine,
+    owner: psycopg.Connection,
+    migrated_db: str,
+    provisioner: SandboxProvisioner,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # The virtual clock (virtual_clock.py) fixes the samples: the source is always a clean
+    # verified seal, so host noise can never turn this row into another rule.
+    clock = vc.install(monkeypatch, vc.CLEAN, seed=7)
+    run_id, experiment_id = await finalized_sandbox_run(
+        api, app_engine, migrated_db, provisioner, clock.options()
+    )
+    source_report, _, source_outcome = stored_report(owner, run_id)
+    assert (source_outcome, source_report["recommendation"]["status"]) == (
+        "verified_recommendation",
+        "verified",
+    ), source_report["headline"]
+    no_llm(monkeypatch)
+    simulate_activation(monkeypatch, status=status)
+    clock.use(vc.CLEAN, seed=8)
+    replay_run = await start_and_seal(
+        api, app_engine, provisioner, experiment_id, seal=True, options=clock.options()
+    )
+
+    report, md, outcome = stored_report(owner, str(replay_run))
+    rr = report["replay_result"]
+    assert (report["schema_version"], report["builder_version"]) == (2, "report-builder@2")
+    assert (outcome, rr["result"]) == expected, rr["basis"]
+    # One sealed decision: run row, manifest, report, basis and recommendation agree.
+    assert report["outcome"] == outcome
+    assert rr["basis"]["comparison_status"] == status
+    verified = outcome == "verified_recommendation"
+    assert (report["recommendation"]["origin"] == "source_run") is verified
+    assert rr["claims_reproduction"] is verified
+    if verified:
+        rec = source_report["recommendation"]
+        assert report["recommendation"]["candidate_key"] == rec["candidate_key"]
+        assert report["recommendation"]["source_run_id"] == run_id
+        assert report["recommendation"]["primary_measurement"] == rec["primary_measurement"]
+    else:
+        assert report["recommendation"]["status"] == "none"
+    assert rr["source"]["run_id"] == run_id
+    assert "## Experiment Replay Result" in md
+    assert "Verified recommendation" not in md
+    api_report = (await api.get(f"/api/v1/runs/{replay_run}/report")).json()
+    assert api_report["report"] == report
+    async with app_engine.connect() as conn:
+        result = await verify_report(conn, replay_run)
+        source = await verify_report(conn, uuid.UUID(run_id))
+    assert result.status == "verified", result.result_json()
+    assert {c.name: c.status for c in result.checks}["rebuild_json"] == "ok"
+    assert {c.name: c.status for c in result.checks}["rebuild_markdown"] == "ok"
+    assert source.status == "verified"
+
+
+async def test_v2_replay_report_verifies_after_its_source_run_is_deleted(
+    api: httpx.AsyncClient,
+    app_engine: AsyncEngine,
+    migrated_db: str,
+    provisioner: SandboxProvisioner,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    run_id, experiment_id = await finalized_sandbox_run(api, app_engine, migrated_db, provisioner)
+    no_llm(monkeypatch)
+    simulate_activation(monkeypatch, status="reproduced")
+    replay_run = await start_and_seal(api, app_engine, provisioner, experiment_id, seal=True)
+    owner_engine = make_engine(migrated_db)
+    try:
+        async with owner_engine.connect() as conn:
+            trans = await conn.begin()
+            for sql in (
+                "DELETE FROM investigation_reports WHERE run_id = :id",
+                "DELETE FROM replay_manifests WHERE run_id = :id",
+                "DELETE FROM run_artifacts WHERE run_id = :id",
+                "DELETE FROM investigation_events WHERE run_id = :id",
+                "DELETE FROM experiments WHERE run_id = :id",
+                "DELETE FROM investigation_runs WHERE id = :id",
+            ):
+                await conn.execute(text(sql), {"id": run_id})
+            result = await verify_report(conn, replay_run)
+            await trans.rollback()
+    finally:
+        await owner_engine.dispose()
+    assert result.status == "verified", [c for c in result.checks if c.status != "ok"]
+    assert result.checks[-1].name == "rebuild_markdown"
+
+
+@pytest.mark.parametrize("role", [ROLE_MANIFEST, ROLE_REPORT_JSON])
+async def test_v2_report_with_a_snapshot_link_removed_after_sealing_fails_closed(
+    role: str,
+    api: httpx.AsyncClient,
+    app_engine: AsyncEngine,
+    migrated_db: str,
+    provisioner: SandboxProvisioner,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The rebuild then cannot load the snapshot, and the v2 builder refuses the sealed basis:
+    report replay reports a rebuild mismatch instead of raising or verifying."""
+    _, experiment_id = await finalized_sandbox_run(api, app_engine, migrated_db, provisioner)
+    no_llm(monkeypatch)
+    simulate_activation(monkeypatch, status="reproduced")
+    replay_run = await start_and_seal(api, app_engine, provisioner, experiment_id, seal=True)
+    owner_engine = make_engine(migrated_db)
+    try:
+        async with owner_engine.connect() as conn:
+            trans = await conn.begin()
+            await conn.execute(text(drop_link(role)), {"r": replay_run})
+            result = await verify_report(conn, replay_run)
+            await trans.rollback()
+    finally:
+        await owner_engine.dispose()
+    assert result.status == "integrity_failed", result.result_json()
+    assert result.failure_code == "rebuild_mismatch"
+
+
+async def test_v2_finalization_refuses_a_legacy_winner_outcome(
+    api: httpx.AsyncClient,
+    app_engine: AsyncEngine,
+    owner: psycopg.Connection,
+    migrated_db: str,
+    provisioner: SandboxProvisioner,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Why v2 must not become current before `_close` is corrected: the legacy winner-based
+    outcome with no basis is a contradiction, so sealing fails closed instead of producing a
+    verified replay report. The attempt is not left half-sealed."""
+    from querycure.reports import registry
+    from querycure.reports.builders.v2 import ReportContractError
+
+    _, experiment_id = await finalized_sandbox_run(api, app_engine, migrated_db, provisioner)
+    no_llm(monkeypatch)
+    monkeypatch.setattr(registry, "CURRENT_BUILDER", "report-builder@2")
+    monkeypatch.setattr(registry, "CURRENT_RENDERER", "report-md@2")
+    real_run = experiment_replay.run_experiment
+
+    def with_winner(config: Any, *a: Any, **k: Any) -> Any:
+        # the legacy `_close` seals verified_recommendation whenever the replay has a winner
+        return real_run(config, *a, **k).model_copy(update={"winner": config.candidates[0].arm})
+
+    monkeypatch.setattr(experiment_replay, "run_experiment", with_winner)
+    started = await api.post(
+        f"/api/v1/experiments/{experiment_id}/replay", json={"confirm_ddl": True}
+    )
+    replay_run = uuid.UUID(started.json()["replay_run_id"])
+    with pytest.raises(ReportContractError):
+        await execute_experiment_replay(
+            app_engine,
+            replay_run,
+            sandbox=provisioner,
+            options=EngineOptions(),
+            reclaimed=False,
+        )
+    row = owner.execute(
+        "SELECT finalized_at, (SELECT count(*) FROM investigation_reports WHERE run_id = %s) "
+        "FROM investigation_runs WHERE id = %s",
+        (str(replay_run), str(replay_run)),
+    ).fetchone()
+    assert row == (None, 0)

@@ -210,9 +210,9 @@ data: {"run_id":"…","seq":42,"ts":"2026-10-11T12:00:03.120Z","type":"hypothesi
 | `verification.completed` | `{experiment_id, candidate_key, verdict, gate, reasons[]}` |
 | `budget.warning` | `{budget, used, limit}` |
 | `error` | `{node, code, message, recoverable}` |
-| `run.concluded` | `{final_status, outcome, stop_reason, synthesis_summary, materiality, no_action_evidence, usage, error}` — last content event, written by `finalize_run` (ADR-0022) |
+| `run.concluded` | `{final_status, outcome, stop_reason, synthesis_summary, materiality, no_action_evidence, usage, error, narrative_check?, replay_basis?}` — last content event, written by `finalize_run` (ADR-0022) |
 | `report.ready` | `{report_url, outcome, manifest_sha256}` — lifecycle event, emitted after the events cutoff |
-| `replay.status_changed` | `{replay_attempt_id, from, to, failure_code?}` — on the replay run's stream |
+| `replay.status_changed` | `{replay_attempt_id, from, to, failure_code?, source_snapshot?}` — on the replay run's stream. `source_snapshot` (`{schema_version, manifest, report_json}`) appears only on the creation event (`from: null`) of replays started under the snapshot contract (ADR-0032); clients may ignore it |
 | `replay.compared` | `{replay_attempt_id, status, comparison_mode, pairs_summary}` (clients label results by `comparison_mode`, REPLAY_ENGINE §9.2) — on the replay run's stream, before its finalization |
 
 ## 4. Cancellation semantics

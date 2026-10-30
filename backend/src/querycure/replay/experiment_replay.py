@@ -67,10 +67,12 @@ from querycure.replay.comparison import compare_experiments
 from querycure.replay.finalize import Conclusion, finalize_run
 from querycure.replay.report_replay import verify_report
 from querycure.replay.source_snapshot import (
+    MARKER_KEY,
     CapturedSnapshot,
     SourceSnapshotError,
     capture_source_snapshot,
     link_source_snapshot,
+    snapshot_marker,
 )
 from querycure.sandbox.provisioner import SandboxProvisioner
 from querycure.sql.ddl_allowlist import validate_candidate
@@ -297,7 +299,13 @@ async def start_replay(
         conn,
         replay_run,
         EventType.REPLAY_STATUS_CHANGED,
-        {"replay_attempt_id": str(attempt.id), "from": None, "to": "queued"},
+        {
+            "replay_attempt_id": str(attempt.id),
+            "from": None,
+            "to": "queued",
+            # Durable creation-time record that this replay requires its source snapshot.
+            MARKER_KEY: snapshot_marker(pre.snapshot.snapshot),
+        },
     )
     await queue.enqueue(
         conn,

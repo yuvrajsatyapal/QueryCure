@@ -298,3 +298,36 @@ async def test_approval_sweep_never_touches_a_sealed_run(
         "SELECT status FROM approval_requests WHERE run_id = %s", (run_id,)
     ).fetchone()
     assert status == ("pending",)
+
+
+async def test_replay_basis_is_written_only_when_set(
+    app_engine: AsyncEngine, owner: psycopg.Connection
+) -> None:
+    """ADR-0026 pattern: an optional `run.concluded` key, absent unless the caller sets it, so
+    every existing run's payload bytes are unchanged (REPLAY_OUTCOME_AUDIT §12.1)."""
+    plain, marked = await prepared(app_engine), await prepared(app_engine)
+    basis = {"code": "source_not_verified", "source_outcome": None,
+             "comparison_status": None, "comparison_mode": None}  # fmt: skip
+    async with app_engine.begin() as conn:
+        await finalize_run(conn, plain, DONE)
+        await finalize_run(
+            conn,
+            marked,
+            Conclusion(
+                final_status=RunStatus.COMPLETED,
+                outcome=RunOutcome.UNVERIFIED_RECOMMENDATIONS,
+                stop_reason=None,
+                replay_basis=basis,
+            ),
+        )
+
+    def concluded(run_id: uuid.UUID) -> dict[str, Any]:
+        row = owner.execute(
+            "SELECT payload FROM investigation_events WHERE run_id = %s AND type = 'run.concluded'",
+            (run_id,),
+        ).fetchone()
+        assert row is not None
+        return dict(row[0])
+
+    assert "replay_basis" not in concluded(plain)
+    assert concluded(marked)["replay_basis"] == basis

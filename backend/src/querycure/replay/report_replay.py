@@ -37,6 +37,7 @@ from querycure.replay.canonical import (
 from querycure.replay.digest import digest
 from querycure.replay.events_digest import EventLogGapError, events_digest
 from querycure.reports import registry
+from querycure.reports.builders.v2 import ReportContractError
 from querycure.reports.inputs import load_report_inputs
 
 ReportReplayStatus = Literal[
@@ -317,14 +318,17 @@ async def verify_report(
             )
         ).scalar_one()
         inputs = await load_report_inputs(conn, run_id, cutoff)
-        rebuilt = registry.build(
-            builder,
-            inputs,
-            finalized_at=to_canonical(final),
-            cutoff_seq=cutoff,
-            events_digest=manifest["events"]["digest"],
-        )
-        if digest("qc-json-v1", canonical_json(to_canonical(rebuilt))) != _bare(
+        try:
+            rebuilt: dict[str, Any] | None = registry.build(
+                builder,
+                inputs,
+                finalized_at=to_canonical(final),
+                cutoff_seq=cutoff,
+                events_digest=manifest["events"]["digest"],
+            )
+        except ReportContractError:  # the records no longer support the sealed report
+            rebuilt = None
+        if rebuilt is None or digest("qc-json-v1", canonical_json(to_canonical(rebuilt))) != _bare(
             report_meta["json"]
         ):
             checks.append(

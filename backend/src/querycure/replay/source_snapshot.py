@@ -10,10 +10,17 @@ digest-checked on every read, they are listed in the replay's manifest when it i
 the snapshot is a pure function of sealed records and later changes to the source run (row,
 outcome, deletion) cannot reach it. A new artifact kind would need a migration
 (`artifacts_kind_check`), and copying the facts would be a second source of truth.
+
+Marker: the same transaction writes the replay's creation event (`replay.status_changed`,
+`from: null`) with `source_snapshot` naming the schema and both linked digests. Events are
+append-only for the app role, never swept by retention, and sealed in the events digest, so a
+replay started under the snapshot contract stays recognisable even if it loses both links
+before it is sealed. No marker and no links is a replay started before snapshots (legacy).
 """
 
 import copy
 import json
+import re
 import uuid
 from collections.abc import Sequence
 from dataclasses import dataclass
@@ -52,6 +59,14 @@ RECOMMENDATION_KEYS = (
 )
 VERIFIED = ("verified", "verified_with_noise_warning")
 NODE = "experiment_replay"
+MARKER_KEY = "source_snapshot"
+MARKER_SCHEMA_VERSION = 1
+_DIGEST_REF = re.compile(r"sha256:[0-9a-f]{64}")
+_CREATION_EVENTS = text(
+    "SELECT payload FROM investigation_events WHERE run_id = :id "
+    "AND type = 'replay.status_changed' AND payload->'from' = 'null'::jsonb "
+    "AND (CAST(:cutoff AS BIGINT) IS NULL OR seq <= :cutoff) ORDER BY seq"
+)
 
 
 class SourceSnapshotError(Exception):
@@ -186,6 +201,44 @@ def _check_recommendation(
         raise SourceSnapshotError("source recommendation is not an arm of this experiment")
 
 
+def snapshot_marker(snapshot: ReplaySourceSnapshot) -> dict[str, Any]:
+    """The creation-event marker: a snapshot is required, and these are its two links."""
+    return {
+        "schema_version": MARKER_SCHEMA_VERSION,
+        "manifest": f"sha256:{snapshot.source_manifest_sha256}",
+        "report_json": f"sha256:{snapshot.source_report_json_sha256}",
+    }
+
+
+def parse_marker(marker: Any) -> tuple[str, str]:
+    """(manifest, report JSON) digests named by a marker; anything else fails closed."""
+    if (
+        not isinstance(marker, dict)
+        or set(marker) != {"schema_version", "manifest", "report_json"}
+        or type(marker["schema_version"]) is not int
+        or marker["schema_version"] != MARKER_SCHEMA_VERSION
+        or not all(
+            isinstance(marker[k], str) and _DIGEST_REF.fullmatch(marker[k])
+            for k in ("manifest", "report_json")
+        )
+    ):
+        raise SourceSnapshotError("replay creation marker is malformed")
+    return marker["manifest"].removeprefix("sha256:"), marker["report_json"].removeprefix("sha256:")
+
+
+async def _creation_marker(
+    conn: AsyncConnection, run_id: uuid.UUID, cutoff: int | None
+) -> tuple[str, str] | None:
+    """The digests the replay's creation event requires, or None for a replay created before
+    markers. Only one creation event can exist: the start transaction writes it once."""
+    events = (await conn.execute(_CREATION_EVENTS, {"id": run_id, "cutoff": cutoff})).all()
+    if len(events) > 1:
+        raise SourceSnapshotError("replay run has more than one creation event")
+    if not events or MARKER_KEY not in events[0].payload:
+        return None
+    return parse_marker(events[0].payload[MARKER_KEY])
+
+
 @dataclass(frozen=True)
 class CapturedSnapshot:
     snapshot: ReplaySourceSnapshot
@@ -285,13 +338,16 @@ async def load_source_snapshot(
     config) and its `parent_run_id`; the source run's rows are never read.
 
     None means the replay has no snapshot because it predates snapshots (or is not a replay).
-    For a sealed replay that is decided by its own sealed manifest, not by the links: a manifest
-    listing the snapshot roles makes missing or different links an error. An unsealed replay
-    has only its links, which the start transaction writes atomically and the app role can
-    neither change nor delete. Anything inconsistent raises SourceSnapshotError."""
+    That is decided by the replay's creation marker, never by the links alone: a marker makes
+    missing or different links an error, and links without a marker are an error too. A sealed
+    replay must also match its own sealed manifest. Anything inconsistent raises
+    SourceSnapshotError."""
     run = (
         await conn.execute(
-            text("SELECT kind, parent_run_id, finalized_at FROM investigation_runs WHERE id = :id"),
+            text(
+                "SELECT kind, parent_run_id, finalized_at, events_cutoff_seq "
+                "FROM investigation_runs WHERE id = :id"
+            ),
             {"id": replay_run_id},
         )
     ).one_or_none()
@@ -305,8 +361,15 @@ async def load_source_snapshot(
         return None
     if run.finalized_at is not None and await _sealed_links(conn, replay_run_id) != linked:
         raise SourceSnapshotError("replay links differ from its sealed manifest")
-    if not manifests and not reports:
+    marker = await _creation_marker(conn, replay_run_id, run.events_cutoff_seq)
+    if marker is None:
+        if manifests or reports:
+            raise SourceSnapshotError("source snapshot linked without a creation marker")
         return None
+    if not manifests or not reports:
+        raise SourceSnapshotError("marker requires a source snapshot the replay is missing")
+    if (manifests, reports) != ([marker[0]], [marker[1]]):
+        raise SourceSnapshotError("replay links differ from its creation marker")
     configs = await _linked(conn, replay_run_id, ROLE_CONFIG)
     if len(manifests) != 1 or len(reports) != 1 or len(configs) != 1:
         raise SourceSnapshotError("replay run has an incomplete source snapshot")

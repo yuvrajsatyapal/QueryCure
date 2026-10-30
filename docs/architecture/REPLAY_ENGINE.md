@@ -208,7 +208,8 @@ Rules:
    - The frontend declares the range of `report_schema_version`s it can render.
    - Outside that range, it displays the stored Markdown artifact with a banner. Older schemas get "archived format". A schema newer than the client (deploy skew) gets warning `schema_newer_than_client`.
    - Markdown always renders, so a verified report is always viewable.
-5. **Optional "view with current renderer".** If the current renderer supports the stored schema version, the UI may re-render the stored JSON, labeled "re-rendered with report-md@M (original report-md@N)". This view is not a verification and never replaces the stored artifact.
+5. **Registered versions (2026-10-30).** `report-builder@1` / `report-md@1` (schema 1) are current. `report-builder@2` / `report-md@2` (schema 2, ADR-0032) are registered for rebuilds but not current until the experiment-replay correction is activated. Schema 2 is additive: ordinary reports equal v1 plus `recommendation.origin`; experiment replays add `replay_result` and take their headline from the sealed `run.concluded.replay_basis`. A v2 rebuild whose records contradict the basis is `rebuild_mismatch`. The frontend renders schemas 1 and 2.
+6. **Optional "view with current renderer".** If the current renderer supports the stored schema version, the UI may re-render the stored JSON, labeled "re-rendered with report-md@M (original report-md@N)". This view is not a verification and never replaces the stored artifact.
 
 ## 8. Replay lifecycles and failure codes
 

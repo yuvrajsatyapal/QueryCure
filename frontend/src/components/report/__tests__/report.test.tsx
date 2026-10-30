@@ -349,3 +349,164 @@ test("result summary without a recommendation says so and keeps warnings", () =>
   expect(within(s).getByText(/offline stub model/)).toBeTruthy();
   expect(within(s).queryByRole("button", { name: "Benchmark details" })).toBeNull();
 });
+
+// --- Report schema 2 and historical replay notices (Workstream 5) ------------------------
+// Fixtures are real report-builder@2 / @1 output for synthetic inputs (backend
+// tests/unit/reports/test_frontend_report_fixture.py keeps them current).
+import v2fixtures from "@/test/fixtures/report-v2.json";
+
+type V2Name = Exclude<keyof typeof v2fixtures, "_note">;
+const v2 = (name: V2Name) => v2fixtures[name] as unknown as ReportV1;
+const LEGACY_COPY =
+  "Earlier replay classification. This report used an older outcome rule based on the replay's measurement, not its comparison with the original investigation. It does not independently verify a recommendation.";
+const LEGACY = /older outcome rule based on the replay's measurement/;
+
+test("a reproduced schema-2 replay says reproduced and shows the original recommendation from its source run", () => {
+  render(<ReportView report={v2("1_reproduced_original")} />);
+  expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("Original recommendation reproduced");
+  expect(screen.queryByText("Verified recommendation")).toBeNull();
+  const original = screen.getByRole("region", { name: "Original recommendation" });
+  expect(within(original).getByText("Source run").nextSibling?.textContent).toBe("00000000-0000-4000-8000-0000000000bb");
+  expect(within(original).getByText(/reproduced by this replay/)).toBeTruthy();
+  const result = screen.getByRole("region", { name: "Experiment replay result" });
+  expect(within(result).getByText("Correctness reproduced").nextSibling?.textContent).toBe("Yes");
+  expect(within(result).getByText(/replay measurement, not a verification/)).toBeTruthy();
+  expect(screen.queryByText(LEGACY)).toBeNull();
+});
+
+test.each([
+  ["2_performance_drift", "Performance drift detected"],
+  ["3_not_reproduced_rows", "Original result not reproduced"],
+  ["5_cross_environment", "Results not directly comparable"],
+  ["8_inconclusive_source_with_replay_winner", "Re-measurement only"],
+  ["14_not_replayable", "No comparison with the original was possible"],
+  ["15_execution_failed", "Replay failed"],
+] as const)("schema-2 replay %s: no recommendation of its own, never a verified card", (name, title) => {
+  render(<ReportView report={v2(name)} />);
+  expect(screen.getByRole("heading", { level: 1 }).textContent).toBe(title);
+  expect(screen.queryByText("Verified recommendation")).toBeNull();
+  expect(screen.queryByRole("region", { name: "Original recommendation" })).toBeNull();
+  expect(within(screen.getByRole("region", { name: "Recommendation" })).getByText("This replay makes no recommendation of its own.")).toBeTruthy();
+});
+
+test("the drifted replay shows the original candidate for reference only", () => {
+  render(<ReportView report={v2("2_performance_drift")} />);
+  const rec = screen.getByRole("region", { name: "Recommendation" });
+  expect(within(rec).getByText(/shown for reference and is not confirmed by this replay/)).toBeTruthy();
+  const result = screen.getByRole("region", { name: "Experiment replay result" });
+  expect(within(result).getByText("Material drift").nextSibling?.textContent).toBe("Yes");
+});
+
+test("result summary: schema-2 replay line, the original candidate labelled, the replay winner a measurement", () => {
+  render(<ResultSummary report={v2("1_reproduced_original")} onReport={() => undefined} />);
+  expect(screen.getByRole("heading", { level: 2 }).textContent).toBe("Original recommendation reproduced");
+  expect(screen.getByText("Original recommendation")).toBeTruthy();
+  expect(screen.getByText(/from the source run/)).toBeTruthy();
+  expect(screen.getByText(/replay measurement, not a verification/)).toBeTruthy();
+  cleanup();
+
+  render(<ResultSummary report={v2("8_inconclusive_source_with_replay_winner")} onReport={() => undefined} />);
+  expect(screen.getByRole("heading", { level: 2 }).textContent).toBe("Re-measurement only");
+  expect(screen.getByText("This replay makes no recommendation of its own.")).toBeTruthy();
+  expect(screen.queryByText(/No recommendation was verified/)).toBeNull();
+});
+
+test("historical v1 replay: stored outcome kept, legacy notice outside the report in panel and summary", async () => {
+  const legacy = v2("legacy_v1_replay");
+  render(<ResultSummary report={legacy} onReport={() => undefined} />);
+  expect(screen.getByRole("heading", { level: 2 }).textContent).toBe("Verified recommendation");
+  expect(screen.getByText("Legacy replay")).toBeTruthy();
+  // one shared copy (REPLAY_OUTCOME_AUDIT §17): the summary, the report notice and the selector tag say the same thing
+  expect(screen.getByRole("note", { name: "Legacy replay" }).textContent).toBe(`Legacy replay${LEGACY_COPY}`);
+  cleanup();
+
+  getReport.mockResolvedValue({ reportSchemaVersion: 1, builderVersion: "report-builder@1", manifestSha256: "f".repeat(64), report: legacy });
+  renderWithQuery(<ReportPanel runId="run-1" />);
+  const notice = await screen.findByRole("note", { name: "Historical replay report" });
+  expect(notice.textContent).toBe(LEGACY_COPY);
+  expect(notice.textContent).not.toMatch(/was reproduced|not reproduced/i);
+  // outside the sealed report body
+  expect(within(screen.getByRole("article", { name: "Final report" })).queryByText(LEGACY)).toBeNull();
+  expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("Verified recommendation");
+});
+
+test("no legacy notice on ordinary v1 reports or on schema-2 replays", async () => {
+  render(<ResultSummary report={report()} onReport={() => undefined} />);
+  expect(screen.queryByText("Legacy replay")).toBeNull();
+  cleanup();
+  getReport.mockResolvedValue({ reportSchemaVersion: 2, manifestSha256: "f".repeat(64), report: v2("1_reproduced_original") });
+  renderWithQuery(<ReportPanel runId="run-1" />);
+  expect(await screen.findByRole("article", { name: "Final report" })).toBeTruthy();
+  expect(screen.queryByRole("note", { name: "Historical replay report" })).toBeNull();
+  expect(screen.queryByText(/newer version than this page understands/)).toBeNull();
+});
+
+test("schema 3 still falls back to the stored markdown", async () => {
+  getReport.mockResolvedValue({ reportSchemaVersion: 3, manifestSha256: "f".repeat(64), report: {} });
+  renderWithQuery(<ReportPanel runId="run-1" />);
+  expect(await screen.findByText(/newer version than this page understands/)).toBeTruthy();
+  expect(await screen.findByText("# Stored markdown body")).toBeTruthy();
+});
+
+test("a schema-2 replay page has no empty problem or hypotheses sections and does not repeat its title", () => {
+  render(<ReportView report={v2("2_performance_drift")} />);
+  expect(screen.queryByRole("region", { name: "Hypotheses" })).toBeNull();
+  expect(screen.queryByRole("region", { name: "Observed problem" })).toBeNull();
+  expect(screen.getByText(/^Correctness held, but the speed-up changed/)).toBeTruthy();
+});
+
+/** Body headings and the contents list must number the same visible sections 01..N (no 00, no gaps). */
+function numbering(container: HTMLElement) {
+  const body = [...container.querySelectorAll("article section > h2")].map((h) => ({
+    n: h.querySelector("span")?.textContent ?? "",
+    title: (h.textContent ?? "").replace(/^\d+/, ""),
+  }));
+  const toc = [...container.querySelectorAll("nav[aria-label='Report contents'] li a")].map((a) => ({
+    n: a.querySelector("span")?.textContent ?? "",
+    title: (a.textContent ?? "").replace(/^\d+/, ""),
+  }));
+  return { body, toc };
+}
+
+const ev = { id: "ev_0123456789ab", kind: "plan_node", summary: "Seq scan on orders", provenance: "measured" };
+const hyp = { key: "h1", category: "missing_index", confidence: "high", statement: "No index.", supportingEvidence: ["ev_0123456789ab"] };
+const NUMBERING_CASES: [string, ReportV1][] = [
+  ...(Object.keys(v2fixtures).filter((k) => k !== "_note") as V2Name[]).map((k) => [k, v2(k)] as [string, ReportV1]),
+  ["v1 verified", report()],
+  ["v1 no rounds, missing evidence", report({ rounds: [], missing: [{ section: "rounds", reason: "not benchmarked" }] }, "unverified")],
+  ["v2 replay with problem evidence", { ...v2("2_performance_drift"), problem: { evidence: [ev], materiality: null } } as unknown as ReportV1],
+  ["v2 replay with materiality only", { ...v2("2_performance_drift"), problem: { evidence: [], materiality: { verdict: "material", reasons: [], evidenceIds: [] } } } as unknown as ReportV1],
+  ["v2 replay with hypotheses", { ...v2("1_reproduced_original"), hypotheses: [hyp] } as unknown as ReportV1],
+  ["v2 replay without rounds or comparison", { ...v2("2_performance_drift"), rounds: [], replay: null, missing: [] } as unknown as ReportV1],
+];
+
+test.each(NUMBERING_CASES)("section numbering is sequential and matches the contents list: %s", (_name, r) => {
+  const { container } = render(<ReportView report={r} toc />);
+  const { body, toc } = numbering(container);
+  expect(body.length).toBeGreaterThan(0);
+  expect(body.map((s) => s.n)).toEqual(body.map((_, i) => String(i + 1).padStart(2, "0")));
+  expect(toc).toEqual(body);
+});
+
+test("reproduced replay: candidate and verification scope lead; source IDs and digests are secondary but complete", () => {
+  render(<ReportView report={v2("1_reproduced_original")} />);
+  const original = screen.getByRole("region", { name: "Original recommendation" });
+  const text = original.textContent ?? "";
+  // primary: what the candidate is and what its verification covers
+  expect(within(original).getByRole("heading", { level: 3 }).textContent).toMatch(/Index on orders \(customer_id\)/);
+  expect(within(original).getByText(/Verified in the sandbox by the source investigation and reproduced by this replay/)).toBeTruthy();
+  // secondary, after the primary content, nothing truncated
+  const details = within(original).getByRole("list", { name: "Source details" });
+  for (const value of ["00000000-0000-4000-8000-0000000000bb", "00000000-0000-4000-8000-0000000000e1", "ev_777777777777", "5a".repeat(32)]) {
+    expect(details.textContent).toContain(value);
+  }
+  expect(text.indexOf("Verified in the sandbox")).toBeLessThan(text.indexOf("00000000-0000-4000-8000-0000000000bb"));
+
+  const result = screen.getByRole("region", { name: "Experiment replay result" });
+  const resultDetails = within(result).getByRole("list", { name: "Source details" });
+  for (const value of ["00000000-0000-4000-8000-0000000000bb", "verified_recommendation", "report-builder@1", "reproduced_source_recommendation", "1".repeat(64), "2".repeat(64)]) {
+    expect(resultDetails.textContent).toContain(value);
+  }
+  // the lead sentence carries no IDs
+  expect(within(result).getByText(/^Re-measured one experiment of the original investigation/).textContent).not.toMatch(/[0-9a-f]{8}/);
+});

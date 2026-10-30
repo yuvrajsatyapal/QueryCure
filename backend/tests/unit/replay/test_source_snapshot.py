@@ -11,7 +11,9 @@ from querycure.replay.canonical import canonical_json, to_canonical
 from querycure.replay.source_snapshot import (
     ReplaySourceSnapshot,
     SourceSnapshotError,
+    parse_marker,
     snapshot_from_sealed,
+    snapshot_marker,
 )
 
 RUN = "00000000-0000-4000-8000-000000000001"
@@ -282,3 +284,58 @@ def test_inconsistent_or_unverifiable_sources_are_rejected(
 ) -> None:
     with pytest.raises(SourceSnapshotError):
         build(m, r, **kw)
+
+
+# --- Creation-time marker (Workstream 5, Phase 1) -----------------------------------------
+
+
+def test_marker_names_the_schema_and_both_linked_digests() -> None:
+    marker = snapshot_marker(build())
+
+    assert marker == {
+        "schema_version": 1,
+        "manifest": f"sha256:{MANIFEST_SHA}",
+        "report_json": f"sha256:{REPORT_SHA}",
+    }
+    assert parse_marker(marker) == (MANIFEST_SHA, REPORT_SHA)
+
+
+@pytest.mark.parametrize(
+    "marker",
+    [
+        None,
+        "yes",
+        1,
+        [],
+        {},
+        {"schema_version": 2, "manifest": f"sha256:{MANIFEST_SHA}", "report_json": "sha256:x"},
+        {"schema_version": 1, "manifest": f"sha256:{MANIFEST_SHA}"},
+        {"schema_version": 1, "manifest": MANIFEST_SHA, "report_json": REPORT_SHA},
+        {"schema_version": 1, "manifest": "sha256:", "report_json": f"sha256:{REPORT_SHA}"},
+        {"schema_version": 1, "manifest": "sha256:XYZ", "report_json": f"sha256:{REPORT_SHA}"},
+        {
+            "schema_version": 1,
+            "manifest": f"sha256:{MANIFEST_SHA}",
+            "report_json": f"sha256:{REPORT_SHA}",
+            "extra": True,
+        },
+        {"schema_version": True, "manifest": f"sha256:{MANIFEST_SHA}", "report_json": "x"},
+    ],
+    ids=[
+        "null",
+        "string",
+        "int",
+        "list",
+        "empty",
+        "schema",
+        "one-digest",
+        "bare-digests",
+        "empty-digest",
+        "not-hex",
+        "extra-key",
+        "bool-schema",
+    ],
+)
+def test_a_malformed_marker_fails_closed(marker: Any) -> None:
+    with pytest.raises(SourceSnapshotError, match="marker"):
+        parse_marker(marker)

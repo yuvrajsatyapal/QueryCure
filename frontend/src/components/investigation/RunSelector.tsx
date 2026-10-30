@@ -5,6 +5,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type 
 import { createPortal } from "react-dom";
 import { Icon } from "@/components/ui/Icon";
 import type { RunSummary } from "@/lib/api/types";
+import type { ReplayReportMeta } from "@/lib/report/replay";
 import { RunPicker, runKindLabel, runRelation } from "./RunPicker";
 
 /** Below this the menu is a sheet at the bottom of the screen (UI_UX §3.6c). */
@@ -38,10 +39,12 @@ export function RunSelector({
   runs,
   selectedId,
   onSelect,
+  replayReports,
 }: {
   runs: RunSummary[];
   selectedId: string | null;
   onSelect: (runId: string) => void;
+  replayReports?: ReadonlyMap<string, ReplayReportMeta>;
 }) {
   const [placement, setPlacement] = useState<Placement | null>(null);
   const open = placement !== null;
@@ -164,6 +167,7 @@ export function RunSelector({
               >
                 <RunPicker
                   runs={runs}
+                  replayReports={replayReports}
                   selectedId={selectedId}
                   onSelect={(id) => {
                     close(true);

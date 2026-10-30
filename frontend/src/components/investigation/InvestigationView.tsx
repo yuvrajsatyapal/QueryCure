@@ -25,6 +25,7 @@ import type { GraphNode as EvidenceNode } from "@/lib/evidence/graph";
 import type { AuditCheck, AuditConcern } from "@/lib/report/types";
 import { ReportPanel } from "@/components/report/ReportPanel";
 import { ResultSummary } from "@/components/report/ResultSummary";
+import { replayReportMeta, sealedReplayRuns, type ReplayReportMeta } from "@/lib/report/replay";
 import { SUPPORTED_REPORT_SCHEMAS, getReport, getVerifications, reportKeys } from "@/lib/api/reports";
 import type { ReportV1 } from "@/lib/report/types";
 import { ApprovalReview } from "@/components/tournament/ApprovalReview";
@@ -214,6 +215,18 @@ export function InvestigationView({ id, requestedRunId }: { id: string; requeste
     enabled: runId !== null && r !== undefined && !active,
     retry: false,
   });
+  // Sealed replays: their (immutable, cached) report gives the run selector the builder's replay
+  // title, or marks a historical report-builder@1 replay (REPLAY_OUTCOME_AUDIT §13.3–§13.4).
+  const replayKey = useQueries({
+    queries: sealedReplayRuns(runs).map((c) => ({
+      queryKey: reportKeys.report(c.id),
+      queryFn: ({ signal }: { signal: AbortSignal }) => getReport(c.id, signal),
+      staleTime: Infinity,
+      retry: false,
+    })),
+    combine: (results) => JSON.stringify(results.flatMap((q) => (q.data ? [[q.data.runId, replayReportMeta(q.data)] as const] : []))),
+  });
+  const replayReports = useMemo(() => new Map<string, ReplayReportMeta>(JSON.parse(replayKey) as [string, ReplayReportMeta][]), [replayKey]);
   const sealedReport = sealed.data && SUPPORTED_REPORT_SCHEMAS.includes(sealed.data.reportSchemaVersion) ? (sealed.data.report as unknown as ReportV1) : null;
   const trace = useMemo(() => buildTrace(events, { active }), [events, active]);
   const claimIndex = useMemo(() => indexClaimSpans(trace), [trace]);
@@ -782,7 +795,7 @@ export function InvestigationView({ id, requestedRunId }: { id: string; requeste
             ) : null}
           </div>
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-            <RunSelector runs={runs} selectedId={runId} onSelect={selectRun} />
+            <RunSelector runs={runs} selectedId={runId} onSelect={selectRun} replayReports={replayReports} />
             {!summary && r ? <span className="font-mono text-xs text-muted">run {r.runNumber}</span> : null}
             <span className="font-mono text-xs text-muted">{r ? runModelLabel(r) : ""}</span>
           </div>

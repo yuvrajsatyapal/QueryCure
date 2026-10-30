@@ -20,7 +20,7 @@ export const reportKeys = {
 };
 
 /** Report schema versions this client renders; others show the stored Markdown (REPLAY_ENGINE §7). */
-export const SUPPORTED_REPORT_SCHEMAS = [1];
+export const SUPPORTED_REPORT_SCHEMAS = [1, 2];
 
 export const getReport = (runId: string, signal?: AbortSignal) =>
   apiFetch<ReportOut>(`/runs/${runId}/report`, { signal });

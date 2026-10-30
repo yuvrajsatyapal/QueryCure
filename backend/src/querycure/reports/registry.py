@@ -9,14 +9,24 @@ from collections.abc import Callable
 from typing import Any
 
 from querycure.reports.builders import v1 as builder_v1
+from querycure.reports.builders import v2 as builder_v2
 from querycure.reports.inputs import ReportInputs
-from querycure.reports.renderers import md_v1
+from querycure.reports.renderers import md_v1, md_v2
 
 Builder = Callable[..., dict[str, Any]]
 Renderer = Callable[[dict[str, Any]], str]
 
-BUILDERS: dict[str, Builder] = {builder_v1.BUILDER_VERSION: builder_v1.build_report}
-RENDERERS: dict[str, Renderer] = {md_v1.MD_RENDERER_VERSION: md_v1.render_markdown}
+# report-builder@2 / report-md@2 are registered so report replay can rebuild them, but they
+# are not current: finalize_run still seals with v1 until the replay correction is activated
+# (REPLAY_OUTCOME_AUDIT §12.5 step 5).
+BUILDERS: dict[str, Builder] = {
+    builder_v1.BUILDER_VERSION: builder_v1.build_report,
+    builder_v2.BUILDER_VERSION: builder_v2.build_report,
+}
+RENDERERS: dict[str, Renderer] = {
+    md_v1.MD_RENDERER_VERSION: md_v1.render_markdown,
+    md_v2.MD_RENDERER_VERSION: md_v2.render_markdown,
+}
 # None retired yet (D10: keep all versions).
 RETIRED_BUILDERS: frozenset[str] = frozenset()
 RETIRED_RENDERERS: frozenset[str] = frozenset()

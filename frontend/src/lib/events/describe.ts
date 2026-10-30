@@ -52,8 +52,13 @@ export function describe(event: RunEvent): { text: string; tone: "normal" | "mut
       const reasons = Array.isArray(p.reasons) && p.reasons.length ? ` (${str((p.reasons[0] as Payload).code)})` : "";
       return { text: `${str(p.candidateKey)}: ${str(p.verdict)}${reasons}`, tone: p.verdict === "rejected" ? "error" : "normal" };
     }
-    case "run.concluded":
-      return { text: `Concluded: ${str(p.finalStatus)}${p.outcome ? ` · ${str(p.outcome).replaceAll("_", " ")}` : ""}`, tone: "normal" };
+    case "run.concluded": {
+      // An experiment replay's sealed basis says why it concluded; its stored outcome alone
+      // could read as a verification it never made (REPLAY_OUTCOME_AUDIT §13.3).
+      const basis = p.replayBasis && typeof p.replayBasis === "object" ? (p.replayBasis as Payload).code : null;
+      const why = basis ? ` · replay basis: ${str(basis).replaceAll("_", " ")}` : p.outcome ? ` · ${str(p.outcome).replaceAll("_", " ")}` : "";
+      return { text: `Concluded: ${str(p.finalStatus)}${why}`, tone: "normal" };
+    }
     case "report.ready":
       return { text: "Final report sealed", tone: "normal" };
     case "replay.status_changed":

@@ -4,7 +4,8 @@ import { useId, useState, type ReactNode } from "react";
 import { VerdictBadge } from "@/components/tournament/VerdictBadge";
 import { Icon, type IconName } from "@/components/ui/Icon";
 import { describeCandidate } from "@/lib/benchmark/candidate";
-import { OUTCOME_LABEL, VERDICT_EXPLANATION, x } from "@/lib/report/labels";
+import { VERDICT_EXPLANATION, x } from "@/lib/report/labels";
+import { LEGACY_REPLAY_NOTICE, LEGACY_REPLAY_TITLE, REPLAY_TONE, YES_NO, headlineBody, isLegacyReplayReport, replayResultOf, reportTitle } from "@/lib/report/replay";
 import type { ReportV1 } from "@/lib/report/types";
 
 const EXPANDED_KEY = "qc.resultSummary.expanded";
@@ -50,6 +51,9 @@ export function ResultSummary({
   const verified = rec.status === "verified" || rec.status === "verified_with_noise_warning";
   const explanation = verified && rec.status in VERDICT_EXPLANATION ? VERDICT_EXPLANATION[rec.status] : null;
   const more = r.limitations.length + (explanation ? 1 : 0);
+  const rr = replayResultOf(r);
+  const legacy = isLegacyReplayReport(r);
+  const tone = rr ? { verified: "text-verified", inconclusive: "text-inconclusive", rejected: "text-rejected", muted: "text-muted" }[REPLAY_TONE[rr.result]] : "";
 
   function toggle() {
     const next = !expanded;
@@ -66,8 +70,16 @@ export function ResultSummary({
       <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-2">
         <div className="flex min-w-0 flex-1 basis-96 flex-col gap-0.5">
           <p className="qc-eyebrow">Result · run {r.run.runNumber}</p>
-          <h2 className="text-base font-semibold tracking-tight">{OUTCOME_LABEL[r.outcome ?? ""] ?? `Run ${r.finalStatus}`}</h2>
-          <p className="text-sm">{r.headline}</p>
+          <h2 className={`text-base font-semibold tracking-tight ${tone}`}>{reportTitle(r)}</h2>
+          <p className="text-sm">{headlineBody(r)}</p>
+          {legacy ? (
+            <p role="note" aria-label="Legacy replay" className="mt-1 flex flex-wrap items-baseline gap-x-2 text-[13px] text-muted">
+              <span className="rounded border border-inconclusive/50 px-1 font-mono text-[11px] text-inconclusive">Legacy replay</span>
+              <span>
+                {LEGACY_REPLAY_TITLE} {LEGACY_REPLAY_NOTICE}
+              </span>
+            </p>
+          ) : null}
         </div>
         <div className="flex shrink-0 flex-wrap gap-2">
           <button type="button" onClick={onReport} className="qc-btn-secondary py-1 text-xs pointer-coarse:min-h-11">
@@ -81,7 +93,31 @@ export function ResultSummary({
         </div>
       </div>
 
-      {rec.candidateKey ? (
+      {rr ? (
+        <div className="flex flex-col gap-1 border-t border-border pt-2.5 text-sm">
+          {rec.origin === "source_run" && rec.candidateKey ? (
+            <p className="flex flex-wrap items-center gap-x-3 gap-y-1">
+              <span className="qc-eyebrow">Original recommendation</span>
+              <VerdictBadge status={rec.status} />
+              <span className="font-medium">{describeCandidate({ kind: rec.kind ?? "", ddl: rec.ddl, querySql: rec.querySql })}</span>
+              <span className="font-mono text-xs text-muted">{rec.candidateKey}</span>
+              <span className="text-muted">from the source run, reproduced by this replay</span>
+            </p>
+          ) : (
+            <p className="text-muted">This replay makes no recommendation of its own.</p>
+          )}
+          <p className="text-[13px] text-muted">
+            Comparison {rr.comparisonStatus?.replaceAll("_", " ") ?? "none"}
+            {rr.comparisonMode ? ` · ${rr.comparisonMode.replaceAll("_", " ")}` : ""} · correctness reproduced {YES_NO(rr.correctnessReproduced).toLowerCase()} · performance
+            reproduced {YES_NO(rr.performanceReproduced).toLowerCase()}
+          </p>
+          {rr.replayMeasurement.engineWinner ? (
+            <p className="text-[13px] text-muted">
+              Replay&apos;s own best arm <span className="font-mono">{rr.replayMeasurement.engineWinner}</span>: {rr.replayMeasurement.label}
+            </p>
+          ) : null}
+        </div>
+      ) : rec.candidateKey ? (
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-border pt-2.5 text-sm">
           <VerdictBadge status={rec.status} />
           <span className="font-medium">{describeCandidate({ kind: rec.kind ?? "", ddl: rec.ddl, querySql: rec.querySql })}</span>

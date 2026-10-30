@@ -79,13 +79,14 @@ def test_the_app_role_cannot_run_ddl(owner: psycopg.Connection) -> None:
         owner.execute("RESET ROLE")
 
 
-@pytest.mark.parametrize("table", ["artifacts", "run_artifacts"])
+@pytest.mark.parametrize("table", ["artifacts", "run_artifacts", "investigation_events"])
 @pytest.mark.parametrize("privilege", ["UPDATE", "DELETE", "TRUNCATE"])
 def test_the_app_role_cannot_change_or_remove_artifacts_or_links(
     owner: psycopg.Connection, table: str, privilege: str
 ) -> None:
-    """Replay snapshots link the source's sealed artifacts (REPLAY_OUTCOME_AUDIT §14): the app
-    can neither soft-delete (UPDATE deleted_at), rewrite nor remove an artifact or a link."""
+    """Replay snapshots link the source's sealed artifacts (REPLAY_OUTCOME_AUDIT §14), and the
+    replay's creation event marks that a snapshot is required (§16): the app can neither
+    soft-delete (UPDATE deleted_at), rewrite nor remove an artifact, a link or an event."""
     allowed = owner.execute(
         "SELECT has_table_privilege('qc_app', %s, %s)", (f"public.{table}", privilege)
     ).fetchone()

@@ -51,6 +51,11 @@ class Conclusion:
     # ADR-0026: sentences of the AI summary removed for contradicting final verdicts. Only
     # written when something was removed; report-builder@1 does not read it.
     narrative_check: dict[str, Any] | None = None
+    # REPLAY_OUTCOME_AUDIT §12.1: an experiment replay's classification basis
+    # (`ReplayClassification.as_basis()`), read by report-builder@2. Written only when set,
+    # so no other run's payload changes; no caller sets it until the replay correction is
+    # activated in `experiment_replay._close`.
+    replay_basis: dict[str, Any] | None = None
 
 
 @dataclass(frozen=True)
@@ -241,6 +246,11 @@ async def finalize_run(
                 **(
                     {"narrative_check": conclusion.narrative_check}
                     if conclusion.narrative_check
+                    else {}
+                ),
+                **(
+                    {"replay_basis": conclusion.replay_basis}
+                    if conclusion.replay_basis is not None
                     else {}
                 ),
             }

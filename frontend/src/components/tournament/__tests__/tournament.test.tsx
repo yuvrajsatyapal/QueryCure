@@ -294,3 +294,14 @@ test("a plan-diff jump by keyboard keeps the focus ring; by pointer it focuses w
   again.blur();
   expect(again.hasAttribute("data-pointer-focus")).toBe(false);
 });
+
+test("a replay's conclusion is described by its sealed basis, never as a bare verified outcome", () => {
+  const event = (type: string, payload: object) => ({ runId: "r", seq: 1, ts: "", type, payload }) as RunEvent;
+  const replay = describeEvent(
+    event("run.concluded", { finalStatus: "completed", outcome: "verified_recommendation", replayBasis: { code: "reproduced_source_recommendation" } }),
+  ).text;
+  expect(replay).toBe("Concluded: completed · replay basis: reproduced source recommendation");
+  expect(describeEvent(event("run.concluded", { finalStatus: "completed", outcome: "verified_recommendation" })).text).toBe(
+    "Concluded: completed · verified recommendation",
+  );
+});
