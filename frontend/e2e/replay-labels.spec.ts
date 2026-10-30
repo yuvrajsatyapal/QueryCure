@@ -29,7 +29,8 @@ async function checkPage(page: Page, name: string) {
     expect(axe.violations.map((v) => v.id), `${name} axe ${scheme}`).toEqual([]);
     for (const width of WIDTHS) {
       await page.setViewportSize({ width, height: 900 });
-      expect(await overflow(page), `${name} overflow at ${width}`).toBeLessThanOrEqual(0);
+      // Polled: read straight after the resize, the previous width's layout can still be measured.
+      await expect.poll(() => overflow(page), `${name} overflow at ${width}`).toBeLessThanOrEqual(0);
       await page.screenshot({ path: `${SHOTS}/${name}-${width}-${scheme}.png`, fullPage: true });
     }
   }

@@ -42,9 +42,9 @@ async function topmost(page: Page, selector: string, index: number) {
   );
 }
 
-// The Sign in button exists only where a provider is configured (not in CI); sidebar-auth.spec
-// covers it with a mocked session.
-const FOOTER_CONTROLS = ['a[href="/app/settings"]', 'button[aria-label*="theme" i]', "[data-sidebar-footer] button"];
+// The Sign in link exists only where a provider is configured (not in CI); sidebar-auth.spec
+// covers it, and the signed-in account controls, with a mocked session.
+const FOOTER_CONTROLS = ['a[href="/app/settings"]', 'button[aria-label*="theme" i]', "[data-sidebar-footer] button", "[data-sidebar-footer] a"];
 
 for (const scheme of ["dark", "light"] as const) {
   test(`sidebar footer - controls stay reachable and uncovered (${scheme})`, async ({ page }) => {

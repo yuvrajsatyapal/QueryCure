@@ -169,7 +169,8 @@ test("sandbox - approve the candidate SQL, then see the benchmarked tournament",
     expect(summary, `tournament tab in ${scheme} mode`).toEqual([]);
   }
   await page.setViewportSize({ width: 390, height: 844 });
-  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+  // Polled: read straight after the resize, scrollWidth can still be the 1440px layout's.
+  await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
 
   // Evidence tab (UI_UX §3.18): recorded links from the run, the auditor's citations included.
   await page.setViewportSize({ width: 1440, height: 900 });
@@ -189,7 +190,8 @@ test("sandbox - approve the candidate SQL, then see the benchmarked tournament",
     expect(summary, `evidence tab in ${scheme} mode`).toEqual([]);
   }
   await page.setViewportSize({ width: 390, height: 844 });
-  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+  // Polled: read straight after the resize, scrollWidth can still be the 1440px layout's.
+  await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
 
   // Workstream 3 (UI_UX §3.15): the run-scoped palette lists the candidate with its recorded status
   // (no speed-up figure) and jumps to its plan diff, opening the folded phone section.
