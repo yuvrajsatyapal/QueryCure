@@ -5,6 +5,7 @@ import { moving } from "@/test/motion";
 import { renderWithQuery } from "@/test/render";
 import { metrics, plan } from "@/components/plan/__tests__/fixture";
 import type { RunEvent } from "@/lib/api/types";
+import fixtures from "@/test/fixtures/report-v2.json";
 
 const events: RunEvent[] = [
   { runId: "run-1", seq: 1, ts: "2026-10-12T10:00:00.000Z", type: "run.status_changed", payload: { from: null, to: "queued" } },
@@ -23,6 +24,11 @@ vi.mock("next/navigation", () => ({ useRouter: () => ({ replace: vi.fn(), push: 
 // Tests may override the stream; by default it is live with the events above.
 const runEvents = vi.hoisted(() => ({ override: null as null | { events: unknown[]; live: boolean; stream: string } }));
 vi.mock("@/lib/events/useRunEvents", () => ({ useRunEvents: () => runEvents.override ?? { events, live: true } }));
+// Reports are unreachable unless a test says otherwise.
+vi.mock("@/lib/api/reports", async (orig) => ({
+  ...(await orig<typeof import("@/lib/api/reports")>()),
+  getReport: vi.fn().mockRejectedValue(new Error("offline")),
+}));
 vi.mock("@/lib/api/investigations", () => ({
   investigationKeys: {
     detail: (id: string) => ["investigations", id],
@@ -151,6 +157,33 @@ test.each([
     renderWithQuery(<InvestigationView id="inv-1" />);
     expect(await screen.findByText(label)).toBeDefined();
     expect(screen.queryByText(/not assigned yet/i) === null).toBe(label !== "Model not assigned yet");
+  } finally {
+    vi.mocked(getRun).mockResolvedValue(real);
+  }
+});
+
+test.each([
+  { name: "a schema-2 report gives the builder's title", report: "1_reproduced_original", label: "Original recommendation reproduced" },
+  { name: "a historical v1 report keeps the stored outcome as legacy context", report: "legacy_v1_replay", label: "Legacy replay · verified recommendation" },
+  { name: "an unreadable report claims nothing", report: null, label: "Replay completed · report unavailable" },
+] as const)("header outcome of a completed replay (REPLAY_OUTCOME_AUDIT §18.1): $name", async ({ report, label }) => {
+  const { getRun } = await import("@/lib/api/investigations");
+  const { getReport } = await import("@/lib/api/reports");
+  const real = await vi.mocked(getRun)("run-1");
+  vi.mocked(getRun).mockResolvedValue({ ...real, kind: "experiment_replay", status: "completed", outcome: "verified_recommendation", finalized: true });
+  if (report) {
+    const r = fixtures[report] as unknown as { builderVersion: string; schemaVersion: number };
+    vi.mocked(getReport).mockResolvedValueOnce({ runId: "run-1", builderVersion: r.builderVersion, reportSchemaVersion: r.schemaVersion, report: r } as never);
+  }
+  try {
+    renderWithQuery(<InvestigationView id="inv-1" />);
+    expect((await screen.findAllByText(label)).length).toBeGreaterThan(0);
+    if (report === "legacy_v1_replay") {
+      // the sealed summary keeps its stored title, always beside the legacy marker (§13.4)
+      expect(screen.getAllByText(/Legacy replay/).length).toBeGreaterThan(1);
+    } else {
+      expect(screen.queryByText("Verified recommendation")).toBeNull();
+    }
   } finally {
     vi.mocked(getRun).mockResolvedValue(real);
   }

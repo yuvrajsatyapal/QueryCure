@@ -132,3 +132,25 @@ test("an approval still pending keeps the gate open in the approval state", () =
   expect(trace.children[0]!.endTs).toBeUndefined();
   expect(trace.children[0]!.wait).toEqual({ startTs: trace.children[0]!.children[0]!.startTs });
 });
+
+test("on an experiment replay run, the event log never prints the bare stored outcome (REPLAY_OUTCOME_AUDIT §18.1)", () => {
+  const texts = (events: RunEvent[]) => flattenTrace(buildTrace(events, { active: false }), new Set()).map((r) => r.span.name);
+  const replay = [
+    ev("replay.status_changed", { from: null, to: "queued" }, 1),
+    ev("run.status_changed", { from: "running", to: "completed", outcome: "verified_recommendation" }, 2),
+    ev("run.concluded", { finalStatus: "completed", outcome: "verified_recommendation" }, 3),
+  ];
+  const lines = texts(replay).join("\n");
+  expect(lines).toContain("Run completed");
+  expect(lines).not.toMatch(/Run completed · verified recommendation/);
+  expect(lines).toContain("Concluded: completed · stored outcome: verified recommendation (legacy replay classification)");
+  // a sealed basis still names itself
+  const basis = [
+    ev("replay.status_changed", { from: null, to: "queued" }, 1),
+    ev("run.concluded", { finalStatus: "completed", outcome: "inconclusive", replayBasis: { code: "comparison_reproduced_with_drift" } }, 2),
+  ];
+  expect(texts(basis).join("\n")).toContain("Concluded: completed · replay basis: comparison reproduced with drift");
+  // ordinary runs are unchanged
+  const ordinary = [ev("run.status_changed", { from: "running", to: "completed", outcome: "verified_recommendation" }, 1)];
+  expect(texts(ordinary).join("\n")).toContain("Run completed · verified recommendation");
+});

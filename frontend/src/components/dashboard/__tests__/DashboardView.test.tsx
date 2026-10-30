@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { cleanup, screen, within } from "@testing-library/react";
 import { moving } from "@/test/motion";
-import { renderWithQuery } from "@/test/render";
+import { renderWithQuery, testQueryClient } from "@/test/render";
+import fixtures from "@/test/fixtures/report-v2.json";
 import { DashboardView } from "../DashboardView";
 
 const { page, recent, run } = vi.hoisted(() => {
@@ -61,6 +62,11 @@ vi.mock("@/lib/api/investigations", async (orig) => ({
     }
   }),
   getRun: vi.fn(async () => ({ usage: { llmCalls: 14, toolCalls: 22 }, budget: { llmCalls: 40, toolCalls: 60 } })),
+}));
+
+vi.mock("@/lib/api/reports", async (orig) => ({
+  ...(await orig<typeof import("@/lib/api/reports")>()),
+  getReport: vi.fn(),
 }));
 
 vi.mock("@/lib/api/optimization", async (orig) => ({
@@ -134,6 +140,34 @@ test("running counts and in-flight rows are polled snapshots, so nothing animate
   const panel = await screen.findByRole("region", { name: "Active investigations" });
   expect(await within(panel).findAllByText("Running")).not.toHaveLength(0);
   expect(moving(container)).toEqual([]);
+});
+
+test("replays in recent investigations and run outcomes never count or read as verified (REPLAY_OUTCOME_AUDIT §18.1)", async () => {
+  const { getReport, reportKeys } = await import("@/lib/api/reports");
+  const replay = { kind: "experiment_replay", finalized: true, finishedAt: "2026-10-19T10:05:00Z" };
+  recent.items = [
+    run("v", "completed", { outcome: "verified_recommendation" }),
+    run("rv", "completed", { ...replay, outcome: "verified_recommendation" }),
+    run("rr", "completed", { ...replay, outcome: "verified_recommendation" }),
+    run("rf", "failed", { ...replay }),
+  ];
+  const client = testQueryClient();
+  const r = fixtures["1_reproduced_original"] as unknown as { builderVersion: string; schemaVersion: number };
+  client.setQueryData(reportKeys.report("run-rr"), { runId: "run-rr", builderVersion: r.builderVersion, reportSchemaVersion: r.schemaVersion, report: r });
+  renderWithQuery(<DashboardView />, client);
+
+  const recentPanel = await screen.findByRole("region", { name: "Recent investigations" });
+  const row = (title: string) => within(recentPanel).getByRole("link", { name: title }).closest("tr")!;
+  await within(recentPanel).findByRole("link", { name: "Investigation rv" });
+  expect(within(row("Investigation v")).getAllByText("Verified recommendation").length).toBeGreaterThan(0);
+  expect(within(row("Investigation rv")).getAllByText("Replay completed").length).toBeGreaterThan(0);
+  expect(within(row("Investigation rr")).getAllByText("Original recommendation reproduced").length).toBeGreaterThan(0);
+  expect(within(row("Investigation rf")).getAllByText("Replay failed").length).toBeGreaterThan(0);
+  for (const t of ["Investigation rv", "Investigation rr", "Investigation rf"]) expect(row(t).textContent).not.toMatch(/verified recommendation/i);
+
+  const outcomes = screen.getByRole("region", { name: "Run outcomes" });
+  expect(within(outcomes).getByRole("img", { name: "1 Verified recommendation, 2 Experiment replays, 1 Failed" })).toBeDefined();
+  expect(vi.mocked(getReport)).not.toHaveBeenCalled();
 });
 
 test("when the list can't load, panels say so instead of showing empty states", async () => {

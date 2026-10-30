@@ -25,7 +25,7 @@ import type { GraphNode as EvidenceNode } from "@/lib/evidence/graph";
 import type { AuditCheck, AuditConcern } from "@/lib/report/types";
 import { ReportPanel } from "@/components/report/ReportPanel";
 import { ResultSummary } from "@/components/report/ResultSummary";
-import { replayReportMeta, sealedReplayRuns, type ReplayReportMeta } from "@/lib/report/replay";
+import { classifyRunOutcome, replayReportMeta, replayReportState, runOutcomeText, sealedReplayRuns, type ReplayReportMeta } from "@/lib/report/replay";
 import { SUPPORTED_REPORT_SCHEMAS, getReport, getVerifications, reportKeys } from "@/lib/api/reports";
 import type { ReportV1 } from "@/lib/report/types";
 import { ApprovalReview } from "@/components/tournament/ApprovalReview";
@@ -234,7 +234,17 @@ export function InvestigationView({ id, requestedRunId }: { id: string; requeste
   const selectedSpan = step === RUN_ROW ? undefined : findSpan(trace, step);
   const graph = useMemo(() => graphRun(trace), [trace]);
   const clock = useClock(active);
-  const activity = activityOf({ status: r?.status ?? "queued", outcome: r?.outcome ?? null, errorMessage: r?.errorMessage ?? null, trace, events, stream: stream ?? (live ? "live" : "closed") });
+  // A completed replay's header uses the shared classification of its sealed report (§18.1).
+  const replayOutcome = r?.kind === "experiment_replay" && r.status === "completed" ? runOutcomeText(classifyRunOutcome(r, replayReportState(sealed))) : undefined;
+  const activity = activityOf({
+    status: r?.status ?? "queued",
+    outcome: r?.outcome ?? null,
+    outcomeLabel: replayOutcome,
+    errorMessage: r?.errorMessage ?? null,
+    trace,
+    events,
+    stream: stream ?? (live ? "live" : "closed"),
+  });
 
   // Cited evidence resolves once per ID (immutable, cached), only while the Plan or Evidence tab is
   // open. The evidence tab also resolves what the Benchmark Auditor's checks cite.

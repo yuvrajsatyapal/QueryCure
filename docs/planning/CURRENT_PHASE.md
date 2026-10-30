@@ -773,3 +773,18 @@ Defaults are chosen so implementation can proceed; change any before the listed 
       - **Flake removed:** an older v2 test that let host noise substitute rules now uses the virtual clock.
     - **Next:** owner approval of ADR-0032 and its scope decision. Then step 0 (deploy inactive), the history/dashboard follow-up, and the activation commit (audit §17.10).
 
+- [x] **Pre-activation consistency and safety (2026-10-30, [audit §18](../reports/REPLAY_OUTCOME_AUDIT_2026-10-27.md)). Pre-activation consistency verified locally — replay outcome activation awaiting approval.** `_close` and the v1 defaults are unchanged; no migration, API contract change or dependency; nothing pushed or deployed.
+  - **Outcome labels:** one shared classifier (`classifyRunOutcome` in `lib/report/replay.ts`) for the run selector, History, Dashboard, the investigation header and the event log.
+    - A replay never reads as a verified recommendation from its stored outcome.
+    - In flight: its status. Failed or cancelled: that status.
+    - Completed: the sealed v2 title, *Legacy replay · …* for v1, or *Replay completed* while the report is unknown.
+    - Lists read reports from the query cache only (no per-row requests).
+  - **Correction:** §17.9.1 was wrong. A replay never becomes an investigation's `latest_run` (only creation and re-investigation set it; 0 of 102 locally; now pinned by a backend test). History and Dashboard never showed replay outcomes; their change is hardening. No API change is needed.
+  - **Ordinary investigations under v2** (owner-approved future default, not switched): 14 shapes. v2 = v1 plus exactly `schema_version`, `builder_version` and `recommendation.origin`. Markdown differs in one line. Frontend renders each like its v1 twin. No incompatibilities.
+  - **Cutover:** replays keep their creation contract.
+    - Drain first, gated by the new read-only `python -m querycure.ops replay-cutover-check` (exit 1 while a legacy replay is in flight).
+    - A legacy replay concluding after activation would be sealed v1 and tagged legacy, never `source_snapshot_missing`.
+    - 10 real-stack tests: legacy queued/running, valid or lost snapshot, restart and duplicate delivery, version skew both ways, unknown builder, rollback after a v2 seal, the gate, `latest_run`.
+  - **Activation diff:** proposed in audit §18.5, not applied. `finalize_run(versions=…)`, contract-aware `_close`, registry v2 current.
+  - **Verified:** 2071 backend passed (2 skipped, 1 xfailed, pre-existing); smoke 5/5 recorded; frontend lint, typecheck, build, 600 Vitest, Playwright 33/33; 702 sealed reports unchanged, 718/718 verify.
+  - **Next:** owner approval of ADR-0032 activation (audit §18.5); step 0 deploy remains an owner decision.

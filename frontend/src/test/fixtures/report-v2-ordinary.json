@@ -1,0 +1,3597 @@
+{
+ "_note": "report-builder@2 output for ordinary investigations; synthetic unit-test inputs, not measurements.",
+ "cancelled": {
+  "builderVersion": "report-builder@2",
+  "errors": [
+   {
+    "code": "AGENT_FAILED",
+    "message": "retry 2 failed",
+    "node": "query_analyzer",
+    "recoverable": true
+   }
+  ],
+  "events": {
+   "cutoffSeq": 42,
+   "digest": "sha256:cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+   "profile": "qc-events-v1"
+  },
+  "evidence": [
+   {
+    "artifactSha256": "efefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefef",
+    "id": "ev_b54af7a859ca",
+    "kind": "plan_node",
+    "locator": "/0/Plan",
+    "provenance": "imported",
+    "summary": "Seq Scan on orders: 120.5 ms of 121.0 ms, 995000 rows removed by filter"
+   }
+  ],
+  "finalStatus": "cancelled",
+  "finalizedAt": "2026-10-13T12:00:00.000000Z",
+  "findings": [
+   {
+    "agent": "query_analyzer",
+    "detail": "Seq Scan reads 1000000 rows.",
+    "evidenceIds": [
+     "ev_b54af7a859ca"
+    ],
+    "key": "fd_222222222222",
+    "severity": "high",
+    "title": "Scan 1 dominates"
+   }
+  ],
+  "headline": "The run ended before reaching a conclusion.",
+  "hypotheses": [
+   {
+    "category": "missing_index",
+    "confidence": "high",
+    "contradictingEvidence": [],
+    "key": "hy_111111111111",
+    "proposedBy": [
+     "query_analyzer"
+    ],
+    "rank": 1,
+    "statement": "Missing index on 2 columns.",
+    "supportingEvidence": [
+     "ev_b54af7a859ca"
+    ],
+    "uncertaintyNotes": "",
+    "verificationMethod": "benchmark"
+   }
+  ],
+  "investigation": {
+   "liveConnection": false,
+   "modes": [
+    "sandbox_benchmark"
+   ],
+   "objective": "Make it fast for 30 users",
+   "title": "Slow orders page",
+   "workloadId": "stale_stats@v1:sf=0.1:seed=42"
+  },
+  "limitations": [
+   "Nothing in this report was benchmarked: hypotheses are unverified."
+  ],
+  "missing": [
+   {
+    "reason": "not benchmarked",
+    "section": "benchmark"
+   }
+  ],
+  "nextSteps": [
+   "The run stopped early; start a new run to complete the investigation."
+  ],
+  "outcome": null,
+  "partial": true,
+  "problem": {
+   "evidence": [
+    {
+     "artifactSha256": "efefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefef",
+     "id": "ev_b54af7a859ca",
+     "kind": "plan_node",
+     "locator": "/0/Plan",
+     "provenance": "imported",
+     "summary": "Seq Scan on orders: 120.5 ms of 121.0 ms, 995000 rows removed by filter"
+    }
+   ],
+   "materiality": {
+    "evidenceIds": [
+     "ev_b54af7a859ca"
+    ],
+    "reasons": [
+     "The query took 121 ms."
+    ],
+    "verdict": "material"
+   }
+  },
+  "provenance": {
+   "llm": [
+    {
+     "agent": "query_analyzer",
+     "calls": 3,
+     "model": "nvidia/x:free",
+     "promptVersion": "query_analyzer@1",
+     "servedBy": "Nvidia",
+     "status": "succeeded"
+    }
+   ],
+   "measurements": [],
+   "stubModel": false
+  },
+  "query": {
+   "paramSets": [
+    {
+     "edgeCase": false,
+     "name": "purchases",
+     "values": [
+      "purchase"
+     ]
+    },
+    {
+     "edgeCase": false,
+     "name": "views",
+     "values": [
+      "view"
+     ]
+    }
+   ],
+   "sha256": "1212121212121212121212121212121212121212121212121212121212121212",
+   "sql": "SELECT count(*), sum(e.amount) FROM events e JOIN accounts a ON a.id = e.account_id WHERE e.kind = $1"
+  },
+  "recommendation": {
+   "candidateKey": null,
+   "ddl": [],
+   "kind": null,
+   "origin": "run",
+   "primaryMeasurement": null,
+   "querySql": null,
+   "scope": "none",
+   "status": "unverified"
+  },
+  "replay": null,
+  "rounds": [
+   {
+    "approval": {
+     "approvedCandidateIds": [
+      "8986847e-6bbb-5b75-b0d2-d98780425b21"
+     ],
+     "decidedAt": "2026-10-13T11:00:00.000000Z",
+     "decidedBy": "user:1",
+     "id": "35375679-1997-5d89-a949-9ec9d0aac67b",
+     "round": 0,
+     "status": "approved"
+    },
+    "candidates": [
+     {
+      "addressesHypotheses": [
+       "hy_111111111111"
+      ],
+      "ddl": [
+       "ANALYZE events"
+      ],
+      "expectedBenefit": "Avoid the 1 sort",
+      "key": "oc_0000000000a3",
+      "kind": "analyze_statistics",
+      "querySql": null,
+      "reasons": [],
+      "risks": [],
+      "sqlSha256": "9ba79d34048ce1c01bc67f7743cf6acf52131bde8796c1a6c0668f1fdd75ad28",
+      "status": "proposed"
+     }
+    ],
+    "experiment": null,
+    "replicates": [],
+    "round": 0
+   }
+  ],
+  "run": {
+   "id": "00000000-0000-4000-8000-0000000000aa",
+   "investigationId": "8f7d60a5-f02f-5114-a93f-e1f6f8c80fd9",
+   "kind": "initial",
+   "parentRunId": null,
+   "runNumber": 1
+  },
+  "schemaVersion": 2,
+  "stopReason": "cancelled",
+  "summary": "The scan over 1000000 rows dominates.",
+  "usage": {
+   "llmCalls": 7,
+   "toolCalls": 2
+  }
+ },
+ "failed_execution": {
+  "builderVersion": "report-builder@2",
+  "errors": [
+   {
+    "code": "AGENT_FAILED",
+    "message": "retry 2 failed",
+    "node": "query_analyzer",
+    "recoverable": true
+   }
+  ],
+  "events": {
+   "cutoffSeq": 42,
+   "digest": "sha256:cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+   "profile": "qc-events-v1"
+  },
+  "evidence": [
+   {
+    "artifactSha256": "efefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefef",
+    "id": "ev_b54af7a859ca",
+    "kind": "plan_node",
+    "locator": "/0/Plan",
+    "provenance": "imported",
+    "summary": "Seq Scan on orders: 120.5 ms of 121.0 ms, 995000 rows removed by filter"
+   }
+  ],
+  "finalStatus": "failed",
+  "finalizedAt": "2026-10-13T12:00:00.000000Z",
+  "findings": [
+   {
+    "agent": "query_analyzer",
+    "detail": "Seq Scan reads 1000000 rows.",
+    "evidenceIds": [
+     "ev_b54af7a859ca"
+    ],
+    "key": "fd_222222222222",
+    "severity": "high",
+    "title": "Scan 1 dominates"
+   }
+  ],
+  "headline": "The run ended before reaching a conclusion.",
+  "hypotheses": [
+   {
+    "category": "missing_index",
+    "confidence": "high",
+    "contradictingEvidence": [],
+    "key": "hy_111111111111",
+    "proposedBy": [
+     "query_analyzer"
+    ],
+    "rank": 1,
+    "statement": "Missing index on 2 columns.",
+    "supportingEvidence": [
+     "ev_b54af7a859ca"
+    ],
+    "uncertaintyNotes": "",
+    "verificationMethod": "benchmark"
+   }
+  ],
+  "investigation": {
+   "liveConnection": false,
+   "modes": [
+    "sandbox_benchmark"
+   ],
+   "objective": "Make it fast for 30 users",
+   "title": "Slow orders page",
+   "workloadId": "stale_stats@v1:sf=0.1:seed=42"
+  },
+  "limitations": [
+   "Nothing in this report was benchmarked: hypotheses are unverified."
+  ],
+  "missing": [
+   {
+    "reason": "no experiment completed",
+    "section": "benchmark"
+   }
+  ],
+  "nextSteps": [
+   "The run stopped early; start a new run to complete the investigation."
+  ],
+  "outcome": null,
+  "partial": true,
+  "problem": {
+   "evidence": [
+    {
+     "artifactSha256": "efefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefef",
+     "id": "ev_b54af7a859ca",
+     "kind": "plan_node",
+     "locator": "/0/Plan",
+     "provenance": "imported",
+     "summary": "Seq Scan on orders: 120.5 ms of 121.0 ms, 995000 rows removed by filter"
+    }
+   ],
+   "materiality": {
+    "evidenceIds": [
+     "ev_b54af7a859ca"
+    ],
+    "reasons": [
+     "The query took 121 ms."
+    ],
+    "verdict": "material"
+   }
+  },
+  "provenance": {
+   "llm": [
+    {
+     "agent": "query_analyzer",
+     "calls": 3,
+     "model": "nvidia/x:free",
+     "promptVersion": "query_analyzer@1",
+     "servedBy": "Nvidia",
+     "status": "succeeded"
+    }
+   ],
+   "measurements": [],
+   "stubModel": false
+  },
+  "query": {
+   "paramSets": [
+    {
+     "edgeCase": false,
+     "name": "purchases",
+     "values": [
+      "purchase"
+     ]
+    },
+    {
+     "edgeCase": false,
+     "name": "views",
+     "values": [
+      "view"
+     ]
+    }
+   ],
+   "sha256": "1212121212121212121212121212121212121212121212121212121212121212",
+   "sql": "SELECT count(*), sum(e.amount) FROM events e JOIN accounts a ON a.id = e.account_id WHERE e.kind = $1"
+  },
+  "recommendation": {
+   "candidateKey": null,
+   "ddl": [],
+   "kind": null,
+   "origin": "run",
+   "primaryMeasurement": null,
+   "querySql": null,
+   "scope": "none",
+   "status": "unverified"
+  },
+  "replay": null,
+  "rounds": [
+   {
+    "approval": {
+     "approvedCandidateIds": [
+      "8986847e-6bbb-5b75-b0d2-d98780425b21"
+     ],
+     "decidedAt": "2026-10-13T11:00:00.000000Z",
+     "decidedBy": "user:1",
+     "id": "35375679-1997-5d89-a949-9ec9d0aac67b",
+     "round": 0,
+     "status": "approved"
+    },
+    "candidates": [
+     {
+      "addressesHypotheses": [
+       "hy_111111111111"
+      ],
+      "ddl": [
+       "ANALYZE events"
+      ],
+      "expectedBenefit": "Avoid the 1 sort",
+      "key": "oc_0000000000a3",
+      "kind": "analyze_statistics",
+      "querySql": null,
+      "reasons": [],
+      "risks": [],
+      "sqlSha256": "9ba79d34048ce1c01bc67f7743cf6acf52131bde8796c1a6c0668f1fdd75ad28",
+      "status": "verified"
+     }
+    ],
+    "experiment": {
+     "audit": [],
+     "builds": [],
+     "config": {
+      "blockSize": 5,
+      "maxCv": 0.25,
+      "maxRegression": 0.95,
+      "measuredRuns": 30,
+      "minEffect": 1.1,
+      "provenance": "configured",
+      "warmupRuns": 5
+     },
+     "correctness": [],
+     "engineVersion": "bench@1",
+     "environment": {
+      "containerRuntime": "docker",
+      "cpuArch": "arm64",
+      "cpuCount": 8,
+      "cpuModel": "arm",
+      "digest": "sha256:9999999999999999999999999999999999999999999999999999999999999999",
+      "memoryBytes": 8589934592,
+      "os": "Darwin 25.6.0",
+      "pgVersion": "170011",
+      "provenance": "recorded",
+      "sandboxImageDigest": "unrecorded",
+      "workloadDataDigest": "8e79c1c9db1f0ad467fe543e9d0a64d20e8186d43ea8e8a32c7a25c7f3d666b8",
+      "workloadId": "stale_stats@v1:sf=0.1:seed=42"
+     },
+     "errorCode": "SANDBOX_UNAVAILABLE",
+     "id": "40812e6a-443b-478c-aabd-d560b72bb079",
+     "measurements": [],
+     "provenance": null,
+     "replicate": 0,
+     "replication": null,
+     "resultSha256": null,
+     "round": 0,
+     "rowProfile": "qc-row-v1",
+     "seed": 42,
+     "status": "failed",
+     "tournament": [],
+     "verdicts": [],
+     "winner": null
+    },
+    "replicates": [],
+    "round": 0
+   }
+  ],
+  "run": {
+   "id": "00000000-0000-4000-8000-0000000000aa",
+   "investigationId": "8f7d60a5-f02f-5114-a93f-e1f6f8c80fd9",
+   "kind": "initial",
+   "parentRunId": null,
+   "runNumber": 1
+  },
+  "schemaVersion": 2,
+  "stopReason": "dead_letter",
+  "summary": "The scan over 1000000 rows dominates.",
+  "usage": {
+   "llmCalls": 7,
+   "toolCalls": 2
+  }
+ },
+ "inconclusive": {
+  "builderVersion": "report-builder@2",
+  "errors": [
+   {
+    "code": "AGENT_FAILED",
+    "message": "retry 2 failed",
+    "node": "query_analyzer",
+    "recoverable": true
+   }
+  ],
+  "events": {
+   "cutoffSeq": 42,
+   "digest": "sha256:cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+   "profile": "qc-events-v1"
+  },
+  "evidence": [
+   {
+    "artifactSha256": "efefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefef",
+    "id": "ev_b54af7a859ca",
+    "kind": "plan_node",
+    "locator": "/0/Plan",
+    "provenance": "imported",
+    "summary": "Seq Scan on orders: 120.5 ms of 121.0 ms, 995000 rows removed by filter"
+   }
+  ],
+  "finalStatus": "completed",
+  "finalizedAt": "2026-10-13T12:00:00.000000Z",
+  "findings": [
+   {
+    "agent": "query_analyzer",
+    "detail": "Seq Scan reads 1000000 rows.",
+    "evidenceIds": [
+     "ev_b54af7a859ca"
+    ],
+    "key": "fd_222222222222",
+    "severity": "high",
+    "title": "Scan 1 dominates"
+   }
+  ],
+  "headline": "The investigation could not reach a verified conclusion.",
+  "hypotheses": [
+   {
+    "category": "missing_index",
+    "confidence": "high",
+    "contradictingEvidence": [],
+    "key": "hy_111111111111",
+    "proposedBy": [
+     "query_analyzer"
+    ],
+    "rank": 1,
+    "statement": "Missing index on 2 columns.",
+    "supportingEvidence": [
+     "ev_b54af7a859ca"
+    ],
+    "uncertaintyNotes": "",
+    "verificationMethod": "benchmark"
+   }
+  ],
+  "investigation": {
+   "liveConnection": false,
+   "modes": [
+    "sandbox_benchmark"
+   ],
+   "objective": "Make it fast for 30 users",
+   "title": "Slow orders page",
+   "workloadId": "orders_ecommerce@v1:sf=1:seed=42"
+  },
+  "limitations": [
+   "Measured in a disposable sandbox copy of the demo workload `orders_ecommerce@v1:sf=1:seed=42`, not on your database. No change was applied to any database you own.",
+   "Warm cache, one session, interleaved runs: production concurrency, cache state and data distribution may change the result.",
+   "Only the listed parameter sets were tested; other inputs may behave differently. A sandbox verification is not a guarantee for every workload.",
+   "Index write overhead on INSERT/UPDATE was not measured; build time and size are recorded per candidate."
+  ],
+  "missing": [],
+  "nextSteps": [
+   "Re-run on a quieter host or with more samples; inconclusive is not a rejection.",
+   "Why: too few samples, or measurements too noisy to decide."
+  ],
+  "outcome": "inconclusive",
+  "partial": false,
+  "problem": {
+   "evidence": [
+    {
+     "artifactSha256": "efefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefef",
+     "id": "ev_b54af7a859ca",
+     "kind": "plan_node",
+     "locator": "/0/Plan",
+     "provenance": "imported",
+     "summary": "Seq Scan on orders: 120.5 ms of 121.0 ms, 995000 rows removed by filter"
+    }
+   ],
+   "materiality": {
+    "evidenceIds": [
+     "ev_b54af7a859ca"
+    ],
+    "reasons": [
+     "The query took 121 ms."
+    ],
+    "verdict": "material"
+   }
+  },
+  "provenance": {
+   "llm": [
+    {
+     "agent": "query_analyzer",
+     "calls": 3,
+     "model": "nvidia/x:free",
+     "promptVersion": "query_analyzer@1",
+     "servedBy": "Nvidia",
+     "status": "succeeded"
+    }
+   ],
+   "measurements": [
+    "measured"
+   ],
+   "stubModel": false
+  },
+  "query": {
+   "paramSets": [
+    {
+     "edgeCase": false,
+     "name": "hot_customer",
+     "values": [
+      1024
+     ]
+    },
+    {
+     "edgeCase": false,
+     "name": "regular_customer",
+     "values": [
+      7
+     ]
+    }
+   ],
+   "sha256": "1212121212121212121212121212121212121212121212121212121212121212",
+   "sql": "SELECT * FROM orders WHERE customer_id = $1 ORDER BY created_at DESC LIMIT 20"
+  },
+  "recommendation": {
+   "candidateKey": null,
+   "ddl": [],
+   "kind": null,
+   "origin": "run",
+   "primaryMeasurement": null,
+   "querySql": null,
+   "scope": "sandbox",
+   "status": "unverified"
+  },
+  "replay": null,
+  "rounds": [
+   {
+    "approval": {
+     "approvedCandidateIds": [
+      "8a87b760-856c-522c-ab1d-ba7ebf26ef59"
+     ],
+     "decidedAt": "2026-10-13T11:00:00.000000Z",
+     "decidedBy": "user:1",
+     "id": "35375679-1997-5d89-a949-9ec9d0aac67b",
+     "round": 0,
+     "status": "approved"
+    },
+    "candidates": [
+     {
+      "addressesHypotheses": [
+       "hy_111111111111"
+      ],
+      "ddl": [
+       "CREATE INDEX ON orders (customer_id, created_at)"
+      ],
+      "expectedBenefit": "Avoid the 1 sort",
+      "key": "oc_7f7a7b68a52c",
+      "kind": "create_index",
+      "querySql": null,
+      "reasons": [],
+      "risks": [],
+      "sqlSha256": "091b245c276620e844beed34b9328f66788610f41c5e3dd91c015e8e972f88bf",
+      "status": "inconclusive"
+     }
+    ],
+    "experiment": {
+     "audit": [
+      {
+       "arm": "oc_7f7a7b68a52c",
+       "auditorStatus": "completed",
+       "checks": [
+        {
+         "detail": "30 samples per arm and set",
+         "evidenceIds": [
+          "ev_52319c07edcf",
+          "ev_0e85ac390c99"
+         ],
+         "name": "samples",
+         "status": "pass"
+        }
+       ],
+       "concerns": [
+        {
+         "arm": "oc_7f7a7b68a52c",
+         "evidenceIds": [
+          "ev_52319c07edcf"
+         ],
+         "severity": "warning",
+         "text": "Only 2 sets tested."
+        }
+       ],
+       "downgraded": false,
+       "engineVerdict": "inconclusive",
+       "notes": "Checked 2 parameter sets.",
+       "promptVersion": "benchmark_auditor@1",
+       "verdict": "inconclusive"
+      }
+     ],
+     "builds": [
+      {
+       "arm": "oc_7f7a7b68a52c",
+       "buildNs": 3320498084,
+       "indexSizeBytes": 31539200,
+       "ok": true,
+       "provenance": "measured",
+       "reason": null
+      }
+     ],
+     "config": {
+      "blockSize": 5,
+      "maxCv": 0.25,
+      "maxRegression": 0.95,
+      "measuredRuns": 30,
+      "minEffect": 1.1,
+      "provenance": "configured",
+      "warmupRuns": 5
+     },
+     "correctness": [
+      {
+       "arm": "oc_7f7a7b68a52c",
+       "baselineRows": 20,
+       "evidenceId": null,
+       "paramSet": "hot_customer",
+       "provenance": "measured",
+       "rows": 20,
+       "sameRows": true
+      },
+      {
+       "arm": "oc_7f7a7b68a52c",
+       "baselineRows": 9,
+       "evidenceId": null,
+       "paramSet": "regular_customer",
+       "provenance": "measured",
+       "rows": 9,
+       "sameRows": true
+      }
+     ],
+     "engineVersion": "bench@1",
+     "environment": {
+      "containerRuntime": "docker",
+      "cpuArch": "aarch64",
+      "cpuCount": 8,
+      "cpuModel": "unknown",
+      "digest": "sha256:9999999999999999999999999999999999999999999999999999999999999999",
+      "memoryBytes": 4108828672,
+      "os": "Linux 6.12.76-linuxkit",
+      "pgVersion": "170011",
+      "provenance": "recorded",
+      "sandboxImageDigest": "postgres:17",
+      "workloadDataDigest": "d6a3be13b5b9d3a1c904fcfa0a24e7c304aea6d2b9c4dc16abfb06eac200ee9a",
+      "workloadId": "orders_ecommerce@v1:sf=1:seed=42"
+     },
+     "errorCode": null,
+     "id": "c66674c2-e449-58d9-a20e-6f7b3cd659cb",
+     "measurements": [
+      {
+       "arm": "oc_7f7a7b68a52c",
+       "baseline": {
+        "medianNs": 50764125.0,
+        "n": 30,
+        "p95Ns": 69038333,
+        "robustCv": 0.2023486738492743
+       },
+       "candidate": {
+        "medianNs": 286916.5,
+        "n": 30,
+        "p95Ns": 669542,
+        "robustCv": 0.4414509539848418
+       },
+       "ciHigh": 210.50074074074075,
+       "ciLow": 143.88959268841506,
+       "evidenceId": "ev_52319c07edcf",
+       "paramSet": "hot_customer",
+       "provenance": "measured",
+       "source": {
+        "artifactSha256": "abababababababababababababababababababababababababababababababab",
+        "pointer": "/stats/0"
+       },
+       "speedup": 176.92996045887915
+      },
+      {
+       "arm": "oc_7f7a7b68a52c",
+       "baseline": {
+        "medianNs": 49671187.5,
+        "n": 30,
+        "p95Ns": 78446667,
+        "robustCv": 0.1655125587099539
+       },
+       "candidate": {
+        "medianNs": 183792.0,
+        "n": 30,
+        "p95Ns": 385584,
+        "robustCv": 0.26371687096826446
+       },
+       "ciHigh": 319.6289519089812,
+       "ciLow": 236.33474663405343,
+       "evidenceId": "ev_0e85ac390c99",
+       "paramSet": "regular_customer",
+       "provenance": "measured",
+       "source": {
+        "artifactSha256": "abababababababababababababababababababababababababababababababab",
+        "pointer": "/stats/1"
+       },
+       "speedup": 270.2576145860538
+      }
+     ],
+     "provenance": "measured",
+     "replicate": 0,
+     "replication": null,
+     "resultSha256": "abababababababababababababababababababababababababababababababab",
+     "round": 0,
+     "rowProfile": "qc-row-v1",
+     "seed": 2995988933220103,
+     "status": "completed",
+     "tournament": [
+      {
+       "arm": "oc_7f7a7b68a52c",
+       "primaryCiLow": 143.88959268841506,
+       "rank": 1,
+       "verdict": "inconclusive"
+      }
+     ],
+     "verdicts": [
+      {
+       "arm": "oc_7f7a7b68a52c",
+       "gate": 4,
+       "reasons": [
+        {
+         "code": "insufficient_evidence",
+         "detail": "hot_customer: candidate robust CV 0.44 > 0.25"
+        }
+       ],
+       "verdict": "inconclusive"
+      }
+     ],
+     "winner": null
+    },
+    "replicates": [],
+    "round": 0
+   }
+  ],
+  "run": {
+   "id": "00000000-0000-4000-8000-0000000000aa",
+   "investigationId": "8f7d60a5-f02f-5114-a93f-e1f6f8c80fd9",
+   "kind": "initial",
+   "parentRunId": null,
+   "runNumber": 1
+  },
+  "schemaVersion": 2,
+  "stopReason": null,
+  "summary": "The scan over 1000000 rows dominates.",
+  "usage": {
+   "llmCalls": 7,
+   "toolCalls": 2
+  }
+ },
+ "mismatch": {
+  "builderVersion": "report-builder@2",
+  "errors": [
+   {
+    "code": "AGENT_FAILED",
+    "message": "retry 2 failed",
+    "node": "query_analyzer",
+    "recoverable": true
+   }
+  ],
+  "events": {
+   "cutoffSeq": 42,
+   "digest": "sha256:cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+   "profile": "qc-events-v1"
+  },
+  "evidence": [
+   {
+    "artifactSha256": "efefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefef",
+    "id": "ev_b54af7a859ca",
+    "kind": "plan_node",
+    "locator": "/0/Plan",
+    "provenance": "imported",
+    "summary": "Seq Scan on orders: 120.5 ms of 121.0 ms, 995000 rows removed by filter"
+   }
+  ],
+  "finalStatus": "completed",
+  "finalizedAt": "2026-10-13T12:00:00.000000Z",
+  "findings": [
+   {
+    "agent": "query_analyzer",
+    "detail": "Seq Scan reads 1000000 rows.",
+    "evidenceIds": [
+     "ev_b54af7a859ca"
+    ],
+    "key": "fd_222222222222",
+    "severity": "high",
+    "title": "Scan 1 dominates"
+   }
+  ],
+  "headline": "The investigation could not reach a verified conclusion.",
+  "hypotheses": [
+   {
+    "category": "missing_index",
+    "confidence": "high",
+    "contradictingEvidence": [],
+    "key": "hy_111111111111",
+    "proposedBy": [
+     "query_analyzer"
+    ],
+    "rank": 1,
+    "statement": "Missing index on 2 columns.",
+    "supportingEvidence": [
+     "ev_b54af7a859ca"
+    ],
+    "uncertaintyNotes": "",
+    "verificationMethod": "benchmark"
+   }
+  ],
+  "investigation": {
+   "liveConnection": false,
+   "modes": [
+    "sandbox_benchmark"
+   ],
+   "objective": "Make it fast for 30 users",
+   "title": "Slow orders page",
+   "workloadId": "rewrite_trap@v1:sf=0.1:seed=42"
+  },
+  "limitations": [
+   "Measured in a disposable sandbox copy of the demo workload `rewrite_trap@v1:sf=0.1:seed=42`, not on your database. No change was applied to any database you own.",
+   "Warm cache, one session, interleaved runs: production concurrency, cache state and data distribution may change the result.",
+   "Only the listed parameter sets were tested; other inputs may behave differently. A sandbox verification is not a guarantee for every workload."
+  ],
+  "missing": [],
+  "nextSteps": [
+   "Re-run on a quieter host or with more samples; inconclusive is not a rejection.",
+   "Why: the candidate returned different rows than the original query."
+  ],
+  "outcome": "inconclusive",
+  "partial": false,
+  "problem": {
+   "evidence": [
+    {
+     "artifactSha256": "efefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefef",
+     "id": "ev_b54af7a859ca",
+     "kind": "plan_node",
+     "locator": "/0/Plan",
+     "provenance": "imported",
+     "summary": "Seq Scan on orders: 120.5 ms of 121.0 ms, 995000 rows removed by filter"
+    }
+   ],
+   "materiality": {
+    "evidenceIds": [
+     "ev_b54af7a859ca"
+    ],
+    "reasons": [
+     "The query took 121 ms."
+    ],
+    "verdict": "material"
+   }
+  },
+  "provenance": {
+   "llm": [
+    {
+     "agent": "query_analyzer",
+     "calls": 3,
+     "model": "nvidia/x:free",
+     "promptVersion": "query_analyzer@1",
+     "servedBy": "Nvidia",
+     "status": "succeeded"
+    }
+   ],
+   "measurements": [
+    "measured"
+   ],
+   "stubModel": false
+  },
+  "query": {
+   "paramSets": [
+    {
+     "edgeCase": false,
+     "name": "default",
+     "values": []
+    }
+   ],
+   "sha256": "1212121212121212121212121212121212121212121212121212121212121212",
+   "sql": "SELECT count(*) FROM accounts WHERE region_code NOT IN (SELECT region_code FROM closed_regions)"
+  },
+  "recommendation": {
+   "candidateKey": null,
+   "ddl": [],
+   "kind": null,
+   "origin": "run",
+   "primaryMeasurement": null,
+   "querySql": null,
+   "scope": "sandbox",
+   "status": "unverified"
+  },
+  "replay": null,
+  "rounds": [
+   {
+    "approval": {
+     "approvedCandidateIds": [
+      "7b24e51b-0fc6-5309-977c-a8898f064994"
+     ],
+     "decidedAt": "2026-10-13T11:00:00.000000Z",
+     "decidedBy": "user:1",
+     "id": "35375679-1997-5d89-a949-9ec9d0aac67b",
+     "round": 0,
+     "status": "approved"
+    },
+    "candidates": [
+     {
+      "addressesHypotheses": [
+       "hy_111111111111"
+      ],
+      "ddl": [],
+      "expectedBenefit": "Avoid the 1 sort",
+      "key": "oc_0000000000a6",
+      "kind": "query_rewrite",
+      "querySql": "SELECT count(*) FROM accounts a WHERE NOT EXISTS (SELECT 1 FROM closed_regions c WHERE c.region_code = a.region_code)",
+      "reasons": [],
+      "risks": [],
+      "sqlSha256": "abc44fd59661f6bab2cdd632b3741bcddf93b5fc4879399636c817bf9e6296f3",
+      "status": "rejected"
+     }
+    ],
+    "experiment": {
+     "audit": [
+      {
+       "arm": "oc_0000000000a6",
+       "auditorStatus": "completed",
+       "checks": [
+        {
+         "detail": "30 samples per arm and set",
+         "evidenceIds": [
+          "ev_8aba724e7cbc"
+         ],
+         "name": "samples",
+         "status": "pass"
+        }
+       ],
+       "concerns": [
+        {
+         "arm": "oc_0000000000a6",
+         "evidenceIds": [
+          "ev_8aba724e7cbc"
+         ],
+         "severity": "warning",
+         "text": "Only 2 sets tested."
+        }
+       ],
+       "downgraded": false,
+       "engineVerdict": "rejected",
+       "notes": "Checked 2 parameter sets.",
+       "promptVersion": "benchmark_auditor@1",
+       "verdict": "rejected"
+      }
+     ],
+     "builds": [
+      {
+       "arm": "oc_0000000000a6",
+       "buildNs": 0,
+       "indexSizeBytes": 0,
+       "ok": true,
+       "provenance": "measured",
+       "reason": null
+      }
+     ],
+     "config": {
+      "blockSize": 5,
+      "maxCv": 0.25,
+      "maxRegression": 0.95,
+      "measuredRuns": 30,
+      "minEffect": 1.1,
+      "provenance": "configured",
+      "warmupRuns": 5
+     },
+     "correctness": [
+      {
+       "arm": "oc_0000000000a6",
+       "baselineRows": 1,
+       "evidenceId": null,
+       "paramSet": "default",
+       "provenance": "measured",
+       "rows": 1,
+       "sameRows": false
+      }
+     ],
+     "engineVersion": "bench@1",
+     "environment": {
+      "containerRuntime": "docker",
+      "cpuArch": "arm64",
+      "cpuCount": 8,
+      "cpuModel": "arm",
+      "digest": "sha256:9999999999999999999999999999999999999999999999999999999999999999",
+      "memoryBytes": 8589934592,
+      "os": "Darwin 25.6.0",
+      "pgVersion": "170011",
+      "provenance": "recorded",
+      "sandboxImageDigest": "unrecorded",
+      "workloadDataDigest": "66bd22dff5f8bf861451c6a6faf73def04e84cfe771ef96c029402707d437671",
+      "workloadId": "rewrite_trap@v1:sf=0.1:seed=42"
+     },
+     "errorCode": null,
+     "id": "e38756e6-00aa-4566-bb7a-37d8fabc9f78",
+     "measurements": [
+      {
+       "arm": "oc_0000000000a6",
+       "baseline": {
+        "medianNs": 1643208.5,
+        "n": 30,
+        "p95Ns": 2958583,
+        "robustCv": 0.08767301786951558
+       },
+       "candidate": {
+        "medianNs": 1269979.5,
+        "n": 30,
+        "p95Ns": 2996833,
+        "robustCv": 0.10830755076152211
+       },
+       "ciHigh": 1.367044219081398,
+       "ciLow": 1.2291501415020087,
+       "evidenceId": "ev_8aba724e7cbc",
+       "paramSet": "default",
+       "provenance": "measured",
+       "source": {
+        "artifactSha256": "abababababababababababababababababababababababababababababababab",
+        "pointer": "/stats/0"
+       },
+       "speedup": 1.2938858461888558
+      }
+     ],
+     "provenance": "measured",
+     "replicate": 0,
+     "replication": null,
+     "resultSha256": "abababababababababababababababababababababababababababababababab",
+     "round": 0,
+     "rowProfile": "qc-row-v1",
+     "seed": 42,
+     "status": "completed",
+     "tournament": [
+      {
+       "arm": "oc_0000000000a6",
+       "primaryCiLow": 1.2291501415020087,
+       "rank": 1,
+       "verdict": "rejected"
+      }
+     ],
+     "verdicts": [
+      {
+       "arm": "oc_0000000000a6",
+       "gate": 3,
+       "reasons": [
+        {
+         "code": "result_mismatch",
+         "detail": "default: same row count, different rows"
+        }
+       ],
+       "verdict": "rejected"
+      }
+     ],
+     "winner": null
+    },
+    "replicates": [],
+    "round": 0
+   }
+  ],
+  "run": {
+   "id": "00000000-0000-4000-8000-0000000000aa",
+   "investigationId": "8f7d60a5-f02f-5114-a93f-e1f6f8c80fd9",
+   "kind": "initial",
+   "parentRunId": null,
+   "runNumber": 1
+  },
+  "schemaVersion": 2,
+  "stopReason": null,
+  "summary": "The scan over 1000000 rows dominates.",
+  "usage": {
+   "llmCalls": 7,
+   "toolCalls": 2
+  }
+ },
+ "missing_evidence": {
+  "builderVersion": "report-builder@2",
+  "errors": [
+   {
+    "code": "AGENT_FAILED",
+    "message": "retry 2 failed",
+    "node": "query_analyzer",
+    "recoverable": true
+   }
+  ],
+  "events": {
+   "cutoffSeq": 42,
+   "digest": "sha256:cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+   "profile": "qc-events-v1"
+  },
+  "evidence": [],
+  "finalStatus": null,
+  "finalizedAt": "2026-10-13T12:00:00.000000Z",
+  "findings": [],
+  "headline": "The run ended before reaching a conclusion.",
+  "hypotheses": [],
+  "investigation": {
+   "liveConnection": false,
+   "modes": [
+    "sandbox_benchmark"
+   ],
+   "objective": "Make it fast for 30 users",
+   "title": "Slow orders page",
+   "workloadId": "stale_stats@v1:sf=0.1:seed=42"
+  },
+  "limitations": [
+   "Nothing in this report was benchmarked: hypotheses are unverified."
+  ],
+  "missing": [
+   {
+    "reason": "no query was provided",
+    "section": "query"
+   },
+   {
+    "reason": "no hypotheses were produced",
+    "section": "hypotheses"
+   },
+   {
+    "reason": "not benchmarked",
+    "section": "benchmark"
+   },
+   {
+    "reason": "no recorded conclusion",
+    "section": "conclusion"
+   }
+  ],
+  "nextSteps": [
+   "The run stopped early; start a new run to complete the investigation."
+  ],
+  "outcome": null,
+  "partial": true,
+  "problem": {
+   "evidence": [],
+   "materiality": null
+  },
+  "provenance": {
+   "llm": [],
+   "measurements": [],
+   "stubModel": false
+  },
+  "query": {
+   "paramSets": null,
+   "sha256": null,
+   "sql": null
+  },
+  "recommendation": {
+   "candidateKey": null,
+   "ddl": [],
+   "kind": null,
+   "origin": "run",
+   "primaryMeasurement": null,
+   "querySql": null,
+   "scope": "none",
+   "status": "none"
+  },
+  "replay": null,
+  "rounds": [],
+  "run": {
+   "id": "00000000-0000-4000-8000-0000000000aa",
+   "investigationId": "8f7d60a5-f02f-5114-a93f-e1f6f8c80fd9",
+   "kind": "initial",
+   "parentRunId": null,
+   "runNumber": 1
+  },
+  "schemaVersion": 2,
+  "stopReason": null,
+  "summary": "",
+  "usage": null
+ },
+ "multiple_experiments": {
+  "builderVersion": "report-builder@2",
+  "errors": [
+   {
+    "code": "AGENT_FAILED",
+    "message": "retry 2 failed",
+    "node": "query_analyzer",
+    "recoverable": true
+   }
+  ],
+  "events": {
+   "cutoffSeq": 42,
+   "digest": "sha256:cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+   "profile": "qc-events-v1"
+  },
+  "evidence": [
+   {
+    "artifactSha256": "efefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefef",
+    "id": "ev_b54af7a859ca",
+    "kind": "plan_node",
+    "locator": "/0/Plan",
+    "provenance": "imported",
+    "summary": "Seq Scan on orders: 120.5 ms of 121.0 ms, 995000 rows removed by filter"
+   }
+  ],
+  "finalStatus": "completed",
+  "finalizedAt": "2026-10-13T12:00:00.000000Z",
+  "findings": [
+   {
+    "agent": "query_analyzer",
+    "detail": "Seq Scan reads 1000000 rows.",
+    "evidenceIds": [
+     "ev_b54af7a859ca"
+    ],
+    "key": "fd_222222222222",
+    "severity": "high",
+    "title": "Scan 1 dominates"
+   }
+  ],
+  "headline": "A candidate change was verified with a noise warning: individual measurements were noisy, and the speed-up was confirmed only by agreement across three independent sandbox experiments.",
+  "hypotheses": [
+   {
+    "category": "missing_index",
+    "confidence": "high",
+    "contradictingEvidence": [],
+    "key": "hy_111111111111",
+    "proposedBy": [
+     "query_analyzer"
+    ],
+    "rank": 1,
+    "statement": "Missing index on 2 columns.",
+    "supportingEvidence": [
+     "ev_b54af7a859ca"
+    ],
+    "uncertaintyNotes": "",
+    "verificationMethod": "benchmark"
+   }
+  ],
+  "investigation": {
+   "liveConnection": false,
+   "modes": [
+    "sandbox_benchmark"
+   ],
+   "objective": "Make it fast for 30 users",
+   "title": "Slow orders page",
+   "workloadId": "stale_stats@v1:sf=0.1:seed=42"
+  },
+  "limitations": [
+   "Measured in a disposable sandbox copy of the demo workload `stale_stats@v1:sf=0.1:seed=42`, not on your database. No change was applied to any database you own.",
+   "Warm cache, one session, interleaved runs: production concurrency, cache state and data distribution may change the result.",
+   "Only the listed parameter sets were tested; other inputs may behave differently. A sandbox verification is not a guarantee for every workload.",
+   "Noise warning: single experiments were too noisy to decide; the result rests on three agreeing independent experiments. Treat the size of the effect as uncertain."
+  ],
+  "missing": [],
+  "nextSteps": [
+   "Review the exact SQL and test it on a staging copy of your own data and workload.",
+   "Re-run this experiment (experiment replay) to check the result is reproducible."
+  ],
+  "outcome": "verified_recommendation",
+  "partial": false,
+  "problem": {
+   "evidence": [
+    {
+     "artifactSha256": "efefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefef",
+     "id": "ev_b54af7a859ca",
+     "kind": "plan_node",
+     "locator": "/0/Plan",
+     "provenance": "imported",
+     "summary": "Seq Scan on orders: 120.5 ms of 121.0 ms, 995000 rows removed by filter"
+    }
+   ],
+   "materiality": {
+    "evidenceIds": [
+     "ev_b54af7a859ca"
+    ],
+    "reasons": [
+     "The query took 121 ms."
+    ],
+    "verdict": "material"
+   }
+  },
+  "provenance": {
+   "llm": [
+    {
+     "agent": "query_analyzer",
+     "calls": 3,
+     "model": "nvidia/x:free",
+     "promptVersion": "query_analyzer@1",
+     "servedBy": "Nvidia",
+     "status": "succeeded"
+    }
+   ],
+   "measurements": [
+    "measured"
+   ],
+   "stubModel": false
+  },
+  "query": {
+   "paramSets": [
+    {
+     "edgeCase": false,
+     "name": "purchases",
+     "values": [
+      "purchase"
+     ]
+    },
+    {
+     "edgeCase": false,
+     "name": "views",
+     "values": [
+      "view"
+     ]
+    }
+   ],
+   "sha256": "1212121212121212121212121212121212121212121212121212121212121212",
+   "sql": "SELECT count(*), sum(e.amount) FROM events e JOIN accounts a ON a.id = e.account_id WHERE e.kind = $1"
+  },
+  "recommendation": {
+   "candidateKey": "oc_0000000000a3",
+   "ddl": [
+    "ANALYZE events"
+   ],
+   "kind": "analyze_statistics",
+   "origin": "run",
+   "primaryMeasurement": {
+    "arm": "oc_0000000000a3",
+    "baseline": {
+     "medianNs": 15657145.5,
+     "n": 30,
+     "p95Ns": 18629333,
+     "robustCv": 0.10790947171571581
+    },
+    "candidate": {
+     "medianNs": 4502250.0,
+     "n": 30,
+     "p95Ns": 5444041,
+     "robustCv": 0.10134809870412788
+    },
+    "ciHigh": 3.6630852351601977,
+    "ciLow": 3.2869577496235736,
+    "evidenceId": "ev_4e653e508733",
+    "paramSet": "purchases",
+    "provenance": "measured",
+    "source": {
+     "artifactSha256": "abababababababababababababababababababababababababababababababab",
+     "pointer": "/stats/0"
+    },
+    "speedup": 3.4776268532400465
+   },
+   "querySql": null,
+   "scope": "sandbox",
+   "status": "verified_with_noise_warning"
+  },
+  "replay": null,
+  "rounds": [
+   {
+    "approval": {
+     "approvedCandidateIds": [
+      "8986847e-6bbb-5b75-b0d2-d98780425b21"
+     ],
+     "decidedAt": "2026-10-13T11:00:00.000000Z",
+     "decidedBy": "user:1",
+     "id": "35375679-1997-5d89-a949-9ec9d0aac67b",
+     "round": 0,
+     "status": "approved"
+    },
+    "candidates": [
+     {
+      "addressesHypotheses": [
+       "hy_111111111111"
+      ],
+      "ddl": [
+       "ANALYZE events"
+      ],
+      "expectedBenefit": "Avoid the 1 sort",
+      "key": "oc_0000000000a3",
+      "kind": "analyze_statistics",
+      "querySql": null,
+      "reasons": [],
+      "risks": [],
+      "sqlSha256": "9ba79d34048ce1c01bc67f7743cf6acf52131bde8796c1a6c0668f1fdd75ad28",
+      "status": "verified_with_noise_warning"
+     }
+    ],
+    "experiment": {
+     "audit": [
+      {
+       "arm": "oc_0000000000a3",
+       "auditorStatus": "completed",
+       "checks": [
+        {
+         "detail": "30 samples per arm and set",
+         "evidenceIds": [
+          "ev_4e653e508733",
+          "ev_37f42e0b412c"
+         ],
+         "name": "samples",
+         "status": "pass"
+        }
+       ],
+       "concerns": [
+        {
+         "arm": "oc_0000000000a3",
+         "evidenceIds": [
+          "ev_4e653e508733"
+         ],
+         "severity": "warning",
+         "text": "Only 2 sets tested."
+        }
+       ],
+       "downgraded": false,
+       "engineVerdict": "verified_with_noise_warning",
+       "notes": "Checked 2 parameter sets.",
+       "promptVersion": "benchmark_auditor@1",
+       "verdict": "verified_with_noise_warning"
+      }
+     ],
+     "builds": [
+      {
+       "arm": "oc_0000000000a3",
+       "buildNs": 73960208,
+       "indexSizeBytes": 0,
+       "ok": true,
+       "provenance": "measured",
+       "reason": null
+      }
+     ],
+     "config": {
+      "blockSize": 5,
+      "maxCv": 0.25,
+      "maxRegression": 0.95,
+      "measuredRuns": 30,
+      "minEffect": 1.1,
+      "provenance": "configured",
+      "warmupRuns": 5
+     },
+     "correctness": [
+      {
+       "arm": "oc_0000000000a3",
+       "baselineRows": 1,
+       "evidenceId": null,
+       "paramSet": "purchases",
+       "provenance": "measured",
+       "rows": 1,
+       "sameRows": true
+      },
+      {
+       "arm": "oc_0000000000a3",
+       "baselineRows": 1,
+       "evidenceId": null,
+       "paramSet": "views",
+       "provenance": "measured",
+       "rows": 1,
+       "sameRows": true
+      }
+     ],
+     "engineVersion": "bench@1",
+     "environment": {
+      "containerRuntime": "docker",
+      "cpuArch": "arm64",
+      "cpuCount": 8,
+      "cpuModel": "arm",
+      "digest": "sha256:9999999999999999999999999999999999999999999999999999999999999999",
+      "memoryBytes": 8589934592,
+      "os": "Darwin 25.6.0",
+      "pgVersion": "170011",
+      "provenance": "recorded",
+      "sandboxImageDigest": "unrecorded",
+      "workloadDataDigest": "8e79c1c9db1f0ad467fe543e9d0a64d20e8186d43ea8e8a32c7a25c7f3d666b8",
+      "workloadId": "stale_stats@v1:sf=0.1:seed=42"
+     },
+     "errorCode": null,
+     "id": "40812e6a-443b-478c-aabd-d560b72bb079",
+     "measurements": [
+      {
+       "arm": "oc_0000000000a3",
+       "baseline": {
+        "medianNs": 15657145.5,
+        "n": 30,
+        "p95Ns": 18629333,
+        "robustCv": 0.10790947171571581
+       },
+       "candidate": {
+        "medianNs": 4502250.0,
+        "n": 30,
+        "p95Ns": 5444041,
+        "robustCv": 0.10134809870412788
+       },
+       "ciHigh": 3.6630852351601977,
+       "ciLow": 3.2869577496235736,
+       "evidenceId": "ev_4e653e508733",
+       "paramSet": "purchases",
+       "provenance": "measured",
+       "source": {
+        "artifactSha256": "abababababababababababababababababababababababababababababababab",
+        "pointer": "/stats/0"
+       },
+       "speedup": 3.4776268532400465
+      },
+      {
+       "arm": "oc_0000000000a3",
+       "baseline": {
+        "medianNs": 5286750.5,
+        "n": 30,
+        "p95Ns": 6474750,
+        "robustCv": 0.10464524871724183
+       },
+       "candidate": {
+        "medianNs": 4708208.5,
+        "n": 30,
+        "p95Ns": 6353250,
+        "robustCv": 0.1409227520481141
+       },
+       "ciHigh": 1.2304361214432549,
+       "ciLow": 1.0247525326521516,
+       "evidenceId": "ev_37f42e0b412c",
+       "paramSet": "views",
+       "provenance": "measured",
+       "source": {
+        "artifactSha256": "abababababababababababababababababababababababababababababababab",
+        "pointer": "/stats/1"
+       },
+       "speedup": 1.122879434927319
+      }
+     ],
+     "provenance": "measured",
+     "replicate": 0,
+     "replication": {
+      "engineVersion": "bench@1",
+      "replicatesRequired": 3,
+      "schemaVersion": 1,
+      "sourceExperimentId": "40812e6a-443b-478c-aabd-d560b72bb079",
+      "verdicts": [
+       {
+        "arm": "oc_0000000000a3",
+        "ciHigh": 3.1,
+        "ciLow": 1.4,
+        "experimentIds": [
+         "40812e6a-443b-478c-aabd-d560b72bb079",
+         "060b7e3e-ce8f-5952-8b5c-98b3deb91903",
+         "156c653a-a136-542c-86c6-338b6bc6c7b9"
+        ],
+        "maxRobustCv": 0.21,
+        "primaryParamSet": "purchases",
+        "reasons": [],
+        "verdict": "verified_with_noise_warning"
+       }
+      ],
+      "winner": "oc_0000000000a3"
+     },
+     "resultSha256": "abababababababababababababababababababababababababababababababab",
+     "round": 0,
+     "rowProfile": "qc-row-v1",
+     "seed": 42,
+     "status": "completed",
+     "tournament": [
+      {
+       "arm": "oc_0000000000a3",
+       "primaryCiLow": 3.2869577496235736,
+       "rank": 1,
+       "verdict": "verified"
+      }
+     ],
+     "verdicts": [
+      {
+       "arm": "oc_0000000000a3",
+       "gate": null,
+       "reasons": [],
+       "verdict": "verified"
+      }
+     ],
+     "winner": "oc_0000000000a3"
+    },
+    "replicates": [
+     {
+      "audit": [],
+      "builds": [
+       {
+        "arm": "oc_0000000000a3",
+        "buildNs": 73960208,
+        "indexSizeBytes": 0,
+        "ok": true,
+        "provenance": "measured",
+        "reason": null
+       }
+      ],
+      "config": {
+       "blockSize": 5,
+       "maxCv": 0.25,
+       "maxRegression": 0.95,
+       "measuredRuns": 30,
+       "minEffect": 1.1,
+       "provenance": "configured",
+       "warmupRuns": 5
+      },
+      "correctness": [
+       {
+        "arm": "oc_0000000000a3",
+        "baselineRows": 1,
+        "evidenceId": null,
+        "paramSet": "purchases",
+        "provenance": "measured",
+        "rows": 1,
+        "sameRows": true
+       },
+       {
+        "arm": "oc_0000000000a3",
+        "baselineRows": 1,
+        "evidenceId": null,
+        "paramSet": "views",
+        "provenance": "measured",
+        "rows": 1,
+        "sameRows": true
+       }
+      ],
+      "engineVersion": "bench@1",
+      "environment": {
+       "containerRuntime": "docker",
+       "cpuArch": "arm64",
+       "cpuCount": 8,
+       "cpuModel": "arm",
+       "digest": "sha256:9999999999999999999999999999999999999999999999999999999999999999",
+       "memoryBytes": 8589934592,
+       "os": "Darwin 25.6.0",
+       "pgVersion": "170011",
+       "provenance": "recorded",
+       "sandboxImageDigest": "unrecorded",
+       "workloadDataDigest": "8e79c1c9db1f0ad467fe543e9d0a64d20e8186d43ea8e8a32c7a25c7f3d666b8",
+       "workloadId": "stale_stats@v1:sf=0.1:seed=42"
+      },
+      "errorCode": null,
+      "id": "060b7e3e-ce8f-5952-8b5c-98b3deb91903",
+      "measurements": [
+       {
+        "arm": "oc_0000000000a3",
+        "baseline": {
+         "medianNs": 15657145.5,
+         "n": 30,
+         "p95Ns": 18629333,
+         "robustCv": 0.10790947171571581
+        },
+        "candidate": {
+         "medianNs": 4502250.0,
+         "n": 30,
+         "p95Ns": 5444041,
+         "robustCv": 0.10134809870412788
+        },
+        "ciHigh": 3.6630852351601977,
+        "ciLow": 3.2869577496235736,
+        "evidenceId": "ev_4e653e508733",
+        "paramSet": "purchases",
+        "provenance": "measured",
+        "source": {
+         "artifactSha256": "abababababababababababababababababababababababababababababababab",
+         "pointer": "/stats/0"
+        },
+        "speedup": 3.4776268532400465
+       },
+       {
+        "arm": "oc_0000000000a3",
+        "baseline": {
+         "medianNs": 5286750.5,
+         "n": 30,
+         "p95Ns": 6474750,
+         "robustCv": 0.10464524871724183
+        },
+        "candidate": {
+         "medianNs": 4708208.5,
+         "n": 30,
+         "p95Ns": 6353250,
+         "robustCv": 0.1409227520481141
+        },
+        "ciHigh": 1.2304361214432549,
+        "ciLow": 1.0247525326521516,
+        "evidenceId": "ev_37f42e0b412c",
+        "paramSet": "views",
+        "provenance": "measured",
+        "source": {
+         "artifactSha256": "abababababababababababababababababababababababababababababababab",
+         "pointer": "/stats/1"
+        },
+        "speedup": 1.122879434927319
+       }
+      ],
+      "provenance": "measured",
+      "replicate": 1,
+      "replication": null,
+      "resultSha256": "abababababababababababababababababababababababababababababababab",
+      "round": 0,
+      "rowProfile": "qc-row-v1",
+      "seed": 42,
+      "status": "completed",
+      "tournament": [
+       {
+        "arm": "oc_0000000000a3",
+        "primaryCiLow": 3.2869577496235736,
+        "rank": 1,
+        "verdict": "verified"
+       }
+      ],
+      "verdicts": [
+       {
+        "arm": "oc_0000000000a3",
+        "gate": null,
+        "reasons": [],
+        "verdict": "verified"
+       }
+      ],
+      "winner": "oc_0000000000a3"
+     },
+     {
+      "audit": [],
+      "builds": [
+       {
+        "arm": "oc_0000000000a3",
+        "buildNs": 73960208,
+        "indexSizeBytes": 0,
+        "ok": true,
+        "provenance": "measured",
+        "reason": null
+       }
+      ],
+      "config": {
+       "blockSize": 5,
+       "maxCv": 0.25,
+       "maxRegression": 0.95,
+       "measuredRuns": 30,
+       "minEffect": 1.1,
+       "provenance": "configured",
+       "warmupRuns": 5
+      },
+      "correctness": [
+       {
+        "arm": "oc_0000000000a3",
+        "baselineRows": 1,
+        "evidenceId": null,
+        "paramSet": "purchases",
+        "provenance": "measured",
+        "rows": 1,
+        "sameRows": true
+       },
+       {
+        "arm": "oc_0000000000a3",
+        "baselineRows": 1,
+        "evidenceId": null,
+        "paramSet": "views",
+        "provenance": "measured",
+        "rows": 1,
+        "sameRows": true
+       }
+      ],
+      "engineVersion": "bench@1",
+      "environment": {
+       "containerRuntime": "docker",
+       "cpuArch": "arm64",
+       "cpuCount": 8,
+       "cpuModel": "arm",
+       "digest": "sha256:9999999999999999999999999999999999999999999999999999999999999999",
+       "memoryBytes": 8589934592,
+       "os": "Darwin 25.6.0",
+       "pgVersion": "170011",
+       "provenance": "recorded",
+       "sandboxImageDigest": "unrecorded",
+       "workloadDataDigest": "8e79c1c9db1f0ad467fe543e9d0a64d20e8186d43ea8e8a32c7a25c7f3d666b8",
+       "workloadId": "stale_stats@v1:sf=0.1:seed=42"
+      },
+      "errorCode": null,
+      "id": "156c653a-a136-542c-86c6-338b6bc6c7b9",
+      "measurements": [
+       {
+        "arm": "oc_0000000000a3",
+        "baseline": {
+         "medianNs": 15657145.5,
+         "n": 30,
+         "p95Ns": 18629333,
+         "robustCv": 0.10790947171571581
+        },
+        "candidate": {
+         "medianNs": 4502250.0,
+         "n": 30,
+         "p95Ns": 5444041,
+         "robustCv": 0.10134809870412788
+        },
+        "ciHigh": 3.6630852351601977,
+        "ciLow": 3.2869577496235736,
+        "evidenceId": "ev_4e653e508733",
+        "paramSet": "purchases",
+        "provenance": "measured",
+        "source": {
+         "artifactSha256": "abababababababababababababababababababababababababababababababab",
+         "pointer": "/stats/0"
+        },
+        "speedup": 3.4776268532400465
+       },
+       {
+        "arm": "oc_0000000000a3",
+        "baseline": {
+         "medianNs": 5286750.5,
+         "n": 30,
+         "p95Ns": 6474750,
+         "robustCv": 0.10464524871724183
+        },
+        "candidate": {
+         "medianNs": 4708208.5,
+         "n": 30,
+         "p95Ns": 6353250,
+         "robustCv": 0.1409227520481141
+        },
+        "ciHigh": 1.2304361214432549,
+        "ciLow": 1.0247525326521516,
+        "evidenceId": "ev_37f42e0b412c",
+        "paramSet": "views",
+        "provenance": "measured",
+        "source": {
+         "artifactSha256": "abababababababababababababababababababababababababababababababab",
+         "pointer": "/stats/1"
+        },
+        "speedup": 1.122879434927319
+       }
+      ],
+      "provenance": "measured",
+      "replicate": 2,
+      "replication": null,
+      "resultSha256": "abababababababababababababababababababababababababababababababab",
+      "round": 0,
+      "rowProfile": "qc-row-v1",
+      "seed": 42,
+      "status": "completed",
+      "tournament": [
+       {
+        "arm": "oc_0000000000a3",
+        "primaryCiLow": 3.2869577496235736,
+        "rank": 1,
+        "verdict": "verified"
+       }
+      ],
+      "verdicts": [
+       {
+        "arm": "oc_0000000000a3",
+        "gate": null,
+        "reasons": [],
+        "verdict": "verified"
+       }
+      ],
+      "winner": "oc_0000000000a3"
+     }
+    ],
+    "round": 0
+   }
+  ],
+  "run": {
+   "id": "00000000-0000-4000-8000-0000000000aa",
+   "investigationId": "8f7d60a5-f02f-5114-a93f-e1f6f8c80fd9",
+   "kind": "initial",
+   "parentRunId": null,
+   "runNumber": 1
+  },
+  "schemaVersion": 2,
+  "stopReason": null,
+  "summary": "The scan over 1000000 rows dominates.",
+  "usage": {
+   "llmCalls": 7,
+   "toolCalls": 2
+  }
+ },
+ "no_action_needed": {
+  "builderVersion": "report-builder@2",
+  "errors": [
+   {
+    "code": "AGENT_FAILED",
+    "message": "retry 2 failed",
+    "node": "query_analyzer",
+    "recoverable": true
+   }
+  ],
+  "events": {
+   "cutoffSeq": 42,
+   "digest": "sha256:cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+   "profile": "qc-events-v1"
+  },
+  "evidence": [
+   {
+    "artifactSha256": "efefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefef",
+    "id": "ev_b54af7a859ca",
+    "kind": "plan_node",
+    "locator": "/0/Plan",
+    "provenance": "imported",
+    "summary": "Seq Scan on orders: 120.5 ms of 121.0 ms, 995000 rows removed by filter"
+   }
+  ],
+  "finalStatus": "completed",
+  "finalizedAt": "2026-10-13T12:00:00.000000Z",
+  "findings": [
+   {
+    "agent": "query_analyzer",
+    "detail": "Seq Scan reads 1000000 rows.",
+    "evidenceIds": [
+     "ev_b54af7a859ca"
+    ],
+    "key": "fd_222222222222",
+    "severity": "high",
+    "title": "Scan 1 dominates"
+   }
+  ],
+  "headline": "No optimization appears worth making for this query, based on the cited evidence.",
+  "hypotheses": [
+   {
+    "category": "missing_index",
+    "confidence": "high",
+    "contradictingEvidence": [],
+    "key": "hy_111111111111",
+    "proposedBy": [
+     "query_analyzer"
+    ],
+    "rank": 1,
+    "statement": "Missing index on 2 columns.",
+    "supportingEvidence": [
+     "ev_b54af7a859ca"
+    ],
+    "uncertaintyNotes": "",
+    "verificationMethod": "benchmark"
+   }
+  ],
+  "investigation": {
+   "liveConnection": false,
+   "modes": [
+    "sandbox_benchmark"
+   ],
+   "objective": "Make it fast for 30 users",
+   "title": "Slow orders page",
+   "workloadId": "stale_stats@v1:sf=0.1:seed=42"
+  },
+  "limitations": [
+   "Nothing in this report was benchmarked: hypotheses are unverified."
+  ],
+  "missing": [
+   {
+    "reason": "not benchmarked",
+    "section": "benchmark"
+   }
+  ],
+  "nextSteps": [
+   "No change recommended; revisit if the data or workload changes."
+  ],
+  "outcome": "no_action_needed",
+  "partial": false,
+  "problem": {
+   "evidence": [
+    {
+     "artifactSha256": "efefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefef",
+     "id": "ev_b54af7a859ca",
+     "kind": "plan_node",
+     "locator": "/0/Plan",
+     "provenance": "imported",
+     "summary": "Seq Scan on orders: 120.5 ms of 121.0 ms, 995000 rows removed by filter"
+    }
+   ],
+   "materiality": {
+    "evidenceIds": [
+     "ev_b54af7a859ca"
+    ],
+    "reasons": [
+     "The query took 2 ms."
+    ],
+    "verdict": "immaterial"
+   }
+  },
+  "provenance": {
+   "llm": [
+    {
+     "agent": "query_analyzer",
+     "calls": 3,
+     "model": "nvidia/x:free",
+     "promptVersion": "query_analyzer@1",
+     "servedBy": "Nvidia",
+     "status": "succeeded"
+    }
+   ],
+   "measurements": [],
+   "stubModel": false
+  },
+  "query": {
+   "paramSets": [
+    {
+     "edgeCase": false,
+     "name": "purchases",
+     "values": [
+      "purchase"
+     ]
+    },
+    {
+     "edgeCase": false,
+     "name": "views",
+     "values": [
+      "view"
+     ]
+    }
+   ],
+   "sha256": "1212121212121212121212121212121212121212121212121212121212121212",
+   "sql": "SELECT count(*), sum(e.amount) FROM events e JOIN accounts a ON a.id = e.account_id WHERE e.kind = $1"
+  },
+  "recommendation": {
+   "candidateKey": null,
+   "ddl": [],
+   "kind": null,
+   "origin": "run",
+   "primaryMeasurement": null,
+   "querySql": null,
+   "scope": "none",
+   "status": "unverified"
+  },
+  "replay": null,
+  "rounds": [],
+  "run": {
+   "id": "00000000-0000-4000-8000-0000000000aa",
+   "investigationId": "8f7d60a5-f02f-5114-a93f-e1f6f8c80fd9",
+   "kind": "initial",
+   "parentRunId": null,
+   "runNumber": 1
+  },
+  "schemaVersion": 2,
+  "stopReason": null,
+  "summary": "The scan over 1000000 rows dominates.",
+  "usage": {
+   "llmCalls": 7,
+   "toolCalls": 2
+  }
+ },
+ "no_optional_provenance": {
+  "builderVersion": "report-builder@2",
+  "errors": [
+   {
+    "code": "AGENT_FAILED",
+    "message": "retry 2 failed",
+    "node": "query_analyzer",
+    "recoverable": true
+   }
+  ],
+  "events": {
+   "cutoffSeq": 42,
+   "digest": "sha256:cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+   "profile": "qc-events-v1"
+  },
+  "evidence": [
+   {
+    "artifactSha256": "efefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefef",
+    "id": "ev_b54af7a859ca",
+    "kind": "plan_node",
+    "locator": "/0/Plan",
+    "provenance": "imported",
+    "summary": "Seq Scan on orders: 120.5 ms of 121.0 ms, 995000 rows removed by filter"
+   }
+  ],
+  "finalStatus": "completed",
+  "finalizedAt": "2026-10-13T12:00:00.000000Z",
+  "findings": [
+   {
+    "agent": "query_analyzer",
+    "detail": "Seq Scan reads 1000000 rows.",
+    "evidenceIds": [
+     "ev_b54af7a859ca"
+    ],
+    "key": "fd_222222222222",
+    "severity": "high",
+    "title": "Scan 1 dominates"
+   }
+  ],
+  "headline": "A candidate change was verified in an isolated sandbox: faster, with the same result rows, on every tested parameter set.",
+  "hypotheses": [
+   {
+    "category": "missing_index",
+    "confidence": "high",
+    "contradictingEvidence": [],
+    "key": "hy_111111111111",
+    "proposedBy": [
+     "query_analyzer"
+    ],
+    "rank": 1,
+    "statement": "Missing index on 2 columns.",
+    "supportingEvidence": [
+     "ev_b54af7a859ca"
+    ],
+    "uncertaintyNotes": "",
+    "verificationMethod": "benchmark"
+   }
+  ],
+  "investigation": {
+   "liveConnection": false,
+   "modes": [
+    "sandbox_benchmark"
+   ],
+   "objective": "Make it fast for 30 users",
+   "title": "Slow orders page",
+   "workloadId": "stale_stats@v1:sf=0.1:seed=42"
+  },
+  "limitations": [
+   "Measured in a disposable sandbox copy of the demo workload `stale_stats@v1:sf=0.1:seed=42`, not on your database. No change was applied to any database you own.",
+   "Warm cache, one session, interleaved runs: production concurrency, cache state and data distribution may change the result.",
+   "Only the listed parameter sets were tested; other inputs may behave differently. A sandbox verification is not a guarantee for every workload."
+  ],
+  "missing": [],
+  "nextSteps": [
+   "Review the exact SQL and test it on a staging copy of your own data and workload.",
+   "Re-run this experiment (experiment replay) to check the result is reproducible."
+  ],
+  "outcome": "verified_recommendation",
+  "partial": false,
+  "problem": {
+   "evidence": [
+    {
+     "artifactSha256": "efefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefef",
+     "id": "ev_b54af7a859ca",
+     "kind": "plan_node",
+     "locator": "/0/Plan",
+     "provenance": "imported",
+     "summary": "Seq Scan on orders: 120.5 ms of 121.0 ms, 995000 rows removed by filter"
+    }
+   ],
+   "materiality": {
+    "evidenceIds": [
+     "ev_b54af7a859ca"
+    ],
+    "reasons": [
+     "The query took 121 ms."
+    ],
+    "verdict": "material"
+   }
+  },
+  "provenance": {
+   "llm": [],
+   "measurements": [
+    "measured"
+   ],
+   "stubModel": false
+  },
+  "query": {
+   "paramSets": [
+    {
+     "edgeCase": false,
+     "name": "purchases",
+     "values": [
+      "purchase"
+     ]
+    },
+    {
+     "edgeCase": false,
+     "name": "views",
+     "values": [
+      "view"
+     ]
+    }
+   ],
+   "sha256": "1212121212121212121212121212121212121212121212121212121212121212",
+   "sql": "SELECT count(*), sum(e.amount) FROM events e JOIN accounts a ON a.id = e.account_id WHERE e.kind = $1"
+  },
+  "recommendation": {
+   "candidateKey": "oc_0000000000a3",
+   "ddl": [
+    "ANALYZE events"
+   ],
+   "kind": "analyze_statistics",
+   "origin": "run",
+   "primaryMeasurement": {
+    "arm": "oc_0000000000a3",
+    "baseline": {
+     "medianNs": 15657145.5,
+     "n": 30,
+     "p95Ns": 18629333,
+     "robustCv": 0.10790947171571581
+    },
+    "candidate": {
+     "medianNs": 4502250.0,
+     "n": 30,
+     "p95Ns": 5444041,
+     "robustCv": 0.10134809870412788
+    },
+    "ciHigh": 3.6630852351601977,
+    "ciLow": 3.2869577496235736,
+    "evidenceId": "ev_4e653e508733",
+    "paramSet": "purchases",
+    "provenance": "measured",
+    "source": {
+     "artifactSha256": "abababababababababababababababababababababababababababababababab",
+     "pointer": "/stats/0"
+    },
+    "speedup": 3.4776268532400465
+   },
+   "querySql": null,
+   "scope": "sandbox",
+   "status": "verified"
+  },
+  "replay": null,
+  "rounds": [
+   {
+    "approval": {
+     "approvedCandidateIds": [
+      "8986847e-6bbb-5b75-b0d2-d98780425b21"
+     ],
+     "decidedAt": "2026-10-13T11:00:00.000000Z",
+     "decidedBy": "user:1",
+     "id": "35375679-1997-5d89-a949-9ec9d0aac67b",
+     "round": 0,
+     "status": "approved"
+    },
+    "candidates": [
+     {
+      "addressesHypotheses": [
+       "hy_111111111111"
+      ],
+      "ddl": [
+       "ANALYZE events"
+      ],
+      "expectedBenefit": "Avoid the 1 sort",
+      "key": "oc_0000000000a3",
+      "kind": "analyze_statistics",
+      "querySql": null,
+      "reasons": [],
+      "risks": [],
+      "sqlSha256": "9ba79d34048ce1c01bc67f7743cf6acf52131bde8796c1a6c0668f1fdd75ad28",
+      "status": "verified"
+     }
+    ],
+    "experiment": {
+     "audit": [
+      {
+       "arm": "oc_0000000000a3",
+       "auditorStatus": "completed",
+       "checks": [
+        {
+         "detail": "30 samples per arm and set",
+         "evidenceIds": [
+          "ev_4e653e508733",
+          "ev_37f42e0b412c"
+         ],
+         "name": "samples",
+         "status": "pass"
+        }
+       ],
+       "concerns": [
+        {
+         "arm": "oc_0000000000a3",
+         "evidenceIds": [
+          "ev_4e653e508733"
+         ],
+         "severity": "warning",
+         "text": "Only 2 sets tested."
+        }
+       ],
+       "downgraded": false,
+       "engineVerdict": "verified",
+       "notes": "Checked 2 parameter sets.",
+       "promptVersion": "benchmark_auditor@1",
+       "verdict": "verified"
+      }
+     ],
+     "builds": [
+      {
+       "arm": "oc_0000000000a3",
+       "buildNs": 73960208,
+       "indexSizeBytes": 0,
+       "ok": true,
+       "provenance": "measured",
+       "reason": null
+      }
+     ],
+     "config": {
+      "blockSize": 5,
+      "maxCv": 0.25,
+      "maxRegression": 0.95,
+      "measuredRuns": 30,
+      "minEffect": 1.1,
+      "provenance": "configured",
+      "warmupRuns": 5
+     },
+     "correctness": [
+      {
+       "arm": "oc_0000000000a3",
+       "baselineRows": 1,
+       "evidenceId": null,
+       "paramSet": "purchases",
+       "provenance": "measured",
+       "rows": 1,
+       "sameRows": true
+      },
+      {
+       "arm": "oc_0000000000a3",
+       "baselineRows": 1,
+       "evidenceId": null,
+       "paramSet": "views",
+       "provenance": "measured",
+       "rows": 1,
+       "sameRows": true
+      }
+     ],
+     "engineVersion": "bench@1",
+     "environment": {
+      "containerRuntime": null,
+      "cpuArch": null,
+      "cpuCount": null,
+      "cpuModel": null,
+      "digest": null,
+      "memoryBytes": null,
+      "os": null,
+      "pgVersion": null,
+      "provenance": null,
+      "sandboxImageDigest": null,
+      "workloadDataDigest": null,
+      "workloadId": null
+     },
+     "errorCode": null,
+     "id": "40812e6a-443b-478c-aabd-d560b72bb079",
+     "measurements": [
+      {
+       "arm": "oc_0000000000a3",
+       "baseline": {
+        "medianNs": 15657145.5,
+        "n": 30,
+        "p95Ns": 18629333,
+        "robustCv": 0.10790947171571581
+       },
+       "candidate": {
+        "medianNs": 4502250.0,
+        "n": 30,
+        "p95Ns": 5444041,
+        "robustCv": 0.10134809870412788
+       },
+       "ciHigh": 3.6630852351601977,
+       "ciLow": 3.2869577496235736,
+       "evidenceId": "ev_4e653e508733",
+       "paramSet": "purchases",
+       "provenance": "measured",
+       "source": {
+        "artifactSha256": "abababababababababababababababababababababababababababababababab",
+        "pointer": "/stats/0"
+       },
+       "speedup": 3.4776268532400465
+      },
+      {
+       "arm": "oc_0000000000a3",
+       "baseline": {
+        "medianNs": 5286750.5,
+        "n": 30,
+        "p95Ns": 6474750,
+        "robustCv": 0.10464524871724183
+       },
+       "candidate": {
+        "medianNs": 4708208.5,
+        "n": 30,
+        "p95Ns": 6353250,
+        "robustCv": 0.1409227520481141
+       },
+       "ciHigh": 1.2304361214432549,
+       "ciLow": 1.0247525326521516,
+       "evidenceId": "ev_37f42e0b412c",
+       "paramSet": "views",
+       "provenance": "measured",
+       "source": {
+        "artifactSha256": "abababababababababababababababababababababababababababababababab",
+        "pointer": "/stats/1"
+       },
+       "speedup": 1.122879434927319
+      }
+     ],
+     "provenance": "measured",
+     "replicate": 0,
+     "replication": null,
+     "resultSha256": "abababababababababababababababababababababababababababababababab",
+     "round": 0,
+     "rowProfile": "qc-row-v1",
+     "seed": 42,
+     "status": "completed",
+     "tournament": [
+      {
+       "arm": "oc_0000000000a3",
+       "primaryCiLow": 3.2869577496235736,
+       "rank": 1,
+       "verdict": "verified"
+      }
+     ],
+     "verdicts": [
+      {
+       "arm": "oc_0000000000a3",
+       "gate": null,
+       "reasons": [],
+       "verdict": "verified"
+      }
+     ],
+     "winner": "oc_0000000000a3"
+    },
+    "replicates": [],
+    "round": 0
+   }
+  ],
+  "run": {
+   "id": "00000000-0000-4000-8000-0000000000aa",
+   "investigationId": "8f7d60a5-f02f-5114-a93f-e1f6f8c80fd9",
+   "kind": "initial",
+   "parentRunId": null,
+   "runNumber": 1
+  },
+  "schemaVersion": 2,
+  "stopReason": null,
+  "summary": "The scan over 1000000 rows dominates.",
+  "usage": null
+ },
+ "noise_warning": {
+  "builderVersion": "report-builder@2",
+  "errors": [
+   {
+    "code": "AGENT_FAILED",
+    "message": "retry 2 failed",
+    "node": "query_analyzer",
+    "recoverable": true
+   }
+  ],
+  "events": {
+   "cutoffSeq": 42,
+   "digest": "sha256:cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+   "profile": "qc-events-v1"
+  },
+  "evidence": [
+   {
+    "artifactSha256": "efefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefef",
+    "id": "ev_b54af7a859ca",
+    "kind": "plan_node",
+    "locator": "/0/Plan",
+    "provenance": "imported",
+    "summary": "Seq Scan on orders: 120.5 ms of 121.0 ms, 995000 rows removed by filter"
+   }
+  ],
+  "finalStatus": "completed",
+  "finalizedAt": "2026-10-13T12:00:00.000000Z",
+  "findings": [
+   {
+    "agent": "query_analyzer",
+    "detail": "Seq Scan reads 1000000 rows.",
+    "evidenceIds": [
+     "ev_b54af7a859ca"
+    ],
+    "key": "fd_222222222222",
+    "severity": "high",
+    "title": "Scan 1 dominates"
+   }
+  ],
+  "headline": "A candidate change was verified with a noise warning: individual measurements were noisy, and the speed-up was confirmed only by agreement across three independent sandbox experiments.",
+  "hypotheses": [
+   {
+    "category": "missing_index",
+    "confidence": "high",
+    "contradictingEvidence": [],
+    "key": "hy_111111111111",
+    "proposedBy": [
+     "query_analyzer"
+    ],
+    "rank": 1,
+    "statement": "Missing index on 2 columns.",
+    "supportingEvidence": [
+     "ev_b54af7a859ca"
+    ],
+    "uncertaintyNotes": "",
+    "verificationMethod": "benchmark"
+   }
+  ],
+  "investigation": {
+   "liveConnection": false,
+   "modes": [
+    "sandbox_benchmark"
+   ],
+   "objective": "Make it fast for 30 users",
+   "title": "Slow orders page",
+   "workloadId": "stale_stats@v1:sf=0.1:seed=42"
+  },
+  "limitations": [
+   "Measured in a disposable sandbox copy of the demo workload `stale_stats@v1:sf=0.1:seed=42`, not on your database. No change was applied to any database you own.",
+   "Warm cache, one session, interleaved runs: production concurrency, cache state and data distribution may change the result.",
+   "Only the listed parameter sets were tested; other inputs may behave differently. A sandbox verification is not a guarantee for every workload.",
+   "Noise warning: single experiments were too noisy to decide; the result rests on three agreeing independent experiments. Treat the size of the effect as uncertain."
+  ],
+  "missing": [],
+  "nextSteps": [
+   "Review the exact SQL and test it on a staging copy of your own data and workload.",
+   "Re-run this experiment (experiment replay) to check the result is reproducible."
+  ],
+  "outcome": "verified_recommendation",
+  "partial": false,
+  "problem": {
+   "evidence": [
+    {
+     "artifactSha256": "efefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefef",
+     "id": "ev_b54af7a859ca",
+     "kind": "plan_node",
+     "locator": "/0/Plan",
+     "provenance": "imported",
+     "summary": "Seq Scan on orders: 120.5 ms of 121.0 ms, 995000 rows removed by filter"
+    }
+   ],
+   "materiality": {
+    "evidenceIds": [
+     "ev_b54af7a859ca"
+    ],
+    "reasons": [
+     "The query took 121 ms."
+    ],
+    "verdict": "material"
+   }
+  },
+  "provenance": {
+   "llm": [
+    {
+     "agent": "query_analyzer",
+     "calls": 3,
+     "model": "nvidia/x:free",
+     "promptVersion": "query_analyzer@1",
+     "servedBy": "Nvidia",
+     "status": "succeeded"
+    }
+   ],
+   "measurements": [
+    "measured"
+   ],
+   "stubModel": false
+  },
+  "query": {
+   "paramSets": [
+    {
+     "edgeCase": false,
+     "name": "purchases",
+     "values": [
+      "purchase"
+     ]
+    },
+    {
+     "edgeCase": false,
+     "name": "views",
+     "values": [
+      "view"
+     ]
+    }
+   ],
+   "sha256": "1212121212121212121212121212121212121212121212121212121212121212",
+   "sql": "SELECT count(*), sum(e.amount) FROM events e JOIN accounts a ON a.id = e.account_id WHERE e.kind = $1"
+  },
+  "recommendation": {
+   "candidateKey": "oc_0000000000a3",
+   "ddl": [
+    "ANALYZE events"
+   ],
+   "kind": "analyze_statistics",
+   "origin": "run",
+   "primaryMeasurement": {
+    "arm": "oc_0000000000a3",
+    "baseline": {
+     "medianNs": 15657145.5,
+     "n": 30,
+     "p95Ns": 18629333,
+     "robustCv": 0.10790947171571581
+    },
+    "candidate": {
+     "medianNs": 4502250.0,
+     "n": 30,
+     "p95Ns": 5444041,
+     "robustCv": 0.10134809870412788
+    },
+    "ciHigh": 3.6630852351601977,
+    "ciLow": 3.2869577496235736,
+    "evidenceId": "ev_4e653e508733",
+    "paramSet": "purchases",
+    "provenance": "measured",
+    "source": {
+     "artifactSha256": "abababababababababababababababababababababababababababababababab",
+     "pointer": "/stats/0"
+    },
+    "speedup": 3.4776268532400465
+   },
+   "querySql": null,
+   "scope": "sandbox",
+   "status": "verified_with_noise_warning"
+  },
+  "replay": null,
+  "rounds": [
+   {
+    "approval": {
+     "approvedCandidateIds": [
+      "8986847e-6bbb-5b75-b0d2-d98780425b21"
+     ],
+     "decidedAt": "2026-10-13T11:00:00.000000Z",
+     "decidedBy": "user:1",
+     "id": "35375679-1997-5d89-a949-9ec9d0aac67b",
+     "round": 0,
+     "status": "approved"
+    },
+    "candidates": [
+     {
+      "addressesHypotheses": [
+       "hy_111111111111"
+      ],
+      "ddl": [
+       "ANALYZE events"
+      ],
+      "expectedBenefit": "Avoid the 1 sort",
+      "key": "oc_0000000000a3",
+      "kind": "analyze_statistics",
+      "querySql": null,
+      "reasons": [],
+      "risks": [],
+      "sqlSha256": "9ba79d34048ce1c01bc67f7743cf6acf52131bde8796c1a6c0668f1fdd75ad28",
+      "status": "verified_with_noise_warning"
+     }
+    ],
+    "experiment": {
+     "audit": [
+      {
+       "arm": "oc_0000000000a3",
+       "auditorStatus": "completed",
+       "checks": [
+        {
+         "detail": "30 samples per arm and set",
+         "evidenceIds": [
+          "ev_4e653e508733",
+          "ev_37f42e0b412c"
+         ],
+         "name": "samples",
+         "status": "pass"
+        }
+       ],
+       "concerns": [
+        {
+         "arm": "oc_0000000000a3",
+         "evidenceIds": [
+          "ev_4e653e508733"
+         ],
+         "severity": "warning",
+         "text": "Only 2 sets tested."
+        }
+       ],
+       "downgraded": false,
+       "engineVerdict": "verified_with_noise_warning",
+       "notes": "Checked 2 parameter sets.",
+       "promptVersion": "benchmark_auditor@1",
+       "verdict": "verified_with_noise_warning"
+      }
+     ],
+     "builds": [
+      {
+       "arm": "oc_0000000000a3",
+       "buildNs": 73960208,
+       "indexSizeBytes": 0,
+       "ok": true,
+       "provenance": "measured",
+       "reason": null
+      }
+     ],
+     "config": {
+      "blockSize": 5,
+      "maxCv": 0.25,
+      "maxRegression": 0.95,
+      "measuredRuns": 30,
+      "minEffect": 1.1,
+      "provenance": "configured",
+      "warmupRuns": 5
+     },
+     "correctness": [
+      {
+       "arm": "oc_0000000000a3",
+       "baselineRows": 1,
+       "evidenceId": null,
+       "paramSet": "purchases",
+       "provenance": "measured",
+       "rows": 1,
+       "sameRows": true
+      },
+      {
+       "arm": "oc_0000000000a3",
+       "baselineRows": 1,
+       "evidenceId": null,
+       "paramSet": "views",
+       "provenance": "measured",
+       "rows": 1,
+       "sameRows": true
+      }
+     ],
+     "engineVersion": "bench@1",
+     "environment": {
+      "containerRuntime": "docker",
+      "cpuArch": "arm64",
+      "cpuCount": 8,
+      "cpuModel": "arm",
+      "digest": "sha256:9999999999999999999999999999999999999999999999999999999999999999",
+      "memoryBytes": 8589934592,
+      "os": "Darwin 25.6.0",
+      "pgVersion": "170011",
+      "provenance": "recorded",
+      "sandboxImageDigest": "unrecorded",
+      "workloadDataDigest": "8e79c1c9db1f0ad467fe543e9d0a64d20e8186d43ea8e8a32c7a25c7f3d666b8",
+      "workloadId": "stale_stats@v1:sf=0.1:seed=42"
+     },
+     "errorCode": null,
+     "id": "40812e6a-443b-478c-aabd-d560b72bb079",
+     "measurements": [
+      {
+       "arm": "oc_0000000000a3",
+       "baseline": {
+        "medianNs": 15657145.5,
+        "n": 30,
+        "p95Ns": 18629333,
+        "robustCv": 0.10790947171571581
+       },
+       "candidate": {
+        "medianNs": 4502250.0,
+        "n": 30,
+        "p95Ns": 5444041,
+        "robustCv": 0.10134809870412788
+       },
+       "ciHigh": 3.6630852351601977,
+       "ciLow": 3.2869577496235736,
+       "evidenceId": "ev_4e653e508733",
+       "paramSet": "purchases",
+       "provenance": "measured",
+       "source": {
+        "artifactSha256": "abababababababababababababababababababababababababababababababab",
+        "pointer": "/stats/0"
+       },
+       "speedup": 3.4776268532400465
+      },
+      {
+       "arm": "oc_0000000000a3",
+       "baseline": {
+        "medianNs": 5286750.5,
+        "n": 30,
+        "p95Ns": 6474750,
+        "robustCv": 0.10464524871724183
+       },
+       "candidate": {
+        "medianNs": 4708208.5,
+        "n": 30,
+        "p95Ns": 6353250,
+        "robustCv": 0.1409227520481141
+       },
+       "ciHigh": 1.2304361214432549,
+       "ciLow": 1.0247525326521516,
+       "evidenceId": "ev_37f42e0b412c",
+       "paramSet": "views",
+       "provenance": "measured",
+       "source": {
+        "artifactSha256": "abababababababababababababababababababababababababababababababab",
+        "pointer": "/stats/1"
+       },
+       "speedup": 1.122879434927319
+      }
+     ],
+     "provenance": "measured",
+     "replicate": 0,
+     "replication": null,
+     "resultSha256": "abababababababababababababababababababababababababababababababab",
+     "round": 0,
+     "rowProfile": "qc-row-v1",
+     "seed": 42,
+     "status": "completed",
+     "tournament": [
+      {
+       "arm": "oc_0000000000a3",
+       "primaryCiLow": 3.2869577496235736,
+       "rank": 1,
+       "verdict": "verified"
+      }
+     ],
+     "verdicts": [
+      {
+       "arm": "oc_0000000000a3",
+       "gate": null,
+       "reasons": [],
+       "verdict": "verified"
+      }
+     ],
+     "winner": "oc_0000000000a3"
+    },
+    "replicates": [],
+    "round": 0
+   }
+  ],
+  "run": {
+   "id": "00000000-0000-4000-8000-0000000000aa",
+   "investigationId": "8f7d60a5-f02f-5114-a93f-e1f6f8c80fd9",
+   "kind": "initial",
+   "parentRunId": null,
+   "runNumber": 1
+  },
+  "schemaVersion": 2,
+  "stopReason": null,
+  "summary": "The scan over 1000000 rows dominates.",
+  "usage": {
+   "llmCalls": 7,
+   "toolCalls": 2
+  }
+ },
+ "rejected": {
+  "builderVersion": "report-builder@2",
+  "errors": [
+   {
+    "code": "AGENT_FAILED",
+    "message": "retry 2 failed",
+    "node": "query_analyzer",
+    "recoverable": true
+   }
+  ],
+  "events": {
+   "cutoffSeq": 42,
+   "digest": "sha256:cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+   "profile": "qc-events-v1"
+  },
+  "evidence": [
+   {
+    "artifactSha256": "efefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefef",
+    "id": "ev_b54af7a859ca",
+    "kind": "plan_node",
+    "locator": "/0/Plan",
+    "provenance": "imported",
+    "summary": "Seq Scan on orders: 120.5 ms of 121.0 ms, 995000 rows removed by filter"
+   }
+  ],
+  "finalStatus": "completed",
+  "finalizedAt": "2026-10-13T12:00:00.000000Z",
+  "findings": [
+   {
+    "agent": "query_analyzer",
+    "detail": "Seq Scan reads 1000000 rows.",
+    "evidenceIds": [
+     "ev_b54af7a859ca"
+    ],
+    "key": "fd_222222222222",
+    "severity": "high",
+    "title": "Scan 1 dominates"
+   }
+  ],
+  "headline": "The investigation could not reach a verified conclusion.",
+  "hypotheses": [
+   {
+    "category": "missing_index",
+    "confidence": "high",
+    "contradictingEvidence": [],
+    "key": "hy_111111111111",
+    "proposedBy": [
+     "query_analyzer"
+    ],
+    "rank": 1,
+    "statement": "Missing index on 2 columns.",
+    "supportingEvidence": [
+     "ev_b54af7a859ca"
+    ],
+    "uncertaintyNotes": "",
+    "verificationMethod": "benchmark"
+   }
+  ],
+  "investigation": {
+   "liveConnection": false,
+   "modes": [
+    "sandbox_benchmark"
+   ],
+   "objective": "Make it fast for 30 users",
+   "title": "Slow orders page",
+   "workloadId": "index_regression@v1:sf=0.1:seed=42"
+  },
+  "limitations": [
+   "Measured in a disposable sandbox copy of the demo workload `index_regression@v1:sf=0.1:seed=42`, not on your database. No change was applied to any database you own.",
+   "Warm cache, one session, interleaved runs: production concurrency, cache state and data distribution may change the result.",
+   "Only the listed parameter sets were tested; other inputs may behave differently. A sandbox verification is not a guarantee for every workload.",
+   "Index write overhead on INSERT/UPDATE was not measured; build time and size are recorded per candidate."
+  ],
+  "missing": [],
+  "nextSteps": [
+   "Re-run on a quieter host or with more samples; inconclusive is not a rejection.",
+   "Why: the candidate made at least one parameter set slower."
+  ],
+  "outcome": "inconclusive",
+  "partial": false,
+  "problem": {
+   "evidence": [
+    {
+     "artifactSha256": "efefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefef",
+     "id": "ev_b54af7a859ca",
+     "kind": "plan_node",
+     "locator": "/0/Plan",
+     "provenance": "imported",
+     "summary": "Seq Scan on orders: 120.5 ms of 121.0 ms, 995000 rows removed by filter"
+    }
+   ],
+   "materiality": {
+    "evidenceIds": [
+     "ev_b54af7a859ca"
+    ],
+    "reasons": [
+     "The query took 121 ms."
+    ],
+    "verdict": "material"
+   }
+  },
+  "provenance": {
+   "llm": [
+    {
+     "agent": "query_analyzer",
+     "calls": 3,
+     "model": "nvidia/x:free",
+     "promptVersion": "query_analyzer@1",
+     "servedBy": "Nvidia",
+     "status": "succeeded"
+    }
+   ],
+   "measurements": [
+    "measured"
+   ],
+   "stubModel": false
+  },
+  "query": {
+   "paramSets": [
+    {
+     "edgeCase": false,
+     "name": "open",
+     "values": [
+      "open"
+     ]
+    },
+    {
+     "edgeCase": false,
+     "name": "escalated",
+     "values": [
+      "escalated"
+     ]
+    }
+   ],
+   "sha256": "1212121212121212121212121212121212121212121212121212121212121212",
+   "sql": "SELECT * FROM tickets WHERE status = $1 ORDER BY opened_at, id LIMIT 10"
+  },
+  "recommendation": {
+   "candidateKey": null,
+   "ddl": [],
+   "kind": null,
+   "origin": "run",
+   "primaryMeasurement": null,
+   "querySql": null,
+   "scope": "sandbox",
+   "status": "unverified"
+  },
+  "replay": null,
+  "rounds": [
+   {
+    "approval": {
+     "approvedCandidateIds": [
+      "04330ed9-df72-5609-8d81-7138258c9cab"
+     ],
+     "decidedAt": "2026-10-13T11:00:00.000000Z",
+     "decidedBy": "user:1",
+     "id": "35375679-1997-5d89-a949-9ec9d0aac67b",
+     "round": 0,
+     "status": "approved"
+    },
+    "candidates": [
+     {
+      "addressesHypotheses": [
+       "hy_111111111111"
+      ],
+      "ddl": [
+       "CREATE INDEX ON tickets (opened_at, id)"
+      ],
+      "expectedBenefit": "Avoid the 1 sort",
+      "key": "oc_0000000000a5",
+      "kind": "create_index",
+      "querySql": null,
+      "reasons": [],
+      "risks": [],
+      "sqlSha256": "9894878abed06f86837ede4498ba0c6ba0d427d5f1a8a4b75432013bb456f2b5",
+      "status": "rejected"
+     }
+    ],
+    "experiment": {
+     "audit": [
+      {
+       "arm": "oc_0000000000a5",
+       "auditorStatus": "completed",
+       "checks": [
+        {
+         "detail": "30 samples per arm and set",
+         "evidenceIds": [
+          "ev_a40924cdf136",
+          "ev_5131183e9f60"
+         ],
+         "name": "samples",
+         "status": "pass"
+        }
+       ],
+       "concerns": [
+        {
+         "arm": "oc_0000000000a5",
+         "evidenceIds": [
+          "ev_a40924cdf136"
+         ],
+         "severity": "warning",
+         "text": "Only 2 sets tested."
+        }
+       ],
+       "downgraded": false,
+       "engineVerdict": "rejected",
+       "notes": "Checked 2 parameter sets.",
+       "promptVersion": "benchmark_auditor@1",
+       "verdict": "rejected"
+      }
+     ],
+     "builds": [
+      {
+       "arm": "oc_0000000000a5",
+       "buildNs": 30336375,
+       "indexSizeBytes": 958464,
+       "ok": true,
+       "provenance": "measured",
+       "reason": null
+      }
+     ],
+     "config": {
+      "blockSize": 5,
+      "maxCv": 0.25,
+      "maxRegression": 0.95,
+      "measuredRuns": 30,
+      "minEffect": 1.1,
+      "provenance": "configured",
+      "warmupRuns": 5
+     },
+     "correctness": [
+      {
+       "arm": "oc_0000000000a5",
+       "baselineRows": 10,
+       "evidenceId": null,
+       "paramSet": "escalated",
+       "provenance": "measured",
+       "rows": 10,
+       "sameRows": true
+      },
+      {
+       "arm": "oc_0000000000a5",
+       "baselineRows": 10,
+       "evidenceId": null,
+       "paramSet": "open",
+       "provenance": "measured",
+       "rows": 10,
+       "sameRows": true
+      }
+     ],
+     "engineVersion": "bench@1",
+     "environment": {
+      "containerRuntime": "docker",
+      "cpuArch": "arm64",
+      "cpuCount": 8,
+      "cpuModel": "arm",
+      "digest": "sha256:9999999999999999999999999999999999999999999999999999999999999999",
+      "memoryBytes": 8589934592,
+      "os": "Darwin 25.6.0",
+      "pgVersion": "170011",
+      "provenance": "recorded",
+      "sandboxImageDigest": "unrecorded",
+      "workloadDataDigest": "2fe42b873d12af57077d16bd1598287eea5360206030dfe9d493f1fa712e2f64",
+      "workloadId": "index_regression@v1:sf=0.1:seed=42"
+     },
+     "errorCode": null,
+     "id": "4b9eebac-1ffb-46b1-9abc-d5b4927f84f2",
+     "measurements": [
+      {
+       "arm": "oc_0000000000a5",
+       "baseline": {
+        "medianNs": 2818041.5,
+        "n": 30,
+        "p95Ns": 4225959,
+        "robustCv": 0.1398307743621681
+       },
+       "candidate": {
+        "medianNs": 774479.0,
+        "n": 30,
+        "p95Ns": 9610167,
+        "robustCv": 0.4434179650445533
+       },
+       "ciHigh": 4.177685407288141,
+       "ciLow": 2.9707345240399383,
+       "evidenceId": "ev_a40924cdf136",
+       "paramSet": "open",
+       "provenance": "measured",
+       "source": {
+        "artifactSha256": "abababababababababababababababababababababababababababababababab",
+        "pointer": "/stats/0"
+       },
+       "speedup": 3.6386286781178057
+      },
+      {
+       "arm": "oc_0000000000a5",
+       "baseline": {
+        "medianNs": 2098354.0,
+        "n": 30,
+        "p95Ns": 3651584,
+        "robustCv": 0.16754298474730986
+       },
+       "candidate": {
+        "medianNs": 7875437.5,
+        "n": 30,
+        "p95Ns": 13612041,
+        "robustCv": 0.11442201461938854
+       },
+       "ciHigh": 0.29155278823057995,
+       "ciLow": 0.23921147136196425,
+       "evidenceId": "ev_5131183e9f60",
+       "paramSet": "escalated",
+       "provenance": "measured",
+       "source": {
+        "artifactSha256": "abababababababababababababababababababababababababababababababab",
+        "pointer": "/stats/1"
+       },
+       "speedup": 0.2664428484131834
+      }
+     ],
+     "provenance": "measured",
+     "replicate": 0,
+     "replication": null,
+     "resultSha256": "abababababababababababababababababababababababababababababababab",
+     "round": 0,
+     "rowProfile": "qc-row-v1",
+     "seed": 42,
+     "status": "completed",
+     "tournament": [
+      {
+       "arm": "oc_0000000000a5",
+       "primaryCiLow": 2.9707345240399383,
+       "rank": 1,
+       "verdict": "rejected"
+      }
+     ],
+     "verdicts": [
+      {
+       "arm": "oc_0000000000a5",
+       "gate": 5,
+       "reasons": [
+        {
+         "code": "regression",
+         "detail": "escalated: speedup CI upper 0.292 < 0.95"
+        }
+       ],
+       "verdict": "rejected"
+      }
+     ],
+     "winner": null
+    },
+    "replicates": [],
+    "round": 0
+   }
+  ],
+  "run": {
+   "id": "00000000-0000-4000-8000-0000000000aa",
+   "investigationId": "8f7d60a5-f02f-5114-a93f-e1f6f8c80fd9",
+   "kind": "initial",
+   "parentRunId": null,
+   "runNumber": 1
+  },
+  "schemaVersion": 2,
+  "stopReason": null,
+  "summary": "The scan over 1000000 rows dominates.",
+  "usage": {
+   "llmCalls": 7,
+   "toolCalls": 2
+  }
+ },
+ "verified": {
+  "builderVersion": "report-builder@2",
+  "errors": [
+   {
+    "code": "AGENT_FAILED",
+    "message": "retry 2 failed",
+    "node": "query_analyzer",
+    "recoverable": true
+   }
+  ],
+  "events": {
+   "cutoffSeq": 42,
+   "digest": "sha256:cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+   "profile": "qc-events-v1"
+  },
+  "evidence": [
+   {
+    "artifactSha256": "efefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefef",
+    "id": "ev_b54af7a859ca",
+    "kind": "plan_node",
+    "locator": "/0/Plan",
+    "provenance": "imported",
+    "summary": "Seq Scan on orders: 120.5 ms of 121.0 ms, 995000 rows removed by filter"
+   }
+  ],
+  "finalStatus": "completed",
+  "finalizedAt": "2026-10-13T12:00:00.000000Z",
+  "findings": [
+   {
+    "agent": "query_analyzer",
+    "detail": "Seq Scan reads 1000000 rows.",
+    "evidenceIds": [
+     "ev_b54af7a859ca"
+    ],
+    "key": "fd_222222222222",
+    "severity": "high",
+    "title": "Scan 1 dominates"
+   }
+  ],
+  "headline": "A candidate change was verified in an isolated sandbox: faster, with the same result rows, on every tested parameter set.",
+  "hypotheses": [
+   {
+    "category": "missing_index",
+    "confidence": "high",
+    "contradictingEvidence": [],
+    "key": "hy_111111111111",
+    "proposedBy": [
+     "query_analyzer"
+    ],
+    "rank": 1,
+    "statement": "Missing index on 2 columns.",
+    "supportingEvidence": [
+     "ev_b54af7a859ca"
+    ],
+    "uncertaintyNotes": "",
+    "verificationMethod": "benchmark"
+   }
+  ],
+  "investigation": {
+   "liveConnection": false,
+   "modes": [
+    "sandbox_benchmark"
+   ],
+   "objective": "Make it fast for 30 users",
+   "title": "Slow orders page",
+   "workloadId": "stale_stats@v1:sf=0.1:seed=42"
+  },
+  "limitations": [
+   "Measured in a disposable sandbox copy of the demo workload `stale_stats@v1:sf=0.1:seed=42`, not on your database. No change was applied to any database you own.",
+   "Warm cache, one session, interleaved runs: production concurrency, cache state and data distribution may change the result.",
+   "Only the listed parameter sets were tested; other inputs may behave differently. A sandbox verification is not a guarantee for every workload."
+  ],
+  "missing": [],
+  "nextSteps": [
+   "Review the exact SQL and test it on a staging copy of your own data and workload.",
+   "Re-run this experiment (experiment replay) to check the result is reproducible."
+  ],
+  "outcome": "verified_recommendation",
+  "partial": false,
+  "problem": {
+   "evidence": [
+    {
+     "artifactSha256": "efefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefef",
+     "id": "ev_b54af7a859ca",
+     "kind": "plan_node",
+     "locator": "/0/Plan",
+     "provenance": "imported",
+     "summary": "Seq Scan on orders: 120.5 ms of 121.0 ms, 995000 rows removed by filter"
+    }
+   ],
+   "materiality": {
+    "evidenceIds": [
+     "ev_b54af7a859ca"
+    ],
+    "reasons": [
+     "The query took 121 ms."
+    ],
+    "verdict": "material"
+   }
+  },
+  "provenance": {
+   "llm": [
+    {
+     "agent": "query_analyzer",
+     "calls": 3,
+     "model": "nvidia/x:free",
+     "promptVersion": "query_analyzer@1",
+     "servedBy": "Nvidia",
+     "status": "succeeded"
+    }
+   ],
+   "measurements": [
+    "measured"
+   ],
+   "stubModel": false
+  },
+  "query": {
+   "paramSets": [
+    {
+     "edgeCase": false,
+     "name": "purchases",
+     "values": [
+      "purchase"
+     ]
+    },
+    {
+     "edgeCase": false,
+     "name": "views",
+     "values": [
+      "view"
+     ]
+    }
+   ],
+   "sha256": "1212121212121212121212121212121212121212121212121212121212121212",
+   "sql": "SELECT count(*), sum(e.amount) FROM events e JOIN accounts a ON a.id = e.account_id WHERE e.kind = $1"
+  },
+  "recommendation": {
+   "candidateKey": "oc_0000000000a3",
+   "ddl": [
+    "ANALYZE events"
+   ],
+   "kind": "analyze_statistics",
+   "origin": "run",
+   "primaryMeasurement": {
+    "arm": "oc_0000000000a3",
+    "baseline": {
+     "medianNs": 15657145.5,
+     "n": 30,
+     "p95Ns": 18629333,
+     "robustCv": 0.10790947171571581
+    },
+    "candidate": {
+     "medianNs": 4502250.0,
+     "n": 30,
+     "p95Ns": 5444041,
+     "robustCv": 0.10134809870412788
+    },
+    "ciHigh": 3.6630852351601977,
+    "ciLow": 3.2869577496235736,
+    "evidenceId": "ev_4e653e508733",
+    "paramSet": "purchases",
+    "provenance": "measured",
+    "source": {
+     "artifactSha256": "abababababababababababababababababababababababababababababababab",
+     "pointer": "/stats/0"
+    },
+    "speedup": 3.4776268532400465
+   },
+   "querySql": null,
+   "scope": "sandbox",
+   "status": "verified"
+  },
+  "replay": null,
+  "rounds": [
+   {
+    "approval": {
+     "approvedCandidateIds": [
+      "8986847e-6bbb-5b75-b0d2-d98780425b21"
+     ],
+     "decidedAt": "2026-10-13T11:00:00.000000Z",
+     "decidedBy": "user:1",
+     "id": "35375679-1997-5d89-a949-9ec9d0aac67b",
+     "round": 0,
+     "status": "approved"
+    },
+    "candidates": [
+     {
+      "addressesHypotheses": [
+       "hy_111111111111"
+      ],
+      "ddl": [
+       "ANALYZE events"
+      ],
+      "expectedBenefit": "Avoid the 1 sort",
+      "key": "oc_0000000000a3",
+      "kind": "analyze_statistics",
+      "querySql": null,
+      "reasons": [],
+      "risks": [],
+      "sqlSha256": "9ba79d34048ce1c01bc67f7743cf6acf52131bde8796c1a6c0668f1fdd75ad28",
+      "status": "verified"
+     }
+    ],
+    "experiment": {
+     "audit": [
+      {
+       "arm": "oc_0000000000a3",
+       "auditorStatus": "completed",
+       "checks": [
+        {
+         "detail": "30 samples per arm and set",
+         "evidenceIds": [
+          "ev_4e653e508733",
+          "ev_37f42e0b412c"
+         ],
+         "name": "samples",
+         "status": "pass"
+        }
+       ],
+       "concerns": [
+        {
+         "arm": "oc_0000000000a3",
+         "evidenceIds": [
+          "ev_4e653e508733"
+         ],
+         "severity": "warning",
+         "text": "Only 2 sets tested."
+        }
+       ],
+       "downgraded": false,
+       "engineVerdict": "verified",
+       "notes": "Checked 2 parameter sets.",
+       "promptVersion": "benchmark_auditor@1",
+       "verdict": "verified"
+      }
+     ],
+     "builds": [
+      {
+       "arm": "oc_0000000000a3",
+       "buildNs": 73960208,
+       "indexSizeBytes": 0,
+       "ok": true,
+       "provenance": "measured",
+       "reason": null
+      }
+     ],
+     "config": {
+      "blockSize": 5,
+      "maxCv": 0.25,
+      "maxRegression": 0.95,
+      "measuredRuns": 30,
+      "minEffect": 1.1,
+      "provenance": "configured",
+      "warmupRuns": 5
+     },
+     "correctness": [
+      {
+       "arm": "oc_0000000000a3",
+       "baselineRows": 1,
+       "evidenceId": null,
+       "paramSet": "purchases",
+       "provenance": "measured",
+       "rows": 1,
+       "sameRows": true
+      },
+      {
+       "arm": "oc_0000000000a3",
+       "baselineRows": 1,
+       "evidenceId": null,
+       "paramSet": "views",
+       "provenance": "measured",
+       "rows": 1,
+       "sameRows": true
+      }
+     ],
+     "engineVersion": "bench@1",
+     "environment": {
+      "containerRuntime": "docker",
+      "cpuArch": "arm64",
+      "cpuCount": 8,
+      "cpuModel": "arm",
+      "digest": "sha256:9999999999999999999999999999999999999999999999999999999999999999",
+      "memoryBytes": 8589934592,
+      "os": "Darwin 25.6.0",
+      "pgVersion": "170011",
+      "provenance": "recorded",
+      "sandboxImageDigest": "unrecorded",
+      "workloadDataDigest": "8e79c1c9db1f0ad467fe543e9d0a64d20e8186d43ea8e8a32c7a25c7f3d666b8",
+      "workloadId": "stale_stats@v1:sf=0.1:seed=42"
+     },
+     "errorCode": null,
+     "id": "40812e6a-443b-478c-aabd-d560b72bb079",
+     "measurements": [
+      {
+       "arm": "oc_0000000000a3",
+       "baseline": {
+        "medianNs": 15657145.5,
+        "n": 30,
+        "p95Ns": 18629333,
+        "robustCv": 0.10790947171571581
+       },
+       "candidate": {
+        "medianNs": 4502250.0,
+        "n": 30,
+        "p95Ns": 5444041,
+        "robustCv": 0.10134809870412788
+       },
+       "ciHigh": 3.6630852351601977,
+       "ciLow": 3.2869577496235736,
+       "evidenceId": "ev_4e653e508733",
+       "paramSet": "purchases",
+       "provenance": "measured",
+       "source": {
+        "artifactSha256": "abababababababababababababababababababababababababababababababab",
+        "pointer": "/stats/0"
+       },
+       "speedup": 3.4776268532400465
+      },
+      {
+       "arm": "oc_0000000000a3",
+       "baseline": {
+        "medianNs": 5286750.5,
+        "n": 30,
+        "p95Ns": 6474750,
+        "robustCv": 0.10464524871724183
+       },
+       "candidate": {
+        "medianNs": 4708208.5,
+        "n": 30,
+        "p95Ns": 6353250,
+        "robustCv": 0.1409227520481141
+       },
+       "ciHigh": 1.2304361214432549,
+       "ciLow": 1.0247525326521516,
+       "evidenceId": "ev_37f42e0b412c",
+       "paramSet": "views",
+       "provenance": "measured",
+       "source": {
+        "artifactSha256": "abababababababababababababababababababababababababababababababab",
+        "pointer": "/stats/1"
+       },
+       "speedup": 1.122879434927319
+      }
+     ],
+     "provenance": "measured",
+     "replicate": 0,
+     "replication": null,
+     "resultSha256": "abababababababababababababababababababababababababababababababab",
+     "round": 0,
+     "rowProfile": "qc-row-v1",
+     "seed": 42,
+     "status": "completed",
+     "tournament": [
+      {
+       "arm": "oc_0000000000a3",
+       "primaryCiLow": 3.2869577496235736,
+       "rank": 1,
+       "verdict": "verified"
+      }
+     ],
+     "verdicts": [
+      {
+       "arm": "oc_0000000000a3",
+       "gate": null,
+       "reasons": [],
+       "verdict": "verified"
+      }
+     ],
+     "winner": "oc_0000000000a3"
+    },
+    "replicates": [],
+    "round": 0
+   }
+  ],
+  "run": {
+   "id": "00000000-0000-4000-8000-0000000000aa",
+   "investigationId": "8f7d60a5-f02f-5114-a93f-e1f6f8c80fd9",
+   "kind": "initial",
+   "parentRunId": null,
+   "runNumber": 1
+  },
+  "schemaVersion": 2,
+  "stopReason": null,
+  "summary": "The scan over 1000000 rows dominates.",
+  "usage": {
+   "llmCalls": 7,
+   "toolCalls": 2
+  }
+ }
+}

@@ -79,6 +79,7 @@ function benchmark(events: RunEvent[], since: string): { label: string; detail: 
 export function activityOf({
   status,
   outcome,
+  outcomeLabel,
   errorMessage,
   trace,
   events,
@@ -86,6 +87,9 @@ export function activityOf({
 }: {
   status: string;
   outcome: string | null;
+  /** The shared outcome classification's words, when the caller has them (experiment replays:
+   * never the bare stored outcome, REPLAY_OUTCOME_AUDIT §18.1). */
+  outcomeLabel?: { label: string; tone: Tone };
   errorMessage: string | null;
   trace: Span;
   events: RunEvent[];
@@ -94,6 +98,7 @@ export function activityOf({
   const still = (label: string, detail: string, tone: Tone, node: string | null = null): Activity => ({ label, detail, tone, animate: false, node });
   switch (status) {
     case "completed":
+      if (outcomeLabel) return still(outcomeLabel.label, "The report is sealed from recorded results.", outcomeLabel.tone);
       return still(outcome ? sentence(outcome) : "Completed", "The report is sealed from recorded results.", outcome ? (OUTCOME_TONE[outcome] ?? "success") : "success");
     case "failed":
       return still("Failed", errorMessage ?? "The run stopped with an error.", "failed");

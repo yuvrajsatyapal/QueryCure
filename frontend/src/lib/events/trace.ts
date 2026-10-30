@@ -70,6 +70,8 @@ function close(s: Span, event: RunEvent, durationMs: unknown, status: SpanStatus
 export function buildTrace(events: RunEvent[], { active }: { active: boolean }): Span {
   const sorted = [...events].sort((a, b) => a.seq - b.seq);
   const first = sorted[0];
+  // Only experiment replay runs record replay.* events (their creation event is one).
+  const ctx = { replay: sorted.some((e) => e.type.startsWith("replay.")) };
   const root: Span = {
     id: "run",
     kind: "run",
@@ -128,7 +130,7 @@ export function buildTrace(events: RunEvent[], { active }: { active: boolean }):
       }
       default: {
         const status = eventStatus(event);
-        const log = span("event", describe(event).text, event, agent, status);
+        const log = span("event", describe(event, ctx).text, event, agent, status);
         log.evidenceIds = ids(p.evidenceIds);
         if (RUN_LEVEL.has(event.type)) {
           root.children.push(log);

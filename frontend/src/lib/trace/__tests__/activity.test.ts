@@ -62,3 +62,18 @@ test("a running run between steps does not invent a step", () => {
   const events = [ev("node.started", { node: "intake", agent: null, attempt: 1 }), ev("node.completed", { node: "intake", agent: null, attempt: 1, durationMs: 4 })];
   expect(act("running", events)).toMatchObject({ label: "Running", detail: "Waiting for the next step to start.", animate: false, node: null });
 });
+
+test("a completed run's label can come from the shared outcome classification (experiment replays)", () => {
+  const a = activityOf({
+    status: "completed",
+    outcome: "verified_recommendation",
+    outcomeLabel: { label: "Replay completed", tone: "neutral" },
+    errorMessage: null,
+    events: [],
+    trace: buildTrace([], { active: false }),
+    stream: "closed",
+  });
+  expect(a).toMatchObject({ label: "Replay completed", tone: "neutral", animate: false });
+  // without one, the stored outcome is used as before
+  expect(act("completed", [], "closed", { outcome: "verified_recommendation" })).toMatchObject({ label: "Verified recommendation", tone: "success" });
+});

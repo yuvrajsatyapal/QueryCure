@@ -24,16 +24,17 @@
 
 ## Activation (separate approval)
 
-A single change:
-- `_close` calls `load_source_snapshot` (an error counts as `None`) and the classifier;
-- passes `Conclusion(final_status, outcome, replay_basis)`;
+A single change (exact plan: audit §18.5):
+- `_close` determines the replay's creation contract. For a `snapshot` replay it calls `load_source_snapshot` (an error counts as `None`) and the classifier, and passes `Conclusion(final_status, outcome, replay_basis)`. A `legacy` replay seals as before, with the v1 versions passed explicitly;
 - sets `registry.CURRENT_BUILDER/RENDERER/SCHEMA_VERSION` to `report-builder@2` / `report-md@2` / `2`.
 
 The two must ship together: v2 refuses the legacy winner-based outcome (tested). Deploy the frontend first (it already renders schema 2), then the API and worker together.
 
 The file-level plan, the deploy order, the handling of replays in flight at activation, monitoring queries and rollback are in [REPLAY_OUTCOME_AUDIT §17.10](../../reports/REPLAY_OUTCOME_AUDIT_2026-10-27.md).
 - **Ship first:** this change set inactive, so v2 is registered everywhere and new replays carry their snapshot marker before any v2 report is sealed.
-- **Open decision:** v2 current for all new reports (this ADR, recommended) or for replay runs only.
+- **Scope decided (owner, 2026-10-30):** v2 becomes current for all new reports, subject to the compatibility checks. They passed for every ordinary report shape (audit §18.3): v2 is v1 plus exactly `schema_version`, `builder_version` and `recommendation.origin`.
+- **Creation contract (audit §18.4):** a replay keeps the contract it was created under. One started before the snapshot marker (`replay/cutover.py`: no marker, no links) is sealed after activation as before, with `report-builder@1` / `report-md@1` and its legacy outcome, and the UI tags it legacy. It is never reclassified as `source_snapshot_missing`. Damaged snapshot records still fail closed. The activation drains such replays first: `python -m querycure.ops replay-cutover-check` exits 1 while one is in flight. The activation patch therefore also gives `finalize_run` an explicit report-version argument (audit §18.5).
+- **Outcome labels (audit §18.1):** one frontend classifier labels runs everywhere (selector, History, Dashboard, header, event log). A replay never reads as a verified recommendation from its stored outcome alone.
 - **Rehearsal, local only (audit §17.6):** a real-stack browser rehearsal ran the activated path end to end without intercepting the report endpoint. It used a test-only worker (`backend/tests/rehearsal/activated_worker.py`) that applies this exact change in-process.
 
 ## Consequences

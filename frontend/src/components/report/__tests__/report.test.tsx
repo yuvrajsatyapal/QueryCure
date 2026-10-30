@@ -204,6 +204,14 @@ test("report panel: loading, not finalized, verify result wording", async () => 
   expect(screen.queryByText(/tamper/i)).toBeNull();
 });
 
+test("a failed report request shows the error and claims no outcome (REPLAY_OUTCOME_AUDIT §18.1)", async () => {
+  getReport.mockRejectedValue(new ApiError("INTERNAL_ERROR", "The report could not be loaded.", 500, [], null));
+  renderWithQuery(<ReportPanel runId="run-1" />);
+  expect(await screen.findByText("The report could not be loaded.")).toBeTruthy();
+  expect(screen.queryByText(/verified recommendation|reproduced/i)).toBeNull();
+  expect(screen.queryByRole("button", { name: "Verify report" })).toBeNull();
+});
+
 test("unknown report schema falls back to the stored markdown", async () => {
   getReport.mockResolvedValue({ reportSchemaVersion: 7, manifestSha256: "f".repeat(64), report: {} });
   renderWithQuery(<ReportPanel runId="run-1" />);

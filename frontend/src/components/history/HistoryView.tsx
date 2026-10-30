@@ -8,6 +8,7 @@ import { deleteInvestigation, listInvestigations, restoreInvestigation } from "@
 import type { InvestigationSummary } from "@/lib/api/types";
 import { Icon } from "@/components/ui/Icon";
 import { groupByDay } from "@/lib/investigations/grouping";
+import { useCachedReplayReports } from "@/lib/report/useCachedReplayReports";
 import { InvestigationRow } from "./InvestigationRow";
 
 const STATUSES = ["", "queued", "running", "awaiting_approval", "completed", "failed", "cancelled"] as const;
@@ -48,6 +49,10 @@ export function HistoryView() {
   });
 
   const items = list.data?.pages.flatMap((p) => p.items) ?? [];
+  const replayReports = useCachedReplayReports(items.map((i) => i.latestRun));
+  // The endpoint filters by the latest run's stored outcome. A replay is never a latest run today
+  // (§18.2); should that change, say why it matches a "verified" filter.
+  const replayMatches = outcome === "verified_recommendation" && items.some((i) => i.latestRun?.kind === "experiment_replay");
   return (
     <div className="mx-auto flex w-full max-w-6xl flex-col gap-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
@@ -104,6 +109,11 @@ export function HistoryView() {
           {items.length} shown{list.hasNextPage ? " · more available" : ""} · newest first (the only order the list endpoint provides)
         </p>
       ) : null}
+      {replayMatches ? (
+        <p className="-mt-2 text-xs text-muted">
+          Experiment replays match this filter by their stored outcome; a replay never verifies a recommendation on its own, and each row says what the replay found.
+        </p>
+      ) : null}
       {deleted ? (
         <div role="status" className="flex items-center justify-between gap-2 rounded-md border border-border bg-surface-2 px-3 py-2 text-sm">
           <span>Deleted “{deleted.title}”.</span>
@@ -138,6 +148,7 @@ export function HistoryView() {
                   <InvestigationRow
                     key={item.id}
                     item={item}
+                    report={item.latestRun ? replayReports.get(item.latestRun.id) : undefined}
                     actions={
                       <button
                         type="button"

@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { StatusIcon, runStatusMeta } from "@/components/ui/StatusPill";
 import type { InvestigationSummary } from "@/lib/api/types";
+import { classifyRunOutcome, runOutcomeText, type ReplayReportState } from "@/lib/report/replay";
 
 const MODE_LABEL: Record<string, string> = {
   offline: "Offline",
@@ -21,10 +22,12 @@ export function timeAgo(iso: string, now = Date.now()): string {
   return shortDate.format(new Date(iso));
 }
 
-/** One investigation as a dense Linear-style row: status, title, modes, outcome, age. */
-export function InvestigationRow({ item, actions }: { item: InvestigationSummary; actions?: ReactNode }) {
+/** One investigation as a dense Linear-style row: status, title, modes, outcome, age. The outcome
+ * uses the shared classification, so a replay never reads as a verification (§18.1). */
+export function InvestigationRow({ item, report, actions }: { item: InvestigationSummary; report?: ReplayReportState; actions?: ReactNode }) {
   const run = item.latestRun;
   const meta = runStatusMeta(run?.status);
+  const outcome = run ? runOutcomeText(classifyRunOutcome(run, report)) : null;
   return (
     <li className="group flex h-11 min-w-0 items-center gap-3 border-b border-border px-3 last:border-b-0 hover:bg-hover">
       <span title={meta.label} className="flex shrink-0">
@@ -42,8 +45,8 @@ export function InvestigationRow({ item, actions }: { item: InvestigationSummary
           </span>
         ))}
       </span>
-      <span className="hidden w-44 shrink-0 truncate text-right text-xs text-muted xl:inline">
-        {run ? (run.outcome ? run.outcome.replaceAll("_", " ") : meta.label) : "no run"}
+      <span title={outcome?.title} className="hidden w-52 shrink-0 truncate text-right text-xs text-muted xl:inline">
+        {outcome ? outcome.label : "no run"}
       </span>
       <time dateTime={item.createdAt} title={new Date(item.createdAt).toLocaleString()} className="w-12 shrink-0 text-right text-xs text-muted tabular-nums">
         {timeAgo(item.createdAt)}

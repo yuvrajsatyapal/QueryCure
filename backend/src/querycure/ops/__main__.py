@@ -4,7 +4,10 @@
   a DSN for the `qc_retention` role (never the app's URL).
 - `verify-integrity`: the restore check (DEPLOYMENT §4c), read-only. The DSN is read from the
   environment variable named by `--url-env` (default DATABASE_URL_DIRECT), never from argv,
-  so it does not show up in process listings or shell history."""
+  so it does not show up in process listings or shell history.
+- `replay-cutover-check`: read-only; lists experiment replays still in flight with the contract
+  they were created under (REPLAY_OUTCOME_AUDIT §18.4). Exit 1 while a legacy one is in flight:
+  activation waits for it. Same `--url-env` rule."""
 
 import argparse
 import asyncio
@@ -13,12 +16,14 @@ import os
 import sys
 
 from pydantic import SecretStr
+from sqlalchemy import text
 
 from querycure.core.config import Settings
 from querycure.core.logging import configure_logging, get_logger
 from querycure.db.engine import make_engine
 from querycure.ops.integrity import verify_integrity
 from querycure.ops.retention import sweep
+from querycure.replay.cutover import in_flight_replays
 
 log = get_logger(__name__)
 
@@ -40,12 +45,55 @@ async def _retention() -> int:
     return 0
 
 
+def _url(settings: Settings, url_env: str) -> str | None:
+    # Settings fields first, so `.env` works; any other name is read from the environment.
+    secret = getattr(settings, url_env.lower(), None)
+    return secret.get_secret_value() if isinstance(secret, SecretStr) else os.environ.get(url_env)
+
+
+async def _replay_cutover_check(url_env: str) -> int:
+    settings = Settings()
+    configure_logging(level=settings.log_level)
+    url = _url(settings, url_env)
+    if not url:
+        print(f"Set {url_env} (a direct, non-pooled DSN).", file=sys.stderr)
+        return 2
+    engine = make_engine(url)
+    try:
+        async with engine.connect() as conn:
+            await conn.execute(text("SET TRANSACTION READ ONLY"))
+            replays = await in_flight_replays(conn)
+            await conn.rollback()
+    finally:
+        await engine.dispose()
+    legacy = [r for r in replays if r.contract == "legacy"]
+    print(
+        json.dumps(
+            {
+                "ready": not legacy,
+                "in_flight": len(replays),
+                "legacy_in_flight": len(legacy),
+                "replays": [
+                    {
+                        "attempt_id": str(r.attempt_id),
+                        "replay_run_id": str(r.replay_run_id),
+                        "attempt_status": r.attempt_status,
+                        "run_status": r.run_status,
+                        "contract": r.contract,
+                    }
+                    for r in replays[:MAX_LISTED_FAILURES]
+                ],
+            },
+            indent=1,
+        )
+    )
+    return 1 if legacy else 0
+
+
 async def _verify_integrity(url_env: str) -> int:
     settings = Settings()
     configure_logging(level=settings.log_level)
-    # Settings fields first, so `.env` works; any other name is read from the environment.
-    secret = getattr(settings, url_env.lower(), None)
-    url = secret.get_secret_value() if isinstance(secret, SecretStr) else os.environ.get(url_env)
+    url = _url(settings, url_env)
     if not url:
         print(f"Set {url_env} (a direct, non-pooled DSN).", file=sys.stderr)
         return 2
@@ -80,9 +128,15 @@ def main() -> None:
         "verify-integrity", help="re-verify every artifact and replay every sealed report"
     )
     verify.add_argument("--url-env", default="DATABASE_URL_DIRECT")
+    cutover = sub.add_parser(
+        "replay-cutover-check", help="list in-flight experiment replays and their contract"
+    )
+    cutover.add_argument("--url-env", default="DATABASE_URL_DIRECT")
     args = parser.parse_args()
     if args.command == "verify-integrity":
         sys.exit(asyncio.run(_verify_integrity(args.url_env)))
+    if args.command == "replay-cutover-check":
+        sys.exit(asyncio.run(_replay_cutover_check(args.url_env)))
     sys.exit(asyncio.run(_retention()))
 
 

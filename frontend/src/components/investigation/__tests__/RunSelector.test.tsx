@@ -250,7 +250,7 @@ test("a historical replay with a stored verified outcome is tagged legacy; the o
   const legacy = run({ id: "run-4", runNumber: 4, kind: "experiment_replay", parentRunId: "run-1", outcome: "verified_recommendation" });
   const user = userEvent.setup();
   render(
-    <RunSelector runs={[original, legacy]} selectedId="run-1" onSelect={vi.fn()} replayReports={new Map([["run-4", { builderVersion: "report-builder@1", replayTitle: null }]])} />,
+    <RunSelector runs={[original, legacy]} selectedId="run-1" onSelect={vi.fn()} replayReports={new Map([["run-4", { builderVersion: "report-builder@1", replayTitle: null, replayResult: null }]])} />,
   );
   await user.click(screen.getByRole("button", { name: /^run \d/ }));
   const [row1, row4] = items();
@@ -270,7 +270,7 @@ test("a schema-2 replay that reproduced the original says so, never 'verified re
       runs={[original, replay]}
       selectedId="run-1"
       onSelect={vi.fn()}
-      replayReports={new Map([["run-4", { builderVersion: "report-builder@2", replayTitle: "Original recommendation reproduced" }]])}
+      replayReports={new Map([["run-4", { builderVersion: "report-builder@2", replayTitle: "Original recommendation reproduced", replayResult: "original_reproduced" }]])}
     />,
   );
   await user.click(screen.getByRole("button", { name: /^run \d/ }));

@@ -7,18 +7,26 @@ seams in-process: the registry's current builder and renderer, and `finalize_run
 `experiment_replay` sees it. Nothing here is importable from `querycure` (the package never
 depends on `tests`, and the Docker image copies `src` only), so production execution cannot
 take this path.
+
+Version-aware continuation (REPLAY_OUTCOME_AUDIT §18.4): a replay keeps the contract it was
+created under. One created before the snapshot code (no marker, no links: `replay_contract`
+says `legacy`) is sealed exactly as it would have been without activation, with
+report-builder@1 / report-md@1 and its legacy conclusion, so the UI tags it legacy instead of
+turning it into an unexplained `source_snapshot_missing`. Every other replay is classified.
 """
 
 import dataclasses
 import json
 import uuid
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
 from typing import Any
 
 from sqlalchemy import text
 
 from querycure.replay import experiment_replay
 from querycure.replay.artifact_store import get_artifact
+from querycure.replay.cutover import replay_contract
 from querycure.replay.outcome import classify_replay_outcome
 from querycure.replay.source_snapshot import SourceSnapshotError, load_source_snapshot
 from querycure.reports import registry
@@ -26,10 +34,27 @@ from querycure.reports import registry
 SetAttr = Callable[[Any, str, Any], None]
 
 
+@contextmanager
+def legacy_report_versions() -> Iterator[None]:
+    """report-builder@1 / report-md@1 for one seal. The activation patch passes the versions
+    to `finalize_run` instead of swapping the registry (§18.5); this is the test stand-in."""
+    saved = (registry.CURRENT_BUILDER, registry.CURRENT_RENDERER, registry.CURRENT_SCHEMA_VERSION)
+    registry.CURRENT_BUILDER, registry.CURRENT_RENDERER = "report-builder@1", "report-md@1"
+    registry.CURRENT_SCHEMA_VERSION = 1
+    try:
+        yield
+    finally:
+        registry.CURRENT_BUILDER, registry.CURRENT_RENDERER, registry.CURRENT_SCHEMA_VERSION = saved
+
+
 def classifying_finalize(real_finalize: Any) -> Any:
-    """`finalize_run` whose completed replay conclusion comes from the classifier."""
+    """`finalize_run` whose completed replay conclusion comes from the classifier, except for
+    replays created under the legacy contract (sealed as before, with the v1 versions)."""
 
     async def finalize(conn: Any, run_id: uuid.UUID, conclusion: Any, **kw: Any) -> Any:
+        if await replay_contract(conn, run_id) == "legacy":
+            with legacy_report_versions():
+                return await real_finalize(conn, run_id, conclusion, **kw)
         if conclusion.final_status.value != "completed":
             return await real_finalize(conn, run_id, conclusion, **kw)
         try:
@@ -68,4 +93,5 @@ def activate(setattr: SetAttr) -> None:
     the builtin in the rehearsal worker process)."""
     setattr(registry, "CURRENT_BUILDER", "report-builder@2")
     setattr(registry, "CURRENT_RENDERER", "report-md@2")
+    setattr(registry, "CURRENT_SCHEMA_VERSION", 2)
     setattr(experiment_replay, "finalize_run", classifying_finalize(experiment_replay.finalize_run))

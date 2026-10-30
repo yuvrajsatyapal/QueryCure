@@ -6,12 +6,13 @@ function str(value: unknown): string {
   return typeof value === "string" ? value : "";
 }
 
-/** One line per event, in words (status is never colour alone). */
-export function describe(event: RunEvent): { text: string; tone: "normal" | "muted" | "error" } {
+/** One line per event, in words (status is never colour alone). On an experiment replay run the
+ * stored outcome is never printed bare: the replay's report says what it found (§18.1). */
+export function describe(event: RunEvent, context: { replay?: boolean } = {}): { text: string; tone: "normal" | "muted" | "error" } {
   const p = event.payload as Payload;
   switch (event.type) {
     case "run.status_changed":
-      return { text: `Run ${str(p.to)}${p.outcome ? ` · ${str(p.outcome).replaceAll("_", " ")}` : ""}`, tone: "normal" };
+      return { text: `Run ${str(p.to)}${p.outcome && !context.replay ? ` · ${str(p.outcome).replaceAll("_", " ")}` : ""}`, tone: "normal" };
     case "node.started":
       return { text: `${str(p.node)} started`, tone: "muted" };
     case "node.completed":
@@ -56,7 +57,14 @@ export function describe(event: RunEvent): { text: string; tone: "normal" | "mut
       // An experiment replay's sealed basis says why it concluded; its stored outcome alone
       // could read as a verification it never made (REPLAY_OUTCOME_AUDIT §13.3).
       const basis = p.replayBasis && typeof p.replayBasis === "object" ? (p.replayBasis as Payload).code : null;
-      const why = basis ? ` · replay basis: ${str(basis).replaceAll("_", " ")}` : p.outcome ? ` · ${str(p.outcome).replaceAll("_", " ")}` : "";
+      const stored = p.outcome ? str(p.outcome).replaceAll("_", " ") : "";
+      const why = basis
+        ? ` · replay basis: ${str(basis).replaceAll("_", " ")}`
+        : stored && context.replay
+          ? ` · stored outcome: ${stored} (legacy replay classification)`
+          : stored
+            ? ` · ${stored}`
+            : "";
       return { text: `Concluded: ${str(p.finalStatus)}${why}`, tone: "normal" };
     }
     case "report.ready":

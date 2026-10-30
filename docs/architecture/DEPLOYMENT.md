@@ -342,6 +342,8 @@ Separately, the `QC_MASTER_KEY` and its version. There is no other state: the sa
 
 The drill's two integrity checks are now one read-only command: `python -m querycure.ops verify-integrity [--url-env NAME]`. It runs in a single `READ ONLY` transaction and writes no `replay_attempts` rows. The DSN comes from the named environment variable (default `DATABASE_URL_DIRECT`), never from argv. Exit codes: 0 means everything verified, 1 means failures were found (IDs are listed), 2 means it was not configured. On 2026-10-18 it reported, against Neon (read-only, after migration 0016), 94/94 artifacts and 9/9 sealed reports `verified`.
 
+**Replay cutover gate (ADR-0032 activation only):** `python -m querycure.ops replay-cutover-check [--url-env NAME]` is read-only (`READ ONLY` transaction, same DSN rule). It lists experiment replays still in flight and the contract each was created under (`legacy`: started before the snapshot marker; `snapshot`: started with it). Exit codes: 0 means no legacy replay is in flight, 1 means wait (they are listed), 2 means it was not configured. Run it right before deploying the activation commit ([REPLAY_OUTCOME_AUDIT §18.4](../reports/REPLAY_OUTCOME_AUDIT_2026-10-27.md)). It never cancels anything.
+
 ### Validating a Neon point-in-time restore (procedure; not yet performed)
 
 Never restore over, reset or truncate the live branch. All steps touch only a new child branch.

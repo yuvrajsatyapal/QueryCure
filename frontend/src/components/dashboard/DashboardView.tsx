@@ -14,6 +14,8 @@ import type { InvestigationPage, InvestigationSummary } from "@/lib/api/types";
 import { cappedCount, sumCounts, type CountResult } from "@/lib/investigations/counts";
 import { activeFirst, medianRunMs, outcomeBreakdown, type OutcomeKey } from "@/lib/investigations/dashboard";
 import { formatDuration } from "@/lib/format";
+import { classifyRunOutcome, runOutcomeText, type ReplayReportState } from "@/lib/report/replay";
+import { useCachedReplayReports } from "@/lib/report/useCachedReplayReports";
 
 // The list endpoint's maximum page; a full page with a cursor is "100+", never a total (UI_UX §3.2).
 const COUNT_PAGE = 100;
@@ -39,6 +41,8 @@ const OUTCOME: Record<OutcomeKey, { label: string; short: string; tone: Tone; ba
   unverified_recommendations: { label: "Unverified recommendations", short: "unverified", tone: "neutral", bar: "bg-hypothesis" },
   no_action_needed: { label: "No action needed", short: "no action needed", tone: "neutral", bar: "bg-border-strong" },
   inconclusive: { label: "Inconclusive", short: "inconclusive", tone: "warning", bar: "bg-inconclusive" },
+  // A replay re-measures an earlier run; its report, not this count, says what it found (§18.1).
+  replay: { label: "Experiment replays", short: "replays", tone: "neutral", bar: "bg-border-strong/60" },
   completed: { label: "Completed", short: "completed", tone: "success", bar: "bg-verified/60" },
   failed: { label: "Failed", short: "failed", tone: "failed", bar: "bg-rejected" },
   cancelled: { label: "Cancelled", short: "cancelled", tone: "neutral", bar: "bg-faint" },
@@ -51,11 +55,10 @@ function liveInterval(client: QueryClient): number | false {
   return busy ? LIVE_REFRESH_MS : false;
 }
 
-/** The latest run's outcome in words, or its status while it has none. */
-function outcomeMeta(item: InvestigationSummary): { tone: Tone; label: string } {
+/** The latest run's outcome in words (the shared classification), or its status while it has none. */
+function outcomeMeta(item: InvestigationSummary, report?: ReplayReportState): { tone: Tone; label: string; title?: string } {
   const run = item.latestRun;
-  if (run?.status === "completed" && run.outcome) return OUTCOME[run.outcome as OutcomeKey] ?? { tone: "success", label: run.outcome.replaceAll("_", " ") };
-  return runStatusMeta(run?.status);
+  return run ? runOutcomeText(classifyRunOutcome(run, report)) : runStatusMeta(null);
 }
 
 function untilLabel(iso: string, now: number): string {
@@ -263,6 +266,7 @@ function OutcomesPanel({ items, failed }: { items: InvestigationSummary[]; faile
 
 function RecentResults({ items, loading, failed }: { items: InvestigationSummary[]; loading: boolean; failed: boolean }) {
   const rows = items.slice(0, RECENT_ROWS);
+  const replayReports = useCachedReplayReports(rows.map((i) => i.latestRun));
   return (
     <section aria-labelledby="dash-recent" className="qc-panel min-w-0 overflow-hidden">
       <div className="qc-panel-header">
@@ -301,11 +305,11 @@ function RecentResults({ items, loading, failed }: { items: InvestigationSummary
             </thead>
             <tbody>
               {rows.map((item) => {
-                const o = outcomeMeta(item);
+                const o = outcomeMeta(item, item.latestRun ? replayReports.get(item.latestRun.id) : undefined);
                 const when = item.latestRun?.finishedAt ?? item.latestRun?.startedAt ?? item.createdAt;
                 return (
                   <tr key={item.id} className="h-11 border-b border-border last:border-b-0 hover:bg-hover">
-                    <td className="hidden px-4 sm:table-cell">
+                    <td className="hidden px-4 sm:table-cell" title={o.title}>
                       <StatusPill tone={o.tone} label={o.label} />
                     </td>
                     <td className="max-w-0 px-4 py-2.5 sm:px-3 sm:py-0">

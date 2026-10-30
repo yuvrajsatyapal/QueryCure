@@ -92,7 +92,8 @@ test("selector labels: the builder's title for schema-2 replays, the stored outc
 test("selector labels before the report is known: never a bare verified replay; ordinary runs unchanged", () => {
   expect(runOutcomeLabel(run({}))).toEqual({ outcome: null, legacy: false });
   expect(runOutcomeLabel(run({ status: "failed", outcome: null }))).toEqual({ outcome: "Replay failed", legacy: false });
-  expect(runOutcomeLabel(run({ outcome: "inconclusive" }))).toEqual({ outcome: "inconclusive", legacy: false });
+  // the stored outcome is not read before the report says what it means (§18.1)
+  expect(runOutcomeLabel(run({ outcome: "inconclusive" }))).toEqual({ outcome: null, legacy: false });
   expect(runOutcomeLabel(run({ kind: "initial" }))).toEqual({ outcome: "verified recommendation", legacy: false });
   expect(runOutcomeLabel(run({ kind: "reinvestigation", outcome: "no_action_needed" }))).toEqual({ outcome: "no action needed", legacy: false });
   expect(runOutcomeLabel(run({ kind: "initial" }), meta("1_reproduced_original"))).toEqual({ outcome: "verified recommendation", legacy: false });

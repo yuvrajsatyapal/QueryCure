@@ -20,6 +20,7 @@ export type OutcomeKey =
   | "unverified_recommendations"
   | "no_action_needed"
   | "inconclusive"
+  | "replay"
   | "completed"
   | "failed"
   | "cancelled";
@@ -27,13 +28,15 @@ export type OutcomeKey =
 const OUTCOMES: readonly string[] = ["verified_recommendation", "unverified_recommendations", "no_action_needed", "inconclusive"];
 
 /** Concluded runs only, keyed by RunOutcome; a completed run with an outcome this UI doesn't know
- * yet still counts, as plain "completed". */
+ * yet still counts, as plain "completed". A completed experiment replay is its own key: its stored
+ * outcome is not a verification (REPLAY_OUTCOME_AUDIT §18.1), and the list carries no report. */
 export function outcomeBreakdown(items: InvestigationSummary[]): { total: number; parts: { key: OutcomeKey; count: number }[] } {
   const counts = new Map<OutcomeKey, number>();
   for (const { latestRun: run } of items) {
     if (!run) continue;
     let key: OutcomeKey | null = null;
-    if (run.status === "completed") key = run.outcome && OUTCOMES.includes(run.outcome) ? (run.outcome as OutcomeKey) : "completed";
+    if (run.status === "completed" && run.kind === "experiment_replay") key = "replay";
+    else if (run.status === "completed") key = run.outcome && OUTCOMES.includes(run.outcome) ? (run.outcome as OutcomeKey) : "completed";
     else if (run.status === "failed" || run.status === "cancelled") key = run.status;
     if (key) counts.set(key, (counts.get(key) ?? 0) + 1);
   }

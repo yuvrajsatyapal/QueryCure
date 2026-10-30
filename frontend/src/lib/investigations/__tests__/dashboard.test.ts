@@ -83,3 +83,17 @@ test("median run time uses completed runs with both timestamps", () => {
   expect(medianRunMs([inv("x", "running")])).toBeNull();
   expect(medianRunMs([inv("a", "completed", { startedAt: t("00:00"), finishedAt: t("01:00") }), inv("b", "completed", { startedAt: t("00:00"), finishedAt: t("02:00") })])).toEqual({ ms: 90_000, n: 2 });
 });
+
+test("experiment replays are counted on their own, never as verified recommendations (REPLAY_OUTCOME_AUDIT §18.1)", () => {
+  const items = [
+    inv("v", "completed", { outcome: "verified_recommendation" }),
+    inv("rv", "completed", { kind: "experiment_replay", outcome: "verified_recommendation", finalized: true }),
+    inv("ri", "completed", { kind: "experiment_replay", outcome: "inconclusive", finalized: true }),
+    inv("rf", "failed", { kind: "experiment_replay" }),
+    inv("rc", "cancelled", { kind: "experiment_replay" }),
+    inv("rr", "running", { kind: "experiment_replay" }),
+  ];
+  const b = outcomeBreakdown(items);
+  expect(b.total).toBe(5);
+  expect(Object.fromEntries(b.parts.map((p) => [p.key, p.count]))).toEqual({ verified_recommendation: 1, replay: 2, failed: 1, cancelled: 1 });
+});

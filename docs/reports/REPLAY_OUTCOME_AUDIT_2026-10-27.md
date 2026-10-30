@@ -829,7 +829,7 @@ Fields that do not exist are stated as such, never invented: v1 reports have no 
 
 ### 17.9 Remaining limitations
 
-1. **History list and dashboard:** they still print the latest run's raw stored outcome. A replay as the latest run (v1 today, v2 after activation) reads "verified recommendation" there, and the dashboard counts it as verified. This needs a frontend follow-up before activation (prerequisite 3).
+1. **History list and dashboard:** ~~they still print the latest run's raw stored outcome…~~ **Corrected in §18.2:** a replay is never an investigation's latest run, so these lists never showed a replay's outcome. The follow-up was done anyway as hardening (§18.1).
 2. **Rehearsal scope:** the browser rehearsal covers the reproduced and drifted scenarios end to end. The other eight are covered on real sealed runs at integration level (API, exports, report replay) and at component level, not in a browser.
 3. **Timing:** the rehearsal and the deterministic tests use the virtual clock, so real host timing is not part of the v2 proof. That is intentional, because thresholds and gates are unchanged.
 4. **Rule 8a:** a real comparison cannot reach rule 8a; its input is set at the comparison boundary.
@@ -864,7 +864,7 @@ Fields that do not exist are stated as such, never invented: v1 reports have no 
 | Replay state at deploy | What happens | Action |
 |---|---|---|
 | Sealed before activation | Keeps its v1 report forever, never rebuilt with v2 (verify uses the stored version) | none |
-| Queued or running, created **without** a marker (before step 0) | Classified with no snapshot → `inconclusive: source_snapshot_missing`, v2 report "No comparison with the original was possible" | Honest but unhelpful: before step 1, wait until `SELECT count(*) FROM replay_attempts WHERE status IN ('queued','running','comparing')` returns 0, or accept the result |
+| Queued or running, created **without** a marker (before step 0) | **Superseded by §18.4:** sealed under its creation contract (v1, legacy outcome, tagged legacy), never reclassified as `source_snapshot_missing` | Drain first: `python -m querycure.ops replay-cutover-check` exits 0 |
 | Queued or running, created **with** a marker (after step 0) | Classified normally | none |
 | Reclaimed after a worker crash | `_close` is idempotent (terminal attempt check, `finalized_at`) | none |
 
@@ -887,3 +887,201 @@ Fields that do not exist are stated as such, never invented: v1 reports have no 
 3. The history and dashboard follow-up (§17.9.1).
 4. The replay queue drained or the exposure accepted.
 5. The full verification re-run on the activated build, including `phase4-lifecycle` on a real activated replay.
+
+## 18. Pre-activation consistency and safety (2026-10-30)
+
+**Status: Pre-activation consistency verified locally — replay outcome activation awaiting approval.** `_close` still seals the replay's own winner (`experiment_replay.py:571-573`), and `registry.CURRENT_BUILDER/RENDERER/SCHEMA_VERSION` are still `report-builder@1` / `report-md@1` / `1`. No migration, API contract change or dependency. Nothing pushed or deployed. The owner approved report-builder@2 / report-md@2 as the future default for **all** new reports (§17.10's open decision), subject to the compatibility checks in §18.3; the default is not switched.
+
+### 18.1 Outcome-labelling contract (every surface)
+
+One classifier, `classifyRunOutcome(run, reportState)` in `frontend/src/lib/report/replay.ts`, decides what a run's outcome may say. Every surface formats its result: the run selector (`runOutcomeLabel`, lower case), History rows, Dashboard recent runs and outcome counts, the investigation header (`activityOf`), and the event log (`describe` with replay context).
+
+| Run | Condition | Label | Tone |
+|---|---|---|---|
+| Ordinary | completed with an outcome | Stored outcome (*Verified recommendation*, *Unverified recommendations*, *No action needed*, *Inconclusive*; unknown → its words) | verified only for `verified_recommendation` |
+| Ordinary | otherwise | Run status | status |
+| Replay | queued, running, awaiting approval, cancelling | Run status; the stored outcome is never read | status |
+| Replay | failed / cancelled | *Replay failed* / *Replay cancelled* | failed / neutral |
+| Replay | completed, schema-2 report loaded | The builder's sealed title (*Original recommendation reproduced*, *Performance drift detected*, *Original result not reproduced*, *Replay comparison inconclusive*, *Results not directly comparable*, …) | verified only for *Original recommendation reproduced* |
+| Replay | completed, report-builder@1 report loaded | *Legacy replay · {stored outcome}*, tooltip = the §13.4 notice | neutral (never the verified tone) |
+| Replay | completed, report loading or not requested | *Replay completed* | neutral |
+| Replay | completed, report request failed | *Replay completed · report unavailable* | neutral |
+| Replay | completed, unknown builder or format | *Replay completed · see report* (tooltip names the builder) | neutral |
+
+- **Invariant (tested over every fixture × every status × every report state):** no replay label is *Verified recommendation*; outside the legacy context no replay label contains "verified recommendation"; the verified tone appears on a replay only with *Original recommendation reproduced*.
+- **Tightened:** before, a completed replay whose report was still loading showed its stored `inconclusive` in the selector. It now shows nothing until the report says what that means.
+- **Dashboard counts:** a completed replay is its own bucket, *Experiment replays*, never *Verified recommendation*. Failed and cancelled replays count under their status.
+- **Event log:** on a replay run (detected from its `replay.*` events, which only replay runs record), `run.status_changed` drops the bare outcome. `run.concluded` names the sealed basis, or for v1 replays reads "stored outcome: … (legacy replay classification)". Ordinary runs are unchanged.
+- **Investigation header:** a completed replay uses the classification of its sealed report (the query the Report tab already makes).
+- **Historical v1 reports are unchanged.** The sealed summary still shows its stored title, always beside the legacy marker. The notice stays outside the sealed body and makes no claim about reproduction.
+- **Deliberately not changed:** the replay page's Manifest viewer prints the sealed manifest's raw `final_status · outcome` fields as manifest content, not as a label.
+
+### 18.2 List views: what they actually show (correction to §17.9.1)
+
+- **Correction:** §17.9.1 said History and Dashboard print a replay's stored outcome when the replay is the latest run. **That never happens with the current API.** The list's `latest_run` is `investigations.latest_run_id`, and only investigation creation and re-investigation set it (`db/repositories/investigations.py`); `start_replay` does not. So did the outcome and status filters, which join on the same column.
+  - **Local data (read only):** 102 investigations have replay runs, and 0 have a replay as their latest run.
+  - **Pinned** by `test_a_replay_never_becomes_its_investigations_latest_run`: after a sealed replay, the source run stays latest, and neither list nor filter returns a replay.
+  - The open investigation page also defaults to `latestRun`, so a replay is reached only by choosing it (run selector, replay page, report link). Those surfaces were already covered in §17.
+- **What the History/Dashboard change therefore is:** defensive hardening, so lists stay correct if replays ever become latest runs, not a fix of a reachable defect. It is kept because it is the same shared classifier and costs nothing. Dashboard counts would then put replays in their own *Experiment replays* bucket. History would show a note when the verified filter matches a replay (unreachable today).
+- **No N+1.** Lists read replay reports **from the query cache only** (`useCachedReplayReports`, `enabled: false`); a row never triggers a report request (unit-tested, and checked in `e2e/replay-labels.spec.ts` on real data).
+- **API:** no change is needed while `latest_run` excludes replays. If a future change made replays latest runs, exact list titles would need an additive, nullable `RunSummary.replay_result = {result, title, builder_version}` filled from `investigation_reports` and the stored report's `replay_result` (one indexed LEFT JOIN, no migration). The outcome filter should then exclude `experiment_replay`. Not proposed for now.
+
+### 18.3 Ordinary investigations under report-builder@2
+
+`backend/tests/unit/reports/test_ordinary_v2_compatibility.py` builds every ordinary report shape with v1 and v2 from the same inputs. The inputs are synthetic unit-test fixtures, not measurements.
+
+| Requested case | Matrix case |
+|---|---|
+| Verified recommendation | `verified` |
+| No action needed | `no_action_needed` (new) |
+| Inconclusive | `inconclusive` |
+| Rejected candidate | `rejected` |
+| Correctness failure | `mismatch` |
+| Missing evidence | `missing_evidence` (new: no conclusion, query, hypotheses or experiments) |
+| Noise warning | `noise_warning` |
+| Failed execution | `failed_execution` (new: dead letter, failed experiment) |
+| Cancelled execution | `cancelled` |
+| Multiple experiments and parameter sets | `multiple_experiments` (new: 3 replicates × 2 parameter sets with a replication verdict) |
+| Missing optional provenance | `no_optional_provenance` (new: no LLM calls, environment or usage) |
+| Also | `downgraded` (auditor), `prerecorded`, `unbenchmarked` |
+
+**Asserted for all 14 cases:**
+1. **Exact additive difference:** the set of differing JSON paths between v1 and v2 is exactly `schema_version` (1 → 2), `builder_version` (`report-builder@1` → `report-builder@2`) and `recommendation.origin` (absent → `"run"`). No other path differs, and `replay_result` is absent.
+2. **Semantics unchanged:** final status, outcome, stop reason, partial flag, headline, next steps, limitations and missing-evidence lists are equal.
+3. **Verification unchanged:** rounds (candidate statuses, verdicts, auditor downgrades, measurements, confidence intervals, builds, correctness), evidence and the recommendation (minus `origin`) are equal.
+4. **No invention:** a recommended candidate is one the run's own rounds verified (or verified with a noise warning); with no candidate the outcome is never `verified_recommendation`.
+5. **Markdown:** report-md@2 differs from report-md@1 in exactly one line (the version line). The provenance-label scan passes, and the headline and recommended candidate appear in the Markdown.
+6. **Determinism:** two builds and two renders are byte-identical.
+7. **Export shape:** after snake → camel conversion, `schemaVersion`, `builderVersion` and `recommendation.origin` are as the frontend reads them.
+
+- **Frontend:** `frontend/src/test/fixtures/report-v2-ordinary.json` is real builder output for the 11 requested cases (a new file; the backend test keeps it identical to the builder). `ordinary-v2.test.tsx` renders each with `ReportView` and `ResultSummary` and compares them to the same report as v1: the sections are identical, and so is the text apart from the version string. No replay wording or legacy notice appears.
+- **Unchanged and still passing:** the v1 golden digests (`v1_golden.json`, generated at `e99886d`), the schema-3+ stored-Markdown fallback, and the existing non-replay v1/v2 equivalence tests.
+- **Incompatibilities found:** none.
+
+### 18.4 In-flight replay cutover
+
+**What a replay depends on.** Its contract is fixed at creation:
+- `start_replay` writes the snapshot links and the creation marker in one transaction.
+- The worker handler runs the experiment, stores the comparison and calls `_close`.
+- `_close` is idempotent: a terminal-attempt check, plus `finalize_run` returning the existing seal when `finalized_at` is set.
+- Retries and reclaims resume the same run. Worker shutdown leaves the job reclaimable.
+
+**Policy (preferred, operational):**
+1. Hold new replay starts for the cutover window. There is no maintenance switch for `POST /experiments/{id}/replay` today, so this means deploying at a quiet time and re-running the gate right before the switch; adding a switch would be a separate, approved change. Existing jobs are never cancelled.
+2. Let queued and running replays drain.
+3. Gate: `python -m querycure.ops replay-cutover-check --url-env <VAR>` (new, read-only, in a `READ ONLY` transaction). It lists in-flight replays and the contract they were created under, and exits 1 while a `legacy` one is in flight.
+4. Deploy API and worker together (the activation commit).
+5. Resume replay starts after the post-deploy checks (§17.10 monitoring).
+
+**Contract detection** (`querycure/replay/cutover.py`, inert: neither the worker nor the API calls it today):
+- `legacy`: no marker and no links (started before step 0).
+- `snapshot`: marker and/or links present, **including damaged or contradictory ones** (fail closed: never legacy).
+
+**If draining is impossible (safety net, part of the activation patch).** A replay keeps its creation contract:
+- A `legacy` replay that concludes after activation is sealed exactly as before activation: its legacy winner-based conclusion with `report-builder@1` / `report-md@1`, no `replay_basis`. The UI then tags it *Legacy replay*.
+- It is **not** turned into `inconclusive: source_snapshot_missing`. That would read as "No comparison with the original was possible", which is wrong for a replay that simply predates snapshots.
+- This replaces the §17.10 table row that accepted `source_snapshot_missing` for these replays.
+
+**Tests** (`backend/tests/integration/test_replay_cutover.py`: real API, worker handler and sandbox PG 17, no LLM; activation simulated by the test-only seam, which now applies the same rule): 9 passed.
+
+| Case | Result |
+|---|---|
+| Legacy replay queued at cutover | Check reports it `legacy`/`queued`; sealed v1 (builder, renderer, schema 1) with the legacy outcome, no basis, no `replay_result`; verifies; no longer in flight |
+| Legacy replay running at cutover (worker died, job reclaimed) | Same, through the reclaim path |
+| New replay, valid snapshot | `snapshot`; sealed v2 with a basis; outcome `verified_recommendation` iff basis `reproduced_source_recommendation`; verifies |
+| New replay, snapshot link lost | Still `snapshot` (marker present); sealed v2 `inconclusive` / `source_snapshot_missing`; never legacy |
+| Worker restart + duplicate delivery | Reclaimed job, then two more deliveries: 1 experiment, 1 report, 1 manifest, 1 `run.concluded`, bytes unchanged |
+| API/worker version skew | Activated worker seals v2 while the API has v1 current: verifies, API serves `report-builder@2` / schema 2. Old worker seals a *marked* replay with v1 while v2 is current: verifies |
+| Builder version unknown to the reader | v2 unregistered: report replay answers `verified_stored_only` + `builder_retired` (no failure, no rebuild); API still serves the stored report |
+| Rollback after a v2 seal | The v2 report keeps its bytes and verifies; the next replay seals v1; both verify |
+| Cutover gate | Exit 1 with one legacy replay queued (attempt still `queued`: the check changes nothing); exit 0 after the user cancels it |
+
+- **Local data:** `replay-cutover-check` against the local dev metadata DB reports `ready: true`, 0 in flight.
+- **Not covered:** two workers delivering the same job concurrently (the queue's `FOR UPDATE SKIP LOCKED` claim prevents it; only sequential duplicates are tested).
+
+### 18.5 Activation diff (proposal — not applied)
+
+**1. `backend/src/querycure/replay/finalize.py`** — `finalize_run` gains an explicit version choice instead of reading globals mid-call:
+
+```python
+@dataclass(frozen=True)
+class ReportVersions:
+    builder: str
+    renderer: str
+
+async def finalize_run(conn, run_id, conclusion, *, fault=None, versions: ReportVersions | None = None):
+    versions = versions or ReportVersions(registry.CURRENT_BUILDER, registry.CURRENT_RENDERER)
+    ...
+    report = registry.build(versions.builder, inputs, ...)          # was registry.CURRENT_BUILDER
+    markdown = registry.RENDERERS[versions.renderer](report)          # was registry.CURRENT_RENDERER
+    ... "renderer": versions.renderer ...                             # investigation_reports row
+    manifest = await _manifest(..., renderer=versions.renderer)       # manifest md_renderer_version
+```
+
+`registry.py` adds `LEGACY_REPORT_VERSIONS = ReportVersions("report-builder@1", "report-md@1")` (or keeps the tuple in `finalize.py`).
+
+**2. `backend/src/querycure/replay/experiment_replay.py`, `_close`:** inside its transaction, before `finalize_run`:
+
+```python
+contract = await replay_contract(conn, run_id)
+versions = LEGACY_REPORT_VERSIONS if contract == "legacy" else None
+conclusion = Conclusion(final_status=run_status, outcome=outcome, stop_reason=..., error=...)
+if contract == "snapshot" and run_status is RunStatus.COMPLETED:
+    try:
+        snapshot = await load_source_snapshot(conn, run_id)
+    except SourceSnapshotError:
+        snapshot = None                          # fails closed: source_snapshot_missing
+    c = classify_replay_outcome(snapshot, result)  # `result` is the comparison dict _close stores
+    conclusion = dataclasses.replace(conclusion, final_status=c.run_status, outcome=c.outcome,
+                                     replay_basis=c.as_basis())
+await finalize_run(conn, run_id, conclusion, versions=versions)
+```
+
+- The completed call site (lines 564–576) keeps passing the winner-based outcome. It is used only for `legacy` replays, so it stays a legacy-only input.
+- Failed and cancelled closes take the same `versions` rule: a legacy replay seals v1 whatever its end.
+
+**3. `backend/src/querycure/reports/registry.py:34-36`:**
+- `CURRENT_BUILDER = builder_v2.BUILDER_VERSION`;
+- `CURRENT_RENDERER = md_v2.MD_RENDERER_VERSION`;
+- `CURRENT_SCHEMA_VERSION = builder_v2.REPORT_SCHEMA_VERSION`.
+
+All builders and renderers stay registered. Every new report, ordinary or replay, is v2 (§18.3), except legacy replays (v1, above). The schema version always comes from the builder's own output (`report["schema_version"]`, already how `investigation_reports` is filled), so schema and builder cannot disagree.
+
+**4. Fail closed:** unchanged.
+- v2 raises `ReportContractError` on any contradiction, and `_close`'s transaction rolls back, leaving no half-sealed run (`test_v2_finalization_refuses_a_legacy_winner_outcome`).
+- The attempt stays non-terminal and the job retries, then dead-letters to `failed`. That path seals with v2's failed result and no outcome, so it is never contradictory.
+
+**Tests in the activation commit:**
+- `test_v2_is_registered_but_v1_stays_current` → "v2 is current; v1 stays registered".
+- `test_historical_v1_replay_keeps_its_stored_contract` pins `versions=LEGACY_REPORT_VERSIONS`, or builds through a legacy-contract replay.
+- `tests/rehearsal/activation.py` shrinks to the comparison-status override. `test_replay_cutover.py`, `test_replay_outcome_e2e.py` and the integration v2 tests then run against production code with no seam (`simulate_activation` → no-op).
+- New unit tests for `finalize_run(versions=…)`: the manifest and the reports row record the chosen renderer; v1 with v2 current is byte-identical to the golden.
+- `frontend/e2e/phase4-lifecycle.spec.ts` expects the schema-2 replay title.
+- Expected behaviour: the §17.4 matrix rows plus §18.4 (legacy → v1 legacy).
+
+**Rollback:** revert the activation commit only (§17.10).
+- v2 stays registered. Replays sealed after rollback are v1 and tagged legacy.
+- The `versions` parameter is harmless to keep.
+
+### 18.6 Remaining risks
+
+1. **List precision (latent):** if replays ever became latest runs, History and Dashboard would show *Replay completed* for replays whose report this session has not loaded, until an additive API field exists (§18.2). Not reachable today.
+2. **Legacy safety net:** a legacy replay that concludes after activation keeps the old defect (a winner-based outcome) for that one run. It is visibly tagged legacy and is avoided entirely by draining (§18.4 step 2).
+3. **Seam vs. patch:** the cutover tests prove the rule through the test seam, which swaps registry globals for one seal. The proposed patch passes versions explicitly. The tests move to the real code in the activation commit.
+4. **Earlier §17.9 limitations 2–6** still hold.
+
+### 18.7 Verification (2026-10-30, local Docker only; no Neon, no live model calls)
+
+| Check | Result |
+|---|---|
+| ruff, ruff format, mypy strict (`src`) | clean (406 files; 222 source files) |
+| Full backend pytest | first run: 2069 passed, **1 failed** (the new cutover-gate test: its in-flight query counted finalized replays whose attempt row was still `queued`; fixed in §18.4 by defining in-flight as "run not sealed"). Re-run: **2071 passed**, 2 skipped, 1 xfailed (both pre-existing) |
+| New backend tests | ordinary v1/v2 matrix 61; cutover integration 10 |
+| Smoke evals (recorded) | 5/5, no quota-ledger entry (no live model calls) |
+| Frontend lint, typecheck, production build | clean |
+| Vitest | **600 passed** (was 567) |
+| Playwright full suite | **33/33** (was 31; +2 `replay-labels.spec.ts`: real data, axe dark and light, no overflow at 320/375/768/1440). An earlier run failed the new dashboard test once: it read a non-OK list response before the session existed; it now waits for an OK one |
+| Screenshots | `test-results/ws5-preact/{history,dashboard}-{320,375,768,1440}-{dark,light}.png` (gitignored), reviewed. No replay rows appear, as §18.2 explains; ordinary labels are capitalised and consistent with the Dashboard pills, with no clipping |
+| Sealed-report sweep (local dev DB, read only) | 702 before: **0 changed or missing** after (stored digests, content md5, builder, renderer, schema, outcome, manifest digest). 16 new reports from Playwright, all report-builder@1 (no activation). `verify-integrity`: 718/718 `verified`, 8303/8303 artifacts |
+| Golden and fixture integrity | `v1_golden.json` and `report-v2.json` unchanged; `report-v2-ordinary.json` is new |
+| Activation files | `registry.py`, `experiment_replay.py`, `finalize.py`: no diff. No migration |
