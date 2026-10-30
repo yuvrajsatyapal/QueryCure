@@ -11,6 +11,11 @@ and the approved-digest check applied again, and is scored with the *source* exp
 rules. The new measurements are compared with the original (`replay/comparison.py`), the
 comparison is stored as the replay run's content, and the replay run is finalized with its own
 manifest. The source run and its records are never touched.
+
+Outcome (ADR-0032): a replay created with a source snapshot is concluded by the classifier
+(`replay/outcome.py`) from that snapshot and the stored comparison, never from its own engine
+winner, and sealed with report-builder@2. A replay created before snapshots keeps its creation
+contract: its winner-based outcome and report-builder@1 (REPLAY_OUTCOME_AUDIT §18.4).
 """
 
 import asyncio
@@ -64,7 +69,9 @@ from querycure.evidence.store import record_evidence
 from querycure.jobs import queue
 from querycure.replay.artifact_store import get_artifact_by_id, link, load_json, store_json
 from querycure.replay.comparison import compare_experiments
+from querycure.replay.cutover import replay_contract
 from querycure.replay.finalize import Conclusion, finalize_run
+from querycure.replay.outcome import classify_replay_outcome
 from querycure.replay.report_replay import verify_report
 from querycure.replay.source_snapshot import (
     MARKER_KEY,
@@ -72,6 +79,7 @@ from querycure.replay.source_snapshot import (
     SourceSnapshotError,
     capture_source_snapshot,
     link_source_snapshot,
+    load_source_snapshot,
     snapshot_marker,
 )
 from querycure.sandbox.provisioner import SandboxProvisioner
@@ -338,6 +346,32 @@ async def _status(
     return updated
 
 
+async def _classified(
+    conn: AsyncConnection, run_id: uuid.UUID, conclusion: Conclusion
+) -> Conclusion:
+    """The classifier's conclusion for a completed snapshot-era replay, from its verified
+    source snapshot and its stored comparison. An unusable snapshot counts as none, so the
+    replay fails closed (`source_snapshot_missing`) instead of verifying."""
+    try:
+        snapshot = await load_source_snapshot(conn, run_id)
+    except SourceSnapshotError:
+        snapshot = None
+    stored = (
+        await conn.execute(
+            text(
+                "SELECT artifact_id FROM run_artifacts WHERE run_id = :run "
+                "AND role = 'replay.comparison'"
+            ),
+            {"run": run_id},
+        )
+    ).scalar_one_or_none()
+    comparison = None if stored is None else await load_json(conn, stored)
+    c = classify_replay_outcome(snapshot, comparison)
+    return dataclasses.replace(
+        conclusion, final_status=c.run_status, outcome=c.outcome, replay_basis=c.as_basis()
+    )
+
+
 async def _close(
     engine: AsyncEngine,
     run_id: uuid.UUID,
@@ -346,10 +380,12 @@ async def _close(
     status: str,
     code: str | None,
     run_status: RunStatus,
-    outcome: RunOutcome | None = None,
+    legacy_outcome: RunOutcome | None = None,
     result: dict[str, Any] | None = None,
     experiment_id: uuid.UUID | None = None,
 ) -> None:
+    """`legacy_outcome` is the pre-ADR-0032 winner-based outcome. It is sealed only for a
+    replay created before source snapshots; every other completed replay is classified."""
     async with engine.begin() as conn:
         current = await _status(
             conn,
@@ -370,18 +406,19 @@ async def _close(
             )
         ).one()
         if run.finalized_at is None and RunStatus(run.status) not in TERMINAL_STATUSES:
-            await finalize_run(
-                conn,
-                run_id,
-                Conclusion(
-                    final_status=run_status,
-                    outcome=outcome,
-                    stop_reason=None
-                    if run_status is RunStatus.COMPLETED
-                    else ("cancelled" if run_status is RunStatus.CANCELLED else "failed"),
-                    error=None if code is None or status != "failed" else {"code": code},
-                ),
+            conclusion = Conclusion(
+                final_status=run_status,
+                outcome=legacy_outcome,
+                stop_reason=None
+                if run_status is RunStatus.COMPLETED
+                else ("cancelled" if run_status is RunStatus.CANCELLED else "failed"),
+                error=None if code is None or status != "failed" else {"code": code},
             )
+            if run_status is RunStatus.COMPLETED and (
+                await replay_contract(conn, run_id) == "snapshot"
+            ):
+                conclusion = await _classified(conn, run_id, conclusion)
+            await finalize_run(conn, run_id, conclusion)
 
 
 def failure_code_for(exc: QueryCureError) -> str:
@@ -568,7 +605,7 @@ async def execute_experiment_replay(
         status=status_,
         code=comparison.get("failure_code"),
         run_status=RunStatus.FAILED if failed else RunStatus.COMPLETED,
-        outcome=None
+        legacy_outcome=None
         if failed
         else (RunOutcome.VERIFIED_RECOMMENDATION if result.winner else RunOutcome.INCONCLUSIVE),
         result=comparison,

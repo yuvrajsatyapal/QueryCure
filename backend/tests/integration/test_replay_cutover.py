@@ -1,13 +1,17 @@
 """In-flight replay safety at the activation boundary (REPLAY_OUTCOME_AUDIT §18.4).
 
-Real API, real worker handler, real sandbox PG 17, no LLM. Activation itself is simulated with
-the test-only seam (`tests/rehearsal/activation.py`), which now also applies the proposed
-version-aware rule: a replay keeps the contract it was created under. Production `_close` and
-the registry defaults are not changed by anything here.
+Real API, real worker handler, real sandbox PG 17, no LLM. Since the ADR-0032 activation every
+test runs the production code: `_close` classifies snapshot-era replays, report-builder@2 is
+current, and a replay keeps the contract it was created under (`finalize_run` seals a `legacy`
+replay with report-builder@1 / report-md@1 on every path: completed, failed, dead-lettered,
+cancelled). The pre-snapshot start code is reproduced by `as_legacy_start`; the pre-activation
+build, needed only for skew and rollback, by `tests/rehearsal/pre_activation.py` inside a
+named `monkeypatch.context()`.
 
 Cases: a legacy replay queued or running at cutover, a new replay with a valid or a missing
 snapshot, a worker restart (reclaimed job), duplicate delivery, API/worker version skew, a
-builder version the reader does not know, and rollback after a v2 report has been sealed.
+builder version the reader does not know, rollback after a v2 report has been sealed, and the
+failed, dead-lettered and cancelled ends of legacy and snapshot replays.
 """
 
 # ruff: noqa: F811 - pytest fixtures are imported by name and used as parameters
@@ -32,28 +36,18 @@ from querycure.sandbox.provisioner import SandboxProvisioner
 from tests.integration.test_experiment_replay import (  # noqa: F401 - fixtures
     _no_active_runs,
     api,
+    as_legacy_start,
     creation_events,
     drop_link,
     finalized_sandbox_run,
     no_llm,
-    simulate_activation,
     start_and_seal,
     stored_report,
     without_marker,
 )
-from tests.rehearsal import activation
+from tests.rehearsal import pre_activation
 
 pytestmark = pytest.mark.integration
-
-
-def as_legacy_start(monkeypatch: pytest.MonkeyPatch) -> None:
-    """The start code before snapshots: no links, no creation marker."""
-
-    async def no_links(*a: Any, **k: Any) -> None:
-        return None
-
-    monkeypatch.setattr(experiment_replay, "link_source_snapshot", no_links)
-    without_marker(monkeypatch)
 
 
 def sealed(owner: psycopg.Connection, run_id: uuid.UUID) -> dict[str, Any]:
@@ -120,8 +114,8 @@ async def test_legacy_replay_in_flight_at_cutover_keeps_its_creation_contract(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Created by the old start code, still queued (or running on a worker that then died)
-    when the activated build takes over: the cutover check reports it, and once it finishes it
-    is sealed under report-builder@1 with its legacy outcome, never silently reclassified."""
+    when the activated build (this code) takes over: the cutover check reports it, and once it
+    finishes it is sealed under report-builder@1 with its legacy outcome, never reclassified."""
     _, experiment_id = await finalized_sandbox_run(api, app_engine, migrated_db, provisioner)
     no_llm(monkeypatch)
     with monkeypatch.context() as old_code:
@@ -141,7 +135,6 @@ async def test_legacy_replay_in_flight_at_cutover_keeps_its_creation_contract(
     assert flight is not None
     assert (flight.contract, flight.attempt_status) == ("legacy", state)
 
-    simulate_activation(monkeypatch)
     await run_replay(app_engine, provisioner, replay_run, reclaimed=state == "running")
 
     row = sealed(owner, replay_run)
@@ -176,7 +169,6 @@ async def test_new_replay_with_a_valid_snapshot_is_classified_after_activation(
     contract, flight = await contract_and_in_flight(app_engine, replay_run)
     assert (contract, flight.contract if flight else None) == ("snapshot", "snapshot")
 
-    simulate_activation(monkeypatch)
     await run_replay(app_engine, provisioner, replay_run)
 
     row = sealed(owner, replay_run)
@@ -209,7 +201,6 @@ async def test_new_replay_that_lost_a_snapshot_link_fails_closed_never_legacy(
     contract, _ = await contract_and_in_flight(app_engine, replay_run)
     assert contract == "snapshot"
 
-    simulate_activation(monkeypatch)
     await run_replay(app_engine, provisioner, replay_run)
 
     row = sealed(owner, replay_run)
@@ -235,7 +226,6 @@ async def test_restart_and_duplicate_delivery_seal_once(
     experiment, one report, one manifest, unchanged bytes."""
     _, experiment_id = await finalized_sandbox_run(api, app_engine, migrated_db, provisioner)
     no_llm(monkeypatch)
-    simulate_activation(monkeypatch)
     replay_run = await start_and_seal(api, app_engine, provisioner, experiment_id, seal=False)
     owner.execute(
         "UPDATE investigation_runs SET status = 'running' WHERE id = %s", (str(replay_run),)
@@ -270,27 +260,33 @@ async def test_api_worker_version_skew_keeps_every_sealed_report_verifiable(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Both skew directions during a deploy, with v2 registered everywhere (step 0):
-    - an activated worker seals v2 while the API still has v1 current;
-    - an old worker seals a marked replay with v1 while the API has v2 current.
+    - the activated worker seals v2 while an old API (v1 current) reads and verifies it;
+    - an old worker seals a marked replay with v1 while the activated API reads it.
     Report replay rebuilds each with its stored version; the API serves both."""
     _, experiment_id = await finalized_sandbox_run(api, app_engine, migrated_db, provisioner)
     no_llm(monkeypatch)
-    with monkeypatch.context() as new_worker:
-        activation.activate(new_worker.setattr)
-        new = await start_and_seal(api, app_engine, provisioner, experiment_id, seal=True)
-    assert registry.CURRENT_BUILDER == "report-builder@1"  # the API side
+    new = await start_and_seal(api, app_engine, provisioner, experiment_id, seal=True)
     assert sealed(owner, new)["builder"] == "report-builder@2"
-    assert await verified(app_engine, new) == ("verified", [])
-    served = (await api.get(f"/api/v1/runs/{new}/report")).json()
-    assert (served["builder_version"], served["report_schema_version"]) == ("report-builder@2", 2)
+    with monkeypatch.context() as old_api:
+        pre_activation.deactivate(old_api.setattr)
+        assert registry.CURRENT_BUILDER == "report-builder@1"
+        assert await verified(app_engine, new) == ("verified", [])
+        served = (await api.get(f"/api/v1/runs/{new}/report")).json()
+        assert (served["builder_version"], served["report_schema_version"]) == (
+            "report-builder@2",
+            2,
+        )
 
-    old = await start_and_seal(api, app_engine, provisioner, experiment_id, seal=True)
+    with monkeypatch.context() as old_worker:
+        pre_activation.deactivate(old_worker.setattr)
+        old = await start_and_seal(api, app_engine, provisioner, experiment_id, seal=True)
     assert creation_events(owner, str(old))[0].get("source_snapshot")  # marked, sealed by v1
     assert sealed(owner, old)["builder"] == "report-builder@1"
-    monkeypatch.setattr(registry, "CURRENT_BUILDER", "report-builder@2")
-    monkeypatch.setattr(registry, "CURRENT_RENDERER", "report-md@2")
+    assert registry.CURRENT_BUILDER == "report-builder@2"
     assert await verified(app_engine, old) == ("verified", [])
     assert await verified(app_engine, new) == ("verified", [])
+    served = (await api.get(f"/api/v1/runs/{old}/report")).json()
+    assert (served["builder_version"], served["report_schema_version"]) == ("report-builder@1", 1)
 
 
 async def test_unknown_builder_version_is_reported_not_rebuilt(
@@ -305,9 +301,7 @@ async def test_unknown_builder_version_is_reported_not_rebuilt(
     serves the stored report."""
     _, experiment_id = await finalized_sandbox_run(api, app_engine, migrated_db, provisioner)
     no_llm(monkeypatch)
-    with monkeypatch.context() as new_worker:
-        activation.activate(new_worker.setattr)
-        new = await start_and_seal(api, app_engine, provisioner, experiment_id, seal=True)
+    new = await start_and_seal(api, app_engine, provisioner, experiment_id, seal=True)
     monkeypatch.delitem(registry.BUILDERS, "report-builder@2")
     status, warnings = await verified(app_engine, new)
     assert (status, warnings) == ("verified_stored_only", ["builder_retired"])
@@ -328,12 +322,11 @@ async def test_rollback_after_a_v2_seal_keeps_v2_reports_and_returns_to_v1(
     its bytes and verifies, and the next replay seals v1 (legacy-tagged in the UI)."""
     _, experiment_id = await finalized_sandbox_run(api, app_engine, migrated_db, provisioner)
     no_llm(monkeypatch)
-    with monkeypatch.context() as activated:
-        activation.activate(activated.setattr)
-        v2_run = await start_and_seal(api, app_engine, provisioner, experiment_id, seal=True)
+    v2_run = await start_and_seal(api, app_engine, provisioner, experiment_id, seal=True)
     before = stored_report(owner, str(v2_run))
     assert sealed(owner, v2_run)["builder"] == "report-builder@2"
 
+    pre_activation.deactivate(monkeypatch.setattr)  # the activation commit reverted
     after_rollback = await start_and_seal(api, app_engine, provisioner, experiment_id, seal=True)
 
     assert sealed(owner, after_rollback)["builder"] == "report-builder@1"
@@ -410,3 +403,106 @@ async def test_a_replay_never_becomes_its_investigations_latest_run(
     for outcome in ("verified_recommendation", "inconclusive"):
         page = (await api.get(f"/api/v1/investigations?outcome={outcome}&limit=100")).json()
         assert all(i["latest_run"]["kind"] != "experiment_replay" for i in page["items"])
+
+
+# --- Failed, dead-lettered and cancelled ends keep the creation contract --------------------
+
+
+async def test_legacy_replay_dead_lettered_after_activation_seals_v1(
+    api: httpx.AsyncClient,
+    app_engine: AsyncEngine,
+    owner: psycopg.Connection,
+    migrated_db: str,
+    provisioner: SandboxProvisioner,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The dead-letter path (`mark_replay_failed` + `fail_run`) seals outside `_close`; a
+    legacy replay still gets report-builder@1 / report-md@1, a snapshot replay v2."""
+    from querycure.agents.run import fail_run
+    from querycure.replay.experiment_replay import mark_replay_failed
+
+    _, experiment_id = await finalized_sandbox_run(api, app_engine, migrated_db, provisioner)
+    no_llm(monkeypatch)
+    with monkeypatch.context() as old_code:
+        as_legacy_start(old_code)
+        legacy = await start_and_seal(api, app_engine, provisioner, experiment_id, seal=False)
+    marked = await start_and_seal(api, app_engine, provisioner, experiment_id, seal=False)
+    for run_id in (legacy, marked):
+        await mark_replay_failed(app_engine, run_id, "internal_error")
+        await fail_run(app_engine, run_id, {"code": "JOB_DEAD_LETTERED"})
+
+    assert {k: sealed(owner, legacy)[k] for k in ("builder", "renderer", "schema", "status")} == {
+        "builder": "report-builder@1", "renderer": "report-md@1", "schema": 1, "status": "failed",
+    }  # fmt: skip
+    assert {k: sealed(owner, marked)[k] for k in ("builder", "renderer", "schema", "status")} == {
+        "builder": "report-builder@2", "renderer": "report-md@2", "schema": 2, "status": "failed",
+    }  # fmt: skip
+    for run_id in (legacy, marked):
+        assert sealed(owner, run_id)["outcome"] is None
+        assert "replay_basis" not in sealed(owner, run_id)["concluded"]
+        assert await verified(app_engine, run_id) == ("verified", [])
+
+
+async def test_queued_replay_cancelled_after_activation_keeps_its_contract(
+    api: httpx.AsyncClient,
+    app_engine: AsyncEngine,
+    owner: psycopg.Connection,
+    migrated_db: str,
+    provisioner: SandboxProvisioner,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Cancel through the API while queued (`cancel_replay_attempt` seals immediately): legacy
+    seals v1, snapshot seals v2; neither invents an outcome or a basis."""
+    _, experiment_id = await finalized_sandbox_run(api, app_engine, migrated_db, provisioner)
+    no_llm(monkeypatch)
+    with monkeypatch.context() as old_code:
+        as_legacy_start(old_code)
+        legacy = await start_and_seal(api, app_engine, provisioner, experiment_id, seal=False)
+    marked = await start_and_seal(api, app_engine, provisioner, experiment_id, seal=False)
+    for run_id in (legacy, marked):
+        assert (await api.post(f"/api/v1/runs/{run_id}/cancel")).status_code == 202
+
+    assert (sealed(owner, legacy)["builder"], sealed(owner, legacy)["schema"]) == (
+        "report-builder@1",
+        1,
+    )
+    assert (sealed(owner, marked)["builder"], sealed(owner, marked)["schema"]) == (
+        "report-builder@2",
+        2,
+    )
+    for run_id in (legacy, marked):
+        row = sealed(owner, run_id)
+        assert (row["status"], row["outcome"]) == ("cancelled", None)
+        assert "replay_basis" not in row["concluded"]
+        assert await verified(app_engine, run_id) == ("verified", [])
+
+
+async def test_replay_whose_sandbox_fails_after_activation_seals_failed_without_outcome(
+    api: httpx.AsyncClient,
+    app_engine: AsyncEngine,
+    owner: psycopg.Connection,
+    migrated_db: str,
+    provisioner: SandboxProvisioner,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """An execution failure never reaches the classifier: run `failed`, no outcome, no basis,
+    v2 report; the attempt records the failure code."""
+    from querycure.core.errors import SandboxUnavailableError
+
+    _, experiment_id = await finalized_sandbox_run(api, app_engine, migrated_db, provisioner)
+    no_llm(monkeypatch)
+
+    def down(*a: Any, **k: Any) -> Any:
+        raise SandboxUnavailableError("sandbox down")
+
+    monkeypatch.setattr(experiment_replay, "run_experiment", down)
+    replay_run = await start_and_seal(api, app_engine, provisioner, experiment_id, seal=True)
+
+    row = sealed(owner, replay_run)
+    assert (row["builder"], row["status"], row["outcome"]) == ("report-builder@2", "failed", None)
+    assert "replay_basis" not in row["concluded"]
+    assert owner.execute(
+        "SELECT status, failure_code FROM replay_attempts WHERE replay_run_id = %s",
+        (str(replay_run),),
+    ).fetchone() == ("failed", "sandbox_unavailable")
+    assert await verified(app_engine, replay_run) == ("verified", [])

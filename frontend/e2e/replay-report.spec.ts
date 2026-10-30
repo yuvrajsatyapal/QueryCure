@@ -3,10 +3,12 @@ import { expect, test, type Page } from "@playwright/test";
 import fixtures from "../src/test/fixtures/report-v2.json";
 import { applyTheme } from "./theme";
 
-/** Report schema 2 and historical replay notices (Workstream 5). report-builder@2 is not active,
- * so no real schema-2 report exists yet: the report endpoint is intercepted with real
- * report-builder@2 / @1 output for synthetic inputs (backend test_frontend_report_fixture.py).
- * Everything else (session, page, layout) is the real app. */
+/** Report schema 2 and historical replay notices (Workstream 5), every scenario of the fixture
+ * set at fixed widths. The report endpoint is intercepted with real report-builder@2 / @1 output
+ * for synthetic inputs (backend test_frontend_report_fixture.py), so scenarios a host cannot
+ * reach on demand are covered too. Real sealed v2 replays (no interception) are covered by
+ * phase4-lifecycle.spec.ts and the rehearsal. Everything else (session, page, layout) is the
+ * real app. */
 
 type Name = Exclude<keyof typeof fixtures, "_note">;
 const RUN = "00000000-0000-4000-8000-0000000000aa";

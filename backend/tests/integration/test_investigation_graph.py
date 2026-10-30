@@ -265,7 +265,7 @@ async def test_already_optimal_query_ends_no_action_needed_despite_a_confident_m
 
     assert run_row(owner, run_id) == ("completed", "no_action_needed", None)
     body = report(owner, run_id)
-    assert body["builder_version"] == "report-builder@1"
+    assert body["builder_version"] == "report-builder@2"  # ADR-0032: v2 is current
     assert body["problem"]["materiality"]["verdict"] == "not_material"
     [h] = body["hypotheses"]
     assert (h["category"], h["confidence"]) == ("missing_index", "low")

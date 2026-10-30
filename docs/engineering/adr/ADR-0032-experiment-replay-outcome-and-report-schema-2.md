@@ -1,6 +1,6 @@
 # ADR-0032: Experiment replay outcome, creation marker and report schema 2
 
-- **Status:** Proposed (2026-10-30). Design D1–D12 owner-approved 2026-10-30 ([REPLAY_OUTCOME_AUDIT §12–§13](../../reports/REPLAY_OUTCOME_AUDIT_2026-10-27.md)). The pieces below are implemented locally but **not active**. Accepting this ADR is the activation approval.
+- **Status:** Accepted (owner, 2026-10-30). Design D1–D12 owner-approved 2026-10-30 ([REPLAY_OUTCOME_AUDIT §12–§13](../../reports/REPLAY_OUTCOME_AUDIT_2026-10-27.md)). **Activated locally and verified (2026-10-30, audit §19); not deployed.** Production still runs the pre-activation build until the owner approves the deployment (DEPLOYMENT §4c, "Replay outcome activation").
 - **Context:** an experiment replay seals `verified_recommendation` whenever its own engine finds a winner (`experiment_replay._close`), and `report-builder@1` derives the recommendation from the replay run's own candidates, which never exist. 56 of 94 local replays sealed a verified outcome; 28 of those replayed an investigation that verified nothing.
 
 ## Decision
@@ -22,11 +22,13 @@
    - **Contradictions:** records that contradict the basis raise `ReportContractError`, so a contradictory report is never sealed. Report replay records `rebuild_mismatch` instead of raising.
 6. **Historical reports are never changed.** `report-builder@1` / `report-md@1` stay registered and current until activation. The UI shows a notice next to, never inside, v1 replay reports.
 
-## Activation (separate approval)
+## Activation (implemented and verified locally, 2026-10-30; audit §19)
 
-A single change (exact plan: audit §18.5):
-- `_close` determines the replay's creation contract. For a `snapshot` replay it calls `load_source_snapshot` (an error counts as `None`) and the classifier, and passes `Conclusion(final_status, outcome, replay_basis)`. A `legacy` replay seals as before, with the v1 versions passed explicitly;
-- sets `registry.CURRENT_BUILDER/RENDERER/SCHEMA_VERSION` to `report-builder@2` / `report-md@2` / `2`.
+One change, as planned in audit §18.5, with one widening (below):
+- **Versioned sealing.** `finalize_run(..., versions=ReportVersions | None)`. `registry.ReportVersions(builder, renderer, schema_version)` is one released contract; `registry.check_versions` refuses an unknown, retired or mixed combination (`UnsupportedReportVersionError`) before anything is written, and the seal also fails if the builder's output names another builder or schema. There is no fallback to another version.
+- **Contract-aware default.** Without an explicit choice, `finalize_run` asks `cutover.report_versions_for`: the current contract, except an experiment replay whose creation contract is `legacy` (no marker, no links) keeps `registry.LEGACY_REPORT_VERSIONS` (report-builder@1 / report-md@1 / 1). *Widening of §18.5:* the rule sits in `finalize_run`, not only in `_close`, so it also covers the dead-letter path (`fail_run`) and the API cancel paths, which seal replays without `_close`.
+- **`_close`.** A completed `snapshot` replay is concluded by `classify_replay_outcome(load_source_snapshot(...) or None, stored replay.comparison artifact)`; the conclusion carries `replay_basis`. The winner-based outcome is now the `legacy_outcome` argument, sealed only for `legacy` replays. Failed and cancelled closes are unchanged (no classification, no basis).
+- **Registry.** `CURRENT_BUILDER/RENDERER/SCHEMA_VERSION` = `report-builder@2` / `report-md@2` / `2`. All four builders and renderers stay registered.
 
 The two must ship together: v2 refuses the legacy winner-based outcome (tested). Deploy the frontend first (it already renders schema 2), then the API and worker together.
 
@@ -35,7 +37,8 @@ The file-level plan, the deploy order, the handling of replays in flight at acti
 - **Scope decided (owner, 2026-10-30):** v2 becomes current for all new reports, subject to the compatibility checks. They passed for every ordinary report shape (audit §18.3): v2 is v1 plus exactly `schema_version`, `builder_version` and `recommendation.origin`.
 - **Creation contract (audit §18.4):** a replay keeps the contract it was created under. One started before the snapshot marker (`replay/cutover.py`: no marker, no links) is sealed after activation as before, with `report-builder@1` / `report-md@1` and its legacy outcome, and the UI tags it legacy. It is never reclassified as `source_snapshot_missing`. Damaged snapshot records still fail closed. The activation drains such replays first: `python -m querycure.ops replay-cutover-check` exits 1 while one is in flight. The activation patch therefore also gives `finalize_run` an explicit report-version argument (audit §18.5).
 - **Outcome labels (audit §18.1):** one frontend classifier labels runs everywhere (selector, History, Dashboard, header, event log). A replay never reads as a verified recommendation from its stored outcome alone.
-- **Rehearsal, local only (audit §17.6):** a real-stack browser rehearsal ran the activated path end to end without intercepting the report endpoint. It used a test-only worker (`backend/tests/rehearsal/activated_worker.py`) that applies this exact change in-process.
+- **Rehearsal, local only (audit §17.6, §19):** before activation the browser rehearsal used a test-only worker that simulated this change in-process. That seam (`tests/rehearsal/activation.py`) is removed. The rehearsal now runs the production worker with only the virtual benchmark clock (`tests/rehearsal/clocked_worker.py`), and the full Playwright suite runs the plain `python -m querycure.worker`. The only remaining test double for this ADR is `tests/rehearsal/pre_activation.py`, which reproduces the *old* build inside named contexts for skew and rollback tests.
+- **Monitoring:** `infra/ops/replay_activation_monitoring.sql` (read only) holds the §17.10 checks plus contract, marker and seal checks; every check must report 0 after activation.
 
 ## Consequences
 

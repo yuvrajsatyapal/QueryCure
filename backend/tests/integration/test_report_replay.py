@@ -103,7 +103,7 @@ async def test_sealed_report_is_served_exported_and_verifies(api: httpx.AsyncCli
     run_id = await sealed_run(api)
 
     report = (await api.get(f"/api/v1/runs/{run_id}/report")).json()
-    assert report["builder_version"] == "report-builder@1"
+    assert (report["builder_version"], report["report_schema_version"]) == ("report-builder@2", 2)
     assert report["final_status"] == "cancelled"
     assert report["report"]["partial"] is True
     md = await api.get(f"/api/v1/runs/{run_id}/report.md")
@@ -269,9 +269,9 @@ async def test_purged_and_tampered_are_all_collected_most_severe_wins(
 async def test_retired_builder_and_renderer_give_stored_only_with_warnings(
     api: httpx.AsyncClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    run_id = await sealed_run(api)
-    monkeypatch.setattr(registry, "RETIRED_BUILDERS", frozenset({"report-builder@1"}))
-    monkeypatch.setattr(registry, "RETIRED_RENDERERS", frozenset({"report-md@1"}))
+    run_id = await sealed_run(api)  # sealed with the current report-builder@2 / report-md@2
+    monkeypatch.setattr(registry, "RETIRED_BUILDERS", frozenset({"report-builder@2"}))
+    monkeypatch.setattr(registry, "RETIRED_RENDERERS", frozenset({"report-md@2"}))
 
     attempt = await replay(api, run_id)
 

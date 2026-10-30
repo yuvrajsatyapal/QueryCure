@@ -29,10 +29,12 @@ from querycure.events.emitter import change_status, emit
 from querycure.events.types import EventType
 from querycure.replay.artifact_store import link, store_json, store_text
 from querycure.replay.canonical import to_canonical
+from querycure.replay.cutover import report_versions_for
 from querycure.replay.events_digest import PROFILE as EVENTS_PROFILE
 from querycure.replay.events_digest import events_digest
 from querycure.reports import registry
 from querycure.reports.inputs import load_report_inputs
+from querycure.reports.registry import ReportVersions, UnsupportedReportVersionError
 
 MANIFEST_SCHEMA_VERSION = 1
 FINALIZER_NODE = "finalize_run"
@@ -52,9 +54,8 @@ class Conclusion:
     # written when something was removed; report-builder@1 does not read it.
     narrative_check: dict[str, Any] | None = None
     # REPLAY_OUTCOME_AUDIT §12.1: an experiment replay's classification basis
-    # (`ReplayClassification.as_basis()`), read by report-builder@2. Written only when set,
-    # so no other run's payload changes; no caller sets it until the replay correction is
-    # activated in `experiment_replay._close`.
+    # (`ReplayClassification.as_basis()`), set by `experiment_replay._close` and read by
+    # report-builder@2. Written only when set, so no other run's payload changes.
     replay_basis: dict[str, Any] | None = None
 
 
@@ -107,6 +108,7 @@ async def _manifest(
     report: dict[str, Any],
     report_sha: str,
     md_sha: str,
+    renderer: str,
 ) -> dict[str, Any]:
     roles = (
         await conn.execute(
@@ -181,7 +183,7 @@ async def _manifest(
             "markdown": _ref(md_sha),
             "report_schema_version": report["schema_version"],
             "builder_version": report["builder_version"],
-            "md_renderer_version": registry.CURRENT_RENDERER,
+            "md_renderer_version": renderer,
         },
         "artifacts": [
             {"role": r.role, "profile": r.canonicalization, "digest": f"sha256:{r.sha256}"}
@@ -207,7 +209,11 @@ async def finalize_run(
     conclusion: Conclusion,
     *,
     fault: Fault | None = None,
+    versions: ReportVersions | None = None,
 ) -> Finalized:
+    """`versions` defaults to the run's contract (`report_versions_for`): the current one,
+    except a replay created before source snapshots keeps report-builder@1 / report-md@1."""
+
     def step(name: str) -> None:
         if fault is not None:
             fault(name)
@@ -228,6 +234,9 @@ async def finalize_run(
         raise InvalidStateError("A terminal run that was never finalized cannot be sealed now.")
     if (conclusion.final_status is RunStatus.COMPLETED) != (conclusion.outcome is not None):
         raise ValueError("an outcome is required for, and only for, the completed status")
+    chosen = registry.check_versions(
+        versions if versions is not None else await report_versions_for(conn, run_id, run.kind)
+    )
 
     await emit(
         conn,
@@ -271,13 +280,21 @@ async def finalize_run(
     finalized_at = to_canonical((await conn.execute(text("SELECT now()"))).scalar_one())
     inputs = await load_report_inputs(conn, run_id, cutoff)
     report = registry.build(
-        registry.CURRENT_BUILDER,
+        chosen.builder,
         inputs,
         finalized_at=finalized_at,
         cutoff_seq=cutoff,
         events_digest=digest,
     )
-    markdown = registry.RENDERERS[registry.CURRENT_RENDERER](report)
+    if (report.get("builder_version"), report.get("schema_version")) != (
+        chosen.builder,
+        chosen.schema_version,
+    ):
+        raise UnsupportedReportVersionError(
+            f"{chosen.builder} emitted {report.get('builder_version')!r} / schema "
+            f"{report.get('schema_version')!r}"
+        )
+    markdown = registry.RENDERERS[chosen.renderer](report)
     as_json = await store_json(conn, kind="report_json", value=report)
     as_md = await store_text(conn, kind="report_md", text=markdown)
     for artifact, role in ((as_json, "output.report_json"), (as_md, "output.report_md")):
@@ -301,7 +318,7 @@ async def finalize_run(
             "outcome": conclusion.outcome.value if conclusion.outcome else None,
             "schema": report["schema_version"],
             "builder": report["builder_version"],
-            "renderer": registry.CURRENT_RENDERER,
+            "renderer": chosen.renderer,
         },
     )
     step("report")
@@ -309,6 +326,7 @@ async def finalize_run(
     manifest = await _manifest(
         conn, run_id, run=run, finalized_at=finalized_at, conclusion=conclusion, cutoff=cutoff,
         digest=digest, report=report, report_sha=as_json.sha256, md_sha=as_md.sha256,
+        renderer=chosen.renderer,
     )  # fmt: skip
     stored = await store_json(conn, kind="replay_manifest", value=manifest)
     await link(

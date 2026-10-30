@@ -47,7 +47,6 @@ from tests.fake_llm import RoleClient
 from tests.integration import virtual_clock as vc
 from tests.integration.sandbox_fixtures import SANDBOX_URL, clone_names
 from tests.integration.test_optimization_graph import INDEX, NOTHING_MORE, candidates, scripts
-from tests.rehearsal import activation
 
 pytestmark = pytest.mark.integration
 
@@ -529,7 +528,9 @@ async def test_replay_links_the_verified_source_snapshot_and_seals_it(
     assert captured.source_experiment_result_sha256 == result_sha[0]
     assert captured.source_manifest_sha256 == manifest_sha
     assert captured.source_report_json_sha256 == report_sha
-    assert captured.source_builder_version == "report-builder@1"
+    # the source's own sealed builder (report-builder@2 since the ADR-0032 activation)
+    assert captured.source_builder_version == source_report["builder_version"]
+    assert captured.source_builder_version == "report-builder@2"
     assert captured.source_final_status == "completed"
     assert captured.source_outcome == source_outcome[0]
     assert captured.source_recommendation is not None
@@ -556,24 +557,27 @@ async def test_replay_links_the_verified_source_snapshot_and_seals_it(
         verified = await verify_report(conn, uuid.UUID(replay_run))
     assert again == captured
     assert verified.status == "verified", verified.result_json()
-    # Historical compatibility: still report-builder@1, which never reads the snapshot.
+    # Activated (ADR-0032): sealed with report-builder@2, and the outcome is the classifier's
+    # decision on these sealed records, never the replay's own engine winner.
     replay_report = (await api.get(f"/api/v1/runs/{replay_run}/report")).json()["report"]
-    assert replay_report["builder_version"] == "report-builder@1"
-    assert replay_report["schema_version"] == 1
-    assert "replay_source" not in replay_report
-    # Not activated: the sealed outcome still follows the legacy rule (the replay's winner).
-    stored = owner.execute(
-        "SELECT r.outcome, convert_from(a.content, 'UTF8')::jsonb -> 'winner' FROM "
-        "investigation_runs r JOIN experiments e ON e.run_id = r.id JOIN artifacts a "
-        "ON a.id = e.result_artifact_id WHERE r.id = %s",
-        (replay_run,),
-    ).fetchone()
-    assert stored is not None
-    assert stored[0] == ("verified_recommendation" if stored[1] else "inconclusive")
-    # The pure classifier gives a contract-valid answer on these real records.
+    assert replay_report["builder_version"] == "report-builder@2"
+    assert replay_report["schema_version"] == 2
     attempt = (await api.get(f"/api/v1/replay-attempts/{started.json()['id']}")).json()
     decided = classify_replay_outcome(again, attempt["result"])
     assert decided.basis in BASIS_CODES
+    concluded = owner.execute(
+        "SELECT r.outcome, e.payload -> 'replay_basis' FROM investigation_runs r "
+        "JOIN investigation_events e ON e.run_id = r.id AND e.type = 'run.concluded' "
+        "WHERE r.id = %s",
+        (replay_run,),
+    ).fetchone()
+    assert concluded is not None
+    assert concluded[0] == decided.outcome.value if decided.outcome else concluded[0] is None
+    assert concluded[1] == decided.as_basis()
+    assert replay_report["replay_result"]["basis"] == decided.as_basis()
+    assert (concluded[0] == "verified_recommendation") is (
+        decided.basis == "reproduced_source_recommendation"
+    )
     assert sealed_shas(owner, run_id) == (manifest_sha, report_sha)
 
 
@@ -1208,25 +1212,34 @@ async def test_concurrent_starts_each_get_a_marker_and_their_own_links(
 
 
 # --- report-builder@2 on real sealed replays (Workstream 5, Phases 2to5) -------------------
-# Activation is simulated inside these tests only: v2 is made current and finalize_run is
-# wrapped so the replay's conclusion comes from the classifier. `_close` is unchanged.
+# Since the ADR-0032 activation these run the production `_close` and `finalize_run`: v2 is
+# current and the replay's conclusion comes from the classifier. Only the comparison verdict
+# may be fixed at its boundary (`fix_comparison_status`), for rules a real comparison on this
+# host cannot reach; the classifier, builders and sealing are never substituted.
 
 
-def simulate_activation(monkeypatch: pytest.MonkeyPatch, *, status: str | None = None) -> None:
-    """The shared test-only activation seam (`tests/rehearsal/activation.py`); `status` also
-    fixes the comparison verdict at its boundary, for rules a real comparison cannot reach."""
+def fix_comparison_status(monkeypatch: pytest.MonkeyPatch, status: str) -> None:
+    """Set the stored comparison's verdict (every pair, same environment) at the comparison
+    boundary. Everything downstream (storage, classifier, builder, seal) is production code."""
     real_compare = experiment_replay.compare_experiments
 
     def compare(**kw: Any) -> dict[str, Any]:
         result = real_compare(**kw)
-        if status is None:
-            return result
         pairs = [{**p, "status": status, "code": None} for p in result["pairs"]]
         return {**result, "status": status, "failure_code": None, "pairs": pairs,
                 "comparison_mode": "same_environment"}  # fmt: skip
 
-    activation.activate(monkeypatch.setattr)
     monkeypatch.setattr(experiment_replay, "compare_experiments", compare)
+
+
+def as_legacy_start(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The start code before snapshots (before step 0): no links, no creation marker."""
+
+    async def no_links(*a: Any, **k: Any) -> None:
+        return None
+
+    monkeypatch.setattr(experiment_replay, "link_source_snapshot", no_links)
+    without_marker(monkeypatch)
 
 
 def stored_report(owner: psycopg.Connection, run_id: str) -> tuple[dict[str, Any], str, Any]:
@@ -1272,7 +1285,7 @@ async def test_v2_replay_report_is_consistent_and_rebuilds_byte_identically(
         "verified",
     ), source_report["headline"]
     no_llm(monkeypatch)
-    simulate_activation(monkeypatch, status=status)
+    fix_comparison_status(monkeypatch, status)
     clock.use(vc.CLEAN, seed=8)
     replay_run = await start_and_seal(
         api, app_engine, provisioner, experiment_id, seal=True, options=clock.options()
@@ -1318,7 +1331,7 @@ async def test_v2_replay_report_verifies_after_its_source_run_is_deleted(
 ) -> None:
     run_id, experiment_id = await finalized_sandbox_run(api, app_engine, migrated_db, provisioner)
     no_llm(monkeypatch)
-    simulate_activation(monkeypatch, status="reproduced")
+    fix_comparison_status(monkeypatch, "reproduced")
     replay_run = await start_and_seal(api, app_engine, provisioner, experiment_id, seal=True)
     owner_engine = make_engine(migrated_db)
     try:
@@ -1354,7 +1367,7 @@ async def test_v2_report_with_a_snapshot_link_removed_after_sealing_fails_closed
     report replay reports a rebuild mismatch instead of raising or verifying."""
     _, experiment_id = await finalized_sandbox_run(api, app_engine, migrated_db, provisioner)
     no_llm(monkeypatch)
-    simulate_activation(monkeypatch, status="reproduced")
+    fix_comparison_status(monkeypatch, "reproduced")
     replay_run = await start_and_seal(api, app_engine, provisioner, experiment_id, seal=True)
     owner_engine = make_engine(migrated_db)
     try:
@@ -1377,35 +1390,25 @@ async def test_v2_finalization_refuses_a_legacy_winner_outcome(
     provisioner: SandboxProvisioner,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Why v2 must not become current before `_close` is corrected: the legacy winner-based
-    outcome with no basis is a contradiction, so sealing fails closed instead of producing a
-    verified replay report. The attempt is not left half-sealed."""
+    """Why the classifier and v2 must ship together: the legacy winner-based outcome with no
+    basis is a contradiction under report-builder@2, so sealing a snapshot-era replay that way
+    fails closed instead of producing a verified replay report, and nothing is half-sealed."""
+    from querycure.domain.runs import RunOutcome, RunStatus
+    from querycure.replay.finalize import Conclusion, finalize_run
     from querycure.reports import registry
     from querycure.reports.builders.v2 import ReportContractError
 
     _, experiment_id = await finalized_sandbox_run(api, app_engine, migrated_db, provisioner)
     no_llm(monkeypatch)
-    monkeypatch.setattr(registry, "CURRENT_BUILDER", "report-builder@2")
-    monkeypatch.setattr(registry, "CURRENT_RENDERER", "report-md@2")
-    real_run = experiment_replay.run_experiment
-
-    def with_winner(config: Any, *a: Any, **k: Any) -> Any:
-        # the legacy `_close` seals verified_recommendation whenever the replay has a winner
-        return real_run(config, *a, **k).model_copy(update={"winner": config.candidates[0].arm})
-
-    monkeypatch.setattr(experiment_replay, "run_experiment", with_winner)
-    started = await api.post(
-        f"/api/v1/experiments/{experiment_id}/replay", json={"confirm_ddl": True}
+    replay_run = await start_and_seal(api, app_engine, provisioner, experiment_id, seal=False)
+    legacy = Conclusion(
+        final_status=RunStatus.COMPLETED,
+        outcome=RunOutcome.VERIFIED_RECOMMENDATION,
+        stop_reason=None,
     )
-    replay_run = uuid.UUID(started.json()["replay_run_id"])
     with pytest.raises(ReportContractError):
-        await execute_experiment_replay(
-            app_engine,
-            replay_run,
-            sandbox=provisioner,
-            options=EngineOptions(),
-            reclaimed=False,
-        )
+        async with app_engine.begin() as conn:
+            await finalize_run(conn, replay_run, legacy, versions=registry.current_versions())
     row = owner.execute(
         "SELECT finalized_at, (SELECT count(*) FROM investigation_reports WHERE run_id = %s) "
         "FROM investigation_runs WHERE id = %s",

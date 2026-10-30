@@ -153,8 +153,9 @@ async def test_manifest_is_consistent_and_excludes_itself(
         "profile": "qc-events-v1",
     }
     assert manifest["report"]["json"] == f"sha256:{done.report_json_sha256}"
-    assert manifest["report"]["builder_version"] == "report-builder@1"
-    assert manifest["report"]["md_renderer_version"] == "report-md@1"
+    assert manifest["report"]["builder_version"] == "report-builder@2"
+    assert manifest["report"]["md_renderer_version"] == "report-md@2"
+    assert manifest["report"]["report_schema_version"] == 2
     assert all(a["role"] != "output.manifest" for a in manifest["artifacts"])
     assert manifest["artifacts"] == sorted(
         manifest["artifacts"], key=lambda a: (a["role"], a["digest"])
@@ -243,14 +244,14 @@ async def test_stored_report_rebuilds_byte_identically(
         ).one()
         inputs = await load_report_inputs(conn, run_id, row.events_cutoff_seq)
     rebuilt = registry.build(
-        "report-builder@1",
+        registry.CURRENT_BUILDER,
         inputs,
         finalized_at=to_canonical(row.finalized_at),
         cutoff_seq=row.events_cutoff_seq,
         events_digest=digest_row.events_digest,
     )
     assert digest("qc-json-v1", canonical_json(to_canonical(rebuilt))) == done.report_json_sha256
-    md = registry.RENDERERS["report-md@1"](rebuilt)
+    md = registry.RENDERERS[registry.CURRENT_RENDERER](rebuilt)
     assert digest("qc-text-v1", canonical_text(md)) == done.report_md_sha256
     assert unlabeled_numbers(md) == []
 
@@ -331,3 +332,114 @@ async def test_replay_basis_is_written_only_when_set(
 
     assert "replay_basis" not in concluded(plain)
     assert concluded(marked)["replay_basis"] == basis
+
+
+def sealed_versions(owner: psycopg.Connection, run_id: uuid.UUID) -> tuple[Any, ...]:
+    """(row builder, row renderer, row schema, manifest builder, manifest renderer,
+    manifest schema, report JSON builder, report JSON schema)."""
+    row = owner.execute(
+        "SELECT ir.builder_version, ir.md_renderer_version, ir.report_schema_version, "
+        "convert_from(ma.content, 'UTF8'), convert_from(j.content, 'UTF8') "
+        "FROM investigation_reports ir JOIN artifacts j ON j.id = ir.report_json_artifact_id "
+        "JOIN replay_manifests m ON m.run_id = ir.run_id "
+        "JOIN artifacts ma ON ma.id = m.manifest_artifact_id WHERE ir.run_id = %s",
+        (run_id,),
+    ).fetchone()
+    assert row is not None
+    import json
+
+    manifest, report = json.loads(row[3])["report"], json.loads(row[4])
+    return (
+        row[0], row[1], row[2], manifest["builder_version"], manifest["md_renderer_version"],
+        manifest["report_schema_version"], report["builder_version"], report["schema_version"],
+    )  # fmt: skip
+
+
+async def test_new_reports_seal_with_the_current_v2_contract(
+    app_engine: AsyncEngine, owner: psycopg.Connection
+) -> None:
+    """ADR-0032 activation: with no explicit choice, a new report is report-builder@2 /
+    report-md@2 / schema 2 everywhere it is recorded."""
+    run_id = await prepared(app_engine)
+    async with app_engine.begin() as conn:
+        await finalize_run(conn, run_id, DONE)
+
+    assert sealed_versions(owner, run_id) == (
+        "report-builder@2", "report-md@2", 2, "report-builder@2", "report-md@2", 2,
+        "report-builder@2", 2,
+    )  # fmt: skip
+
+
+async def test_explicit_legacy_versions_seal_v1_byte_identically_while_v2_is_current(
+    app_engine: AsyncEngine, owner: psycopg.Connection
+) -> None:
+    """The legacy contract chosen explicitly: builder, renderer and schema are recorded as v1
+    in the reports row, the manifest and the report, and the stored bytes rebuild with v1."""
+    run_id = await prepared(app_engine)
+    async with app_engine.begin() as conn:
+        done = await finalize_run(conn, run_id, DONE, versions=registry.LEGACY_REPORT_VERSIONS)
+
+    assert sealed_versions(owner, run_id) == (
+        "report-builder@1", "report-md@1", 1, "report-builder@1", "report-md@1", 1,
+        "report-builder@1", 1,
+    )  # fmt: skip
+    async with app_engine.connect() as conn:
+        row = (
+            await conn.execute(
+                text(
+                    "SELECT r.finalized_at, r.events_cutoff_seq, m.events_digest FROM "
+                    "investigation_runs r JOIN replay_manifests m ON m.run_id = r.id "
+                    "WHERE r.id = :id"
+                ),
+                {"id": run_id},
+            )
+        ).one()
+        inputs = await load_report_inputs(conn, run_id, row.events_cutoff_seq)
+    rebuilt = registry.build(
+        "report-builder@1",
+        inputs,
+        finalized_at=to_canonical(row.finalized_at),
+        cutoff_seq=row.events_cutoff_seq,
+        events_digest=row.events_digest,
+    )
+    assert digest("qc-json-v1", canonical_json(to_canonical(rebuilt))) == done.report_json_sha256
+    md = registry.RENDERERS["report-md@1"](rebuilt)
+    assert digest("qc-text-v1", canonical_text(md)) == done.report_md_sha256
+
+
+@pytest.mark.parametrize(
+    "versions",
+    [
+        registry.ReportVersions("report-builder@9", "report-md@2", 2),
+        registry.ReportVersions("report-builder@2", "report-md@1", 2),
+        registry.ReportVersions("report-builder@1", "report-md@1", 2),
+    ],
+)
+async def test_unsupported_report_versions_are_refused_before_anything_is_written(
+    app_engine: AsyncEngine, owner: psycopg.Connection, versions: registry.ReportVersions
+) -> None:
+    run_id = await prepared(app_engine)
+    before = state(owner, run_id)
+
+    with pytest.raises(registry.UnsupportedReportVersionError):
+        async with app_engine.begin() as conn:
+            await finalize_run(conn, run_id, DONE, versions=versions)
+
+    assert state(owner, run_id) == before
+
+
+async def test_a_builder_that_emits_another_contract_is_refused(
+    app_engine: AsyncEngine, owner: psycopg.Connection, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The recorded versions come from one checked contract; a builder whose output names
+    another builder or schema fails the seal instead of recording a mismatch."""
+    run_id = await prepared(app_engine)
+    before = state(owner, run_id)
+    v1 = registry.BUILDERS["report-builder@1"]
+    monkeypatch.setitem(registry.BUILDERS, "report-builder@2", v1)
+
+    with pytest.raises(registry.UnsupportedReportVersionError, match="emitted"):
+        async with app_engine.begin() as conn:
+            await finalize_run(conn, run_id, DONE)
+
+    assert state(owner, run_id) == before

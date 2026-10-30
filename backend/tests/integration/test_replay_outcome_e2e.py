@@ -6,9 +6,12 @@ and report-builder@2 / report-md@2. Timing comes from the virtual clock (`virtua
 the measured samples are fixed per scenario, so each test exercises exactly its own rule and
 never substitutes another. Production thresholds are untouched.
 
-Activation is simulated inside these tests only (`simulate_activation`): v2 is made current
-and the replay's conclusion comes from the classifier. Production `_close` and the registry
-defaults are unchanged.
+Since the ADR-0032 activation these exercise the production path: `_close` classifies the
+replay and `finalize_run` seals it with the current report-builder@2 / report-md@2. Nothing
+here substitutes the classifier, `_close`, `finalize_run` or the registry (`test_production_
+path_is_not_substituted`); only rule 9a's comparison verdict is fixed at the comparison
+boundary (`fix_comparison_status`), because a real comparison of a noise-warning original
+cannot be `reproduced`.
 
 Expected values come from the cross-layer matrix `frontend/src/test/fixtures/
 replay-consistency.json`, which the builder unit tests and the frontend tests also read.
@@ -31,11 +34,12 @@ from tests.integration import virtual_clock as vc
 from tests.integration.test_experiment_replay import (  # noqa: F401 - fixtures
     _no_active_runs,
     api,
+    as_legacy_start,
     corrupt,
     drop_link,
     finalized_sandbox_run,
+    fix_comparison_status,
     no_llm,
-    simulate_activation,
     start_and_seal,
     stored_report,
 )
@@ -215,6 +219,29 @@ async def replay(
     )
 
 
+def test_production_path_is_not_substituted() -> None:
+    """These scenarios must prove the activated production code, not a stand-in: `_close`
+    seals through the real `finalize_run`, classifies with the real classifier, and the
+    registry's current contract is v2. No test-only activation module exists any more."""
+    import importlib.util
+
+    from querycure.replay import experiment_replay, finalize, outcome
+
+    assert experiment_replay.finalize_run is finalize.finalize_run
+    assert experiment_replay.classify_replay_outcome is outcome.classify_replay_outcome
+    assert registry.current_versions() == registry.ReportVersions(
+        "report-builder@2", "report-md@2", 2
+    )
+    assert importlib.util.find_spec("tests.rehearsal.activation") is None
+    sources = Path(__file__).parents[1].rglob("*.py")
+    seams = ('"finalize_run"', '"classify_replay_outcome"', '"_close"', '"CURRENT_BUILDER"')
+    offenders = [
+        str(f) for f in sources if f.name != Path(__file__).name
+        and any(seam in f.read_text() for seam in seams)
+    ]  # fmt: skip
+    assert offenders == [str(Path(__file__).parents[1] / "rehearsal" / "pre_activation.py")]
+
+
 # --- 1-5: a clean verified original, replayed under five measured conditions ---------------
 
 
@@ -239,7 +266,6 @@ async def test_clean_original(
     run_id, experiment_id = await source(stack, clock, expect="verified")
     source_before = stored_report(stack[2], run_id)
     no_llm(monkeypatch)
-    simulate_activation(monkeypatch)  # the real comparison decides: no status override
     replay_run = await replay(stack, clock, experiment_id, profile, **options)
     report = await check_row(
         name, replay_run, source_run=run_id, api=stack[0], app_engine=stack[1], owner=stack[2]
@@ -266,7 +292,6 @@ async def test_noise_warning_original_real_comparison_is_inconclusive(
     clock = vc.install(monkeypatch, vc.NOISY, seed=SEED)
     run_id, experiment_id = await source(stack, clock, expect="verified_with_noise_warning")
     no_llm(monkeypatch)
-    simulate_activation(monkeypatch)
     replay_run = await replay(stack, clock, experiment_id, vc.NOISY)
     report = await check_row(
         "inconclusive_comparison",
@@ -290,7 +315,7 @@ async def test_noise_warning_original_with_reproduced_comparison_is_not_confirme
     clock = vc.install(monkeypatch, vc.NOISY, seed=SEED)
     run_id, experiment_id = await source(stack, clock, expect="verified_with_noise_warning")
     no_llm(monkeypatch)
-    simulate_activation(monkeypatch, status="reproduced")
+    fix_comparison_status(monkeypatch, "reproduced")
     replay_run = await replay(stack, clock, experiment_id, vc.NOISY)
     await check_row(
         "noise_warning_original",
@@ -312,7 +337,6 @@ async def test_replay_of_a_replay_never_propagates_verification(
     clock = vc.install(monkeypatch, vc.CLEAN, seed=SEED)
     run_id, experiment_id = await source(stack, clock, expect="verified")
     no_llm(monkeypatch)
-    simulate_activation(monkeypatch)
     first = await replay(stack, clock, experiment_id, vc.CLEAN)
     await check_row("reproduced", first, source_run=run_id, api=api, app_engine=app_engine,
                     owner=owner)  # fmt: skip
@@ -347,7 +371,6 @@ async def test_mismatched_recommendation_experiment_is_not_confirmed(
     ).fetchall()
     assert [r[1] for r in rows] == [0, 1], rows  # two rounds: the recommendation is round 2's
     no_llm(monkeypatch)
-    simulate_activation(monkeypatch)
     clock.use(vc.CLEAN, seed=SEED + 1, arms=(vc.REGRESSED,))
     api, app_engine, _, _, provisioner = stack  # noqa: F811
     replay_run = await start_and_seal(
@@ -376,7 +399,6 @@ async def test_missing_or_corrupted_snapshot_fails_closed(
     clock = vc.install(monkeypatch, vc.CLEAN, seed=SEED)
     _, experiment_id = await source(stack, clock, expect="verified")
     no_llm(monkeypatch)
-    simulate_activation(monkeypatch)
     replay_run = await start_and_seal(api, app_engine, provisioner, experiment_id, seal=False)
     sql = drop_link(ROLE_REPORT_JSON) if fault == "missing" else corrupt(ROLE_REPORT_JSON)
     owner.execute(sql.replace(":r", "%(r)s"), {"r": str(replay_run)})
@@ -401,17 +423,21 @@ async def test_missing_or_corrupted_snapshot_fails_closed(
 async def test_historical_v1_replay_keeps_its_stored_contract(
     stack: Fixtures, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Without activation (the production default today) a replay still seals v1 with the
-    legacy winner-based outcome. It stays byte-identical on rebuild and is never rewritten."""
+    """A replay created by the pre-snapshot start code (no marker, no links) and concluded by
+    the activated build keeps its creation contract (§18.4): report-builder@1 / report-md@1
+    with the legacy winner-based outcome, no basis, tagged legacy in the UI. It rebuilds
+    byte-identically and is never reclassified."""
     api, app_engine, owner, _, _ = stack  # noqa: F811
     assert (registry.CURRENT_BUILDER, registry.CURRENT_RENDERER) == (
-        "report-builder@1",
-        "report-md@1",
+        "report-builder@2",
+        "report-md@2",
     )
     clock = vc.install(monkeypatch, vc.CLEAN, seed=SEED)
     run_id, experiment_id = await source(stack, clock, expect="verified")
     no_llm(monkeypatch)
-    replay_run = await replay(stack, clock, experiment_id, vc.CLEAN)
+    with monkeypatch.context() as old_start:
+        as_legacy_start(old_start)
+        replay_run = await replay(stack, clock, experiment_id, vc.CLEAN)
     await check_row(
         "historical_v1", replay_run, source_run=run_id, api=api, app_engine=app_engine,
         owner=owner,

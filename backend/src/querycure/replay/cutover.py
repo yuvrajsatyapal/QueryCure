@@ -1,7 +1,6 @@
 """The activation boundary of the replay outcome correction (REPLAY_OUTCOME_AUDIT §18.4).
 
-Read-only, and not called by the worker or the API: it answers the two questions the cutover
-needs before ADR-0032 is activated.
+Read-only. It answers the questions the ADR-0032 cutover needs:
 
 - `replay_contract`: which contract a replay was created under, fixed at creation. `legacy`
   means no snapshot marker and no snapshot links (started before the snapshot code was
@@ -11,6 +10,9 @@ needs before ADR-0032 is activated.
   sealed run can no longer change (a later job claim is a no-op), whatever its attempt row says.
   Activation waits until no `legacy` replay is in flight (`python -m querycure.ops
   replay-cutover-check` exits 1 while one is).
+- `report_versions_for`: the report contract a run seals with (used by `finalize_run`). A
+  replay keeps its creation contract on every path (completed, failed, dead-lettered,
+  cancelled), so a `legacy` one is sealed with report-builder@1 / report-md@1 as before.
 """
 
 import uuid
@@ -21,7 +23,10 @@ from typing import Literal
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncConnection
 
+from querycure.domain.runs import RunKind
 from querycure.replay.source_snapshot import SourceSnapshotError, load_source_snapshot
+from querycure.reports import registry
+from querycure.reports.registry import ReportVersions
 
 ReplayContract = Literal["legacy", "snapshot"]
 
@@ -32,6 +37,16 @@ async def replay_contract(conn: AsyncConnection, replay_run_id: uuid.UUID) -> Re
     except SourceSnapshotError:
         return "snapshot"
     return "legacy" if snapshot is None else "snapshot"
+
+
+async def report_versions_for(
+    conn: AsyncConnection, run_id: uuid.UUID, run_kind: str
+) -> ReportVersions:
+    if run_kind == RunKind.EXPERIMENT_REPLAY.value and (
+        await replay_contract(conn, run_id) == "legacy"
+    ):
+        return registry.LEGACY_REPORT_VERSIONS
+    return registry.current_versions()
 
 
 @dataclass(frozen=True)

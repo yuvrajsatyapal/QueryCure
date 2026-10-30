@@ -208,7 +208,7 @@ Rules:
    - The frontend declares the range of `report_schema_version`s it can render.
    - Outside that range, it displays the stored Markdown artifact with a banner. Older schemas get "archived format". A schema newer than the client (deploy skew) gets warning `schema_newer_than_client`.
    - Markdown always renders, so a verified report is always viewable.
-5. **Registered versions (2026-10-30).** `report-builder@1` / `report-md@1` (schema 1) are current. `report-builder@2` / `report-md@2` (schema 2, ADR-0032) are registered for rebuilds but not current until the experiment-replay correction is activated. Schema 2 is additive: ordinary reports equal v1 plus `recommendation.origin`; experiment replays add `replay_result` and take their headline from the sealed `run.concluded.replay_basis`. A v2 rebuild whose records contradict the basis is `rebuild_mismatch`. The frontend renders schemas 1 and 2.
+5. **Registered versions (2026-10-30, ADR-0032 activated locally; not deployed).** `report-builder@2` / `report-md@2` (schema 2) are current for every new report. `report-builder@1` / `report-md@1` (schema 1) stay registered: they rebuild the reports they sealed, and they still seal experiment replays created before source snapshots (the `legacy` creation contract, `replay/cutover.py`), on every path (completed, failed, dead-lettered, cancelled). A builder, its renderer and its schema are one contract (`registry.ReportVersions`); `finalize_run` refuses an unknown, retired or mixed combination before writing anything, never substituting another version. Schema 2 is additive: ordinary reports equal v1 plus `recommendation.origin`; experiment replays add `replay_result` and take their headline from the sealed `run.concluded.replay_basis`. A v2 rebuild whose records contradict the basis is `rebuild_mismatch`. The frontend renders schemas 1 and 2.
 6. **Optional "view with current renderer".** If the current renderer supports the stored schema version, the UI may re-render the stored JSON, labeled "re-rendered with report-md@M (original report-md@N)". This view is not a verification and never replaces the stored artifact.
 
 ## 8. Replay lifecycles and failure codes
@@ -287,6 +287,8 @@ stateDiagram-v2
 | `cancelled` | `cancelled_by_user` |
 | `inconclusive` (comparison) | `insufficient_evidence`, `drift_undetermined`, `verdict_inconclusive` |
 | `not_reproduced` (comparison) | `verdict_changed`, `direction_reversed`, `result_fingerprint_changed`, `winner_changed` |
+
+**Run outcome (ADR-0032).** The comparison verdict above is the attempt's result; the replay *run's* outcome is decided separately. For a replay created with a source snapshot, `_close` calls the pure classifier (`replay/outcome.py`) on the verified snapshot and the stored comparison, and seals its `replay_basis` in `run.concluded`. The replay's own engine winner is not an input. Only `reproduced_source_recommendation` (a non-replay source that sealed a clean `verified` recommendation measured by this experiment, reproduced in the same environment for that candidate) yields `verified_recommendation`; drift, not reproduced, inconclusive, cross-environment, replay-of-replay, noise-warning, mismatched-experiment and missing-snapshot cases seal `inconclusive`. Execution failures and cancellations seal `failed` / `cancelled` with no outcome and no basis. A replay created before snapshots keeps its legacy winner-based outcome and report-builder@1, and the UI tags it *Legacy replay*.
 
 ## 9. Statistical comparison: original vs replay
 

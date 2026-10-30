@@ -1085,3 +1085,104 @@ All builders and renderers stay registered. Every new report, ordinary or replay
 | Sealed-report sweep (local dev DB, read only) | 702 before: **0 changed or missing** after (stored digests, content md5, builder, renderer, schema, outcome, manifest digest). 16 new reports from Playwright, all report-builder@1 (no activation). `verify-integrity`: 718/718 `verified`, 8303/8303 artifacts |
 | Golden and fixture integrity | `v1_golden.json` and `report-v2.json` unchanged; `report-v2-ordinary.json` is new |
 | Activation files | `registry.py`, `experiment_replay.py`, `finalize.py`: no diff. No migration |
+
+## 19. Activation (2026-10-30/31, local only)
+
+**Status: ACTIVATED LOCALLY — not deployed.** The owner accepted ADR-0032 and authorized the activation for local implementation, testing, documentation and a local commit. Nothing was pushed or deployed, and Neon was not accessed. Production still runs the pre-activation build; its cutover procedure is DEPLOYMENT §4c, "Replay outcome activation".
+
+### 19.1 What changed (the §18.5 diff, plus one widening)
+
+| File | Change |
+|---|---|
+| `reports/registry.py` | `ReportVersions(builder, renderer, schema_version)`, `CONTRACTS`, `LEGACY_REPORT_VERSIONS`, `current_versions()`, `check_versions()` (unknown, retired or mixed → `UnsupportedReportVersionError`). `CURRENT_*` = `report-builder@2` / `report-md@2` / `2`. All builders and renderers stay registered. |
+| `replay/finalize.py` | `finalize_run(..., versions=None)`. The contract is checked before anything is written. The builder's output must name the chosen builder and schema. The reports row and the manifest record the chosen renderer (no globals read mid-seal). |
+| `replay/cutover.py` | `report_versions_for(conn, run_id, kind)`: current, except a `legacy`-contract experiment replay → v1. It is now called by `finalize_run`. |
+| `replay/experiment_replay.py` | `_close` classifies a completed `snapshot` replay with `classify_replay_outcome` on `load_source_snapshot(...)` (error → `None`) and the stored `replay.comparison` artifact, and seals `replay_basis`. The winner-based outcome is renamed `legacy_outcome` and is sealed only for `legacy` replays. Failed and cancelled closes are unchanged. |
+
+**Widening of §18.5 (found while implementing):** replays are also sealed outside `_close`: by the dead-letter path (`jobs/handlers` → `agents/run.fail_run`), by `cancel_replay_attempt` (API cancel of a queued replay), and by the API's own cancel. §18.5 put the legacy-version rule only in `_close`, so a legacy replay that dead-lettered after activation would have sealed v2. The rule therefore lives in `finalize_run`'s default (`report_versions_for`), and every path keeps the creation contract. Each path is tested.
+
+No migration, API change, new outcome value or dependency. The frozen v1 builder and renderer, the thresholds, the correctness rules and the comparison are unchanged.
+
+### 19.2 Test-only activation substitutes retired
+
+- `tests/rehearsal/activation.py` is deleted. `simulate_activation` became `fix_comparison_status`, which only fixes the comparison verdict at its boundary, for rule 9a. Everything downstream is production code.
+- `tests/rehearsal/activated_worker.py` became `clocked_worker.py`: the production worker plus the virtual clock (timing only). The full Playwright suite uses the plain `python -m querycure.worker`.
+- `tests/rehearsal/pre_activation.py` (new) reproduces the **old** build (v1 current, every replay `legacy`) inside a named `monkeypatch.context()`. Only the skew and rollback tests use it.
+- **Guard:** `test_production_path_is_not_substituted` asserts the following:
+  - `experiment_replay.finalize_run is finalize.finalize_run`;
+  - `experiment_replay.classify_replay_outcome is outcome.classify_replay_outcome`;
+  - v2 is current, and the old seam module no longer exists;
+  - no test file other than `pre_activation.py` names `finalize_run`, `classify_replay_outcome`, `_close` or `CURRENT_BUILDER` as a patch target.
+- **Tests updated for the new default (an expected value changed, never a weakened check):**
+  - two graph tests and `test_report_replay`'s served-report test now expect `report-builder@2`;
+  - the retired-builder test retires v2, the builder that sealed its run, so it keeps its meaning;
+  - the snapshot test now asserts that the snapshot records the source's real builder (v2), and that the replay's sealed outcome and basis equal the classifier's on its records;
+  - `test_v2_finalization_refuses_a_legacy_winner_outcome` calls the real `finalize_run` with v2 and the legacy conclusion.
+
+### 19.3 Deterministic matrix and cutover on the activated code
+
+- `test_replay_outcome_e2e.py` passes 13 tests: the 10 matrix scenarios (11 tests, because the missing and corrupted snapshot cases are separate; the noise-warning row is rule 9a with a real noise-warning source), the real-comparison noise-warning case, and the guard. They cover reproduced, drift, not reproduced, inconclusive, cross-environment, noise warning, replay of a replay, mismatched experiment, missing or corrupted snapshot, and historical v1. The historical-v1 row is now produced the way it happens in production: the replay is created by the pre-snapshot start code and concluded by the activated build.
+- `test_replay_cutover.py` passes 13 tests:
+  - legacy queued or running → v1;
+  - valid snapshot → v2 with a basis;
+  - lost link → `source_snapshot_missing`, never legacy;
+  - restart plus duplicate delivery → one seal;
+  - skew both ways; unknown builder;
+  - rollback;
+  - the gate; `latest_run`;
+  - new: dead-lettered legacy (v1) and snapshot (v2) replays;
+  - new: queued cancel of legacy (v1) and snapshot (v2) replays;
+  - new: sandbox failure → `failed`, no outcome, no basis.
+- New finalization tests: v2 by default everywhere it is recorded; explicit legacy seals v1 byte-identically while v2 is current; unsupported or mixed versions are refused with nothing written; a builder emitting another contract is refused.
+- Not covered: two workers delivering the same job concurrently (prevented by `FOR UPDATE SKIP LOCKED`; only sequential duplicates are tested, as before).
+
+### 19.4 Real-stack rehearsal (local Docker, stub model, no interception)
+
+- **Plain production worker** (full Playwright, `phase4-lifecycle`): a stub investigation sealed with v2 (verified recommendation), then a real replay. On real host timing all four lifecycle replays in this session sealed `inconclusive` / `comparison_inconclusive` with v2, and each verified. The page reads "Replay comparison inconclusive", with no historical notice and no "Verified recommendation".
+- **Clocked rehearsal** (`clocked_worker`, production classification and sealing, virtual clock only):
+  - reproduced → `verified_recommendation` / `reproduced_source_recommendation`, `recommendation.origin = source_run`;
+  - drift → `inconclusive` / `comparison_reproduced_with_drift`;
+  - a real historical v1 replay keeps its stored outcome and legacy notice;
+  - all verify, and the exports equal the sealed report.
+- The run selector, header, result summary and event log use the sealed titles.
+- **Historical v1 and ordinary v2 investigations:** covered in the same runs, plus `replay-labels.spec.ts` (History and Dashboard on real data).
+- **Screenshots (gitignored), reviewed by eye:**
+  - `test-results/ws5-rehearsal/{reproduced,drifted,legacy}-{320,375,768,1440}-{dark,light}.png` and `run-selector-1440-{dark,light}.png`;
+  - `test-results/ws5-activation/{plain-inconclusive-report,ordinary-v2-report,replay-run-page}-{320,375,768,1440}-{dark,light}.png` (plain-worker replay);
+  - `test-results/ws5-preact/` (History, Dashboard).
+- **Accessibility checks** (by a temporary local spec, deleted, not committed):
+  - axe clean at 320 and 1440 in both themes;
+  - no horizontal page overflow at any width;
+  - reduced motion emulated;
+  - *Verify report* reachable by Tab and operable with Enter.
+- **Correction during QA:** the first temporary QA run picked the newest v2 replay by basis, which was a clocked rehearsal replay, not a plain-worker one. Those shots were discarded and retaken on a plain-worker replay (`E2E lifecycle …`, run `12030f66-…`).
+- **Known fragility, not this change:** `trace-layout.spec.ts` failed once in one full run with `sidebarTop` of `-0` against `0`. `Math.round` of a sub-pixel negative top gives `-0`, and `toBe` uses `Object.is`. It passed in the other full runs and twice alone; the file is unchanged here.
+
+### 19.5 Verification (local Docker only; no Neon; no live model calls)
+
+| Check | Result |
+|---|---|
+| ruff, ruff format, mypy strict | clean (406 files; 222 source files) |
+| Full backend pytest (unit, integration, security, retention, replay, snapshot, builders, finalization, cutover) | first full run: 2086 passed, **4 failed** (v1 version pins, §19.2); fixed; clean re-run: **2090 passed**, 2 skipped, 1 xfailed (pre-existing) |
+| Smoke evals (recorded) | 5/5; quota ledger unchanged (no entry for the day) |
+| Frontend lint, typecheck, production build | clean |
+| Vitest | 600 passed |
+| Playwright full suite (plain worker) | run 1: 32 passed, 1 failed (the new lifecycle assertion matched two "Integrity check passed" texts: a locator bug, fixed); run 2: 32 passed, 1 failed (`trace-layout` `-0`, above); run 3: **33/33** |
+| Rehearsal (`clocked_worker`) | 1/1 |
+| Sealed-report integrity (local dev DB, read only) | baseline **726** reports (718 v1, 8 v2): **0 changed or missing** (JSON, Markdown and manifest digests and content, builder, renderer, schema, outcome, status). 31 new reports, all report-builder@2. `verify-integrity`: **757/757** reports `verified`, 8766/8766 artifacts |
+| Golden fixtures | `v1_golden.json`, `report-v2.json`, `report-v2-ordinary.json`, `replay-consistency.json` unchanged |
+| Monitoring (`infra/ops/replay_activation_monitoring.sql`, `since` = 2026-10-30T16:20:44Z) | all 10 checks **0**. Distribution: 4 `comparison_inconclusive`, 1 drift, 1 reproduced (all v2). Run with an earlier `since`, the same script flags the pre-activation defect (5 marked replays sealed `verified_recommendation` by v1), so the checks do discriminate |
+| `replay-cutover-check` (local) | `ready: true`, 0 in flight, before and after |
+
+### 19.6 Rollback readiness
+
+Revert the activation commit only (DEPLOYMENT §4c). v2 stays registered, sealed v2 reports keep verifying (`test_rollback_after_a_v2_seal_keeps_v2_reports_and_returns_to_v1`, run here against the reverted build reproduced by `pre_activation`), and later replays seal v1 with the legacy tag. No rollback was needed locally.
+
+### 19.7 Remaining risks and limitations
+
+1. **Not deployed.** Production needs step 0 first, then the drain and gate, then the activation commit. The deploy order is in DEPLOYMENT §4c.
+2. **Worker logs** were not scanned for `ReportContractError` locally, because Playwright discards the API and worker stdout. The database-side checks that a refused seal would trip (monitoring 9 and 10) read 0, and every new report verified.
+3. **Host timing:** on this machine every plain-worker replay was `comparison_inconclusive`. The reproduced and drift outcomes were exercised end to end only with the virtual clock (thresholds unchanged, ADR-0023).
+4. **Legacy safety net:** a legacy replay that concludes after activation still carries the old winner-based outcome (tagged legacy). Draining avoids it.
+5. §17.9 items 4–6 still hold.
+

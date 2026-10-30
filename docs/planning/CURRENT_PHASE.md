@@ -4,7 +4,7 @@
 |---|---|
 | Phase | **5 — Production polish** (authorized by the owner 2026-10-16). Phase 1: [PHASE_1_REPORT](reports/PHASE_1_REPORT.md); Phase 2: [PHASE_2_REPORT](reports/PHASE_2_REPORT.md); Phase 3: [PHASE_3_REPORT](reports/PHASE_3_REPORT.md); Phase 4 owner-reviewed 2026-10-16: [PHASE_4_REPORT](reports/PHASE_4_REPORT.md) |
 | Status | **Phase 5 implementation complete and verified locally (2026-10-16); not publicly deployed; awaiting owner review** ([PHASE_5_REPORT](reports/PHASE_5_REPORT.md)). Exit criterion "deployed" not met by design (needs owner approval, domain, accounts) |
-| Last updated | 2026-10-30 |
+| Last updated | 2026-10-31 |
 | Application code | Phases 1–3 (API, metadata DB, parsing, inspection gateway, artifact store, six demo workloads, multi-agent graph, approval gate, sandbox benchmark engine `bench@2`, tournament, web workspace) plus Phase 4: Benchmark Auditor (deterministic checks + downgrade-only review), atomic finalization with versioned reports (`report-builder@1`, `report-md@1`), report replay, experiment replay with statistical comparison, re-investigation start, plan diff; migrations 0001–0012; web app adds Report tab, report and replay pages, lineage drawer, audit panel and plan diff |
 
 ## Post-Phase-5 addition (2026-10-16)
@@ -788,3 +788,21 @@ Defaults are chosen so implementation can proceed; change any before the listed 
   - **Activation diff:** proposed in audit §18.5, not applied. `finalize_run(versions=…)`, contract-aware `_close`, registry v2 current.
   - **Verified:** 2071 backend passed (2 skipped, 1 xfailed, pre-existing); smoke 5/5 recorded; frontend lint, typecheck, build, 600 Vitest, Playwright 33/33; 702 sealed reports unchanged, 718/718 verify.
   - **Next:** owner approval of ADR-0032 activation (audit §18.5); step 0 deploy remains an owner decision.
+
+- [x] **Workstream 5: replay outcome activation (2026-10-30/31, [ADR-0032](../engineering/adr/ADR-0032-experiment-replay-outcome-and-report-schema-2.md) Accepted, [audit §19](../reports/REPLAY_OUTCOME_AUDIT_2026-10-27.md)). ACTIVATED LOCALLY — not deployed.** Committed locally on `main`; nothing pushed or deployed; no Neon access. Production still runs the pre-activation build. Its cutover is DEPLOYMENT §4c, "Replay outcome activation", and needs separate owner approval.
+  - **Production `_close`** now classifies every completed snapshot-era replay from its verified source snapshot and stored comparison, and seals `replay_basis`. The replay's own winner is used only for pre-snapshot (`legacy`) replays.
+  - **v2 is the default:** report-builder@2 / report-md@2 / schema 2 for all new reports. v1 stays registered.
+  - **Versioned sealing:** `finalize_run(versions=…)` with `registry.ReportVersions`. Unknown, retired or mixed contracts are refused before anything is written.
+  - **Legacy replays** keep report-builder@1 on every path (completed, failed, dead-lettered, cancelled). This widens the §18.5 plan to cover sealing outside `_close`.
+  - **Test seam retired:** the activation seam (`tests/rehearsal/activation.py`) is deleted. Tests run the production path; a guard test pins it. `pre_activation.py` reproduces the old build only for the skew and rollback tests. The rehearsal worker is now `clocked_worker` (virtual clock only).
+  - **Monitoring:** `infra/ops/replay_activation_monitoring.sql` (read only, 10 checks plus the distribution).
+  - **Verified:**
+    - ruff, format, mypy; 2090 backend passed (2 skipped, 1 xfailed, pre-existing); smoke 5/5 recorded;
+    - frontend lint, typecheck, build, Vitest 600, Playwright 33/33 (third full run; §19.5 lists the two earlier single failures and their causes), rehearsal 1/1;
+    - 726 baseline sealed reports unchanged; 757/757 verify; 31 new reports all v2;
+    - monitoring 10/10 checks at 0.
+  - **Open:**
+    - deploy step 0, drain, gate, then the activation commit (owner approval);
+    - production worker logs need scanning after deploy;
+    - plain-worker replays on this host were all `comparison_inconclusive` (reproduced and drift proven with the virtual clock).
+

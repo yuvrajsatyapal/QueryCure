@@ -6,9 +6,10 @@ hypotheses that were never benchmarked (no Mode C, declined approval, no valid c
 `unverified_recommendations`. When the deterministic materiality check finds nothing worth
 optimizing, the run ends `no_action_needed` even if hypotheses exist.
 
-Since Phase 4 the report is `report-builder@1` / `report-md@1` written by `finalize_run` in the
-same transaction as the terminal status. The interim builders stay in `reports/interim.py`
-(frozen) for the records of earlier runs.
+Since Phase 4 the report is written by `finalize_run` in the same transaction as the terminal
+status: the registry's current builder and renderer (`report-builder@2` / `report-md@2` since
+ADR-0032; `report-builder@1` / `report-md@1` before). The interim builders stay in
+`reports/interim.py` (frozen) for the records of earlier runs.
 """
 
 from collections.abc import Mapping, Sequence

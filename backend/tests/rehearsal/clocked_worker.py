@@ -1,20 +1,18 @@
-"""A worker with the replay-outcome correction simulated, for the local browser rehearsal only.
+"""The production worker timed by the virtual clock, for the local browser rehearsal only.
 
 Run by `frontend/playwright.rehearsal.config.ts` in place of `python -m querycure.worker`:
 
-    uv run python -m tests.rehearsal.activated_worker
+    uv run python -m tests.rehearsal.clocked_worker
 
-It is the production worker (same runner, handlers, replay handler, comparison, classifier,
-finalization, sealing) with two test-only changes applied in this process before it starts:
-
-1. `activation.activate`: report-builder@2 / report-md@2 current and the classifier deciding a
-   completed replay's conclusion (the approved `_close` change, simulated).
-2. The virtual benchmark clock (`tests/integration/virtual_clock.py`): every sample's duration
-   comes from a seeded profile, so the rehearsal always reaches the scenario it names instead
-   of whatever this host's noise decides. Investigation runs use CLEAN; the n-th experiment
-   replay uses the n-th profile of `QC_REHEARSAL_REPLAY_PROFILES` (default `CLEAN,DRIFTED`:
-   reproduced, then performance drift). The sandbox still builds indexes, runs every query and
-   checks every row.
+It is `python -m querycure.worker` unchanged (same runner, handlers, replay handler,
+comparison, classifier in `_close`, report-builder@2, finalization and sealing) with one
+test-only change applied in this process before it starts: the virtual benchmark clock
+(`tests/integration/virtual_clock.py`). Every sample's duration comes from a seeded profile,
+so the rehearsal reaches the scenario it names instead of whatever this host's noise decides.
+Investigation runs use CLEAN; the n-th experiment replay uses the n-th profile of
+`QC_REHEARSAL_REPLAY_PROFILES` (default `CLEAN,DRIFTED`: reproduced, then performance drift).
+The sandbox still builds indexes, runs every query and checks every row; nothing on the
+replay-outcome or reporting path is substituted (the ADR-0032 activation is production code).
 
 It refuses to start unless the metadata DB is local and the LLM is the offline stub. Nothing in
 `querycure` imports it, and the Docker image does not contain `tests/`.
@@ -29,7 +27,6 @@ from querycure.jobs import handlers
 from querycure.jobs.queue import Job
 from querycure.worker import __main__ as worker_main
 from tests.integration import virtual_clock as vc
-from tests.rehearsal import activation
 
 SEED = 7
 LOCAL_HOSTS = {"127.0.0.1", "localhost", "::1"}
@@ -89,7 +86,6 @@ def _install_clock() -> None:
 
 def main() -> None:
     _require_local()
-    activation.activate(setattr)
     _install_clock()
     asyncio.run(worker_main.main())
 

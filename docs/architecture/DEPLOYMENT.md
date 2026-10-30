@@ -342,7 +342,39 @@ Separately, the `QC_MASTER_KEY` and its version. There is no other state: the sa
 
 The drill's two integrity checks are now one read-only command: `python -m querycure.ops verify-integrity [--url-env NAME]`. It runs in a single `READ ONLY` transaction and writes no `replay_attempts` rows. The DSN comes from the named environment variable (default `DATABASE_URL_DIRECT`), never from argv. Exit codes: 0 means everything verified, 1 means failures were found (IDs are listed), 2 means it was not configured. On 2026-10-18 it reported, against Neon (read-only, after migration 0016), 94/94 artifacts and 9/9 sealed reports `verified`.
 
-**Replay cutover gate (ADR-0032 activation only):** `python -m querycure.ops replay-cutover-check [--url-env NAME]` is read-only (`READ ONLY` transaction, same DSN rule). It lists experiment replays still in flight and the contract each was created under (`legacy`: started before the snapshot marker; `snapshot`: started with it). Exit codes: 0 means no legacy replay is in flight, 1 means wait (they are listed), 2 means it was not configured. Run it right before deploying the activation commit ([REPLAY_OUTCOME_AUDIT §18.4](../reports/REPLAY_OUTCOME_AUDIT_2026-10-27.md)). It never cancels anything.
+**Replay cutover gate (ADR-0032 activation only):** `python -m querycure.ops replay-cutover-check [--url-env NAME]` is read-only (`READ ONLY` transaction, same DSN rule). It lists experiment replays still in flight and the contract each was created under (`legacy`: started before the snapshot marker; `snapshot`: started with it). Exit codes: 0 means no legacy replay is in flight, 1 means wait (they are listed), 2 means it was not configured. Run it right before deploying the activation commit ([REPLAY_OUTCOME_AUDIT §18.4](../reports/REPLAY_OUTCOME_AUDIT_2026-10-27.md)); the full cutover is the next section. It never cancels anything.
+
+### Replay outcome activation (ADR-0032): production cutover (procedure; not yet performed)
+
+**Status:** activated and verified **locally only** (2026-10-30, [REPLAY_OUTCOME_AUDIT §19](../reports/REPLAY_OUTCOME_AUDIT_2026-10-27.md)). Production runs the pre-activation build. Every step below needs the owner's explicit deployment approval.
+
+**What production needs, in order:**
+1. **Step 0 (inactive change set):** deploy the commits up to `8f4c14e` (frontend, API and worker). It registers report-builder@2 everywhere and writes the snapshot links and creation marker for every new replay. None of this is deployed today, so every production replay is `legacy`.
+2. **Drain:** deploy at a quiet time. There is no switch for `POST /experiments/{id}/replay`, so starts are not blocked. Let queued and running replays finish; never cancel them for the cutover.
+3. **Gate:** run `python -m querycure.ops replay-cutover-check --url-env <VAR>` immediately before step 4. Continue only on exit 0 (`legacy_in_flight: 0`). If draining is impossible, a `legacy` replay that concludes after activation is still sealed with report-builder@1 and its legacy outcome, and the UI tags it *Legacy replay*. Accepting that exposure is an owner decision.
+4. **Deploy order:** frontend first (it already renders schemas 1 and 2). Then the API and worker **together, from the activation commit**. Never run an activated worker against a pre-step-0 API: that API cannot rebuild v2 reports.
+5. **Post-deploy checks (read only):**
+   - `psql "$DSN" -v since="'<deploy time, UTC>'" -f infra/ops/replay_activation_monitoring.sql`: all ten checks must report 0 violations.
+     1. a verified replay without the reproduced-source basis and source provenance;
+     2. outcome versus basis across run row, report row, report JSON and manifest;
+     3. a snapshot replay sealed with v1;
+     4. a completed snapshot replay without a basis;
+     5. a legacy replay not sealed as legacy;
+     6. a damaged marker or links;
+     7. a builder, renderer or schema mismatch;
+     8. an ordinary report sealed with v1;
+     9. a terminal run without a seal;
+     10. a replay attempt with `internal_error`.
+   - The last query is the basis distribution per day. On shared hosts, expect mostly `comparison_inconclusive` (ADR-0023).
+   - `python -m querycure.ops verify-integrity --url-env <VAR>`: exit 0 means every report rebuilds.
+   - Worker logs: no `ReportContractError` and no `finalize_failed`.
+
+**Rollback** (only on a failed check you cannot explain): revert the activation commit only. That is `registry.CURRENT_*` and `_close` together; the `versions` parameter may stay.
+- **Never** unregister report-builder@2 / report-md@2. Sealed v2 reports depend on them for rebuilds.
+- **Never** edit a sealed report.
+- After a rollback, new replays seal v1 again and are tagged *Legacy replay*.
+- If only the classifier's verified rule is in doubt, the safer fallback is A′: rule 9 returns `inconclusive`. A′ is a new change that needs approval.
+- Re-run the monitoring script after any rollback.
 
 ### Validating a Neon point-in-time restore (procedure; not yet performed)
 

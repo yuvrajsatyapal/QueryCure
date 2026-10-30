@@ -68,10 +68,23 @@ test("lifecycle - approve, audit, report, verify, replay the experiment", async 
   await page.getByRole("link", { name: "Open the replay run's report" }).click();
   await expect(page.getByRole("article", { name: "Final report" })).toBeVisible({ timeout: 15_000 });
   await expect(page.getByText(/experiment replay · run 2/)).toBeVisible();
-  // report-builder@1 still seals replays (the correction is not active), so this real replay
-  // report gets the historical notice, outside the sealed report body.
-  await expect(page.getByRole("note", { name: "Historical replay report" })).toBeVisible();
-  await expect(page.getByRole("article", { name: "Final report" }).getByText(/earlier replay rules|report-builder@1, which set/)).toHaveCount(0);
+  // ADR-0032 is active: the production worker seals this real replay with report-builder@2,
+  // classified from the source snapshot and the comparison (host timing decides which basis).
+  // It is never headed "Verified recommendation" and carries no historical notice.
+  await expect(page).toHaveURL(/\/app\/reports\/[0-9a-f-]{36}$/);
+  const replayRun = page.url().match(/\/app\/reports\/([0-9a-f-]{36})$/)![1];
+  const sealed = await (await page.request.get(`http://localhost:8100/api/v1/runs/${replayRun}/report`)).json();
+  expect([sealed.builder_version, sealed.report_schema_version]).toEqual(["report-builder@2", 2]);
+  const basis = sealed.report.replay_result.basis.code as string;
+  expect(sealed.outcome === "verified_recommendation").toBe(basis === "reproduced_source_recommendation");
+  const replayArticle = page.getByRole("article", { name: "Final report" });
+  await expect(replayArticle.getByRole("heading", { level: 1 })).toHaveText(sealed.report.replay_result.title);
+  await expect(replayArticle.getByRole("heading", { level: 1 })).not.toHaveText("Verified recommendation");
+  await expect(replayArticle.getByRole("region", { name: "Experiment replay result" })).toBeVisible();
+  await expect(page.getByRole("note", { name: "Historical replay report" })).toHaveCount(0);
+  await page.getByRole("button", { name: "Verify report" }).click();
+  // Scoped: the replay history on this page shows the source's verification badge too.
+  await expect(page.getByRole("region", { name: "Report verification" }).getByText("Integrity check passed against stored digests")).toBeVisible({ timeout: 15_000 });
 
   // Run history (Phase 5): the investigation lists both runs; the replay links to its source.
   await page.goto(investigationUrl);

@@ -419,17 +419,63 @@ def scenario(name: str) -> dict[str, Any]:
 # --- Versioning and registration -------------------------------------------------------
 
 
-def test_v2_is_registered_but_v1_stays_current() -> None:
+def test_v2_is_current_and_v1_stays_registered() -> None:
+    """ADR-0032 activation: new reports seal with report-builder@2 / report-md@2 / schema 2;
+    the frozen v1 stays registered for the reports it sealed and for legacy replays."""
     assert registry.BUILDERS[v2.BUILDER_VERSION] is v2.build_report
     assert registry.RENDERERS[md_v2.MD_RENDERER_VERSION] is md_v2.render_markdown
     assert registry.BUILDERS[v1.BUILDER_VERSION] is v1.build_report
     assert registry.RENDERERS[md_v1.MD_RENDERER_VERSION] is md_v1.render_markdown
     assert (registry.CURRENT_BUILDER, registry.CURRENT_RENDERER) == (
-        "report-builder@1",
-        "report-md@1",
+        "report-builder@2",
+        "report-md@2",
     )
-    assert registry.CURRENT_SCHEMA_VERSION == 1
+    assert registry.CURRENT_SCHEMA_VERSION == 2
     assert (v2.BUILDER_VERSION, v2.REPORT_SCHEMA_VERSION) == ("report-builder@2", 2)
+    assert registry.current_versions() == registry.ReportVersions(
+        "report-builder@2", "report-md@2", 2
+    )
+    assert (
+        registry.ReportVersions("report-builder@1", "report-md@1", 1)
+        == registry.LEGACY_REPORT_VERSIONS
+    )
+
+
+@pytest.mark.parametrize(
+    "versions",
+    [
+        registry.ReportVersions("report-builder@1", "report-md@1", 1),
+        registry.ReportVersions("report-builder@2", "report-md@2", 2),
+    ],
+)
+def test_released_report_contracts_are_accepted(versions: registry.ReportVersions) -> None:
+    assert registry.check_versions(versions) == versions
+
+
+@pytest.mark.parametrize(
+    ("versions", "why"),
+    [
+        (registry.ReportVersions("report-builder@9", "report-md@2", 2), "not available"),
+        (registry.ReportVersions("report-builder@2", "report-md@9", 2), "not available"),
+        (registry.ReportVersions("report-builder@2", "report-md@1", 2), "seals only with"),
+        (registry.ReportVersions("report-builder@1", "report-md@2", 1), "seals only with"),
+        (registry.ReportVersions("report-builder@2", "report-md@2", 1), "seals only with"),
+        (registry.ReportVersions("report-builder@1", "report-md@1", 2), "seals only with"),
+    ],
+)
+def test_unsupported_or_mixed_report_contracts_are_refused(
+    versions: registry.ReportVersions, why: str
+) -> None:
+    """Never a silent downgrade or a mixed contract: the builder, its renderer and its schema
+    are one version."""
+    with pytest.raises(registry.UnsupportedReportVersionError, match=why):
+        registry.check_versions(versions)
+
+
+def test_a_retired_contract_is_refused_for_sealing(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(registry, "RETIRED_BUILDERS", frozenset({"report-builder@1"}))
+    with pytest.raises(registry.UnsupportedReportVersionError, match="not available"):
+        registry.check_versions(registry.LEGACY_REPORT_VERSIONS)
 
 
 @pytest.mark.parametrize("case", CASES)

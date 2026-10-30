@@ -255,7 +255,7 @@ async def test_no_sandbox_ddl_before_approval_then_approved_run_is_benchmarked(
         == 2 * (1 + replicates)  # two param sets per experiment
     )
     body = report(owner, run_id)
-    assert body["builder_version"] == "report-builder@1"
+    assert body["builder_version"] == "report-builder@2"  # ADR-0032: v2 is current
     first_round = body["rounds"][0]
     if cand_status == "verified_with_noise_warning":
         # Kept by the auditor (a scripted neutral review): the noise warning is always stated.
