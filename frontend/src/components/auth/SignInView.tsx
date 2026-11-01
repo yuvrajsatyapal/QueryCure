@@ -12,7 +12,7 @@ import { ProviderIcon, type Provider } from "@/components/ui/ProviderIcon";
 import { API_BASE_URL, ApiError } from "@/lib/api/client";
 import { getAuthOptions, getMe, logout } from "@/lib/api/session";
 import { NOT_APPROVED, authErrorMessage } from "@/lib/auth/errors";
-import { rememberReturnTo, safeReturnTo } from "@/lib/auth/returnTo";
+import { forgetReturnTo, rememberReturnTo, safeReturnTo } from "@/lib/auth/returnTo";
 
 const PROVIDERS: { id: Provider; label: string; flag: "googleLogin" | "githubLogin" }[] = [
   { id: "google", label: "Google", flag: "googleLogin" },
@@ -44,9 +44,13 @@ export function SignInView({ next, authError }: { next: string | null; authError
     if (signedIn) router.replace(returnTo);
   }, [signedIn, returnTo, router]);
   useEffect(() => {
+    // Any earlier attempt is over (its destination is in `next` now); a click remembers the new one.
+    forgetReturnTo();
     // Coming back with the browser's Back button can restore this page from the bfcache.
     const restored = (e: PageTransitionEvent) => {
-      if (e.persisted) setPending(null);
+      if (!e.persisted) return;
+      setPending(null);
+      forgetReturnTo();
     };
     window.addEventListener("pageshow", restored);
     return () => window.removeEventListener("pageshow", restored);
@@ -81,6 +85,8 @@ export function SignInView({ next, authError }: { next: string | null; authError
             href={`${API_BASE_URL}/api/v1/auth/${p.id}/login?return_to=${encodeURIComponent(returnTo)}`}
             aria-disabled={pending ? true : undefined}
             onClick={(e) => {
+              // Opened in another tab or window: this page stays as it is.
+              if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
               if (pending) {
                 e.preventDefault();
                 return;

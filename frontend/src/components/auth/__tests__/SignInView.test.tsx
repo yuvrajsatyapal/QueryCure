@@ -3,7 +3,7 @@ import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { renderWithQuery } from "@/test/render";
 import { API_BASE_URL, ApiError } from "@/lib/api/client";
 import { getAuthOptions, getMe, logout } from "@/lib/api/session";
-import { rememberedReturnTo } from "@/lib/auth/returnTo";
+import { rememberReturnTo, rememberedReturnTo } from "@/lib/auth/returnTo";
 import { SignInView } from "../SignInView";
 
 vi.mock("@/lib/api/session", () => ({
@@ -159,4 +159,25 @@ test("a signed-in account that is not approved is told so once, and can sign out
   expect(replace).not.toHaveBeenCalled();
   fireEvent.click(screen.getByRole("button", { name: "Sign out" }));
   await waitFor(() => expect(logout).toHaveBeenCalledOnce());
+});
+
+test("reaching the sign-in page forgets an earlier attempt's destination; the next click remembers its own", async () => {
+  rememberReturnTo("/app/connections");
+  renderWithQuery(<SignInView next="/app/history" authError="access_denied" />);
+  const google = await screen.findByRole("link", { name: "Continue with Google" });
+  expect(rememberedReturnTo()).toBe("/app");
+  window.addEventListener("click", (e) => e.preventDefault(), { once: true });
+  fireEvent.click(google);
+  expect(rememberedReturnTo()).toBe("/app/history");
+});
+
+test("opening a provider in another tab leaves this page usable", async () => {
+  renderWithQuery(<SignInView next="/app/history" authError={null} />);
+  const google = await screen.findByRole("link", { name: "Continue with Google" });
+  for (const modifier of [{ metaKey: true }, { ctrlKey: true }, { shiftKey: true }]) {
+    window.addEventListener("click", (e) => e.preventDefault(), { once: true });
+    fireEvent.click(google, modifier);
+  }
+  expect(screen.getByRole("link", { name: "Continue with Google" }).getAttribute("aria-disabled")).toBeNull();
+  expect(screen.getByRole("link", { name: "Continue with GitHub" }).getAttribute("aria-disabled")).toBeNull();
 });

@@ -4,7 +4,7 @@ import { applyTheme } from "./theme";
 
 /** T5.10: axe (WCAG 2.1 A/AA rules) on the core pages, keyboard focus, reduced motion. */
 const PAGES: [string, string][] = [
-  ["/", "QueryCure"],
+  ["/", "Find out why your PostgreSQL queries are slow"],
   ["/demo", "Prerecorded investigations"],
   ["/demo/orders-sandbox-composite-index", "Inconclusive"],
   ["/app", ""],
@@ -22,6 +22,10 @@ for (const [path, heading] of PAGES) {
     await page.waitForLoadState("networkidle");
     for (const scheme of ["light", "dark"] as const) {
       await applyTheme(page, scheme);
+      // Contrast is only meaningful at rest: let one-shot entrances finish (loops never do, so skip them).
+      await page.waitForFunction(() => document.getAnimations().every((a) => a.playState !== "running" || a.effect?.getComputedTiming().iterations === Infinity), null, {
+        timeout: 15_000,
+      });
       const result = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]).analyze();
       const summary = result.violations.map((v) => `${v.id} (${v.impact}): ${v.nodes.map((n) => n.target.join(" ")).slice(0, 3).join(" | ")}`);
       expect(summary, `${path} in ${scheme} mode`).toEqual([]);
@@ -40,9 +44,9 @@ test("a11y - empty states are axe-clean too (the history page with no matches)",
 test("a11y - keyboard reaches the main actions with a visible focus ring", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByRole("heading", { level: 1 })).toBeVisible({ timeout: 30_000 });
-  // Header (logo, Demo, theme) comes first; the hero's primary action follows in reading order.
+  // Header (logo, section links, Demo, theme, app) comes first; the hero's primary action follows.
   const focused = page.locator(":focus");
-  for (const name of ["QueryCure", "Demo", "", "Open the app"]) {
+  for (const name of ["QueryCure", "Product", "How it works", "Verification", "Reports", "Demo", "", "Open QueryCure", "Explore Demo"]) {
     await page.keyboard.press("Tab");
     if (name) await expect(focused).toHaveText(name);
   }

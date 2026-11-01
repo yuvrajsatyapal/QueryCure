@@ -32,7 +32,8 @@ export function signInHref(current: string, authError?: string | null): string {
 }
 
 // The API sends a failed sign-in to `/app?auth_error=` without the destination, so the sign-in page
-// keeps it for this tab. Every attempt overwrites it, so it always belongs to the latest one.
+// keeps it for this tab. Every attempt overwrites it, and it is forgotten once the attempt is over
+// (back on the sign-in page, or signed in), so a later failure can never pick up an old one.
 export const PENDING_RETURN_KEY = "qc.signIn.returnTo";
 
 export function rememberReturnTo(path: string): void {
@@ -48,5 +49,13 @@ export function rememberedReturnTo(): string {
     return safeReturnTo(sessionStorage.getItem(PENDING_RETURN_KEY));
   } catch {
     return DEFAULT_RETURN_TO;
+  }
+}
+
+export function forgetReturnTo(): void {
+  try {
+    sessionStorage.removeItem(PENDING_RETURN_KEY);
+  } catch {
+    // Storage blocked: nothing was remembered either.
   }
 }

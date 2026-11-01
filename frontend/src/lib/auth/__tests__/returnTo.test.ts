@@ -1,5 +1,5 @@
 import { afterEach, expect, test, vi } from "vitest";
-import { DEFAULT_RETURN_TO, PENDING_RETURN_KEY, rememberReturnTo, rememberedReturnTo, safeReturnTo, signInHref } from "../returnTo";
+import { DEFAULT_RETURN_TO, PENDING_RETURN_KEY, forgetReturnTo, rememberReturnTo, rememberedReturnTo, safeReturnTo, signInHref } from "../returnTo";
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -78,4 +78,14 @@ test("a tampered remembered destination, or unavailable storage, falls back to t
   });
   expect(() => rememberReturnTo("/app/connections")).not.toThrow();
   expect(rememberedReturnTo()).toBe(DEFAULT_RETURN_TO);
+});
+
+test("a remembered destination can be forgotten, even when storage is blocked", () => {
+  rememberReturnTo("/app/connections");
+  forgetReturnTo();
+  expect(rememberedReturnTo()).toBe(DEFAULT_RETURN_TO);
+  vi.spyOn(Storage.prototype, "removeItem").mockImplementation(() => {
+    throw new Error("blocked");
+  });
+  expect(() => forgetReturnTo()).not.toThrow();
 });

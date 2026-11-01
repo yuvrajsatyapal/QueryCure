@@ -3,7 +3,7 @@ import { cleanup, screen, waitFor } from "@testing-library/react";
 import { renderWithQuery } from "@/test/render";
 import { ApiError } from "@/lib/api/client";
 import { createSession, getAuthOptions, getMe } from "@/lib/api/session";
-import { rememberReturnTo } from "@/lib/auth/returnTo";
+import { rememberReturnTo, rememberedReturnTo } from "@/lib/auth/returnTo";
 import { SessionGate } from "../SessionGate";
 
 vi.mock("@/lib/api/session", () => ({
@@ -97,4 +97,20 @@ test("a signed-in account keeps a sign-in error on the page it came back to", as
   expect(await screen.findByText("app content")).toBeDefined();
   expect(screen.getByRole("alert").textContent).toBe("Sign-in was cancelled.");
   expect(replace).not.toHaveBeenCalled();
+});
+
+test("a completed sign-in forgets its remembered destination, so a later failure cannot reuse it", async () => {
+  rememberReturnTo("/app/connections");
+  window.history.replaceState(null, "", "/app/connections");
+  vi.mocked(getMe).mockResolvedValue(me as never);
+  renderWithQuery(<SessionGate>app content</SessionGate>);
+  expect(await screen.findByText("app content")).toBeDefined();
+  expect(rememberedReturnTo()).toBe("/app");
+});
+
+test("the automatic hand-over to sign-in keeps the page's fragment", async () => {
+  window.history.replaceState(null, "", "/app/history?q=1#recent");
+  vi.mocked(getMe).mockRejectedValue(denied(403, "ACCESS_DENIED"));
+  renderWithQuery(<SessionGate>app content</SessionGate>);
+  await waitFor(() => expect(replace).toHaveBeenCalledWith("/sign-in?next=%2Fapp%2Fhistory%3Fq%3D1%23recent"));
 });

@@ -181,3 +181,27 @@ test("the collapsed rail expands to an icon Sign out below the avatar", async ()
   expect(profile.compareDocumentPosition(signOut) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   expect(screen.queryByRole("menu")).toBeNull();
 });
+
+for (const collapsed of [false, true]) {
+  test(`expanding the account brings its actions into view on a short screen${collapsed ? " (rail)" : ""}`, async () => {
+    vi.mocked(getMe).mockResolvedValue(oauth("Ada Lovelace") as never);
+    const scrolled: Element[] = [];
+    const original = Element.prototype.scrollIntoView;
+    Element.prototype.scrollIntoView = function (this: Element) {
+      scrolled.push(this);
+    };
+    try {
+      renderWithQuery(<SidebarAccount collapsed={collapsed} />);
+      const profile = await screen.findByRole("button", { name: /Ada Lovelace/ });
+      fireEvent.click(profile);
+      const group = screen.getByRole("group", { name: "Account" });
+      await waitFor(() => expect(scrolled).toContain(group));
+      // Collapsing scrolls nothing.
+      scrolled.length = 0;
+      fireEvent.click(profile);
+      expect(scrolled).toEqual([]);
+    } finally {
+      Element.prototype.scrollIntoView = original;
+    }
+  });
+}

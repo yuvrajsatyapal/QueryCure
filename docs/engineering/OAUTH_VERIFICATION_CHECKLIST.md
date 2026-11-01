@@ -51,6 +51,7 @@
 | 11 | Second test account | Sees none of the first account's investigations (404 on its URL) |
 | 12 | Tamper: start login, then edit the `state` query value on the callback URL | Redirect with `?auth_error=…`; no session issued |
 | 13 | Deny consent at the provider | Redirect with `?auth_error=…`; no 500 |
+| 13a | Start from the sidebar's **Sign in** on `/app/connections`, deny consent, then retry and approve | The denial lands on `/sign-in?next=%2Fapp%2Fconnections&auth_error=access_denied` with "Sign-in was cancelled."; the retry ends on `/app/connections`. Afterwards DevTools → Application → Session Storage holds no `qc.signIn.returnTo` |
 | 14 | `return_to=//evil.example` on `/auth/<provider>/login` | After sign-in, lands on `/app`, not off-site |
 | 15 | API logs for the run | `oauth_signed_in` / `oauth_failed` events only; no codes, tokens, secrets or emails |
 

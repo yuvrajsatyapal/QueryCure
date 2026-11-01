@@ -7,7 +7,7 @@ import { ErrorNotice } from "@/components/common/ErrorNotice";
 import { ApiError } from "@/lib/api/client";
 import { createSession, getMe } from "@/lib/api/session";
 import { authErrorMessage } from "@/lib/auth/errors";
-import { rememberedReturnTo, signInHref } from "@/lib/auth/returnTo";
+import { forgetReturnTo, rememberedReturnTo, signInHref } from "@/lib/auth/returnTo";
 
 const isDenied = (error: unknown) => error instanceof ApiError && error.status === 403 && error.code === "ACCESS_DENIED";
 
@@ -20,7 +20,7 @@ function ToSignIn() {
   const router = useRouter();
   useEffect(() => {
     const code = authErrorCode();
-    router.replace(code ? signInHref(rememberedReturnTo(), code) : signInHref(window.location.pathname + window.location.search));
+    router.replace(code ? signInHref(rememberedReturnTo(), code) : signInHref(window.location.pathname + window.location.search + window.location.hash));
   }, [router]);
   return <p className="text-muted">Opening sign-in…</p>;
 }
@@ -30,6 +30,10 @@ function ToSignIn() {
 function SignedInOrRetry({ oauth, children }: { oauth: boolean; children: ReactNode }) {
   // Mounted only after the session query resolves in the browser, so window exists here.
   const [code] = useState(authErrorCode);
+  useEffect(() => {
+    // Signed in (or this account's attempt at another one ended here): the attempt is over.
+    if (oauth) forgetReturnTo();
+  }, [oauth]);
   if (code !== null && !oauth) return <ToSignIn />;
   return (
     <>

@@ -3,7 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { Icon } from "@/components/ui/Icon";
 import { ApiError } from "@/lib/api/client";
 import { getMe, logout } from "@/lib/api/session";
@@ -83,6 +83,12 @@ function SignedIn({ name: displayName, collapsed }: { name: string | null; colla
   const client = useQueryClient();
   const [open, setOpen] = useState(false);
   const regionId = useId();
+  const region = useRef<HTMLDivElement>(null);
+  // On a short screen the footer sits at the sidebar's bottom edge, so the revealed actions would
+  // open below it: bring them into view (instant; nothing moves when they are already visible).
+  useEffect(() => {
+    if (open) region.current?.scrollIntoView?.({ block: "nearest" });
+  }, [open]);
   const out = useMutation({
     mutationFn: logout,
     // Drops every cached query (no stale name or runs); SessionGate then notices the 401 and
@@ -109,7 +115,7 @@ function SignedIn({ name: displayName, collapsed }: { name: string | null; colla
         <button {...disclosure} aria-label={`Account: ${name}`} className={`rounded-full ${out.isError ? "ring-2 ring-rejected" : ""}`}>
           <Avatar name={displayName} />
         </button>
-        <div id={regionId} role="group" aria-label="Account" hidden={!open}>
+        <div ref={region} id={regionId} role="group" aria-label="Account" hidden={!open}>
           <button
             type="button"
             onClick={() => out.mutate()}
@@ -138,7 +144,7 @@ function SignedIn({ name: displayName, collapsed }: { name: string | null; colla
         </span>
         <Icon name="chevronDown" size={15} className={`shrink-0 text-faint motion-safe:transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
-      <div id={regionId} role="group" aria-label="Account" hidden={!open} className="pt-1">
+      <div ref={region} id={regionId} role="group" aria-label="Account" hidden={!open} className="pt-1">
         <button
           type="button"
           onClick={() => out.mutate()}

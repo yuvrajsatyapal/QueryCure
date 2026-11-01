@@ -255,6 +255,8 @@ for (const scheme of ["dark", "light"] as const) {
       await expect(profile).toHaveAttribute("aria-expanded", "true");
       const signOut = nav.getByRole("button", { name: "Sign out" });
       await expect(signOut).toBeVisible();
+      // Fully on screen without scrolling by hand, even 360px tall.
+      await expect(signOut, `${at}: Sign out opened off screen`).toBeInViewport({ ratio: 1 });
       await expect(page.getByRole("menu")).toHaveCount(0);
       expect(await inFlow(signOut), `${at}: Sign out is layered, not in flow`).toBe(true);
       // It takes room in the sidebar's footer (the layout grows) and sits directly below the profile.
@@ -298,6 +300,7 @@ test("sidebar auth - the collapsed rail expands an icon Sign out inline", async 
     await aside.getByRole("button", { name: "Account: Ada Lovelace" }).click();
     const signOut = aside.getByRole("button", { name: "Sign out" });
     await expect(signOut).toBeVisible();
+    await expect(signOut).toBeInViewport({ ratio: 1 });
     expect(await inFlow(signOut)).toBe(true);
     expect(await onTop(signOut)).toBe(true);
     expect(await noSideways(page)).toBeLessThanOrEqual(0);
@@ -376,4 +379,75 @@ test("sidebar auth - axe finds no violations on the sign-in page or the expanded
   await nav.getByRole("button", { name: /Ada Lovelace/ }).click();
   await expect(nav.getByRole("button", { name: "Sign out" })).toBeVisible();
   await scan("expanded account in drawer");
+});
+
+test("sign-in page - a not-approved account sees the notice once, does not loop, and can sign out", async ({ page }) => {
+  const errors = collectErrors(page);
+  let signedOut = false;
+  const logouts: string[] = [];
+  const err = (status: number, code: string) => ({ status, json: { error: { code, message: code, status, details: [] } } });
+  await page.route("**/api/v1/me", (route) => route.fulfill(signedOut ? err(401, "UNAUTHENTICATED") : err(403, "ACCESS_DENIED")));
+  await page.route("**/api/v1/session", (route) => route.fulfill(err(403, "ACCESS_DENIED")));
+  await page.route("**/api/v1/auth/options", (route) => route.fulfill({ json: { ...OPTIONS, restricted_access: true } }));
+  await page.route("**/api/v1/auth/logout", (route) => {
+    logouts.push(route.request().method());
+    signedOut = true;
+    return route.fulfill({ status: 204 });
+  });
+  const navigations: string[] = [];
+  page.on("framenavigated", (frame) => {
+    if (frame === page.mainFrame()) navigations.push(frame.url());
+  });
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/app/history");
+  await expect(page).toHaveURL(/\/sign-in\?next=%2Fapp%2Fhistory$/);
+  const notice = page.locator("main").getByRole("alert");
+  await expect(notice).toHaveText(/not approved for this trial/);
+  await expect(notice).toHaveCount(1);
+  // Settled on the sign-in page: no further navigations (a gate ⇄ sign-in loop would keep adding them).
+  const settled = navigations.length;
+  await page.waitForTimeout(1500);
+  expect(navigations.length).toBe(settled);
+  await expect(page).toHaveURL(/\/sign-in\?next=%2Fapp%2Fhistory$/);
+
+  await page.getByRole("button", { name: "Sign out" }).click();
+  await expect(page.getByRole("button", { name: "Sign out" })).toHaveCount(0);
+  await expect(notice).toHaveCount(0);
+  expect(logouts).toEqual(["POST"]);
+  await expect(page.getByRole("link", { name: "Continue with Google" })).toBeVisible();
+  await expect(page).toHaveURL(/\/sign-in\?next=%2Fapp%2Fhistory$/);
+  expect(errors).toEqual([]);
+});
+
+test("sign-in page - a completed sign-in leaves no destination for a later, unrelated failure", async ({ page }) => {
+  let oauth = false;
+  await page.route("**/api/v1/me", async (route) => {
+    if (oauth) return route.fulfill({ json: OAUTH_ME });
+    const response = await route.fetch();
+    const body = await response.json();
+    return route.fulfill({ response, json: { ...body, features: FEATURES } });
+  });
+  await page.route("**/api/v1/auth/options", (route) => route.fulfill({ json: OPTIONS }));
+  await page.route("**/api/v1/auth/logout", (route) => {
+    oauth = false;
+    return route.fulfill({ status: 204 });
+  });
+  // A successful provider round trip ends on the destination with a signed-in session.
+  await page.route("**/api/v1/auth/google/login**", (route) => {
+    oauth = true;
+    return route.fulfill({ status: 302, headers: { location: new URL("/app/connections", page.url()).toString() } });
+  });
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/sign-in?next=%2Fapp%2Fconnections");
+  await page.getByRole("link", { name: "Continue with Google" }).click();
+  await expect(page).toHaveURL(/\/app\/connections$/);
+  const nav = await sidebar(page);
+  await nav.getByRole("button", { name: /Ada Lovelace/ }).click();
+  await nav.getByRole("button", { name: "Sign out" }).click();
+  await expect(nav.getByRole("link", { name: "Sign in" })).toBeVisible();
+  expect(await page.evaluate(() => sessionStorage.getItem("qc.signIn.returnTo"))).toBeNull();
+
+  // A failure that did not start on the sign-in page must not pick up the old destination.
+  await page.goto("/app?auth_error=access_denied");
+  await expect(page).toHaveURL(/\/sign-in\?auth_error=access_denied$/);
 });

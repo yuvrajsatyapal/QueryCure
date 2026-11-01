@@ -6,6 +6,7 @@ import { CommandProvider } from "@/components/command/CommandProvider";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import { Icon } from "@/components/ui/Icon";
 import { Logo } from "@/components/ui/Logo";
+import { useRailTooltip } from "./RailTooltip";
 import { SessionGate } from "./SessionGate";
 import { SideNav } from "./SideNav";
 import { SidebarAccount } from "./SidebarAccount";
@@ -82,14 +83,17 @@ function SidebarBody({ collapsed = false, onToggle, onNavigate }: { collapsed?: 
 export function AppShell({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState(false);
   const [rail, setRail] = useSidebarRail();
+  const railTip = useRailTooltip(rail);
 
   return (
     <CommandProvider>
       <div className="flex min-h-full flex-1">
         <aside
           className={`sticky top-0 hidden h-dvh shrink-0 flex-col gap-5 overflow-y-auto border-r border-border bg-sidebar py-3 md:flex ${rail ? "w-14 px-2" : "w-60 px-3"}`}
+          {...railTip.bind}
         >
           <SidebarBody collapsed={rail} onToggle={() => setRail(!rail)} />
+          {railTip.node}
         </aside>
         {open ? (
           <div className="fixed inset-0 z-40 md:hidden" role="dialog" aria-modal="true" aria-label="Navigation">
