@@ -209,7 +209,7 @@ data: {"run_id":"…","seq":42,"ts":"2026-10-11T12:00:03.120Z","type":"hypothesi
 | `benchmark.progress` | `{experiment_id, state, param_set?, block?, blocks_total?, cancelled?, time_budget_reached?}` |
 | `verification.completed` | `{experiment_id, candidate_key, verdict, gate, reasons[]}` |
 | `budget.warning` | `{budget, used, limit}` |
-| `error` | `{node, code, message, recoverable}` |
+| `error` | `{node, code, message, recoverable}`. `AUDIT_NOT_COMPLETED` (node `write_report`, also when raised from `fail_run`; `recoverable=false`) means verified candidates were sealed as `inconclusive` because their audit never ran; it is not a `verification.completed` |
 | `run.concluded` | `{final_status, outcome, stop_reason, synthesis_summary, materiality, no_action_evidence, usage, error, narrative_check?, replay_basis?}` — last content event, written by `finalize_run` (ADR-0022) |
 | `report.ready` | `{report_url, outcome, manifest_sha256}` — lifecycle event, emitted after the events cutoff |
 | `replay.status_changed` | `{replay_attempt_id, from, to, failure_code?, source_snapshot?}` — on the replay run's stream. `source_snapshot` (`{schema_version, manifest, report_json}`) appears only on the creation event (`from: null`) of replays started under the snapshot contract (ADR-0032); clients may ignore it |

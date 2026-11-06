@@ -154,12 +154,14 @@ COMMIT
 - **Write rule.** No content record of a finalized run (evidence, hypotheses, candidates, verification results, run artifacts) may be written. Repositories check `finalized_at` in the same transaction.
 - **Timestamps.** `finalized_at` is taken once from the database clock inside the transaction. `build_report` reads no other clock, so a rebuild from the same records is byte-identical.
 
+**Audit completeness (current implementation).** Currently, audit completeness is enforced by the relevant callers before they invoke `finalize_run`; `finalize_run` itself does not perform this check and seals the candidate statuses it finds. `write_report` and `fail_run` each downgrade any verified candidate whose Benchmark Auditor checks never ran, in the same transaction and after taking the run-row lock (rules and reason codes: [AGENT_SYSTEM, Audit completeness](AGENT_SYSTEM.md#optimization-loop-implemented-in-phase-3)). The `AUDIT_NOT_COMPLETED` error event is written before step 0, so it is inside the events cutoff and digest. A new caller that seals a run after an experiment would have to make the same call; nothing enforces that today. Whether to move the check into `finalize_run` is an open decision (recorded in [CURRENT_PHASE](../planning/CURRENT_PHASE.md); no ADR has been written).
+
 **Failure behaviour.**
 
 - **Exception before COMMIT.** Nothing is visible and the run stays `running`/`cancelling`. The node is retried, and it is idempotent: artifacts are content-addressed and step 1 short-circuits.
 - **Crash after COMMIT but before the LangGraph checkpoint.** The node re-runs and step 1 returns the existing manifest.
-- **Failed or cancelled runs.** These are finalized the same way, with a partial report and `final_status = failed | cancelled`.
-- **Finalization itself fails permanently** (e.g., the metadata DB is unreachable past the retry budget). The run is marked `failed` with no manifest. Report replay then returns `not_replayable: not_finalized`; it never fabricates a manifest.
+- **Failed or cancelled runs.** These are finalized the same way, with a partial report and `final_status = failed | cancelled`. `fail_run` enforces audit completeness inside that transaction, so the downgrade, its event and the seal succeed or roll back together.
+- **Finalization itself fails permanently** (e.g., the metadata DB is unreachable past the retry budget). The run is marked `failed` with no manifest. Report replay then returns `not_replayable: not_finalized`; it never fabricates a manifest. This fallback does not enforce audit completeness, so candidate rows can remain `verified` in the database; no sealed report exists to present them.
 
 ## 6. Integrity scope (what the digests do and do not prove)
 

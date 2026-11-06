@@ -4,7 +4,7 @@
 |---|---|
 | Phase | **5 — Production polish** (authorized by the owner 2026-10-16). Phase 1: [PHASE_1_REPORT](reports/PHASE_1_REPORT.md); Phase 2: [PHASE_2_REPORT](reports/PHASE_2_REPORT.md); Phase 3: [PHASE_3_REPORT](reports/PHASE_3_REPORT.md); Phase 4 owner-reviewed 2026-10-16: [PHASE_4_REPORT](reports/PHASE_4_REPORT.md) |
 | Status | **Phase 5 implementation complete and verified locally (2026-10-16); not publicly deployed; awaiting owner review** ([PHASE_5_REPORT](reports/PHASE_5_REPORT.md)). Exit criterion "deployed" not met by design (needs owner approval, domain, accounts) |
-| Last updated | 2026-11-01 |
+| Last updated | 2026-11-06 |
 | Application code | Phases 1–3 (API, metadata DB, parsing, inspection gateway, artifact store, six demo workloads, multi-agent graph, approval gate, sandbox benchmark engine `bench@2`, tournament, web workspace) plus Phase 4: Benchmark Auditor (deterministic checks + downgrade-only review), atomic finalization with versioned reports (`report-builder@1`, `report-md@1`), report replay, experiment replay with statistical comparison, re-investigation start, plan diff; migrations 0001–0012; web app adds Report tab, report and replay pages, lineage drawer, audit panel and plan diff |
 
 ## Post-Phase-5 addition (2026-10-16)
@@ -179,6 +179,18 @@
     - An already-open SSE stream and already-queued jobs are not cut off.
     - The demo gallery stays public.
     - Approved emails are stored in `users.email`.
+
+- [x] **Audit completeness: no unaudited verified recommendation (2026-11-06, local commit `66a19e6`, not pushed; behavior in [AGENT_SYSTEM, Audit completeness](../architecture/AGENT_SYSTEM.md#optimization-loop-implemented-in-phase-3), [REPLAY_ENGINE §5](../architecture/REPLAY_ENGINE.md#5-atomic-finalization)).**
+  - **Gap fixed.** `run_experiment` stores the engine verdict as the candidate status before the Benchmark Auditor runs. If the auditor was skipped (budget) or crashed, the candidate stayed `verified` and the sealed report presented it as a verified recommendation, including in a failed run sealed by `fail_run` after a dead-lettered job.
+  - **Fix.** `audit/completeness.py` (pure matching: exact primary experiment id, candidate id, key and round; fail closed) and `audit/enforcement.py` (downgrade to `inconclusive` / `audit_not_completed`, one `AUDIT_NOT_COMPLETED` error event). Called by `write_report` and by `fail_run` (run-row `FOR UPDATE` first), in the sealing transaction. Audited candidates and auditor downgrades are left as written.
+  - **Tests.** 3 unit files and 3 integration files (metadata DB only; recorded fixture, scripted LLM, real auditor). The failed-run test was red before the fix (`recommendation.status == 'verified'`) and green after.
+  - **Verified (local, metadata DB only; the sandbox stayed off):** ruff, format, `mypy src`; unit suite 1421 passed, 2 skipped, 1 xfailed; the relevant integration suites 65 passed, 16 skipped. The 16 skipped tests need the sandbox database (`sandbox-db` was unreachable), which was not started, so they were not run and are not counted as passing.
+  - **Limitations (also in AGENT_SYSTEM):**
+    - The `fail_run` fallback (sealing failed) marks the run failed with no report and does not enforce, so candidate rows can stay `verified`; no sealed report exists to present them.
+    - The check is made at the `write_report` and `fail_run` call sites, not inside `finalize_run`; nothing tests that a new caller does it.
+    - **Report presentation is unresolved:** `report-md@2` still prints `Engine verdict <arm>: verified` for a downgraded candidate. Fixing it needs a new builder/renderer version (ADR-0015).
+    - No concurrent-writer test of the locking design; `fail_run` with a `cancelled` stop reason and an exception inside the enforcement are untested.
+  - **Decision pending (no ADR written):** keep the per-caller gate, or move it into `finalize_run` (needs `experiment_id_for` moved below `agents/` to avoid an upward import).
 
 ## Completed
 
