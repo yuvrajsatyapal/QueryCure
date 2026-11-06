@@ -18,6 +18,7 @@ from querycure.agents.graph import compile_graph
 from querycure.agents.runtime import LlmClients, RunContext
 from querycure.agents.services import GatewayInspectorFactory
 from querycure.agents.state import InvestigationState
+from querycure.audit.enforcement import enforce_audit_completeness
 from querycure.benchmark.engine import EngineOptions
 from querycure.benchmark.measurement_fixtures import ContextOpener, MeasureFn
 from querycure.core.config import Settings
@@ -93,14 +94,33 @@ async def fail_run(engine: AsyncEngine, run_id: uuid.UUID, error: dict[str, Any]
             status = await get_run_status(conn, run_id)
             if status is None or status in TERMINAL_STATUSES:
                 return
+            # Lock before reading candidates: a worker that outlived its lease cannot commit a
+            # verified candidate between the audit check and the seal (its writes wait here).
+            locked = (
+                await conn.execute(
+                    text(
+                        "SELECT status, finalized_at FROM investigation_runs "
+                        "WHERE id = :id FOR UPDATE"
+                    ),
+                    {"id": run_id},
+                )
+            ).one()
+            status = RunStatus(locked.status)
+            if locked.finalized_at is not None or status in TERMINAL_STATUSES:
+                return
             cancelled = status in (RunStatus.CANCELLING, RunStatus.AWAITING_APPROVAL)
+            stop_reason = "cancelled" if cancelled else "failed"
+            # The auditor may never have run (it crashed on every attempt): a verified engine
+            # verdict must not be sealed as the report's recommendation. Same transaction as
+            # the seal, so the downgrade, its event and the report commit together or not at all.
+            await enforce_audit_completeness(conn, run_id, stop_reason)
             await finalize_run(
                 conn,
                 run_id,
                 Conclusion(
                     final_status=RunStatus.CANCELLED if cancelled else RunStatus.FAILED,
                     outcome=None,
-                    stop_reason="cancelled" if cancelled else "failed",
+                    stop_reason=stop_reason,
                     error=error,
                 ),
             )

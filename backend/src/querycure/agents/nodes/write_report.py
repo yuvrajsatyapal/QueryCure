@@ -1,6 +1,7 @@
 """write_report (terminal, deterministic): outcome, then `finalize_run` (report, manifest, seal).
 
-Outcomes (AGENT_SYSTEM §12): a verified tournament winner → `verified_recommendation`; an
+Outcomes (AGENT_SYSTEM §12): an audited, verified tournament winner → `verified_recommendation`
+(a winner whose Benchmark Auditor checks never ran is downgraded first); an
 expired approval, or candidates benchmarked without a verified winner → `inconclusive`;
 hypotheses that were never benchmarked (no Mode C, declined approval, no valid candidate) →
 `unverified_recommendations`. When the deterministic materiality check finds nothing worth
@@ -22,6 +23,7 @@ from sqlalchemy.ext.asyncio import AsyncConnection
 from querycure.agents.claims_v2 import CHECKER_VERSION, action_refs, claim_context, filter_text
 from querycure.agents.runtime import REPORT_NODE, RunContext, guarded
 from querycure.agents.state import InvestigationState
+from querycure.audit.enforcement import enforce_audit_completeness
 from querycure.core.logging import get_logger
 from querycure.db.repositories.agents import call_outcomes
 from querycure.db.repositories.findings import list_hypotheses
@@ -85,6 +87,8 @@ async def write_report(state: InvestigationState, runtime: Runtime[RunContext]) 
         current = RunStatus(row.status)
         if row.finalized_at is not None or current in TERMINAL_STATUSES:
             return {"outcome": row.outcome}  # re-run after a crash: already sealed
+        # Before anything reads candidate statuses: the report and the outcome must agree.
+        audit = await enforce_audit_completeness(conn, ctx.run_id, state.get("stop_reason"))
         hypotheses = await list_hypotheses(conn, ctx.run_id)
         materiality = state.get("materiality") or {}
         evidence = await list_evidence(conn, ctx.run_id)
@@ -95,7 +99,7 @@ async def write_report(state: InvestigationState, runtime: Runtime[RunContext]) 
             has_hypotheses=bool(hypotheses),
             has_no_action_evidence=bool(state.get("no_action_evidence")),
             not_material=materiality.get("verdict") == "not_material",
-            winner=state.get("winner"),
+            winner=audit.winner(state.get("winner")),
             approval_status=state.get("approval_status"),
             benchmarked=bool(optimization and optimization["benchmarked"]),
         )
