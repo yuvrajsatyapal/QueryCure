@@ -3040,7 +3040,7 @@ export interface components {
              */
             availability: "live" | "prerecorded";
             /** Default Seed */
-            default_seed: number;
+            default_seed: number | null;
             /** Description */
             description: string;
             /** Example Queries */
@@ -3051,6 +3051,10 @@ export interface components {
             injected_problem: string;
             /** Name */
             name: string;
+            /** Ref */
+            ref: string | null;
+            /** Requires Local Data */
+            requires_local_data: boolean;
             /** Scale Factors */
             scale_factors: number[];
             /** Tables */

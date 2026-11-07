@@ -336,7 +336,7 @@ function ExperimentScene({ reduced }: { reduced: boolean }) {
           apBtn.textContent = "✓ Approved";
           appr.classList.add("ok");
           apT.textContent = "Approved";
-          apSt.textContent = "demo approval";
+          apSt.textContent = "approval";
         });
         at(2300, () => {
           appr.classList.remove("on");
@@ -766,8 +766,8 @@ const SCENE_MS = {
 const FX: { t: string; icon: LpIconName; ms: number; d: string; Scene: (p: { reduced: boolean }) => ReactNode }[] = [
   { t: "Investigate intelligently", ms: SCENE_MS.investigate, icon: "search", d: "Specialist agents read the plan, schema and statistics. Every claim has to point to evidence; claims that don't are removed.", Scene: InvestigateScene },
   { t: "Experiment safely", ms: SCENE_MS.experiment, icon: "flask", d: "Your database is only ever read, with plain EXPLAIN. Changes run in a throwaway sandbox, and only after you approve the exact SQL.", Scene: ExperimentScene },
-  { t: "Measure performance", ms: SCENE_MS.measure, icon: "gauge", d: "Both versions run many times and every timing is kept. You get a range for the speed-up, and it narrows as evidence builds up.", Scene: MeasureScene },
-  { t: "Verify independently", ms: SCENE_MS.verify, icon: "shieldCheck", d: "Plain code checks correctness and statistics and gives the verdict. The AI that suggested a change can't promote it.", Scene: VerifyScene },
+  { t: "Measure performance", ms: SCENE_MS.measure, icon: "gauge", d: "Both versions run many times, interleaved, and every timing is kept. You get an interval for the speed-up, not a single number.", Scene: MeasureScene },
+  { t: "Verify independently", ms: SCENE_MS.verify, icon: "shieldCheck", d: "Plain code checks correctness and statistics and gives the verdict, and a result is only verified once its audit has run. The AI that suggested a change can't promote it.", Scene: VerifyScene },
   { t: "Replay with evidence", ms: SCENE_MS.replay, icon: "replay", d: "Replaying a report re-checks the fingerprint of every stored file. Nothing is re-run; measuring again or re-investigating are separate actions.", Scene: ReplayScene },
 ];
 

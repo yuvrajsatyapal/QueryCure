@@ -1,7 +1,8 @@
-/* Query X-Ray: one illustrative query and its plan before and after
- * `CREATE INDEX ON orders (customer_id, created_at DESC)`. The plan shapes match a real PostgreSQL 17 run;
- * the timings shown with them come from the separate illustrative benchmark (bench.ts), not from this plan
- * (docs/design/prototypes/landing/README.md). */
+/* Query X-Ray: one query and its plan before and after `CREATE INDEX ON orders (customer_id, created_at DESC)`.
+ * Plan shapes, row counts and timings all come from one recorded PostgreSQL EXPLAIN ANALYZE run
+ * (xrayMeasured.ts, docs/design/prototypes/landing/README.md). */
+
+import { MEASURED } from "./xrayMeasured";
 
 export type XrayRow = "limit" | "sort" | "seq" | "idx" | "removed" | "note" | "baseline" | "result";
 export type XrayViewId = "before" | "after";
@@ -24,7 +25,7 @@ export const XRAY_VIEWS: Record<XrayViewId, XrayView> = {
   before: {
     show: ["limit", "sort", "seq", "note", "baseline"],
     noteLevel: 3,
-    note: "Reads every heap row of orders to find one customer's 47, then sorts them.",
+    note: `Reads all ${MEASURED.before.examined.toLocaleString("en-US")} rows of orders to find one customer's ${MEASURED.before.kept}, then sorts them.`,
     edges: [
       ["seq", "sort", "hot"],
       ["sort", "limit", "hot"],
@@ -34,7 +35,7 @@ export const XRAY_VIEWS: Record<XrayViewId, XrayView> = {
   after: {
     show: ["limit", "idx", "removed", "note", "result"],
     noteLevel: 2,
-    note: "In this example the index returns rows newest-first, so the scan stops after 20.",
+    note: `In this example the index returns rows newest-first, so the scan stops after ${MEASURED.limit}.`,
     edges: [["idx", "limit", "cool"]],
     leader: "idx",
   },

@@ -12,23 +12,60 @@ export function Hero() {
         <div>
           <p className="eyebrow">PostgreSQL performance, with evidence</p>
           <h1>
-            Find out why your PostgreSQL queries are slow. <em>Then prove the fix.</em>
+            Find out why your PostgreSQL queries are slow. <em>Then test the fix first.</em>
           </h1>
-          <p className="hero-sub">Analyze slow PostgreSQL queries, uncover bottlenecks, test potential fixes, and verify the results with reproducible evidence.</p>
-          <div className="hero-ctas">
-            <Link href="/demo" className="btn btn-primary">
-              Explore Demo <LpIcon name="arrowRight" size={15} />
-            </Link>
-            <Link href="/app" className="btn btn-secondary">
-              Open QueryCure
-            </Link>
-          </div>
-          <p className="hero-note">
-            <span className="dot" />
-            The public demo uses prerecorded investigations, labelled as such.
+          <p className="hero-sub">
+            QueryCure uses AI to investigate SQL performance, identify likely causes, and propose evidence-backed fixes. Each candidate is tested in an isolated sandbox, only after your approval. Every result is evaluated using measured
+            performance and supporting evidence.
           </p>
+          <div className="hero-ctas">
+            <Link href="/app" className="btn btn-primary">
+              Open QueryCure <LpIcon name="arrowRight" size={15} />
+            </Link>
+            <a href="#how" className="btn btn-secondary">
+              See how it works
+            </a>
+          </div>
         </div>
         <QueryXRay />
+      </div>
+    </section>
+  );
+}
+
+const FLOW = [
+  ["search", "Investigate", "Reads your SQL, execution plan, and schema. Live database inspection is read-only."],
+  ["dashed", "Hypothesize", "Proposes likely causes, each one a hypothesis backed by cited evidence."],
+  ["hand", "Approve", "Review the exact SQL for each candidate. Nothing runs without your approval."],
+  ["gauge", "Verify", "Approved candidates are tested in an isolated sandbox. Benchmark rules check correctness and measured performance."],
+  ["fileText", "Report", "A sealed report preserving findings, evidence, and the limits of the investigation."],
+] as const;
+
+/** The whole workflow in five steps, with the one human gate called out. */
+export function FlowStrip() {
+  return (
+    <section className="flow" aria-label="The workflow in five steps">
+      <div className="wrap">
+        <ol className="flow-list">
+          {FLOW.map(([icon, title, body], i) => {
+            const gate = title === "Approve";
+            return (
+              <li key={title} className={gate ? "flow-gate" : undefined}>
+                <Reveal>
+                  <span className="flow-ic">
+                    <LpIcon name={icon} size={16} />
+                  </span>
+                  <p className="eyebrow">
+                    {String(i + 1).padStart(2, "0")}
+                    {gate ? <span className="pill t-approval sm">Human gate</span> : null}
+                  </p>
+                  <h3>{title}</h3>
+                  <p>{body}</p>
+                </Reveal>
+              </li>
+            );
+          })}
+        </ol>
       </div>
     </section>
   );
@@ -83,13 +120,13 @@ export function CtaSection() {
           <br />
           <span>Start investigating.</span>
         </h2>
-        <p>Understand slow PostgreSQL queries with measured experiments and reproducible evidence.</p>
+        <p>Understand slow PostgreSQL queries with measured experiments and evidence you can re-check.</p>
         <div className="hero-ctas">
-          <Link href="/demo" className="btn btn-primary">
-            Explore Demo <LpIcon name="arrowRight" size={15} />
+          <Link href="/sign-in" className="btn btn-primary">
+            Get Started <LpIcon name="arrowRight" size={15} />
           </Link>
-          <Link href="/sign-in" className="btn btn-secondary">
-            Get Started
+          <Link href="/app" className="btn btn-secondary">
+            Open QueryCure
           </Link>
         </div>
       </div>
@@ -108,7 +145,6 @@ export function LandingFooter() {
           </Link>
         </div>
         <nav className="ft-links" aria-label="Footer">
-          <Link href="/demo">Demo</Link>
           <a href="https://github.com/yuvrajsatyapal/QueryCure/tree/main/docs">Docs</a>
           <a href="https://github.com/yuvrajsatyapal/QueryCure">GitHub</a>
           <Link href="/sign-in">Sign in</Link>
@@ -116,7 +152,7 @@ export function LandingFooter() {
       </div>
       <div className="wrap ft-bottom">
         <span>© 2026 QueryCure</span>
-        <span>PostgreSQL query investigation · Sandbox-first · Sample data on this page is illustrative</span>
+        <span>PostgreSQL query optimization · Sandbox-first · Human-approved changes</span>
       </div>
       <div className="ft-mega" aria-hidden="true">
         <span className="ft-word">QueryCure</span>

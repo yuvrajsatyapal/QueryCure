@@ -313,7 +313,7 @@ export function ReportShowcase() {
             <span>
               Findings, evidence, limitations, and a{" "}
               <span className="term" tabIndex={0}>
-                fingerprint
+                Fingerprint
                 <span className="tip" role="tooltip">
                   A digest (SHA-256) is a fingerprint of a file. Change one byte
                   and the fingerprint changes.
@@ -648,8 +648,7 @@ export function ReportShowcase() {
                                 Every stored file gets a fingerprint when the
                                 report is sealed. Replay fingerprints the files
                                 again and compares; it does not re-run anything
-                                or prove authenticity. In this demo the result
-                                is prerecorded, not computed in your browser.
+                                or prove authenticity.
                               </div>
                               <dl className="ri-kv">
                                 <dt>Manifest</dt>
@@ -657,7 +656,7 @@ export function ReportShowcase() {
                                 <dt>Outcome</dt>
                                 <dd>verified_recommendation</dd>
                                 <dt>Sealed by</dt>
-                                <dd>report-builder@1</dd>
+                                <dd>report-builder@2</dd>
                               </dl>
                             </div>
                             <button

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from "react";
 import { ILLUSTRATIVE_BENCH as B } from "@/lib/landing/bench";
-import { DEMO_SQL_PLAIN, Check, DemoSql, Ddl, EvChip, Spin } from "./atoms";
+import { SAMPLE_SQL_PLAIN, Check, SampleSql, Ddl, EvChip, Spin } from "./atoms";
 import { BenchChart } from "./BenchmarkSection";
 import { useReducedMotion } from "./hooks";
 import { LpIcon } from "./LpIcon";
@@ -39,7 +39,7 @@ const SC = ["Query", "Plan", "Agents", "Sandbox", "Benchmark", "Verify", "Report
 const STAGE_MS = [4400, 4000, 5600, 5000, 4600, 4800, 4200];
 
 function QueryStage({ reduced, cursor }: StageProps) {
-  const [typed, done] = useTyped(DEMO_SQL_PLAIN, 450, reduced);
+  const [typed, done] = useTyped(SAMPLE_SQL_PLAIN, 450, reduced);
   const start = useRef<HTMLButtonElement>(null);
   const [starting, setStarting] = useState(false);
   useEffect(() => cursor.click(start, 2250, () => setStarting(true)), [cursor]);
@@ -52,11 +52,11 @@ function QueryStage({ reduced, cursor }: StageProps) {
       <div style={d(2)} className="panel">
         <div className="panel-h">
           <LpIcon name="code" size={14} />
-          Query<span className="cap">orders_demo workload · PostgreSQL 16</span>
+          Query<span className="cap">illustrative orders workload · PostgreSQL 17</span>
         </div>
         <div className="panel-b">
           <div className="code" style={{ minHeight: 122 }}>
-            {done ? <DemoSql /> : <>{typed}<span className="caret" /></>}
+            {done ? <SampleSql /> : <>{typed}<span className="caret" /></>}
           </div>
         </div>
       </div>
@@ -232,7 +232,7 @@ function SandboxStage({ reduced, cursor, onApproved }: StageProps) {
           <span className={`pill ${approvedAt >= 0 ? "t-verified" : "t-approval"}`} style={{ marginLeft: 8 }}>
             {approvedAt >= 0 ? "Approved" : "Waiting on you"}
           </span>
-          <span className="cap">{approvedAt >= 0 ? "demo approval granted" : "expires in 14:52"}</span>
+          <span className="cap">{approvedAt >= 0 ? "approval granted" : "expires in 14:52"}</span>
         </div>
         <div className="panel-b">
           <div className="code">
@@ -240,7 +240,7 @@ function SandboxStage({ reduced, cursor, onApproved }: StageProps) {
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "120px 1fr", gap: "6px 12px", fontSize: 12.5, marginTop: 12 }}>
             <span style={{ color: "var(--muted)" }}>Target</span>
-            <span className="mono">sandbox_db · orders_demo, seed 42</span>
+            <span className="mono">sandbox_db · illustrative orders table, seed 42</span>
             <span style={{ color: "var(--muted)" }}>Your database</span>
             <span>not touched</span>
             <span style={{ color: "var(--muted)" }}>Risk</span>
@@ -336,7 +336,7 @@ function VerifyStage({ reduced }: StageProps) {
       <div className="checks" style={{ ...d(1), marginTop: 8 }}>
         {AUDIT.map(([t, r], k) => (
           <div key={t} className="check">
-            <span className="ci" style={{ display: "inline-flex", width: 15 }}>
+            <span className="chk-i">
               {n > k ? <Check size={15} /> : <Spin />}
             </span>
             {t}
@@ -382,7 +382,7 @@ function ReportStage({ reduced }: StageProps) {
       <div style={d(3)} className="app-foot">
         <span className="tag" style={{ opacity: sealed ? 1 : 0, transition: "opacity .4s" }}>
           <LpIcon name="lock" size={12} />
-          sealed · report-builder@1
+          sealed · report-builder@2
         </span>
         <span className="tag">{hash}</span>
         <button className="btn btn-secondary btn-sm" tabIndex={-1} aria-hidden="true">
@@ -550,7 +550,7 @@ export function ProductShowcase() {
       <div className="showcase-bg" />
       <div className="wrap">
         <Reveal className="sec-head center how-head">
-          <p className="eyebrow">The workspace</p>
+          <p className="eyebrow">The workspace · illustrative walkthrough</p>
           <h2>
             <span className="l1" style={{ color: "inherit" }}>Watch an investigation from first query to sealed report.</span> <span>Every step is visible, cited and verifiable.</span>
           </h2>
@@ -693,7 +693,7 @@ export function ProductShowcase() {
             ))}
           </div>
           <span className="illus" style={{ marginLeft: "auto" }}>
-            ◆ Illustrative fixture · not a recorded run
+            ◆ Illustrative workspace
           </span>
         </div>
       </div>

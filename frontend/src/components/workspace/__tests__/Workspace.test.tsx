@@ -20,7 +20,25 @@ vi.mock("@/lib/api/optimization", () => ({
         availability: "live",
         tables: ["orders"],
         version: 1,
+        ref: null,
+        requiresLocalData: false,
         exampleQueries: [{ name: "by_customer", sql: "SELECT * FROM orders WHERE customer_id = $1", paramSets: [{ name: "hot", values: [1], edgeCase: false }] }],
+      },
+      {
+        id: "online_retail_ii@v1",
+        name: "online_retail_ii",
+        description: "Real invoice lines",
+        injectedProblem: "None injected",
+        scaleFactors: [],
+        defaultSeed: null,
+        availability: "live",
+        tables: ["retail_lines"],
+        version: 1,
+        ref: "online_retail_ii@v1:data=b3471c34b273",
+        requiresLocalData: true,
+        exampleQueries: [
+          { name: "lines_of_invoice", sql: "SELECT * FROM retail_lines WHERE invoice_no = $1 ORDER BY line_id", paramSets: [{ name: "typical_invoice", values: ["489450"], edgeCase: false }] },
+        ],
       },
     ],
   }),
@@ -315,6 +333,41 @@ test("a workload example replaces the SQL; review checks it again and starts a s
     preAuthorizeDemoSandbox: true,
     paramSets: [{ name: "hot", values: [1] }],
   });
+});
+
+test("a fixed dataset has no scale factor, says its data is local, and is started by its full ref", async () => {
+  const user = userEvent.setup();
+  renderWithQuery(<Workspace />);
+  await toPlanSource(user);
+  await user.click(screen.getByRole("radio", { name: /Demo workload/ }));
+  await user.selectOptions(await screen.findByLabelText("Workload"), "online_retail_ii");
+
+  expect(screen.queryByLabelText("Scale factor")).toBeNull();
+  expect(screen.getByText(/real data from a file on this machine/i)).toBeDefined();
+  await user.click(screen.getByRole("button", { name: "Continue" }));
+  await user.click(screen.getByLabelText(/Pre-authorize sandbox experiments/));
+  await user.click(screen.getByRole("button", { name: "Continue" }));
+  const startButton = screen.getByRole("button", { name: "Start investigation" });
+  await waitFor(() => expect(startButton).toHaveProperty("disabled", false));
+  await user.click(startButton);
+
+  const [input] = vi.mocked(createInvestigation).mock.calls[0] ?? [];
+  expect(input).toMatchObject({
+    modes: ["sandbox_benchmark"],
+    workloadId: "online_retail_ii@v1:data=b3471c34b273",
+    paramSets: [{ name: "typical_invoice", values: ["489450"] }],
+  });
+});
+
+test("a generated workload still shows its scale factors", async () => {
+  const user = userEvent.setup();
+  renderWithQuery(<Workspace />);
+  await toPlanSource(user);
+  await user.click(screen.getByRole("radio", { name: /Demo workload/ }));
+  await user.selectOptions(await screen.findByLabelText("Workload"), "orders_ecommerce");
+
+  expect(screen.getByLabelText("Scale factor")).toBeDefined();
+  expect(screen.queryByText(/real data from a file on this machine/i)).toBeNull();
 });
 
 test("Ctrl/Cmd+Enter advances outside the SQL editor", async () => {

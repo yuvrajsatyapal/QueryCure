@@ -1,12 +1,17 @@
 "use client";
 
 import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent, type ReactNode } from "react";
-import { ILLUSTRATIVE_BENCH as B } from "@/lib/landing/bench";
+import { MEASURED as M, formatMs, formatMicros, logRowsPct } from "@/lib/landing/xrayMeasured";
 import { XRAY_QUERY, XRAY_VIEWS, elbowPath, viewDiff, type XrayRow, type XrayViewId } from "@/lib/landing/xray";
 import { useReducedMotion } from "./hooks";
 import { LpIcon } from "./LpIcon";
 
-const f2 = (x: number) => x.toFixed(2);
+const int = (n: number) => Math.round(n).toLocaleString("en-US");
+const RATIO_SHOWN = Math.round(M.ratio);
+const RATIO_FINAL = `≈${int(RATIO_SHOWN)}×`;
+const easeOut = (p: number) => 1 - (1 - p) ** 3;
+/** Share of the race after which the After lane has finished and its label appears. */
+const RACE_FADE_AT = 0.08;
 const NS = "http://www.w3.org/2000/svg";
 const CANCEL = Symbol("cancel");
 
@@ -18,7 +23,7 @@ class XrayController {
   run = 0;
   visible = false;
   played = false;
-  private waiters = new Set<{ left: number; res: () => void; rej: (e: unknown) => void }>();
+  private waiters = new Set<{ left: number; total: number; fn?: (p: number) => void; res: () => void; rej: (e: unknown) => void }>();
   private anims = new Set<Animation>();
   private raf = 0;
   private last = 0;
@@ -40,8 +45,11 @@ class XrayController {
     const dt = now - this.last;
     this.last = now;
     this.waiters.forEach((w) => {
-      if ((w.left -= dt) <= 0) {
+      w.left -= dt;
+      w.fn?.(Math.min(1, Math.max(0, 1 - w.left / w.total)));
+      if (w.left <= 0) {
         this.waiters.delete(w);
+        w.fn?.(1);
         w.res();
       }
     });
@@ -53,12 +61,20 @@ class XrayController {
       this.raf = requestAnimationFrame(this.tick);
     }
   }
-  private sleep(ms: number, run: number) {
+  /** Resolves after `ms` of visible time; `fn` gets progress 0..1 on every frame and exactly 1 at the end. */
+  private sweep(ms: number, run: number, fn?: (p: number) => void) {
     if (run !== this.run) return Promise.reject(CANCEL);
     return new Promise<void>((res, rej) => {
-      this.waiters.add({ left: ms, res, rej });
+      this.waiters.add({ left: ms, total: Math.max(1, ms), fn, res, rej });
       this.clock();
     });
+  }
+  private sleep(ms: number, run: number) {
+    return this.sweep(ms, run);
+  }
+  /** Runs an animation without awaiting it; only a real error (not cancellation) surfaces. */
+  private spawn(p: Promise<void>, run: number) {
+    p.catch(this.ignore(run));
   }
   private anim(el: Element, kf: Keyframe[], opts: KeyframeAnimationOptions) {
     const a = el.animate(kf, opts);
@@ -78,6 +94,70 @@ class XrayController {
   private ignore = (run: number) => (e: unknown) => {
     if (e !== CANCEL && run === this.run) throw e;
   };
+
+  private ct(name: string, text: string) {
+    const el = this.$(`[data-ct="${name}"]`);
+    if (!el) return;
+    el.textContent = text;
+    // Only the settled "≈14,064×" gets the extra space after the ≈ (CSS ::first-letter), not the counting digits.
+    el.toggleAttribute("data-approx", text.startsWith("≈"));
+  }
+  private lane(name: string, p: number) {
+    const el = this.$<HTMLElement>(`[data-lane="${name}"]`);
+    if (el) el.style.transform = `scaleX(${p})`;
+  }
+  private fade(name: string, shown: boolean) {
+    const el = this.$<HTMLElement>(`[data-fade="${name}"]`);
+    if (el) el.style.opacity = shown ? "" : "0";
+  }
+
+  /** Every animated value at its recorded final reading. */
+  settle() {
+    this.ct("rows", int(M.before.examined));
+    this.ct("b0", formatMs(M.before.medianMs));
+    this.ct("b1", formatMs(M.before.medianMs));
+    this.ct("ratio", RATIO_FINAL);
+    this.lane("b0", 1);
+    this.lane("b1", 1);
+    this.lane("a1", 1);
+    this.fade("a1", true);
+    this.fade("lbl", true);
+  }
+  /** Every animated value at its starting reading, before a pass reveals it. */
+  private zero() {
+    this.ct("rows", "0");
+    this.ct("b0", "0.0");
+    this.ct("b1", "0.0");
+    this.ct("ratio", "1×");
+    this.lane("b0", 0);
+    this.lane("b1", 0);
+    this.lane("a1", 0);
+    this.fade("a1", false);
+    this.fade("lbl", false);
+  }
+
+  /** Rows read by the Seq Scan, counted up as the scan line passes. */
+  private async countRows(run: number, ms: number) {
+    await this.sweep(ms, run, (p) => this.ct("rows", int(M.before.examined * easeOut(p))));
+  }
+  /** Before's stopwatch: the median fills its lane while the number counts up. */
+  private async countBefore(run: number, ms: number) {
+    await this.sweep(ms, run, (p) => {
+      this.ct("b0", formatMs(M.before.medianMs * p));
+      this.lane("b0", p);
+    });
+  }
+  /** Both plans start together. After finishes almost at once; Before keeps running, and the ratio counts up on a log scale. */
+  private async race(run: number, ms: number) {
+    await this.sweep(ms, run, (p) => {
+      this.ct("b1", formatMs(M.before.medianMs * p));
+      this.lane("b1", p);
+      this.lane("a1", Math.min(1, p / RACE_FADE_AT));
+      this.fade("a1", p >= RACE_FADE_AT);
+      this.fade("lbl", p >= 1);
+      this.ct("ratio", p >= 1 ? RATIO_FINAL : `${int(Math.exp(Math.log(RATIO_SHOWN) * easeOut(p)))}×`);
+    });
+  }
 
   setVisible(v: boolean) {
     this.visible = v;
@@ -116,6 +196,7 @@ class XrayController {
     this.row("seq").classList.remove("elim");
     this.row("idx").classList.remove("pulse");
     const note = this.row("note");
+    this.settle();
     note.style.setProperty("--lvl", String(XRAY_VIEWS[v].noteLevel));
     (note.querySelector(".nt") as HTMLElement).textContent = XRAY_VIEWS[v].note;
   }
@@ -175,8 +256,10 @@ class XrayController {
       const start = n === "idx" && seqTop !== null ? `translateY(${seqTop - el.offsetTop}px)` : "translateY(6px)";
       this.anim(el, [{ opacity: 0, transform: start }, { opacity: 1, transform: "none" }], { duration: 360, delay: k * 70, easing: "cubic-bezier(.2,.8,.2,1)", fill: "backwards" });
     });
+    this.zero();
     await this.sleep(360 + (entering.length - 1) * 70, run);
     if (to === "after") this.row("idx").classList.add("pulse");
+    this.spawn(to === "after" ? this.race(run, user ? 900 : 1500) : this.countBefore(run, user ? 600 : 1000), run);
   }
 
   select(v: XrayViewId) {
@@ -197,8 +280,10 @@ class XrayController {
     this.onReplay(false);
     this.onPressed("before");
     this.paint("before");
+    this.zero();
     const xr = this.$(".xr") as HTMLElement;
     xr.classList.add("ghost");
+    xr.classList.remove("note-lit");
     this.root.querySelectorAll(".xr-node, .xr-note, .xr-res").forEach((n) => n.classList.remove("lit"));
     this.edges();
     this.show();
@@ -216,6 +301,9 @@ class XrayController {
         await this.sleep(at - t, run);
         t = at;
         el.classList.add("lit");
+        if (n === "note") xr.classList.add("note-lit");
+        if (n === "seq") this.spawn(this.countRows(run, 800), run);
+        if (n === "baseline") this.spawn(this.countBefore(run, 1000), run);
       }
       await this.sleep(D - t, run);
       band.style.opacity = "0";
@@ -332,7 +420,7 @@ export function QueryXRay() {
         <div className="xr-top">
           <span className="xr-title">
             <LpIcon name="layers" size={14} />
-            Query X-Ray <small>EXPLAIN ANALYZE · sandbox</small>
+            Query X-Ray <small>EXPLAIN ANALYZE · {M.engine}</small>
           </span>
           <div className="xr-seg" role="group" aria-label="Execution plan" onKeyDown={onKey}>
             {(["before", "after"] as const).map((v) => (
@@ -344,6 +432,15 @@ export function QueryXRay() {
           <button type="button" className={`xr-replay${replay ? "" : " off"}`} aria-label="Replay the X-ray" onClick={() => void ctl.current?.play()}>
             <LpIcon name="replay" size={15} />
           </button>
+        </div>
+        <div className="xr-prov">
+          <span className="xr-meas">
+            <LpIcon name="checkCircle" size={11} />
+            Measured
+          </span>
+          <span>{int(M.tableRows)}-row synthetic table</span>
+          <span>median of {M.runs} runs per plan</span>
+          <span>server-side time</span>
         </div>
         <div className="xr-q">
           <span aria-hidden="true">
@@ -364,7 +461,7 @@ export function QueryXRay() {
             <div className="xr-op">
               <span className="xr-k">Limit</span>
             </div>
-            <Metric rows={<><b>20</b> rows returned</>} width={21} />
+            <Metric rows={<><b>{M.limit}</b> rows returned</>} width={logRowsPct(M.limit)} />
           </Row>
           <Row n="sort" className="xr-node warm" lvl={1}>
             <span className="xr-strike" />
@@ -372,7 +469,7 @@ export function QueryXRay() {
               <span className="xr-k">Sort</span>
               <span className="xr-d">Extra ordering step · created_at DESC · top-N heapsort</span>
             </div>
-            <Metric rows={<><b>47</b> in → <b>20</b> out</>} width={27} />
+            <Metric rows={<><b>{M.before.sortIn}</b> in → <b>{M.before.sortOut}</b> out</>} width={logRowsPct(M.before.sortIn)} />
           </Row>
           <Row n="seq" className="xr-node hot" lvl={2}>
             <span className="xr-strike" />
@@ -380,10 +477,10 @@ export function QueryXRay() {
               <span className="xr-k">Seq Scan on orders</span>
               <span className="xr-d">Filter: customer_id = $1</span>
             </div>
-            <Metric rows={<><b>2,000,000</b> examined · <b>47</b> kept</>} width={100} />
+            <Metric rows={<><b className="xr-ct" data-ct="rows">{int(M.before.examined)}</b> examined · <b>{M.before.kept}</b> kept</>} width={100} />
             <div className="xr-tag">
               <LpIcon name="alert" size={12} />
-              Bottleneck: 1,999,953 rows read, then discarded by the filter
+              Bottleneck: {int(M.before.discarded)} rows read, then discarded by the filter
             </div>
           </Row>
           <Row n="idx" className="xr-node cool" lvl={1}>
@@ -393,7 +490,7 @@ export function QueryXRay() {
               </span>
               <span className="xr-d">Index Cond: customer_id = $1</span>
             </div>
-            <Metric rows={<><b>20</b> examined · <b>20</b> kept</>} width={21} />
+            <Metric rows={<><b>{M.after.rows}</b> examined · <b>{M.after.rows}</b> kept</>} width={logRowsPct(M.after.rows)} />
           </Row>
           <Row n="removed" className="xr-note xr-gone" lvl={1}>
             <span className="lb">removed</span>
@@ -408,37 +505,65 @@ export function QueryXRay() {
           </Row>
           <Row n="baseline" className="xr-res xr-res0">
             <span className="xr-big">
-              <span>{f2(B.baselineMedian)}</span>
-              <small>ms median</small>
+              <span className="xr-ct" data-ct="b0">{formatMs(M.before.medianMs)}</span>
+              <small>ms</small>
             </span>
             <div className="xr-res-r">
               <div className="row">
-                <span className="xr-state">Before optimization</span>
-                <span className="xr-illus">◆ Illustrative</span>
+                <span className="xr-state">Before the index</span>
+                <span className="xr-range">
+                  range {formatMs(M.before.minMs)} – {formatMs(M.before.maxMs)} ms
+                </span>
               </div>
-              <span className="xr-sub">From a separate illustrative benchmark, not a measurement of this plan</span>
-            </div>
-          </Row>
-          <Row n="result" className="xr-res">
-            <span className="xr-big">
-              <span>{f2(B.ratio)}×</span>
-              <small>faster</small>
-            </span>
-            <div className="xr-res-r">
-              <div className="row">
-                <span className="pill t-verified">
-                  <LpIcon name="checkCircle" size={11} />
-                  Illustrative verified outcome
+              <div className="xr-lane hot" aria-hidden="true">
+                <span className="track">
+                  <i data-lane="b0" />
                 </span>
               </div>
               <span className="xr-sub">
-                Separate illustrative benchmark, not this plan · median {f2(B.baselineMedian)} → {f2(B.candidateMedian)} ms · 95% CI {f2(B.ciLow)}–{f2(B.ciHigh)}× · {B.n} runs
-                per arm
+                Median server-side time, {M.runs} runs. {M.engine}.
               </span>
             </div>
           </Row>
+          <Row n="result" className="xr-res xr-res1">
+            <span className="xr-big">
+              <small className="xr-lbl" data-fade="lbl">query execution speedup</small>
+              <span className="xr-ct xr-ratio" data-ct="ratio" data-approx="">{RATIO_FINAL}</span>
+            </span>
+            <span className="xr-meas solid">
+              <LpIcon name="checkCircle" size={11} />
+              Measured on {M.engine}
+            </span>
+            <div className="xr-lanes" role="img" aria-label={`Median server-side time: before ${formatMs(M.before.medianMs)} ms, after ${formatMicros(M.after.medianMs)}; bar lengths are not to scale`}>
+              <div className="xr-lane hot">
+                <span className="ln">Before</span>
+                <span className="track">
+                  <i data-lane="b1" />
+                </span>
+                <span className="lv">
+                  <b data-ct="b1">{formatMs(M.before.medianMs)}</b> ms
+                </span>
+              </div>
+              <div className="xr-lane cool">
+                <span className="ln">After</span>
+                <span className="track">
+                  <i data-lane="a1" />
+                </span>
+                <span className="lv" data-fade="a1">
+                  <b>{formatMicros(M.after.medianMs)}</b>
+                </span>
+              </div>
+            </div>
+            <span className="xr-sub xr-caveat">
+              Median execution time across {M.runs} runs per plan. After measurement rounded to 1 µs; speedup is approximate. Measured directly in PostgreSQL, independently of QueryCure&apos;s
+              investigation verdict.
+            </span>
+          </Row>
         </div>
-        <div className="xr-foot">◆ Illustrative example, not a live benchmark. Real plans come from EXPLAIN ANALYZE in a disposable sandbox, never your database.</div>
+        <div className="xr-foot">
+          ◆ Measured on a synthetic orders table in a disposable PostgreSQL sandbox. Server-side execution time only; excludes network and client overhead. QueryCure never runs EXPLAIN
+          ANALYZE against your database.
+        </div>
       </div>
     </div>
   );

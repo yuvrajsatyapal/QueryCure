@@ -1,10 +1,10 @@
 import type { CSSProperties, ReactNode } from "react";
 import { LpIcon } from "./LpIcon";
 
-/** The demo workload's slow query, used by the scripted sections (the X-Ray uses `SELECT *`). */
-export const DEMO_SQL_PLAIN = "SELECT o.id, o.status, o.total_cents, o.created_at\nFROM   orders o\nWHERE  o.customer_id = $1\nORDER BY o.created_at DESC\nLIMIT  20;";
+/** The sample workload's slow query, used by the scripted sections (the X-Ray uses `SELECT *`). */
+export const SAMPLE_SQL_PLAIN = "SELECT o.id, o.status, o.total_cents, o.created_at\nFROM   orders o\nWHERE  o.customer_id = $1\nORDER BY o.created_at DESC\nLIMIT  20;";
 
-export function DemoSql() {
+export function SampleSql() {
   return (
     <>
       <span className="k">SELECT</span> o.id, o.status, o.total_cents, o.created_at{"\n"}

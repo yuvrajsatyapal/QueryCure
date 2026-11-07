@@ -6237,8 +6237,15 @@
             "type": "string"
           },
           "default_seed": {
-            "title": "Default Seed",
-            "type": "integer"
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Seed"
           },
           "description": {
             "title": "Description",
@@ -6262,6 +6269,21 @@
           "name": {
             "title": "Name",
             "type": "string"
+          },
+          "ref": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ref"
+          },
+          "requires_local_data": {
+            "title": "Requires Local Data",
+            "type": "boolean"
           },
           "scale_factors": {
             "items": {
@@ -6291,6 +6313,8 @@
           "tables",
           "scale_factors",
           "default_seed",
+          "ref",
+          "requires_local_data",
           "example_queries",
           "availability"
         ],

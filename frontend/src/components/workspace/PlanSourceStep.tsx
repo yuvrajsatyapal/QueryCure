@@ -160,22 +160,30 @@ export function PlanSourceStep(props: {
           {spec ? (
             <>
               <p className="text-xs text-muted">Injected problem: {spec.injectedProblem}</p>
+              {spec.requiresLocalData ? (
+                <p className="text-xs text-muted">
+                  This is real data from a file on this machine, not generated. Its sandbox copy is prepared once, locally, before the first
+                  benchmark.
+                </p>
+              ) : null}
               <div className="flex flex-wrap gap-3">
-                <label className="flex items-center gap-2 text-sm">
-                  Scale
-                  <select
-                    aria-label="Scale factor"
-                    value={workload.scale}
-                    onChange={(e) => props.onScale(e.target.value)}
-                    className="rounded-md border border-border-strong bg-surface px-2 py-1 text-sm"
-                  >
-                    {spec.scaleFactors.map((sf) => (
-                      <option key={sf} value={String(sf)}>
-                        sf={sf}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+                {spec.scaleFactors.length > 0 ? (
+                  <label className="flex items-center gap-2 text-sm">
+                    Scale
+                    <select
+                      aria-label="Scale factor"
+                      value={workload.scale}
+                      onChange={(e) => props.onScale(e.target.value)}
+                      className="rounded-md border border-border-strong bg-surface px-2 py-1 text-sm"
+                    >
+                      {spec.scaleFactors.map((sf) => (
+                        <option key={sf} value={String(sf)}>
+                          sf={sf}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                ) : null}
                 {spec.exampleQueries.length > 1 ? (
                   <label className="flex items-center gap-2 text-sm">
                     Query

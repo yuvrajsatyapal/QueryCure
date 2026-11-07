@@ -89,7 +89,8 @@ export function Workspace() {
   const models = useQuery({ queryKey: investigationKeys.models, queryFn: ({ signal }) => getModels(signal) });
 
   const spec = workloads.data?.items.find((w) => w.name === workload.name);
-  const workloadId = spec ? `${spec.id}:sf=${workload.scale}:seed=${spec.defaultSeed}` : undefined;
+  // A fixed dataset is named by its content (spec.ref); a generated one by scale factor and seed.
+  const workloadId = spec ? (spec.ref ?? `${spec.id}:sf=${workload.scale}:seed=${spec.defaultSeed}`) : undefined;
   const choice = {
     source,
     connectionId: connectionId || undefined,

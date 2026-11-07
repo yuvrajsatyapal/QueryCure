@@ -2,7 +2,7 @@
 
 import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type CSSProperties, type KeyboardEvent, type ReactNode } from "react";
 import { ILLUSTRATIVE_BENCH as B, logPosition, pct } from "@/lib/landing/bench";
-import { DEMO_SQL_PLAIN, Check, DemoSql, Ddl, EvChip, Spin } from "./atoms";
+import { SAMPLE_SQL_PLAIN, Check, SampleSql, Ddl, EvChip, Spin } from "./atoms";
 import { BenchChart } from "./BenchmarkSection";
 import { useInView, useReducedMotion } from "./hooks";
 import { LpIcon } from "./LpIcon";
@@ -15,7 +15,7 @@ type Body = (p: { reduced: boolean }) => ReactNode;
 type Stage = { t: string; d: string; eye: string; tone?: "approval"; body: Body; foot: string; ms: number };
 
 const InputsBody: Body = ({ reduced }) => {
-  const [typed, done] = useTyped(DEMO_SQL_PLAIN, 200, reduced);
+  const [typed, done] = useTyped(SAMPLE_SQL_PLAIN, 200, reduced);
   return (
     <>
       <div className="hw-two">
@@ -25,7 +25,7 @@ const InputsBody: Body = ({ reduced }) => {
             query.sql
           </div>
           <div className="code" style={{ minHeight: 122 }}>
-            {done ? <DemoSql /> : <>{typed}<span className="caret" /></>}
+            {done ? <SampleSql /> : <>{typed}<span className="caret" /></>}
           </div>
         </div>
         <div className="hw-blk">
@@ -146,7 +146,7 @@ const ApproveBody: Body = ({ reduced }) => {
       </div>
       <div className="hw-meta">
         <span>Target</span>
-        <b className="mono">sandbox_db · orders_demo, seed 42</b>
+        <b className="mono">sandbox_db · illustrative orders table, seed 42</b>
         <span>Risk</span>
         <b>Index build on 2M seeded rows</b>
         <span>Expires</span>
@@ -156,10 +156,10 @@ const ApproveBody: Body = ({ reduced }) => {
         <span className="hw-dec">Decline</span>
         <span className={`hw-cta${pressed ? " ok pressed" : ""}`} aria-hidden="true">
           <LpIcon name={pressed ? "checkCircle" : "hand"} size={15} />
-          {pressed ? "Demo approval granted" : "Approve experiment"}
+          {pressed ? "Approval granted" : "Approve experiment"}
         </span>
       </div>
-      <p className="hw-fine">Scripted demo: this button is pressed automatically; nothing is approved or run here.</p>
+      <p className="hw-fine">Pressed automatically in this walkthrough; nothing is run.</p>
     </div>
   );
 };
@@ -336,7 +336,7 @@ const STAGES: Stage[] = [
   { t: "Investigate", d: "Specialist agents, every claim cited", eye: "Investigation", body: InvestigateBody, foot: "Agents exchange typed, cited findings. A claim without evidence is dropped before anyone sees it.", ms: 4400 },
   { t: "Approve", d: "You review the exact SQL", eye: "Approval gate", tone: "approval", body: ApproveBody, foot: "Nothing runs until you approve. Declining everything still produces a report.", ms: 3600 },
   { t: "Experiment", d: "Measured in a throwaway sandbox", eye: "Sandbox experiment", body: ExperimentBody, foot: "Baseline and candidate run under identical conditions. Every timing is kept, not just the best one.", ms: 4400 },
-  { t: "Verify", d: "Fixed rules decide, not the AI", eye: "Verification", body: VerifyBody, foot: "A recommendation is only called verified when correctness and statistics both pass.", ms: 4200 },
+  { t: "Verify", d: "Fixed rules decide, not the AI", eye: "Verification", body: VerifyBody, foot: "A recommendation is only called verified when correctness and statistics both pass and its audit has completed.", ms: 4200 },
   { t: "Report", d: "Sealed, explained, replayable", eye: "Sealed report", body: ReportBody, foot: "Report replay re-checks stored evidence only. To measure again, start an experiment replay; to rethink the problem, a re-investigation.", ms: 4400 },
 ];
 
@@ -464,7 +464,7 @@ export function HowItWorks() {
         <span className="hw-eye" id="hw-eye">
           {stage.eye}
         </span>
-        <span className="illus hw-demo">◆ Scripted demo</span>
+        <span className="illus hw-badge">◆ Illustrative</span>
         <span className="hw-count">
           0{i + 1} / 0{STAGES.length}
         </span>

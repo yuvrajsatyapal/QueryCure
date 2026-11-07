@@ -44,9 +44,9 @@ test("a11y - empty states are axe-clean too (the history page with no matches)",
 test("a11y - keyboard reaches the main actions with a visible focus ring", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByRole("heading", { level: 1 })).toBeVisible({ timeout: 30_000 });
-  // Header (logo, section links, Demo, theme, app) comes first; the hero's primary action follows.
+  // Header (logo, section links, theme, app) comes first; the hero's primary action follows.
   const focused = page.locator(":focus");
-  for (const name of ["QueryCure", "Product", "How it works", "Verification", "Reports", "Demo", "", "Open QueryCure", "Explore Demo"]) {
+  for (const name of ["QueryCure", "Product", "How it works", "Safety", "Verification", "Reports", "Real data", "", "Open QueryCure", "Open QueryCure"]) {
     await page.keyboard.press("Tab");
     if (name) await expect(focused).toHaveText(name);
   }

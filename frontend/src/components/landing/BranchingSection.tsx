@@ -52,7 +52,7 @@ const BRANCHES: { tone: Tone; conf: string; by: string; t: string; steps: [strin
   },
 ];
 const STAGES = ["Query received", "Hypotheses formed", "Testing each in a sandbox", "Fixed rules decide", "Summary"];
-const STAGE_AT = [0, 1450, 2500, 4250, 5450];
+const STAGE_AT = [0, 1450, 2500, 4250];
 const NS = "http://www.w3.org/2000/svg";
 // A step passes unless it is the rejected branch's evidence/measurement or the inconclusive branch's measurement.
 const stepOk = (tone: Tone, s: number) => !(tone === "bad" && s >= 2) && !(tone === "unk" && s === 3);
@@ -221,7 +221,14 @@ export function BranchingSection() {
         c.classList.add("v");
       });
     });
-    at(5500, () => {
+    // The summary wires and card wait until the summary is on screen, so they don't finish while it is still below the fold.
+    let finaleReady = false;
+    let sumSeen = false;
+    let finaleDone = false;
+    const playFinale = () => {
+      if (finaleDone || !finaleReady || !sumSeen) return;
+      finaleDone = true;
+      setStage(4);
       layout();
       bottomDrawn = true;
       paths.forEach(({ b }) => {
@@ -239,13 +246,28 @@ export function BranchingSection() {
           timers.push(window.setTimeout(() => (light(`s${i}`), ringAt(`s${i}`, color)), 900 + i * 90 - 60));
         }
       });
+      timers.push(window.setTimeout(() => sum.classList.add("on"), reduced ? 0 : 450));
+    };
+    at(5500, () => {
+      finaleReady = true;
+      playFinale();
     });
-    at(6300, () => sum.classList.add("on"));
+    const sumIo = new IntersectionObserver(
+      (es) => {
+        if (es[0]?.isIntersecting) {
+          sumSeen = true;
+          playFinale();
+        }
+      },
+      { threshold: 0.05 },
+    );
+    sumIo.observe(sum);
     const ro = new ResizeObserver(() => layout());
     ro.observe(cols);
     return () => {
       timers.forEach(clearTimeout);
       ro.disconnect();
+      sumIo.disconnect();
     };
   }, [run, reduced]);
 

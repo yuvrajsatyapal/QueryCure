@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { mulberry32 } from "@/lib/landing/bench";
 
-/* Small scripted-demo timelines. Callers remount (via `key`) to restart one, so state starts fresh and
+/* Small scripted timelines. Callers remount (via `key`) to restart one, so state starts fresh and
  * effects only schedule timers. Reduced motion starts at the end state and schedules nothing. */
 
 /** Number of `times` (ms after mount) that have passed. */

@@ -6,10 +6,12 @@ import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import { Logo } from "@/components/ui/Logo";
 
 const SECTIONS = [
-  ["#product", "Product"],
+  ["#screens", "Product"],
   ["#how", "How it works"],
+  ["#safety", "Safety"],
   ["#verify", "Verification"],
   ["#report", "Reports"],
+  ["#data", "Real data"],
 ] as const;
 
 /** Sticky landing header; it condenses into a floating pill once the page scrolls. */
@@ -34,12 +36,8 @@ export function LandingNav() {
               {label}
             </a>
           ))}
-          <Link href="/demo">Demo</Link>
         </nav>
         <div className="nav-right">
-          <Link href="/demo" className="btn btn-ghost nav-demo-sm">
-            Demo
-          </Link>
           <ThemeToggle />
           <Link href="/app" className="btn btn-primary btn-sm">
             Open QueryCure

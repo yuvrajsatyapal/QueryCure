@@ -1,0 +1,61 @@
+{
+ "postgres": "PostgreSQL 17.11 (Debian 17.11-1.pgdg13+2) on aarch64-unknown-linux-gnu",
+ "rows": 2000000,
+ "matching_rows_for_customer": 47,
+ "index_name": "orders_customer_id_created_at_idx",
+ "before": {
+  "nodes": [
+   {
+    "depth": 0,
+    "node": "Limit",
+    "actual_rows": 20,
+    "removed_by_filter": null,
+    "sort_method": null,
+    "filter": null
+   },
+   {
+    "depth": 1,
+    "node": "Sort",
+    "actual_rows": 20,
+    "removed_by_filter": null,
+    "sort_method": "top-N heapsort",
+    "filter": null
+   },
+   {
+    "depth": 2,
+    "node": "Seq Scan on orders",
+    "actual_rows": 47,
+    "removed_by_filter": 1999953,
+    "sort_method": null,
+    "filter": "(customer_id = '1234'::smallint)"
+   }
+  ],
+  "median_exec_ms": 84.386,
+  "min_ms": 76.399,
+  "max_ms": 104.298
+ },
+ "after": {
+  "nodes": [
+   {
+    "depth": 0,
+    "node": "Limit",
+    "actual_rows": 20,
+    "removed_by_filter": null,
+    "sort_method": null,
+    "filter": null
+   },
+   {
+    "depth": 1,
+    "node": "Index Scan using orders_customer_id_created_at_idx on orders",
+    "actual_rows": 20,
+    "removed_by_filter": null,
+    "sort_method": null,
+    "filter": "(customer_id = '1234'::smallint)"
+   }
+  ],
+  "median_exec_ms": 0.006,
+  "min_ms": 0.006,
+  "max_ms": 0.019
+ },
+ "median_ratio": 14064.3
+}
