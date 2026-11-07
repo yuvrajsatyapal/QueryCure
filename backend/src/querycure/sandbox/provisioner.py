@@ -18,6 +18,7 @@ import uuid
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 import psycopg
@@ -29,13 +30,22 @@ from querycure.core.errors import SandboxUnavailableError
 from querycure.core.logging import get_logger
 from querycure.replay.canonical import canonical_json
 from querycure.replay.digest import digest
-from querycure.workloads.loader import load_workload, table_checksums
+from querycure.workloads.loader import (
+    DATASETS_DIR_ENV,
+    load_fixed_dataset,
+    load_workload,
+    table_checksums,
+    verified_source,
+)
 from querycure.workloads.registry import WORKLOADS, WorkloadRef
 
 log = get_logger(__name__)
 
 BENCH_ROLE = "qc_bench"
 TEMPLATE_BUILDER = "tpl@1"  # bump when template preparation changes (new template names)
+# Fixed datasets (loaded from a pinned file) are prepared differently and versioned on their own,
+# so changing one never renames the templates of the generated workloads.
+FIXED_TEMPLATE_BUILDER = "tpl-fixed@1"
 LOCK_KEY = 0x51435342  # "QCSB"
 CLONE_PREFIX = "qc_clone_"
 BUILD_PREFIX = "qc_tplbuild_"
@@ -71,8 +81,12 @@ class ServerEnvironment:
     pg_settings: dict[str, str]
 
 
+def builder_for(ref: WorkloadRef) -> str:
+    return FIXED_TEMPLATE_BUILDER if ref.data_id is not None else TEMPLATE_BUILDER
+
+
 def template_name(ref: WorkloadRef) -> str:
-    h = hashlib.sha256(f"{ref}|{TEMPLATE_BUILDER}".encode()).hexdigest()[:16]
+    h = hashlib.sha256(f"{ref}|{builder_for(ref)}".encode()).hexdigest()[:16]
     return f"{TEMPLATE_PREFIX}{h}"
 
 
@@ -217,7 +231,7 @@ class SandboxLease:
             pg_version=str(version[0]) if version else "", pg_settings=settings
         )
 
-    def _template(self, name: str) -> Template | None:
+    def _template(self, name: str, builder_version: str = TEMPLATE_BUILDER) -> Template | None:
         row = self._conn.execute(
             "SELECT shobj_description(oid, 'pg_database') FROM pg_database "
             "WHERE datname = %s AND datistemplate",
@@ -226,15 +240,34 @@ class SandboxLease:
         if row is None or not row[0]:
             return None
         workload_id, builder, data_digest = str(row[0]).split("|")
-        if builder != TEMPLATE_BUILDER:
+        if builder != builder_version:
             return None
         return Template(name=name, workload_id=workload_id, data_digest=data_digest)
 
-    def ensure_template(self, ref: WorkloadRef) -> Template:
+    def ensure_template(self, ref: WorkloadRef, source: Path | None = None) -> Template:
+        """The ready template for `ref`, built on first use.
+
+        A fixed dataset is built only from `source` (its verified CSV). Without one, a missing
+        template is an actionable error: the worker never has the file, so the template is built
+        once, on the operator's machine, with `python -m querycure.workloads build-template`.
+        """
+        fixed = WORKLOADS[ref.name].fixed
+        if source is not None and fixed is None:
+            raise ValueError(f"{ref.name} is not a fixed dataset: it has no source file")
         name = template_name(ref)
-        existing = self._template(name)
+        existing = self._template(name, builder_for(ref))
         if existing is not None:
             return existing
+        if fixed is not None and source is None:
+            raise SandboxUnavailableError(
+                f"The sandbox template for {ref} has not been built. Build it once, locally: "
+                "python -m querycure.workloads build-template --sandbox-url <local sandbox URL> "
+                f"(the data file is read from ${DATASETS_DIR_ENV}, default ~/Datasets/QueryCure; "
+                "see docs/data/ONLINE_RETAIL_II.md)."
+            )
+        if fixed is not None and source is not None:
+            with verified_source(source, fixed):  # refuse a wrong file before creating anything
+                pass
         self._drop_template_named(name)  # a stale or unmarked database under the same name
         build = f"{BUILD_PREFIX}{name.removeprefix(TEMPLATE_PREFIX)}"
         self._drop(build)
@@ -244,25 +277,34 @@ class SandboxLease:
             )
         )
         tables = WORKLOADS[ref.name].tables
-        with self._p._admin(build) as conn:
-            # Objects belong to qc_bench so its candidate DDL (CREATE INDEX, ANALYZE) can run.
-            conn.execute(sql.SQL("SET ROLE {}").format(sql.Identifier(BENCH_ROLE)))
-            load_workload(conn, ref)
-            for table in tables:
-                # Clones inherit this: no background autovacuum/analyze during measurement.
-                conn.execute(
-                    sql.SQL(
-                        "ALTER TABLE {} SET (autovacuum_enabled = false, "
-                        "toast.autovacuum_enabled = false)"
-                    ).format(sql.Identifier(table))
-                )
-            # Freeze + visibility map for stable index-only scans. No ANALYZE: statistics are
-            # exactly what the workload generator left (stale_stats relies on that).
-            conn.execute("VACUUM (FREEZE)")
-            checksums = table_checksums(conn, tables)
-        data_digest = digest(
-            "qc-json-v1", canonical_json({"tables": checksums, "workload_id": str(ref)})
-        )
+        try:
+            with self._p._admin(build) as conn:
+                # Objects belong to qc_bench so its candidate DDL (CREATE INDEX, ANALYZE) can run.
+                conn.execute(sql.SQL("SET ROLE {}").format(sql.Identifier(BENCH_ROLE)))
+                if fixed is not None and source is not None:
+                    load_fixed_dataset(conn, ref, source)
+                else:
+                    load_workload(conn, ref)
+                for table in tables:
+                    # Clones inherit this: no background autovacuum/analyze during measurement.
+                    conn.execute(
+                        sql.SQL(
+                            "ALTER TABLE {} SET (autovacuum_enabled = false, "
+                            "toast.autovacuum_enabled = false)"
+                        ).format(sql.Identifier(table))
+                    )
+                # Freeze + visibility map for stable index-only scans. No ANALYZE here: the
+                # statistics are what the loader left (generated: its own; fixed: its ANALYZE).
+                conn.execute("VACUUM (FREEZE)")
+                checksums = table_checksums(conn, tables)
+        except Exception:
+            if fixed is not None:
+                self._drop(build)  # a refused or failed fixed build leaves no half-built database
+            raise
+        identity: dict[str, Any] = {"tables": checksums, "workload_id": str(ref)}
+        if fixed is not None:
+            identity["source_sha256"] = fixed.csv_sha256
+        data_digest = digest("qc-json-v1", canonical_json(identity))
         self._conn.execute(
             sql.SQL("ALTER DATABASE {} RENAME TO {}").format(
                 sql.Identifier(build), sql.Identifier(name)
@@ -275,7 +317,7 @@ class SandboxLease:
         )
         self._conn.execute(
             sql.SQL("COMMENT ON DATABASE {} IS {}").format(
-                sql.Identifier(name), sql.Literal(f"{ref}|{TEMPLATE_BUILDER}|{data_digest}")
+                sql.Identifier(name), sql.Literal(f"{ref}|{builder_for(ref)}|{data_digest}")
             )
         )
         log.info("sandbox_template_built", workload=str(ref), template=name)

@@ -365,7 +365,6 @@ class Harness:
             (enforcement, "set_candidate_status", store.set_candidate_status),
             (enforcement, "emit", store.emit),
             (module, "emit", store.emit),
-            (module, "finalize_run", store.finalize_run),
             (module, "enforce_audit_completeness", enforce),
             (module, "list_hypotheses", empty),
             (module, "list_evidence", empty),
@@ -374,6 +373,7 @@ class Harness:
             (module, "call_outcomes", outcomes),
         ):
             monkeypatch.setattr(target, name, fake)
+        monkeypatch.setattr("querycure.agents.nodes.write_report.finalize_run", store.finalize_run)
         self.ctx = SimpleNamespace(
             run_id=RUN_ID, engine=_Engine(store), attempt=1, events=FakeEvents()
         )

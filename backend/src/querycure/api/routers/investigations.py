@@ -103,7 +103,7 @@ async def _check(
             )
     if body.workload_id is not None:
         try:
-            WorkloadRef.parse(body.workload_id)
+            _check_workload_available(body.workload_id, settings)
         except ValueError as exc:
             raise _invalid("workload_id", str(exc)) from None
     for field, sha, kinds in (
@@ -125,12 +125,23 @@ async def _check(
 MAX_BENCH_PARAM_SETS = 5
 
 
+def _check_workload_available(workload_id: str, settings: Settings) -> None:
+    """A fixed dataset is a file on the operator's machine: the public demo has none."""
+    ref = WorkloadRef.parse(workload_id)
+    if WORKLOADS[ref.name].fixed is not None and settings.profile is Profile.DEMO:
+        raise _invalid(
+            "workload_id",
+            "this dataset needs local data and is not available on this deployment",
+        )
+
+
 def _check_sandbox(body: CreateInvestigationRequest, settings: Settings) -> None:
     """Mode C (Phase 3): demo workloads only; the user-provisioned sandbox (D4) is deferred."""
     if not settings.feature_sandbox:
         raise FeatureDisabledError("Sandbox benchmarking is disabled on this deployment.")
     if body.workload_id is None:
         raise _invalid("workload_id", "sandbox benchmarking needs a demo workload")
+    _check_workload_available(body.workload_id, settings)
     if body.query is None:
         raise _invalid("query", "sandbox benchmarking needs the query text")
     if len(body.param_sets) > MAX_BENCH_PARAM_SETS:

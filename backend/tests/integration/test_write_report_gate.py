@@ -21,7 +21,6 @@ import psycopg
 import pytest
 from sqlalchemy.ext.asyncio import AsyncEngine
 
-from querycure.agents.nodes import write_report as module
 from querycure.agents.nodes.write_report import write_report
 from querycure.agents.run import execute_run
 from querycure.audit.completeness import UnauditedCandidate, unaudited_reasons
@@ -123,7 +122,7 @@ def fail_at(monkeypatch: pytest.MonkeyPatch, step: str) -> None:
 
         return await real_finalize_run(conn, run_id, conclusion, fault=fault, **kwargs)
 
-    monkeypatch.setattr(module, "finalize_run", finalize_run)
+    monkeypatch.setattr("querycure.agents.nodes.write_report.finalize_run", finalize_run)
 
 
 @pytest.mark.parametrize("step", STEPS)

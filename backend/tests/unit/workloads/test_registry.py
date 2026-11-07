@@ -47,6 +47,8 @@ def test_generated_sql_is_deterministic_and_seeded() -> None:
 
 def test_generated_sql_uses_no_nondeterministic_functions() -> None:
     for name, spec in WORKLOADS.items():
+        if spec.fixed is not None:
+            continue  # loaded from a file, not generated: nothing to scan
         sql = sql_text(WorkloadRef(name=name, version=spec.version, scale_factor=1, seed=1))
         for forbidden in ("random(", "now(", "clock_timestamp", "hashtext", "gen_random_uuid"):
             assert forbidden not in sql.lower(), (name, forbidden)
