@@ -83,7 +83,7 @@ Each state transition emits a `benchmark.progress` event. Persistence is coarser
 ## 3. Sandbox layout
 
 - One sandbox **server** (Docker `postgres:17` in local profile; version recorded) on an internal network.
-- Per workload version a **template database** `qc_tpl_<workload_hash>` built once: schema + deterministic data + `ANALYZE` + `VACUUM (FREEZE)`; marked `datistemplate`.
+- Per workload version a **template database** `qc_tpl_<workload_hash>` built once: schema + deterministic data + `ANALYZE` + `VACUUM (FREEZE)`; marked `datistemplate`. A fixed (real) dataset's template is built from its verified file by the local `build-template` command (§11).
 - Per experiment arm a **clone** `qc_clone_<experiment>_<arm>` via `CREATE DATABASE … TEMPLATE qc_tpl_…` (file-level copy; far faster than reloading data). Clones are dropped at the end.
 - Same server for all arms of an experiment → comparable hardware/config; one experiment at a time per server (advisory lock) → no neighbour interference from ourselves.
 - Settings pinned and recorded: `shared_buffers`, `work_mem`, `effective_cache_size`, `random_page_cost`, `jit`, `max_parallel_workers_per_gather`. Default: `jit=off` (JIT compile time adds variance on short queries; recorded as a limitation).
@@ -256,6 +256,18 @@ Deterministic generators (`workloads/registry.py`, seeded, versioned; workload I
 | `index_regression` | Low-selectivity predicate where an index scan is slower than seq scan for one param set | candidate `rejected: regression` |
 
 These double as the eval suite's ground truth ([TESTING_STRATEGY.md](../engineering/TESTING_STRATEGY.md)).
+
+### Fixed (real) datasets (Part B, 2026-11-06; [ADR-0033](../engineering/adr/ADR-0033-fixed-real-datasets-in-mode-c.md); not benchmarked)
+
+`online_retail_ii@v1` is real data, not generated: UCI Online Retail II, 1,067,371 invoice lines, CC BY 4.0. Full facts, checksums and quality notes: [ONLINE_RETAIL_II](../data/ONLINE_RETAIL_II.md).
+
+- **Reference.** `name@vN:data=<first 12 hex of the CSV SHA-256>` (`online_retail_ii@v1:data=b3471c34b273`), parsed with `fullmatch`. The registry pins the full digest, the byte size and the reconciliation facts; a reference with another identifier is refused. A generated workload rejects `data=`, a fixed one rejects `sf=`/`seed=`. The six generated references, their string forms, template names and generated data are pinned by compatibility goldens and did not change.
+- **Load.** `workloads/loader.load_fixed_dataset`: the file is verified before any statement (no symlink, regular file, exact size, full SHA-256, on one descriptor), streamed through `COPY … FROM STDIN` as `qc_bench`, hashed again while streaming, `ANALYZE`d, and its table must reproduce the pinned reconciliation exactly, all in one transaction.
+- **Template.** Built once by `python -m querycure.workloads build-template` (local sandbox hosts only; the file is read from `$QC_DATASETS_DIR`, default `~/Datasets/QueryCure`). Named with the builder tag `tpl-fixed@1`, so generated template names do not change; the data digest includes the CSV digest. Without the template the worker raises `SandboxUnavailableError` naming that command. A refused or failed build leaves no `qc_tplbuild_*` database.
+- **Types.** `unit_price numeric(12,3)` (18 prices have three decimals), `invoice_date timestamp` without time zone (the source has none).
+- **Not offered in the demo profile.** There is no data directory on a hosted deployment, so the catalog does not list the dataset and investigations refuse its reference.
+- **Registered queries** order totally (`line_id` last) or aggregate; their parameter sets come from the profile (heaviest, median, single-line and nonexistent customer; typical, largest, cancellation and missing invoice; one-day, one-month and full-range windows).
+- **Status.** Implemented, unit-tested, and checked against the local servers on 2026-11-06 (template build from the verified file, reconciliation in a clone, parameter binding including date strings, qc-row-v1 through a server). No benchmark, eval case or recording exists, so no verdict or speed-up is claimed. Speed-ups on this data are lower bounds because of the transport floor (§12).
 
 ## 12. Repeatability (measured 2026-10-18)
 

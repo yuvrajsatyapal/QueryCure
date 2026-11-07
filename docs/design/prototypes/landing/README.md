@@ -9,14 +9,11 @@ One query, `SELECT * FROM orders WHERE customer_id = $1 ORDER BY created_at DESC
 - **Before:** Limit → Sort (top-N heapsort) → Seq Scan on orders (2,000,000 rows examined, 47 kept).
 - **After:** Limit → Index Scan using `orders_customer_id_created_at_idx` (20 rows examined); Sort and Seq Scan removed.
 
-## Two sources of numbers, kept apart
+## Numbers (updated 2026-11-07)
 
-| Source | Before | After | Speed-up | Where it appears |
-|---|---|---|---|---|
-| Illustrative benchmark (seeded PRNG in the page, shared with the benchmark section) | 12.50 ms median | 3.95 ms median | 3.17× | X-Ray result, labelled illustrative and from a separate example |
-| Real PostgreSQL check (`xray_pg_check.py`) | 84.4 ms median | 0.006 ms median | ≈ 14,000× | This README and `xray_pg_result.json` only |
+The production X-Ray no longer uses the seeded illustrative benchmark. Its numbers all come from the real PostgreSQL check below (84.4 ms → 0.006 ms server-side, ≈14,064×), copied to `frontend/src/lib/landing/xray_pg_result.json` and read through `xrayMeasured.ts`. This closes the earlier open decision: the card no longer shows a plan it did not measure. The seeded 12.50 → 3.95 ms / 3.17× benchmark stays only in the benchmark section, labelled illustrative. The standalone `index.html` in this folder still shows the old illustrative result and is a historical design reference, not the shipped card.
 
-The 3.17× is **not** a measurement of the X-Ray plan. It comes from the page's illustrative benchmark, which models a typical verified index improvement. The owner chose to keep it (2026-11-01) on the condition that it is labelled as a separate illustrative example and never presented as the measured result of the X-Ray plan.
+Re-recording `xray_pg_result.json` here means copying it to the frontend path too; the unit test fails if the two differ.
 
 ## Real PostgreSQL check
 

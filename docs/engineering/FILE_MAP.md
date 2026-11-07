@@ -10,6 +10,7 @@ querycure/                      (repo root; product name QueryCure)
 ├── CLAUDE.md                   ✅ Claude Code instructions
 ├── AGENTS.md                   ✅ tool-agnostic agent instructions
 ├── docs/                       ✅ all documentation (this tree)
+│   ├── data/                   ✅ dataset notes (ONLINE_RETAIL_II: source, CC BY 4.0, checksums, preparation, quality notes); the data itself is never in the repo
 │   ├── diagrams/               ✅ 3 designed HTML diagrams (system architecture, trust boundaries, agent graph); Mermaid in the .md docs is authoritative
 │   └── planning/reports/       ⏳ phase completion reports (created at end of each phase)
 ├── backend/                    🟡 Python package `querycure`: api app factory + health route exist; worker not yet
@@ -41,9 +42,9 @@ backend/
 │   ├── sql/                    parser.py (SQLGlot), validator.py (allowlist/denylist), fingerprint.py, ddl_allowlist.py
 │   ├── plans/                  parser.py (PG JSON → PlanTree), metrics.py, diff.py, summarize.py (deterministic text for prompts)
 │   ├── connectors/             ssrf_guard.py, session.py (hardened psycopg sessions), inspection_gateway.py, catalog_queries/ (*.sql templates), capabilities.py
-│   ├── sandbox/                ✅ provisioner.py (templates, clones, advisory-lock leases, orphan cleanup); user_sandbox_backend.py planned (D4)
+│   ├── sandbox/                ✅ provisioner.py (templates incl. fixed-dataset templates, clones, advisory-lock leases, orphan cleanup); user_sandbox_backend.py planned (D4)
 │   ├── benchmark/              ✅ engine.py, executor.py (timing), schedule.py, correctness.py, stats.py, rules.py, tournament.py, fixtures.py (prerecorded)
-│   ├── workloads/              registry.py, <name>/generator.py, <name>/schema.sql, <name>/queries.yaml
+│   ├── workloads/              ✅ registry.py (generated workloads and fixed datasets, refs), loader.py (generated load; verified-file COPY load of a fixed dataset; table checksums), retail_prep.py (official XLSX → the pinned CSV, stdlib only), __main__.py (load, `build-template`)
 │   ├── llm/                    providers.py (Gemini, OpenRouter via LangChain), credentials.py (BYOK decrypt), structured.py (with_structured_output + repair), rate_limit.py
 │   ├── agents/
 │   │   ├── graph.py            StateGraph assembly, routing functions

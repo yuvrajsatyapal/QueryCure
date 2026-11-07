@@ -26,6 +26,7 @@ Canonical terms. Use these exact names in code, docs, UI, and API fields.
 | Provenance | Where a number came from: `measured`, `prerecorded`, `imported`. | `provenance` |
 | Canonicalization profile | Frozen rule set producing canonical bytes for hashing (`qc-json-v1`, `qc-text-v1`, `qc-raw-v1`, `qc-events-v1`, `qc-row-v1`). | `artifacts.canonicalization` |
 | Digest | `SHA-256(profile ‖ LF ‖ canonical bytes)`, written `sha256:<hex>`. Proves consistency with a stored reference, not authenticity. | `sha256` |
+| Fixed dataset | A real data set loaded from a pinned local file instead of generated; referenced as `name@vN:data=<12 hex of the file's SHA-256>` (ADR-0033). | `WorkloadSpec.fixed` |
 | Finalization | The single transaction that seals a run: event cutoff, events digest, report, manifest, terminal status. | `finalize_run` |
 | Events cutoff | Last event `seq` covered by the events digest; later events are lifecycle-only. | `events_cutoff_seq` |
 | Report replay | Verify a finalized run's stored evidence against its manifest and redisplay it; zero LLM calls. | `replay_attempts.kind=report` |

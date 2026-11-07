@@ -90,7 +90,7 @@ Error messages never include credentials, DSNs, or raw driver errors (driver err
 ### Workloads
 | Method | Path | Purpose | Phase |
 |---|---|---|---|
-| GET | `/workloads` | Demo workloads with scale factors, example queries, availability (`live` or `prerecorded`) | 1 |
+| GET | `/workloads` | Demo workloads with scale factors, example queries, availability (`live` or `prerecorded`). A fixed dataset has `scale_factors: []`, `default_seed: null`, the full `ref` (`name@vN:data=<id>`) and `requires_local_data: true`; generated workloads have `ref: null`. The demo profile does not list fixed datasets and refuses their reference when an investigation is created (ADR-0033) | 1 |
 
 ### Investigations & runs
 | Method | Path | Body / Response | Phase |

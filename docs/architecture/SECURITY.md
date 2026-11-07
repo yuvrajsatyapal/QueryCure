@@ -190,6 +190,14 @@ Controls:
 - **Replicates.** A noisy round may re-run the approved arms in up to two replicate experiments. They run the same SQL, checked again against the approved digest, in new disposable clones, with no new DDL, data or target. The approval card discloses this.
 - **Default worker.** The worker container is the default local benchmarking path. It runs as non-root uid 10001 and is the only application process on `sandbox_net`; `sandbox-db` still publishes no port and has no egress. Re-verified 2026-10-13: no TCP, DNS or metadata-db route from `sandbox-db`.
 
+**Fixed dataset loading (Part B, [ADR-0033](../engineering/adr/ADR-0033-fixed-real-datasets-in-mode-c.md)).** A real dataset is a file on the operator's machine, loaded by trusted code:
+- The file is opened with `O_NOFOLLOW` (a symlink is refused), must be a regular file (a named pipe is refused without blocking), must have exactly the pinned size (an oversized file is refused before it is read) and the pinned full SHA-256, all checked on one file descriptor before the first database statement. The same bytes are hashed again while streaming into the database, so a file replaced after verification fails the load.
+- The path never reaches the server: the data goes through `COPY … FROM STDIN` as `qc_bench`, which has no server-file privilege. Error messages name the problem and the file path, never file content.
+- The load is one transaction with an exact reconciliation (row count, sums, NULL counts); any difference rolls everything back, including the table. A refused source creates no database; a failed build drops its half-built database.
+- `build-template` accepts local sandbox hosts only (like the repeatability study), reads the bench password from `SANDBOX_BENCH_PASSWORD`, and never prints it or the admin URL.
+- The XLSX preparation tool uses the standard library's XML reader and is for an operator-chosen file, not untrusted input. The worker container never has the data; a hosted (demo) deployment neither lists nor accepts the dataset.
+- Not covered: UCI publishes no checksums, so the pinned digests are trust on first use.
+
 A user-provisioned sandbox connection gets Mode C privileges **only** if flagged `purpose=sandbox` and the user confirms an explicit attestation; QueryCure still only touches databases it creates (`qc_clone_*`) and refuses if it cannot `CREATE DATABASE`.
 
 ## 9. Application security baseline
