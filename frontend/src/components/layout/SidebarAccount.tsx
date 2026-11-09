@@ -1,25 +1,14 @@
 "use client";
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useId, useRef, useState } from "react";
 import { Icon } from "@/components/ui/Icon";
 import { ApiError } from "@/lib/api/client";
-import { getMe, logout } from "@/lib/api/session";
+import { getMe } from "@/lib/api/session";
+import { initials, useSignOut } from "@/lib/auth/account";
 import { signInHref } from "@/lib/auth/returnTo";
-
-/** First and last initials of a display name, or null when there is nothing to take them from. */
-function initials(name: string | null): string | null {
-  const words = (name ?? "").trim().split(/\s+/).filter(Boolean);
-  const picked = words.length > 1 ? [words[0], words.at(-1)] : words;
-  return (
-    picked
-      .map((w) => Array.from(w ?? "")[0] ?? "")
-      .join("")
-      .toUpperCase() || null
-  );
-}
 
 // The API exposes no avatar or email (ADR-0013, ADR-0031: an email is stored only for the
 // restricted-access check and never returned), so the account shows initials and a neutral line.
@@ -80,7 +69,6 @@ export function SidebarAccount({ collapsed = false, onNavigate }: { collapsed?: 
 }
 
 function SignedIn({ name: displayName, collapsed }: { name: string | null; collapsed: boolean }) {
-  const client = useQueryClient();
   const [open, setOpen] = useState(false);
   const regionId = useId();
   const region = useRef<HTMLDivElement>(null);
@@ -89,12 +77,8 @@ function SignedIn({ name: displayName, collapsed }: { name: string | null; colla
   useEffect(() => {
     if (open) region.current?.scrollIntoView?.({ block: "nearest" });
   }, [open]);
-  const out = useMutation({
-    mutationFn: logout,
-    // Drops every cached query (no stale name or runs); SessionGate then notices the 401 and
-    // starts a fresh anonymous (or local) session.
-    onSuccess: () => client.resetQueries(),
-  });
+  // SessionGate notices the resulting 401 and starts a fresh anonymous (or local) session.
+  const out = useSignOut();
   const name = displayName?.trim() || "Your account";
   const toggle = () => {
     if (open) out.reset();

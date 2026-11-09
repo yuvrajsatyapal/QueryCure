@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Logo } from "@/components/ui/Logo";
 import { FooterTile } from "./FooterTile";
+import { FinalCtas, FooterAuthLink, HeroCta } from "./LandingAuth";
 import { LpIcon } from "./LpIcon";
 import { QueryXRay } from "./QueryXRay";
 import { Reveal } from "./Reveal";
@@ -19,9 +20,7 @@ export function Hero() {
             performance and supporting evidence.
           </p>
           <div className="hero-ctas">
-            <Link href="/app" className="btn btn-primary">
-              Open QueryCure <LpIcon name="arrowRight" size={15} />
-            </Link>
+            <HeroCta />
             <a href="#how" className="btn btn-secondary">
               See how it works
             </a>
@@ -122,12 +121,7 @@ export function CtaSection() {
         </h2>
         <p>Understand slow PostgreSQL queries with measured experiments and evidence you can re-check.</p>
         <div className="hero-ctas">
-          <Link href="/sign-in" className="btn btn-primary">
-            Get Started <LpIcon name="arrowRight" size={15} />
-          </Link>
-          <Link href="/app" className="btn btn-secondary">
-            Open QueryCure
-          </Link>
+          <FinalCtas />
         </div>
       </div>
     </section>
@@ -147,7 +141,7 @@ export function LandingFooter() {
         <nav className="ft-links" aria-label="Footer">
           <a href="https://github.com/yuvrajsatyapal/QueryCure/tree/main/docs">Docs</a>
           <a href="https://github.com/yuvrajsatyapal/QueryCure">GitHub</a>
-          <Link href="/sign-in">Sign in</Link>
+          <FooterAuthLink />
         </nav>
       </div>
       <div className="wrap ft-bottom">

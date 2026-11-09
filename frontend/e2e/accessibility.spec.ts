@@ -42,11 +42,16 @@ test("a11y - empty states are axe-clean too (the history page with no matches)",
 });
 
 test("a11y - keyboard reaches the main actions with a visible focus ring", async ({ page }) => {
+  // The header and hero calls to action depend on the visitor's session, so fix it: signed out, both providers on.
+  await page.route("**/api/v1/me", (route) => route.fulfill({ status: 401, json: { error: { code: "UNAUTHENTICATED", message: "Sign in required.", status: 401 } } }));
+  await page.route("**/api/v1/auth/options", (route) => route.fulfill({ json: { google_login: true, github_login: true, restricted_access: false } }));
   await page.goto("/");
   await expect(page.getByRole("heading", { level: 1 })).toBeVisible({ timeout: 30_000 });
-  // Header (logo, section links, theme, app) comes first; the hero's primary action follows.
+  // The calls to action appear once the session is known; tabbing earlier would skip their reserved space.
+  await expect(page.locator("section.hero").getByRole("link", { name: "Get started" })).toBeVisible();
+  // Header (logo, section links, theme, then Open QueryCure and Sign in) comes first; the hero's primary action follows.
   const focused = page.locator(":focus");
-  for (const name of ["QueryCure", "Product", "How it works", "Safety", "Verification", "Reports", "Real data", "", "Open QueryCure", "Open QueryCure"]) {
+  for (const name of ["QueryCure", "Product", "How it works", "Safety", "Verification", "Reports", "Real data", "", "Open QueryCure", "Sign in", "Get started"]) {
     await page.keyboard.press("Tab");
     if (name) await expect(focused).toHaveText(name);
   }

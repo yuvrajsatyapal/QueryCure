@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { cleanup, screen, waitFor } from "@testing-library/react";
-import { renderWithQuery } from "@/test/render";
+import { renderWithQuery, testQueryClient } from "@/test/render";
+import { useLandingAuth } from "@/components/landing/useLandingAuth";
 import { ApiError } from "@/lib/api/client";
 import { createSession, getAuthOptions, getMe } from "@/lib/api/session";
 import { rememberReturnTo, rememberedReturnTo } from "@/lib/auth/returnTo";
@@ -113,4 +114,27 @@ test("the automatic hand-over to sign-in keeps the page's fragment", async () =>
   vi.mocked(getMe).mockRejectedValue(denied(403, "ACCESS_DENIED"));
   renderWithQuery(<SessionGate>app content</SessionGate>);
   await waitFor(() => expect(replace).toHaveBeenCalledWith("/sign-in?next=%2Fapp%2Fhistory%3Fq%3D1%23recent"));
+});
+
+test("a signed-out landing visit leaves a cached /me 401 that does not stop the app from starting its session", async () => {
+  const client = testQueryClient();
+  vi.mocked(getAuthOptions).mockResolvedValue({ restrictedAccess: false, githubLogin: true, googleLogin: true });
+  vi.mocked(getMe)
+    .mockRejectedValueOnce(denied(401, "UNAUTHENTICATED")) // the landing page's read
+    .mockRejectedValueOnce(denied(401, "UNAUTHENTICATED")) // the gate's first read
+    .mockResolvedValue({ ...me, user: { id: "u2", kind: "anonymous", displayName: null } } as never);
+  vi.mocked(createSession).mockResolvedValue({});
+
+  function Landing() {
+    return <p>{useLandingAuth().status}</p>;
+  }
+  const landing = renderWithQuery(<Landing />, client);
+  expect(await screen.findByText("signedOut")).toBeDefined();
+  expect(createSession).not.toHaveBeenCalled();
+  landing.unmount();
+
+  // Same QueryClient, as when the visitor clicks "Open QueryCure" from the landing page.
+  renderWithQuery(<SessionGate>app content</SessionGate>, client);
+  expect(await screen.findByText("app content")).toBeDefined();
+  expect(createSession).toHaveBeenCalledOnce();
 });

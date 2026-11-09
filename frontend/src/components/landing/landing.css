@@ -67,13 +67,23 @@ html:not(.dark) .lp .nav.scrolled::before{background:color-mix(in srgb,var(--bg)
 .lp .nav-links{display:flex;gap:4px;margin:0 auto}
 .lp .nav-links a{padding:8px 12px;border-radius:8px;color:var(--muted);font-size:15px}
 .lp .nav-links a:hover{color:var(--ink);background:var(--hover)}
-.lp .nav-right{display:flex;align-items:center;gap:8px}
-@media (max-width:860px){
+.lp .nav-right{display:flex;align-items:center;gap:8px;position:relative}
+.lp .auth-slot{display:inline-block;height:42px;width:164px;border-radius:8px;background:var(--hover)}
+.lp .auth-slot.sm{height:30px;width:96px}
+.lp .nav-acct{display:inline-flex;flex:none;align-items:center;justify-content:center;width:30px;height:30px;border-radius:999px;border:1px solid var(--border-strong);background:var(--surface);color:var(--muted);font-size:11px;font-weight:600}
+.lp .nav-err{position:absolute;right:0;top:calc(100% + 8px);width:max-content;max-width:260px;padding:8px 10px;border-radius:8px;border:1px solid var(--border-strong);background:var(--surface);color:var(--ink);font-size:12px;line-height:1.4}
+.lp .nav .btn,.lp .nav-links a{white-space:nowrap}
+@media (max-width:1240px){
+.lp .nav .wrap{gap:20px}
+}
+/* The header's session-aware actions (Open QueryCure + Sign in, or the dashboard, account and Sign out) need
+ * room, so the section links give way sooner than they did with one button. */
+@media (max-width:1100px){
 .lp .nav-links{display:none}
 .lp .nav-right{margin-left:auto}
 }
 @media (max-width:420px){
-.lp .nav .btn-primary{display:none}
+.lp .nav .btn-primary,.lp .nav .auth-slot{display:none}
 }
 .lp section{position:relative}
 .lp .sec{padding:136px 0}

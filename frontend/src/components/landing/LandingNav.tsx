@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import { Logo } from "@/components/ui/Logo";
+import { NavAuth } from "./LandingAuth";
 
 const SECTIONS = [
   ["#screens", "Product"],
@@ -39,9 +40,7 @@ export function LandingNav() {
         </nav>
         <div className="nav-right">
           <ThemeToggle />
-          <Link href="/app" className="btn btn-primary btn-sm">
-            Open QueryCure
-          </Link>
+          <NavAuth />
         </div>
       </div>
     </header>
