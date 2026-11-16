@@ -1,5 +1,6 @@
 import type { NextConfig } from "next";
 import { PHASE_PRODUCTION_BUILD } from "next/constants";
+import { apiRewrites, resolveBackendProxy } from "./src/lib/api/backendProxy";
 import { resolveApiOrigin } from "./src/lib/api/origin";
 
 // Production security headers (SECURITY §9). The API origin is the only other origin the
@@ -39,7 +40,24 @@ export default function config(phase: string): NextConfig {
   // read routes; it produces no bundle, so it must not need the deployment's API origin.
   const building = phase === PHASE_PRODUCTION_BUILD && !process.argv.includes("typegen");
   const apiOrigin = resolveApiOrigin(process.env.NEXT_PUBLIC_API_BASE_URL, { production: building });
+  // Same-origin API proxy (ADR-0034). Off unless BACKEND_ORIGIN is set, so local builds and the
+  // Compose stacks (which call the API origin directly) are unchanged.
+  const proxy = resolveBackendProxy(
+    process.env.BACKEND_ORIGIN,
+    apiOrigin,
+    process.env.BACKEND_PROXY_TIMEOUT_MS,
+  );
   return {
+    ...(proxy && {
+      // Next's gzip middleware buffers a proxied text/event-stream until the stream ends, so live
+      // events never arrive (measured, ADR-0034). `proxyTimeout` and `compress` are read when
+      // `next start` runs, so BACKEND_ORIGIN must be set for the running server too.
+      compress: false,
+      experimental: { proxyTimeout: proxy.timeoutMs },
+      async rewrites() {
+        return apiRewrites(proxy);
+      },
+    }),
     async headers() {
       if (process.env.NODE_ENV !== "production") return [];
       return [{ source: "/:path*", headers: securityHeaders(apiOrigin) }];
