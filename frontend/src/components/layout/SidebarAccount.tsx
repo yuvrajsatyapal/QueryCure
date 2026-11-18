@@ -107,7 +107,7 @@ function SignedIn({
   onNavigate?: () => void;
 }) {
   // SessionGate notices the resulting 401 and starts a fresh anonymous (or local) session.
-  const out = useSignOut();
+  const out = useSignOut({ startSession: true });
   const name = displayName?.trim() || "Your account";
   const signOutLabel = out.isPending ? "Signing out…" : "Sign out";
   const size = collapsed ? "size-8" : "size-7 pointer-coarse:size-11";

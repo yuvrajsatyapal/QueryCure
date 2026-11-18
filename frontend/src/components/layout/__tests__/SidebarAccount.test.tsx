@@ -3,7 +3,7 @@ import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { renderWithQuery } from "@/test/render";
 import { ApiError } from "@/lib/api/client";
-import { getMe, logout } from "@/lib/api/session";
+import { createSession, getMe, logout } from "@/lib/api/session";
 import { SidebarAccount } from "../SidebarAccount";
 
 vi.mock("@/lib/api/session", () => ({
@@ -148,6 +148,19 @@ test("Sign out uses the existing logout, shows progress, and reports a failure",
   fail(new Error("offline"));
   expect(await screen.findByRole("alert")).toHaveProperty("textContent", "Sign-out failed. Check your connection and try again.");
   expect(screen.getByRole("button", { name: "Sign out" }).hasAttribute("disabled")).toBe(false);
+});
+
+test("sign-out starts the replacement session before the account row is replaced", async () => {
+  vi.mocked(getMe)
+    .mockResolvedValueOnce(oauth("Ada Lovelace") as never)
+    .mockResolvedValue(local as never);
+  const order: string[] = [];
+  vi.mocked(logout).mockImplementation(async () => void order.push("logout"));
+  vi.mocked(createSession).mockImplementation(async () => void order.push("session"));
+  renderWithQuery(<SidebarAccount />);
+  fireEvent.click(await screen.findByRole("button", { name: "Sign out" }));
+  expect(await screen.findByText("Local session")).toBeDefined();
+  expect(order).toEqual(["logout", "session"]);
 });
 
 test("a successful sign-out drops the cached account so the session is re-read", async () => {
