@@ -165,7 +165,12 @@ export function SideNav({ collapsed = false, onNavigate }: { collapsed?: boolean
       <ActiveRuns collapsed={collapsed} onNavigate={onNavigate} />
       {group(WORKSPACE, "Workspace")}
       <div className={`mt-auto flex flex-col gap-0.5 ${collapsed ? "items-center" : ""}`}>
-        {showNavSettings ? <NavLink item={SETTINGS} pathname={pathname} collapsed={collapsed} onNavigate={onNavigate} /> : null}
+        {showNavSettings ? (
+          <NavLink item={SETTINGS} pathname={pathname} collapsed={collapsed} onNavigate={onNavigate} />
+        ) : me.data ? null : (
+          // Reserve the link's height until the session is known, so nothing above the footer jumps.
+          <span aria-hidden="true" className="h-8" />
+        )}
       </div>
     </nav>
   );

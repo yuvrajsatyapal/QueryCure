@@ -34,7 +34,18 @@ export function SidebarAccount({ collapsed = false, onNavigate }: { collapsed?: 
     // A 401 means SessionGate is starting a session: still loading, never a "signed out" flash.
     const starting = me.error instanceof ApiError && me.error.status === 401;
     if (!me.isPending && !starting) return null;
-    return <span role="status" aria-label="Loading account" className={`block rounded-md bg-surface-2 ${collapsed ? "mx-auto size-8" : "h-[60px] w-full"}`} />;
+    // Same footprint as the signed-in row, so signing in or out never makes the footer jump.
+    return collapsed ? (
+      <span role="status" aria-label="Loading account" className="mx-auto block size-8 rounded-full bg-surface-2 motion-safe:animate-pulse" />
+    ) : (
+      <div role="status" aria-label="Loading account" className="flex items-center gap-2.5 p-1.5 motion-safe:animate-pulse">
+        <span className="size-8 shrink-0 rounded-full bg-surface-2" />
+        <span className="flex flex-1 flex-col gap-1.5">
+          <span className="h-3 w-24 rounded bg-surface-2" />
+          <span className="h-2.5 w-14 rounded bg-surface-2" />
+        </span>
+      </div>
+    );
   }
 
   const { user, features } = me.data;
