@@ -7,6 +7,7 @@ import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import { Icon } from "@/components/ui/Icon";
 import { Logo } from "@/components/ui/Logo";
 import { useRailTooltip } from "./RailTooltip";
+import { AppBoot } from "./AppBoot";
 import { SessionGate } from "./SessionGate";
 import { SideNav } from "./SideNav";
 import { SidebarAccount } from "./SidebarAccount";
@@ -87,6 +88,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <CommandProvider>
+      <AppBoot />
       <div className="flex min-h-full flex-1">
         <aside
           className={`sticky top-0 hidden h-dvh shrink-0 flex-col gap-5 overflow-y-auto border-r border-border bg-sidebar py-3 md:flex ${rail ? "w-14 px-2" : "w-60 px-3"}`}

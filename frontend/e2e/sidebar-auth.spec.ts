@@ -301,8 +301,10 @@ for (const width of [1440, 375]) {
       await route.fulfill({ status: 204 });
     });
     await nav.getByRole("button", { name: "Sign out" }).click();
-    await expect(nav.getByText("Local session")).toBeVisible();
-    await expect(nav.getByText("Ada Lovelace")).toHaveCount(0);
+    // The signing-out screen, then the home page (a fresh load, so no trace of the account).
+    await expect(page.getByRole("heading", { name: "Signing you out" })).toBeVisible();
+    await expect(page).toHaveURL(/\/$/);
+    await expect(page.getByText("Ada Lovelace")).toHaveCount(0);
   });
 }
 
@@ -410,7 +412,7 @@ test("sign-in page - a completed sign-in leaves no destination for a later, unre
   await expect(page).toHaveURL(/\/app\/connections$/);
   const nav = await sidebar(page);
   await nav.getByRole("button", { name: "Sign out" }).click();
-  await expect(nav.getByRole("link", { name: "Sign in" })).toBeVisible();
+  await expect(page).toHaveURL(/\/$/);
   expect(await page.evaluate(() => sessionStorage.getItem("qc.signIn.returnTo"))).toBeNull();
 
   // A failure that did not start on the sign-in page must not pick up the old destination.

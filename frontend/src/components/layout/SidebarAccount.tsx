@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Icon } from "@/components/ui/Icon";
+import { LoadingScreen } from "./LoadingScreen";
 import { ApiError } from "@/lib/api/client";
 import { getMe } from "@/lib/api/session";
 import { initials, useSignOut } from "@/lib/auth/account";
@@ -107,11 +108,23 @@ function SignedIn({
   onNavigate?: () => void;
 }) {
   // SessionGate notices the resulting 401 and starts a fresh anonymous (or local) session.
-  const out = useSignOut({ startSession: true });
+  const out = useSignOut({ toHome: true });
   const name = displayName?.trim() || "Your account";
   const signOutLabel = out.isPending ? "Signing out…" : "Sign out";
   const size = collapsed ? "size-8" : "size-7 pointer-coarse:size-11";
 
+  // Stays up through the page load that follows (success), so there is no flash of anything between.
+  const leaving =
+    out.isPending || out.isSuccess ? (
+      <LoadingScreen
+        title="Signing you out"
+        status={out.isSuccess ? "Taking you home…" : "Ending your session…"}
+        steps={[
+          { label: "End session", state: out.isSuccess ? "done" : "run" },
+          { label: "Return to home", state: out.isSuccess ? "run" : "wait" },
+        ]}
+      />
+    ) : null;
   const signOut = (
     <button
       type="button"
@@ -139,6 +152,7 @@ function SignedIn({
         <SettingsLink active={settingsActive} onNavigate={onNavigate} className={`flex ${size} items-center justify-center rounded-md`} />
         {signOut}
         {failed}
+        {leaving}
       </div>
     );
   }
@@ -156,6 +170,7 @@ function SignedIn({
         {signOut}
       </div>
       {failed}
+      {leaving}
     </div>
   );
 }

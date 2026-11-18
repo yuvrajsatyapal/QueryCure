@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en" class="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sign-in loading screen — prototype</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  /* Tokens from frontend/src/styles/tokens.css */
+  :root{--bg:#fbfbfc;--sidebar:#f4f5f6;--surface:#fff;--surface-2:#f2f3f5;--hover:#eceef1;--border:#e1e4e8;--border-strong:#cbcfd6;--ink:#16171a;--muted:#565b68;--faint:#8b909b;--accent:#0a6f6a;--accent-tint:rgba(10,111,106,.08);--verified:#1e7240}
+  .dark{--bg:#08090a;--sidebar:#0d0e10;--surface:#111214;--surface-2:#17181b;--hover:#1d1f22;--border:#232529;--border-strong:#34373d;--ink:#f2f3f5;--muted:#9aa0ab;--faint:#636873;--accent:#3cc3b4;--accent-tint:rgba(60,195,180,.12);--verified:#5bc584}
+  *{box-sizing:border-box}
+  body{margin:0;background:#000;color:var(--ink);font:14px/1.4 Inter,system-ui,sans-serif}
+  .tools{position:fixed;z-index:5;bottom:14px;left:50%;transform:translateX(-50%);display:flex;flex-wrap:wrap;justify-content:center;gap:6px;width:max-content;max-width:94vw}
+  .tools button{font:inherit;font-size:12px;color:var(--muted);background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:5px 9px;cursor:pointer}
+  .tools button:hover,.tools button.on{color:var(--ink);border-color:var(--border-strong)}
+  .stage{min-height:100dvh;background:var(--bg);display:grid;place-items:center;padding:24px}
+  .card{width:100%;max-width:340px;text-align:center}
+  .mark{color:var(--ink);display:block;margin:0 auto 22px;overflow:visible}
+  .mark .dot{animation:pulse 1.6s ease-in-out infinite;transform-origin:25.7px 23.4px}
+  @keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.45;transform:scale(.8)}}
+  h1{font-size:17px;font-weight:600;letter-spacing:-.01em;margin:0 0 4px}
+  .sub{color:var(--muted);margin:0 0 26px;min-height:20px}
+  .bar{height:3px;border-radius:3px;background:var(--surface-2);overflow:hidden;margin-bottom:22px}
+  .bar i{display:block;height:100%;width:0;background:var(--accent);border-radius:3px;transition:width .5s cubic-bezier(.2,.7,.2,1)}
+  ul{list-style:none;margin:0;padding:0;text-align:left;display:flex;flex-direction:column;gap:10px}
+  li{display:flex;align-items:center;gap:10px;color:var(--faint);font-size:13px;transition:color .2s}
+  li .ic{width:16px;height:16px;flex:none;display:grid;place-items:center}
+  li.run{color:var(--ink)}
+  li.done{color:var(--muted)}
+  .spin{width:14px;height:14px;border-radius:50%;border:2px solid var(--border-strong);border-top-color:var(--accent);animation:spin .8s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .dotp{width:6px;height:6px;border-radius:50%;background:var(--border-strong)}
+  .tick{width:16px;height:16px;fill:none;stroke:var(--verified);stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+  .fade{animation:out .35s ease forwards}
+  @keyframes out{to{opacity:0;transform:translateY(-4px)}}
+  .hint{margin-top:26px;font-size:12px;color:var(--faint)}
+  .err{display:none;margin-top:22px;text-align:left;border:1px solid var(--border);background:var(--surface);border-radius:10px;padding:16px;animation:in .3s ease}
+  @keyframes in{from{opacity:0;transform:translateY(6px)}}
+  .err .hd{display:flex;align-items:center;gap:10px;margin-bottom:6px}
+  .err .ico{width:28px;height:28px;border-radius:50%;background:var(--accent-tint);display:grid;place-items:center;flex:none}
+  .err .ico svg{width:15px;height:15px;fill:none;stroke:var(--accent);stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+  .err h2{font-size:14px;font-weight:600;margin:0;letter-spacing:-.005em}
+  .err p{margin:0 0 14px 38px;color:var(--muted);font-size:13px;line-height:1.5}
+  .err .row{display:flex;gap:8px;margin-left:38px}
+  .err .row button{flex:1 1 0;height:36px;border:1px solid var(--border-strong);background:var(--surface-2);padding:0 12px;line-height:1;white-space:nowrap}
+  .err button{font:inherit;font-size:14px;font-weight:600;border-radius:6px;padding:7px 12px;cursor:pointer;border:1px solid var(--border);background:var(--surface);color:var(--ink)}
+  .err button:hover{border-color:var(--border-strong);background:var(--hover)}
+  .err .row button.pri{background:var(--accent);border-color:var(--accent);color:var(--bg)}
+  .err .row button.pri:hover{opacity:.9;background:var(--accent)}
+  .err button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  @media (prefers-reduced-motion:reduce){.mark .dot,.spin{animation:none}.bar i{transition:none}}
+</style>
+</head>
+<body>
+<div class="tools">
+  <button data-mode="in" class="on">Signing in</button>
+  <button data-mode="out">Signing out</button>
+  <button data-mode="slow">Slow / failed</button>
+  <button id="theme">Light / dark</button>
+</div>
+
+<div class="stage">
+  <div class="card" id="card" role="status" aria-live="polite">
+    <svg class="mark" width="44" height="44" viewBox="0 0 32 32" aria-hidden="true">
+      <g fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M22.43 12.25A9.5 9.5 0 1 1 17.52 6.89"/><path d="M17.1 19.1L21.4 23.4H23.2"/>
+      </g>
+      <circle class="dot" cx="25.7" cy="23.4" r="2.6" fill="var(--accent)"/>
+    </svg>
+    <h1 id="title">Signing you in</h1>
+    <p class="sub" id="sub">Confirming your account…</p>
+    <div class="bar" aria-hidden="true"><i id="fill"></i></div>
+    <ul id="steps"></ul>
+    <p class="hint" id="hint"></p>
+    <div class="err" id="err" role="alert">
+      <div class="hd"><span class="ico"><svg viewBox="0 0 24 24"><path d="M12 8v5M12 17h.01"/><circle cx="12" cy="12" r="10"/></svg></span><h2>Still connecting to QueryCure</h2></div>
+      <p>The server is slower than usual to respond. This can happen right after it has been idle. We'll keep trying in the background.</p>
+      <div class="row"><button class="pri" id="retry">Try again</button><button id="home">Back to home</button></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const TICK = '<svg class="tick" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg>';
+const MODES = {
+  in:   { title: "Signing you in", subs: ["Confirming your account…", "Loading your workspace…", "Almost there…", "Welcome back"], steps: ["Confirm account", "Load workspace", "Fetch investigations"], hint: "Opens your dashboard when everything is ready.", gap: 900 },
+  out:  { title: "Signing you out", subs: ["Ending your session…", "Taking you home…"], steps: ["End session", "Return to home"], hint: "", gap: 700 },
+  slow: { title: "Signing you in", subs: ["Confirming your account…", "Loading your workspace…"], steps: ["Confirm account", "Load workspace", "Fetch investigations"], hint: "Opens your dashboard when everything is ready.", gap: 900, stall: 1 },
+};
+let mode = "in", timers = [];
+const clear = () => { timers.forEach(clearTimeout); timers = []; };
+const at = (ms, fn) => timers.push(setTimeout(fn, ms));
+
+function run() {
+  clear();
+  const m = MODES[mode];
+  $("card").classList.remove("fade"); $("err").style.display = "none";
+  $("title").textContent = m.title; $("hint").textContent = m.hint; $("fill").style.width = "4%";
+  $("sub").textContent = m.subs[0];
+  $("steps").innerHTML = m.steps.map((s, i) => `<li data-i="${i}"><span class="ic"><span class="dotp"></span></span>${s}</li>`).join("");
+  const n = m.steps.length, last = m.stall ? n - 1 : n;
+  const set = (i, state) => {
+    const li = $("steps").children[i]; if (!li) return;
+    li.className = state;
+    li.querySelector(".ic").innerHTML = state === "done" ? TICK : state === "run" ? '<span class="spin"></span>' : '<span class="dotp"></span>';
+  };
+  for (let i = 0; i < last; i++) {
+    at(i * m.gap + 250, () => { set(i, "run"); $("sub").textContent = m.subs[Math.min(i, m.subs.length - 1)]; });
+    at((i + 1) * m.gap, () => { set(i, "done"); $("fill").style.width = ((i + 1) / n) * 100 + "%"; });
+  }
+  if (m.stall) {
+    at(last * m.gap + 250, () => set(last, "run"));
+    at(last * m.gap + 3500, () => { $("sub").textContent = "Taking a little longer…"; $("err").style.display = "block"; });
+    return;
+  }
+  at(last * m.gap + 150, () => { $("sub").textContent = m.subs[m.subs.length - 1]; $("fill").style.width = "100%"; });
+  at(last * m.gap + 900, () => { $("card").classList.add("fade"); });
+  at(last * m.gap + 1800, run); // loop for the demo only
+}
+document.querySelectorAll("[data-mode]").forEach(b => b.onclick = () => {
+  document.querySelectorAll("[data-mode]").forEach(x => x.classList.toggle("on", x === b));
+  mode = b.dataset.mode; run();
+});
+$("retry").onclick = () => { mode = "in"; document.querySelectorAll("[data-mode]").forEach(x => x.classList.toggle("on", x.dataset.mode === "in")); run(); };
+$("theme").onclick = () => document.documentElement.classList.toggle("dark");
+run();
+</script>
+</body>
+</html>

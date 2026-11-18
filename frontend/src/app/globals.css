@@ -222,3 +222,10 @@ li p a {
   --xy-controls-button-border-color: var(--border);
   --xy-attribution-background-color: transparent;
 }
+
+/* The mark on the loading screen: its accent point breathes while the app gets ready. */
+@media (prefers-reduced-motion: no-preference) {
+  .qc-mark-busy .qc-dot {
+    animation: qc-pulse 1.6s ease-in-out infinite;
+  }
+}
