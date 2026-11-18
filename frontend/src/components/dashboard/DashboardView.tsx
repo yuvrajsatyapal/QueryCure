@@ -335,8 +335,14 @@ function RecentResults({ items, loading, failed }: { items: InvestigationSummary
           </table>
         </div>
       ) : (
-        <div className="flex flex-col items-start gap-3 p-6">
-          <p className="text-sm text-muted">Nothing investigated yet.</p>
+        <div className="flex flex-col items-center gap-3 px-6 py-12 text-center">
+          <span className="flex size-10 items-center justify-center rounded-full border border-border bg-surface-2 text-faint">
+            <Icon name="history" size={18} />
+          </span>
+          <div className="flex flex-col gap-1">
+            <p className="text-sm font-medium">Nothing investigated yet</p>
+            <p className="max-w-sm text-sm text-muted">Your most recent investigations will appear here with their latest run.</p>
+          </div>
           <Link href="/app/investigations/new" className="qc-btn-secondary">
             Start an investigation
           </Link>

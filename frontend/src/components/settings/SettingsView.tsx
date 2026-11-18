@@ -1,15 +1,12 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useTheme } from "next-themes";
-import { useState, useSyncExternalStore } from "react";
+import { useState } from "react";
 import { ErrorNotice } from "@/components/common/ErrorNotice";
 import { getModels } from "@/lib/api/investigations";
 import { addCredential, deleteCredential, listCredentials, settingsKeys } from "@/lib/api/settings";
-import { Icon, type IconName } from "@/components/ui/Icon";
+import { Icon } from "@/components/ui/Icon";
 import { PageHeader, SettingsSection } from "@/components/ui/SettingsSection";
-
-const subscribe = () => () => {};
 
 const dateTime = new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" });
 
@@ -128,39 +125,7 @@ export function SettingsView() {
             {add.isSuccess ? <p role="status" className="text-sm text-verified">Key saved; only its last four characters are kept visible.</p> : null}
           </form>
         </SettingsSection>
-
-        <SettingsSection title="Appearance" description="Dark is the default. The choice is kept in this browser only.">
-          <ThemeChoice />
-        </SettingsSection>
       </div>
-    </div>
-  );
-}
-
-/** Same setting as the sidebar toggle, as native radios (arrow keys move between them). */
-function ThemeChoice() {
-  const { theme, setTheme } = useTheme();
-  const mounted = useSyncExternalStore(subscribe, () => true, () => false);
-  const current = mounted ? (theme ?? "dark") : "dark";
-  const options: [string, string, IconName][] = [
-    ["dark", "Dark", "moon"],
-    ["light", "Light", "sun"],
-    ["system", "Match system", "settings"],
-  ];
-  return (
-    <div role="radiogroup" aria-label="Theme" className="flex w-fit gap-0.5 rounded-md border border-border bg-surface-2 p-0.5">
-      {options.map(([value, label, icon]) => (
-        <label
-          key={value}
-          className={`flex cursor-pointer items-center gap-1.5 rounded px-3 py-1.5 text-xs has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-accent ${
-            current === value ? "bg-surface font-medium text-ink shadow-sm" : "text-muted hover:text-ink"
-          }`}
-        >
-          <input type="radio" name="theme" value={value} checked={current === value} onChange={() => setTheme(value)} className="sr-only" />
-          <Icon name={icon} size={13} />
-          {label}
-        </label>
-      ))}
     </div>
   );
 }
