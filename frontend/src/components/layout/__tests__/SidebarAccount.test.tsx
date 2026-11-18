@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
-import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
+import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { renderWithQuery } from "@/test/render";
 import { ApiError } from "@/lib/api/client";
@@ -76,104 +76,64 @@ test("while the session loads or is being replaced, neither Sign in nor an accou
   expect(screen.queryByText("Local session")).toBeNull();
 });
 
-test("a signed-in account shows its initials, name and a collapsed disclosure", async () => {
-  vi.mocked(getMe).mockResolvedValue(oauth("Ada Lovelace") as never);
-  renderWithQuery(<SidebarAccount />);
-  const profile = await screen.findByRole("button", { name: /Ada Lovelace/ });
-  expect(profile.getAttribute("aria-expanded")).toBe("false");
-  expect(profile.hasAttribute("aria-haspopup")).toBe(false);
-  expect(within(profile).getByText("AL")).toBeDefined();
-  expect(within(profile).getByText("Signed in")).toBeDefined();
-  expect(screen.queryByRole("button", { name: "Sign out" })).toBeNull();
-  expect(screen.queryByRole("link", { name: "Sign in" })).toBeNull();
-});
-
-test("the profile expands account actions inline, below it, and collapses again", async () => {
-  vi.mocked(getMe).mockResolvedValue(oauth("Ada Lovelace") as never);
-  const { container } = renderWithQuery(<SidebarAccount />);
-  const profile = await screen.findByRole("button", { name: /Ada Lovelace/ });
-  fireEvent.click(profile);
-  expect(profile.getAttribute("aria-expanded")).toBe("true");
-  const signOut = screen.getByRole("button", { name: "Sign out" });
-  // In the sidebar's own flow: inside this component, after the profile, labelled as its region.
-  expect(container.contains(signOut)).toBe(true);
-  expect(profile.compareDocumentPosition(signOut) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-  const region = document.getElementById(profile.getAttribute("aria-controls") ?? "");
-  expect(region?.contains(signOut)).toBe(true);
-  expect(screen.queryByRole("menu")).toBeNull();
-  expect(screen.queryByRole("dialog")).toBeNull();
-  // No account route exists, so no dead Account entry is offered.
-  expect(within(region as HTMLElement).getAllByRole("button")).toHaveLength(1);
-
-  fireEvent.click(profile);
-  expect(profile.getAttribute("aria-expanded")).toBe("false");
-  expect(screen.queryByRole("button", { name: "Sign out" })).toBeNull();
-});
-
-test("a signed-in row puts Settings between the name and the chevron", async () => {
+test("a signed-in account shows its initials and name with Settings and Sign out beside them", async () => {
   vi.mocked(getMe).mockResolvedValue(oauth("Ada Lovelace") as never);
   const onNavigate = vi.fn();
   renderWithQuery(<SidebarAccount onNavigate={onNavigate} />);
-  const profile = await screen.findByRole("button", { name: /Ada Lovelace/ });
+  expect(await screen.findByText("Ada Lovelace")).toBeDefined();
+  expect(screen.getByText("AL")).toBeDefined();
+  expect(screen.getByText("Signed in")).toBeDefined();
+  const name = screen.getByText("Ada Lovelace");
   const settings = screen.getByRole("link", { name: "Settings" });
-  const chevron = screen.getByRole("button", { name: "Account actions" });
+  const signOut = screen.getByRole("button", { name: "Sign out" });
   expect(settings.getAttribute("href")).toBe("/app/settings");
   expect(settings.hasAttribute("aria-current")).toBe(false);
-  expect(profile.compareDocumentPosition(settings) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-  expect(settings.compareDocumentPosition(chevron) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-  // The chevron toggles the same region as the name; the link is not inside a button.
-  fireEvent.click(chevron);
-  expect(profile.getAttribute("aria-expanded")).toBe("true");
-  expect(settings.closest("button")).toBeNull();
+  // Order: name, Settings, Sign out. No disclosure, chevron, menu or dialog.
+  expect(name.compareDocumentPosition(settings) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(settings.compareDocumentPosition(signOut) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(screen.queryByRole("button", { name: /Account actions/ })).toBeNull();
+  expect(document.querySelector("[aria-expanded]")).toBeNull();
+  expect(screen.queryByRole("link", { name: "Sign in" })).toBeNull();
   fireEvent.click(settings);
   expect(onNavigate).toHaveBeenCalledOnce();
 });
 
-test("the collapsed rail keeps a Settings link under the avatar", async () => {
+test("Settings is marked current on the settings page", async () => {
+  vi.resetModules();
+  vi.doMock("next/navigation", () => ({ usePathname: () => "/app/settings" }));
+  const { SidebarAccount: Account } = await import("../SidebarAccount");
   vi.mocked(getMe).mockResolvedValue(oauth("Ada Lovelace") as never);
-  renderWithQuery(<SidebarAccount collapsed />);
-  const avatar = await screen.findByRole("button", { name: "Account: Ada Lovelace" });
-  const settings = screen.getByRole("link", { name: "Settings" });
-  expect(settings.getAttribute("href")).toBe("/app/settings");
-  expect(avatar.compareDocumentPosition(settings) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  renderWithQuery(<Account />);
+  expect((await screen.findByRole("link", { name: "Settings" })).getAttribute("aria-current")).toBe("page");
+  vi.doUnmock("next/navigation");
 });
 
-test("the disclosure works from the keyboard", async () => {
+test("the tab order is Settings then Sign out", async () => {
   vi.mocked(getMe).mockResolvedValue(oauth("Ada Lovelace") as never);
   const user = userEvent.setup();
   renderWithQuery(<SidebarAccount />);
-  const profile = await screen.findByRole("button", { name: /Ada Lovelace/ });
-  await user.tab();
-  expect(document.activeElement).toBe(profile);
-  await user.keyboard("{Enter}");
-  expect(profile.getAttribute("aria-expanded")).toBe("true");
-  // Name, then Settings, then the chevron, then the revealed Sign out.
+  await screen.findByText("Ada Lovelace");
   await user.tab();
   expect(document.activeElement).toBe(screen.getByRole("link", { name: "Settings" }));
   await user.tab();
-  expect(document.activeElement).toBe(screen.getByRole("button", { name: "Account actions" }));
-  await user.tab();
   expect(document.activeElement).toBe(screen.getByRole("button", { name: "Sign out" }));
-  await user.keyboard("{Shift>}{Tab}{/Shift}");
-  await user.keyboard(" ");
-  expect(profile.getAttribute("aria-expanded")).toBe("false");
 });
 
 test("a missing name falls back to a neutral label and icon; a long one keeps its full text available", async () => {
   vi.mocked(getMe).mockResolvedValue(oauth(null) as never);
   renderWithQuery(<SidebarAccount />);
-  const profile = await screen.findByRole("button", { name: /Your account/ });
-  expect(profile.querySelector('[data-avatar="icon"]')).not.toBeNull();
+  expect(await screen.findByText("Your account")).toBeDefined();
+  expect(document.querySelector('[data-avatar="icon"]')).not.toBeNull();
   cleanup();
 
   const long = "Augusta Ada King, Countess of Lovelace and Analytical Engine Enthusiast";
   vi.mocked(getMe).mockResolvedValue(oauth(long) as never);
   renderWithQuery(<SidebarAccount />);
-  const named = await screen.findByRole("button", { name: new RegExp(long) });
-  expect(named.getAttribute("title")).toBe(long);
-  expect(within(named).getByText(long).className).toContain("truncate");
+  const text = await screen.findByText(long);
+  expect(text.closest("[title]")?.getAttribute("title")).toBe(long);
+  expect(text.className).toContain("truncate");
   // First and last word, as in "Ada Lovelace" → AL.
-  expect(within(named).getByText("AE")).toBeDefined();
+  expect(screen.getByText("AE")).toBeDefined();
 });
 
 test("Sign out uses the existing logout, shows progress, and reports a failure", async () => {
@@ -181,8 +141,7 @@ test("Sign out uses the existing logout, shows progress, and reports a failure",
   let fail: (e: Error) => void = () => {};
   vi.mocked(logout).mockReturnValueOnce(new Promise((_, reject) => (fail = reject)));
   renderWithQuery(<SidebarAccount />);
-  fireEvent.click(await screen.findByRole("button", { name: /Ada Lovelace/ }));
-  fireEvent.click(screen.getByRole("button", { name: "Sign out" }));
+  fireEvent.click(await screen.findByRole("button", { name: "Sign out" }));
   const pending = await screen.findByRole("button", { name: "Signing out…" });
   expect(pending.hasAttribute("disabled")).toBe(true);
   expect(logout).toHaveBeenCalledOnce();
@@ -197,44 +156,19 @@ test("a successful sign-out drops the cached account so the session is re-read",
     .mockResolvedValue(local as never);
   vi.mocked(logout).mockResolvedValue(undefined);
   renderWithQuery(<SidebarAccount />);
-  fireEvent.click(await screen.findByRole("button", { name: /Ada Lovelace/ }));
-  fireEvent.click(screen.getByRole("button", { name: "Sign out" }));
+  fireEvent.click(await screen.findByRole("button", { name: "Sign out" }));
   expect(await screen.findByText("Local session")).toBeDefined();
   expect(screen.queryByText("Ada Lovelace")).toBeNull();
   expect(getMe).toHaveBeenCalledTimes(2);
 });
 
-test("the collapsed rail expands to an icon Sign out below the avatar", async () => {
+test("the collapsed rail shows the avatar, a Settings link and a Sign out button", async () => {
   vi.mocked(getMe).mockResolvedValue(oauth("Ada Lovelace") as never);
   renderWithQuery(<SidebarAccount collapsed />);
-  const profile = await screen.findByRole("button", { name: "Account: Ada Lovelace" });
-  expect(profile.getAttribute("aria-expanded")).toBe("false");
-  fireEvent.click(profile);
+  const avatar = await screen.findByRole("img", { name: "Account: Ada Lovelace" });
+  const settings = screen.getByRole("link", { name: "Settings" });
   const signOut = screen.getByRole("button", { name: "Sign out" });
-  expect(profile.compareDocumentPosition(signOut) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-  expect(screen.queryByRole("menu")).toBeNull();
+  expect(settings.getAttribute("href")).toBe("/app/settings");
+  expect(avatar.compareDocumentPosition(settings) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(settings.compareDocumentPosition(signOut) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
 });
-
-for (const collapsed of [false, true]) {
-  test(`expanding the account brings its actions into view on a short screen${collapsed ? " (rail)" : ""}`, async () => {
-    vi.mocked(getMe).mockResolvedValue(oauth("Ada Lovelace") as never);
-    const scrolled: Element[] = [];
-    const original = Element.prototype.scrollIntoView;
-    Element.prototype.scrollIntoView = function (this: Element) {
-      scrolled.push(this);
-    };
-    try {
-      renderWithQuery(<SidebarAccount collapsed={collapsed} />);
-      const profile = await screen.findByRole("button", { name: /Ada Lovelace/ });
-      fireEvent.click(profile);
-      const group = screen.getByRole("group", { name: "Account" });
-      await waitFor(() => expect(scrolled).toContain(group));
-      // Collapsing scrolls nothing.
-      scrolled.length = 0;
-      fireEvent.click(profile);
-      expect(scrolled).toEqual([]);
-    } finally {
-      Element.prototype.scrollIntoView = original;
-    }
-  });
-}

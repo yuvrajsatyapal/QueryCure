@@ -220,7 +220,7 @@ test("sign-in page - a signed-in account does not stay on it", async ({ page }) 
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto("/sign-in?next=%2Fapp%2Fconnections");
   await expect(page).toHaveURL(/\/app\/connections$/);
-  await expect(page.locator("aside.sticky").getByRole("button", { name: /Ada Lovelace/ })).toBeVisible();
+  await expect(page.locator("aside.sticky").getByText("Ada Lovelace")).toBeVisible();
 });
 
 test("sign-in page - public pages need no sign-in", async ({ page }) => {
@@ -233,7 +233,7 @@ test("sign-in page - public pages need no sign-in", async ({ page }) => {
 });
 
 for (const scheme of ["dark", "light"] as const) {
-  test(`sidebar auth - signed in: the profile expands Sign out inline, in the sidebar's flow (${scheme})`, async ({ page }) => {
+  test(`sidebar auth - signed in: the row shows Settings and Sign out beside the name (${scheme})`, async ({ page }) => {
     const errors = collectErrors(page);
     await mockSignedIn(page);
     for (const size of SIZES) {
@@ -242,36 +242,22 @@ for (const scheme of ["dark", "light"] as const) {
       await applyTheme(page, scheme);
       const at = `${size.width}x${size.height} ${scheme}`;
       const nav = await sidebar(page);
-      const profile = nav.getByRole("button", { name: /Ada Lovelace/ });
-      await expect(profile).toHaveAttribute("aria-expanded", "false");
-      await expect(nav.getByRole("link", { name: "Sign in" })).toHaveCount(0);
-      await expect(nav.getByRole("button", { name: "Sign out" })).toHaveCount(0);
-      expect(await onTop(profile), `${at}: profile covered`).toBe(true);
-
       const footer = nav.locator("[data-sidebar-footer]");
-      const before = await footer.evaluate((f) => f.getBoundingClientRect().height);
-      await profile.focus();
-      await page.keyboard.press("Enter");
-      await expect(profile).toHaveAttribute("aria-expanded", "true");
-      const signOut = nav.getByRole("button", { name: "Sign out" });
-      await expect(signOut).toBeVisible();
-      // Fully on screen without scrolling by hand, even 360px tall.
-      await expect(signOut, `${at}: Sign out opened off screen`).toBeInViewport({ ratio: 1 });
+      await expect(footer.getByText("Ada Lovelace")).toBeVisible();
+      await expect(nav.getByRole("link", { name: "Sign in" })).toHaveCount(0);
+      const settings = footer.getByRole("link", { name: "Settings" });
+      const signOut = footer.getByRole("button", { name: "Sign out" });
+      await expect(settings).toHaveCount(1);
+      // Settings moved out of the nav list into the footer row, so it exists exactly once.
+      await expect(nav.getByRole("link", { name: "Settings" })).toHaveCount(1);
       await expect(page.getByRole("menu")).toHaveCount(0);
-      expect(await inFlow(signOut), `${at}: Sign out is layered, not in flow`).toBe(true);
-      // It takes room in the sidebar's footer (the layout grows) and sits directly below the profile.
-      expect(await footer.evaluate((f) => f.getBoundingClientRect().height), `${at}: expanding added no height`).toBeGreaterThan(before);
-      const [p, s] = [await profile.boundingBox(), await signOut.boundingBox()];
-      expect((s?.y ?? 0) + 1, `${at}: Sign out should be below the profile`).toBeGreaterThanOrEqual((p?.y ?? 0) + (p?.height ?? 0));
-      for (const target of [signOut, nav.getByRole("link", { name: "Settings" }), nav.getByRole("button", { name: /theme/i }), profile]) {
+      for (const target of [settings, signOut, nav.getByRole("button", { name: /theme/i })]) {
+        await expect(target, `${at}: control off screen`).toBeInViewport({ ratio: 1 });
         expect(await onTop(target), `${at}: control covered`).toBe(true);
       }
+      const [st, so] = [await settings.boundingBox(), await signOut.boundingBox()];
+      expect((so?.x ?? 0) + 1, `${at}: Sign out should follow Settings`).toBeGreaterThanOrEqual((st?.x ?? 0) + (st?.width ?? 0));
       expect(await noSideways(page), `${at}: sideways overflow`).toBeLessThanOrEqual(0);
-
-      await profile.focus();
-      await page.keyboard.press("Space");
-      await expect(profile).toHaveAttribute("aria-expanded", "false");
-      await expect(signOut).toHaveCount(0);
     }
     expect(errors).toEqual([]);
   });
@@ -282,26 +268,25 @@ test("sidebar auth - long names truncate without sideways overflow on a 320px ph
   await page.setViewportSize({ width: 320, height: 568 });
   await page.goto("/app");
   const nav = await sidebar(page);
-  const profile = nav.getByRole("button", { name: /Augusta Ada King/ });
-  await profile.click();
-  await expect(nav.getByRole("button", { name: "Sign out" })).toBeVisible();
-  const overflow = await profile.evaluate((b) => b.scrollWidth - b.clientWidth);
-  expect(overflow).toBeLessThanOrEqual(0);
+  const footer = nav.locator("[data-sidebar-footer]");
+  await expect(footer.getByRole("button", { name: "Sign out" })).toBeVisible();
+  await expect(footer.getByRole("link", { name: "Settings" })).toBeVisible();
+  const name = footer.getByText(/Augusta Ada King/);
+  expect(await name.evaluate((n) => n.scrollWidth - n.clientWidth)).toBeGreaterThanOrEqual(0);
   expect(await noSideways(page)).toBeLessThanOrEqual(0);
 });
 
-test("sidebar auth - the collapsed rail expands an icon Sign out inline", async ({ page }) => {
+test("sidebar auth - the collapsed rail shows Settings and an icon Sign out", async ({ page }) => {
   await mockSignedIn(page);
   await page.setViewportSize({ width: 1024, height: 360 });
   await page.goto("/app");
   await page.getByRole("button", { name: "Collapse sidebar" }).click();
   try {
     const aside = page.locator("aside.sticky");
-    await aside.getByRole("button", { name: "Account: Ada Lovelace" }).click();
     const signOut = aside.getByRole("button", { name: "Sign out" });
     await expect(signOut).toBeVisible();
     await expect(signOut).toBeInViewport({ ratio: 1 });
-    expect(await inFlow(signOut)).toBe(true);
+    await expect(aside.getByRole("link", { name: "Settings" })).toBeInViewport({ ratio: 1 });
     expect(await onTop(signOut)).toBe(true);
     expect(await noSideways(page)).toBeLessThanOrEqual(0);
   } finally {
@@ -316,10 +301,9 @@ for (const width of [1440, 375]) {
     await page.goto("/app");
     const nav = await sidebar(page);
     await page.route("**/api/v1/auth/logout", (route) => route.fulfill({ status: 500, json: { error: { code: "INTERNAL", message: "boom" } } }));
-    await nav.getByRole("button", { name: /Ada Lovelace/ }).click();
     await nav.getByRole("button", { name: "Sign out" }).click();
     await expect(nav.getByRole("alert")).toContainText("Sign-out failed");
-    await expect(nav.getByRole("button", { name: /Ada Lovelace/ })).toBeVisible();
+    await expect(nav.getByText("Ada Lovelace")).toBeVisible();
 
     // The mocked account's session is the real local one underneath: dropping the /me mock is what
     // a revoked OAuth session followed by SessionGate's fresh local session looks like here.
@@ -334,7 +318,7 @@ for (const width of [1440, 375]) {
   });
 }
 
-test("sidebar auth - axe finds no violations on the sign-in page or the expanded account", async ({ page }) => {
+test("sidebar auth - axe finds no violations on the sign-in page or the account row", async ({ page }) => {
   const scan = async (label: string) => {
     for (const scheme of ["light", "dark"] as const) {
       await applyTheme(page, scheme);
@@ -367,18 +351,13 @@ test("sidebar auth - axe finds no violations on the sign-in page or the expanded
   await mockSignedIn(page);
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto("/app/connections");
-  await page
-    .locator("aside.sticky")
-    .getByRole("button", { name: /Ada Lovelace/ })
-    .click();
   await expect(page.locator("aside.sticky").getByRole("button", { name: "Sign out" })).toBeVisible();
-  await scan("expanded account");
+  await scan("account row");
   await page.setViewportSize({ width: 375, height: 667 });
   await page.goto("/app/connections");
   const nav = await sidebar(page);
-  await nav.getByRole("button", { name: /Ada Lovelace/ }).click();
   await expect(nav.getByRole("button", { name: "Sign out" })).toBeVisible();
-  await scan("expanded account in drawer");
+  await scan("account in drawer");
 });
 
 test("sign-in page - a not-approved account sees the notice once, does not loop, and can sign out", async ({ page }) => {
@@ -442,7 +421,6 @@ test("sign-in page - a completed sign-in leaves no destination for a later, unre
   await page.getByRole("link", { name: "Continue with Google" }).click();
   await expect(page).toHaveURL(/\/app\/connections$/);
   const nav = await sidebar(page);
-  await nav.getByRole("button", { name: /Ada Lovelace/ }).click();
   await nav.getByRole("button", { name: "Sign out" }).click();
   await expect(nav.getByRole("link", { name: "Sign in" })).toBeVisible();
   expect(await page.evaluate(() => sessionStorage.getItem("qc.signIn.returnTo"))).toBeNull();
