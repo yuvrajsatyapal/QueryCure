@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { logout } from "@/lib/api/session";
 import { goHome } from "./navigate";
+import { sleep, STEP_MS } from "./pacing";
 
 /** First and last initials of a display name, or null when there is nothing to take them from. */
 export function initials(name: string | null): string | null {
@@ -21,7 +22,16 @@ export function initials(name: string | null): string | null {
 export function useSignOut({ toHome = false }: { toHome?: boolean } = {}) {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: logout,
-    onSuccess: () => (toHome ? goHome() : client.resetQueries()),
+    // The screen of the app shell is paced like the sign-in one: the request is not shown for less than a step.
+    mutationFn: async () => {
+      if (!toHome) return logout();
+      const [result] = await Promise.all([logout(), sleep(STEP_MS)]);
+      return result;
+    },
+    // Not awaited: the mutation must read as succeeded meanwhile, so the screen shows its second step.
+    onSuccess: () => {
+      if (toHome) setTimeout(goHome, STEP_MS);
+      else void client.resetQueries();
+    },
   });
 }

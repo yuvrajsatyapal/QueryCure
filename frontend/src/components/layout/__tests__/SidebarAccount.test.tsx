@@ -158,7 +158,10 @@ test("a successful sign-out shows the signing-out screen and loads the home page
   renderWithQuery(<SidebarAccount />);
   fireEvent.click(await screen.findByRole("button", { name: "Sign out" }));
   expect(await screen.findByRole("heading", { name: "Signing you out" })).toBeDefined();
-  await waitFor(() => expect(goHome).toHaveBeenCalledOnce());
+  // Paced: the second step is on show before the page loads, not skipped past.
+  expect(await screen.findByText("Taking you home…")).toBeDefined();
+  expect(goHome).not.toHaveBeenCalled();
+  await waitFor(() => expect(goHome).toHaveBeenCalledOnce(), { timeout: 3000 });
   // It stays up through the page load: no flash of the local session or the old account.
   expect(screen.getByRole("heading", { name: "Signing you out" })).toBeDefined();
   expect(screen.queryByText("Local session")).toBeNull();

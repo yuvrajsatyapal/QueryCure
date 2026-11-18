@@ -23,10 +23,24 @@ test("covers the app until the account and the first investigations are in, then
   vi.mocked(listInvestigations).mockReturnValue(new Promise((r) => (release = r)) as never);
   renderWithQuery(<AppBoot />);
   expect(screen.getByRole("heading", { name: "Getting QueryCure ready" })).toBeDefined();
-  expect(await screen.findByText("Loading your workspace…")).toBeDefined();
+  expect(await screen.findByText("Loading your workspace…", {}, { timeout: 2000 })).toBeDefined();
   expect(screen.getByRole("heading", { name: "Getting QueryCure ready" })).toBeDefined();
   await act(async () => release({ items: [], nextCursor: null }));
-  await waitFor(() => expect(screen.queryByRole("heading", { name: "Getting QueryCure ready" })).toBeNull());
+  await waitFor(() => expect(screen.queryByRole("heading", { name: "Getting QueryCure ready" })).toBeNull(), { timeout: 3000 });
+});
+
+test("answers that arrive at once are still shown step by step, not as a flash", async () => {
+  vi.mocked(getMe).mockResolvedValue(me as never);
+  vi.mocked(listInvestigations).mockResolvedValue({ items: [], nextCursor: null } as never);
+  renderWithQuery(<AppBoot />);
+  await act(async () => {
+    await Promise.resolve();
+  });
+  // Everything has answered, yet the first step is still on show.
+  expect(screen.getByText("Confirming your account…")).toBeDefined();
+  expect(await screen.findByText("Loading your workspace…", {}, { timeout: 2000 })).toBeDefined();
+  expect(await screen.findByText("Welcome back", {}, { timeout: 2000 })).toBeDefined();
+  await waitFor(() => expect(screen.queryByRole("heading", { name: "Getting QueryCure ready" })).toBeNull(), { timeout: 2000 });
 });
 
 test("a 401 while the session starts keeps the screen up, without an error", async () => {

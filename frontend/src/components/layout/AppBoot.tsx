@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { ApiError } from "@/lib/api/client";
 import { listInvestigations } from "@/lib/api/investigations";
 import { getMe } from "@/lib/api/session";
+import { usePacedStage } from "@/lib/auth/pacing";
 import { LoadingScreen, type LoadingStep } from "./LoadingScreen";
 import { RECENT_LIMIT, recentKey } from "./SideNav";
 
@@ -24,9 +25,13 @@ export function AppBoot() {
   const [done, setDone] = useState(false);
   const [slow, setSlow] = useState(false);
 
+  // Real progress (0 account, 1 investigations, 2 all loaded) is shown at a readable pace: each stage
+  // stays up for STEP_MS at least, and stage 3 is the finished screen held for one beat before leaving.
+  const target = !me.isSuccess ? 0 : recent.isPending ? 1 : 3;
+  const stage = usePacedStage(target);
   // A denied account is sent to the sign-in page by SessionGate: nothing left to wait for here.
   const denied = me.error instanceof ApiError && me.error.status === 403;
-  const ready = denied || (me.isSuccess && !recent.isPending);
+  const ready = denied || stage >= 3;
   // Latch during render (React's pattern for state derived from a changing value): never reopens.
   if (ready && !done) setDone(true);
   useEffect(() => {
@@ -39,10 +44,10 @@ export function AppBoot() {
 
   const unreachable = me.isError && !(me.error instanceof ApiError && me.error.status === 401);
   const steps: LoadingStep[] = [
-    { label: "Confirm account", state: me.isSuccess ? "done" : "run" },
-    { label: "Load investigations", state: !me.isSuccess ? "wait" : recent.isPending ? "run" : "done" },
+    { label: "Confirm account", state: stage >= 1 ? "done" : "run" },
+    { label: "Load investigations", state: stage < 1 ? "wait" : stage >= 2 ? "done" : "run" },
   ];
-  const status = !me.isSuccess ? "Confirming your account…" : "Loading your workspace…";
+  const status = stage < 1 ? "Confirming your account…" : stage < 2 ? "Loading your workspace…" : "Welcome back";
   const stalled =
     slow || unreachable
       ? {
