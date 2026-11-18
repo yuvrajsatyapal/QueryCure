@@ -56,18 +56,6 @@ async function onTop(locator: Locator) {
 
 const noSideways = (page: Page) => page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
 
-/** No fixed, absolute or portalled layer anywhere between the element and the sidebar. */
-async function inFlow(locator: Locator) {
-  return locator.evaluate((el) => {
-    const aside = el.closest("aside");
-    if (!aside) return false;
-    for (let node: Element | null = el; node && node !== aside; node = node.parentElement) {
-      if (["fixed", "absolute"].includes(getComputedStyle(node).position)) return false;
-    }
-    return true;
-  });
-}
-
 function collectErrors(page: Page): string[] {
   const errors: string[] = [];
   page.on("console", (m) => {
