@@ -116,9 +116,10 @@ export function SideNav({ collapsed = false, onNavigate }: { collapsed?: boolean
   // A signed-in account reaches Settings from its footer row (SidebarAccount); a local session has
   // no such row, so the nav keeps the link there. Same query key as the footer, so one fetch.
   const me = useQuery({ queryKey: ["me"], queryFn: ({ signal }) => getMe(signal), retry: false });
-  // Wait for the answer: while it loads we cannot know yet, and showing the link then would flash
-  // a second Settings for a signed-in account.
-  const showNavSettings = me.data ? me.data.user.kind !== "oauth" : !me.isPending;
+  // Only once a local session has actually loaded. While there is no session yet (loading, or the
+  // 401 gap around sign-in and sign-out while SessionGate starts one) we cannot know whether the
+  // account is signed in, and showing the link then flashes a second Settings.
+  const showNavSettings = !!me.data && me.data.user.kind !== "oauth";
   const group = (items: NavItem[], title?: string) => (
     <div className={`flex flex-col gap-0.5 ${collapsed ? "items-center" : ""}`}>
       {title && !collapsed ? <p className="px-2 pb-1 text-xs font-medium text-muted">{title}</p> : null}

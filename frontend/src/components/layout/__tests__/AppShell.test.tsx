@@ -58,6 +58,14 @@ test("Settings leaves the nav for a signed-in account (it is in the footer row) 
   me.current = { user: { id: "u0", kind: "local", displayName: null } };
 });
 
+test("Settings is not shown while there is no session yet (the 401 gap around sign-in and sign-out)", async () => {
+  vi.mocked(getMe).mockRejectedValueOnce(new Error("401"));
+  renderNav();
+  await waitFor(() => expect(vi.mocked(getMe)).toHaveBeenCalled());
+  await new Promise((r) => setTimeout(r, 20));
+  expect(screen.queryByRole("link", { name: "Settings" })).toBeNull();
+});
+
 test("active runs list only in-flight investigations, approvals first, with the status in words", async () => {
   items.push(inv("done", "completed"), inv("r", "running"), inv("a", "awaiting_approval"));
   renderNav();
