@@ -3,6 +3,7 @@ import { cleanup, screen, waitFor, within } from "@testing-library/react";
 import { CommandProvider } from "@/components/command/CommandProvider";
 import { moving } from "@/test/motion";
 import { renderWithQuery } from "@/test/render";
+import { getMe } from "@/lib/api/session";
 import { SideNav } from "../SideNav";
 
 vi.mock("@/lib/api/session", () => ({ getMe: vi.fn(async () => me.current) }));
@@ -35,8 +36,9 @@ afterEach(() => {
   items.length = 0;
 });
 
-test("every section is a real link (no dead or placeholder entries)", () => {
+test("every section is a real link (no dead or placeholder entries)", async () => {
   const { container } = renderNav();
+  await screen.findByRole("link", { name: "Settings" });
 
   expect(screen.getByRole("link", { name: "Dashboard" }).getAttribute("href")).toBe("/app");
   expect(screen.getByRole("link", { name: "History" }).getAttribute("href")).toBe("/app/history");
@@ -48,7 +50,11 @@ test("every section is a real link (no dead or placeholder entries)", () => {
 test("Settings leaves the nav for a signed-in account (it is in the footer row) and stays for a local session", async () => {
   me.current = { user: { id: "u1", kind: "oauth", displayName: "Ada Lovelace" } };
   renderNav();
-  await waitFor(() => expect(screen.queryByRole("link", { name: "Settings" })).toBeNull());
+  // Never shown, not even while the account is still loading.
+  expect(screen.queryByRole("link", { name: "Settings" })).toBeNull();
+  await waitFor(() => expect(vi.mocked(getMe)).toHaveBeenCalled());
+  await new Promise((r) => setTimeout(r, 20));
+  expect(screen.queryByRole("link", { name: "Settings" })).toBeNull();
   me.current = { user: { id: "u0", kind: "local", displayName: null } };
 });
 

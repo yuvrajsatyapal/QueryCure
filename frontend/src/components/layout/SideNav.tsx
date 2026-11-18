@@ -116,7 +116,9 @@ export function SideNav({ collapsed = false, onNavigate }: { collapsed?: boolean
   // A signed-in account reaches Settings from its footer row (SidebarAccount); a local session has
   // no such row, so the nav keeps the link there. Same query key as the footer, so one fetch.
   const me = useQuery({ queryKey: ["me"], queryFn: ({ signal }) => getMe(signal), retry: false });
-  const settingsInFooter = me.data?.user.kind === "oauth";
+  // Wait for the answer: while it loads we cannot know yet, and showing the link then would flash
+  // a second Settings for a signed-in account.
+  const showNavSettings = me.data ? me.data.user.kind !== "oauth" : !me.isPending;
   const group = (items: NavItem[], title?: string) => (
     <div className={`flex flex-col gap-0.5 ${collapsed ? "items-center" : ""}`}>
       {title && !collapsed ? <p className="px-2 pb-1 text-xs font-medium text-muted">{title}</p> : null}
@@ -162,7 +164,7 @@ export function SideNav({ collapsed = false, onNavigate }: { collapsed?: boolean
       <ActiveRuns collapsed={collapsed} onNavigate={onNavigate} />
       {group(WORKSPACE, "Workspace")}
       <div className={`mt-auto flex flex-col gap-0.5 ${collapsed ? "items-center" : ""}`}>
-        {settingsInFooter ? null : <NavLink item={SETTINGS} pathname={pathname} collapsed={collapsed} onNavigate={onNavigate} />}
+        {showNavSettings ? <NavLink item={SETTINGS} pathname={pathname} collapsed={collapsed} onNavigate={onNavigate} /> : null}
       </div>
     </nav>
   );
