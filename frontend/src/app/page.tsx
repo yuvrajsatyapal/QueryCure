@@ -8,6 +8,7 @@ import { LandingNav } from "@/components/landing/LandingNav";
 import { PauseOffscreen } from "@/components/landing/PauseOffscreen";
 import { ProductScreens } from "@/components/landing/ProductScreens";
 import { ProductShowcase } from "@/components/landing/ProductShowcase";
+import { SignedInRedirect } from "@/components/landing/SignedInRedirect";
 import { RealDataSection } from "@/components/landing/RealDataSection";
 import { ReportShowcase } from "@/components/landing/ReportShowcase";
 import { Bridge, CtaSection, FlowStrip, Hero, LandingFooter, ProblemBand } from "@/components/landing/StaticSections";
@@ -18,6 +19,7 @@ import "@/components/landing/landing.css";
 export default function Home() {
   return (
     <div className="lp flex flex-1 flex-col">
+      <SignedInRedirect />
       <DotDepth />
       <LandingNav />
       <main>

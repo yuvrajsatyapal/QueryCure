@@ -8,6 +8,8 @@ import { renderWithQuery } from "@/test/render";
 import { MEASURED, formatMs } from "@/lib/landing/xrayMeasured";
 import Page from "../page";
 
+const replace = vi.fn();
+vi.mock("next/navigation", () => ({ useRouter: () => ({ replace }) }));
 vi.mock("@/lib/api/session", () => ({ getMe: vi.fn(), createSession: vi.fn(), getAuthOptions: vi.fn(), logout: vi.fn() }));
 
 // jsdom lacks the observers and animation APIs the landing sections use; these inert stubs never fire,
@@ -48,13 +50,17 @@ test("landing page states the product and links only to real app routes", async 
   expect(screen.getAllByRole("link", { name: "Get started" })[0]?.getAttribute("href")).toBe("/sign-in");
 });
 
-test("a signed-in visitor sees the dashboard entry point, never Get started or Sign in", async () => {
+test("a signed-in visitor is sent straight to the dashboard without starting a session", async () => {
   vi.mocked(getMe).mockReset().mockResolvedValue({ user: { id: "u1", kind: "oauth", displayName: "Ada Lovelace" }, profile: "demo", features: {} } as never);
   renderWithQuery(<Page />);
-  await waitFor(() => expect(screen.getAllByRole("link", { name: "Open dashboard" }).length).toBeGreaterThan(0));
-  expect(screen.queryByRole("link", { name: /Get started|Sign in|Open QueryCure/ })).toBeNull();
-  expect(screen.getByRole("button", { name: "Sign out" })).toBeDefined();
+  await waitFor(() => expect(replace).toHaveBeenCalledWith("/app"));
   expect(createSession).not.toHaveBeenCalled();
+});
+
+test("a signed-out visitor stays on the landing page", async () => {
+  renderWithQuery(<Page />);
+  await waitFor(() => expect(screen.getAllByRole("link", { name: "Get started" }).length).toBeGreaterThan(0));
+  expect(replace).not.toHaveBeenCalled();
 });
 
 test("before the session is known the page makes no account claim and starts no session", () => {
