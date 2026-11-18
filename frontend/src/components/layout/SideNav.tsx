@@ -7,6 +7,7 @@ import { useCommands } from "@/components/command/CommandProvider";
 import { KeyHint } from "@/components/command/KeyHint";
 import { Icon, type IconName } from "@/components/ui/Icon";
 import { StatusIcon, StatusOrb, TONE_TEXT, runStatusMeta } from "@/components/ui/StatusPill";
+import { getMe } from "@/lib/api/session";
 import { investigationKeys, listInvestigations } from "@/lib/api/investigations";
 import type { InvestigationPage } from "@/lib/api/types";
 import { activeFirst } from "@/lib/investigations/dashboard";
@@ -112,6 +113,10 @@ function ActiveRuns({ collapsed, onNavigate }: { collapsed: boolean; onNavigate?
 export function SideNav({ collapsed = false, onNavigate }: { collapsed?: boolean; onNavigate?: () => void }) {
   const pathname = usePathname();
   const { openPalette, mac } = useCommands();
+  // A signed-in account reaches Settings from its footer row (SidebarAccount); a local session has
+  // no such row, so the nav keeps the link there. Same query key as the footer, so one fetch.
+  const me = useQuery({ queryKey: ["me"], queryFn: ({ signal }) => getMe(signal), retry: false });
+  const settingsInFooter = me.data?.user.kind === "oauth";
   const group = (items: NavItem[], title?: string) => (
     <div className={`flex flex-col gap-0.5 ${collapsed ? "items-center" : ""}`}>
       {title && !collapsed ? <p className="px-2 pb-1 text-xs font-medium text-muted">{title}</p> : null}
@@ -157,7 +162,7 @@ export function SideNav({ collapsed = false, onNavigate }: { collapsed?: boolean
       <ActiveRuns collapsed={collapsed} onNavigate={onNavigate} />
       {group(WORKSPACE, "Workspace")}
       <div className={`mt-auto flex flex-col gap-0.5 ${collapsed ? "items-center" : ""}`}>
-        <NavLink item={SETTINGS} pathname={pathname} collapsed={collapsed} onNavigate={onNavigate} />
+        {settingsInFooter ? null : <NavLink item={SETTINGS} pathname={pathname} collapsed={collapsed} onNavigate={onNavigate} />}
       </div>
     </nav>
   );

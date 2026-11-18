@@ -40,7 +40,7 @@ export function SidebarAccount({ collapsed = false, onNavigate }: { collapsed?: 
   }
 
   const { user, features } = me.data;
-  if (user.kind === "oauth") return <SignedIn key={user.id} name={user.displayName} collapsed={collapsed} />;
+  if (user.kind === "oauth") return <SignedIn key={user.id} name={user.displayName} collapsed={collapsed} settingsActive={isSettings(pathname)} onNavigate={onNavigate} />;
 
   const canSignIn = features.googleLogin || features.githubLogin;
   const href = signInHref(pathname ?? "/app");
@@ -68,7 +68,35 @@ export function SidebarAccount({ collapsed = false, onNavigate }: { collapsed?: 
   );
 }
 
-function SignedIn({ name: displayName, collapsed }: { name: string | null; collapsed: boolean }) {
+const isSettings = (pathname: string | null) => !!pathname?.startsWith("/app/settings");
+
+/** Settings lives in the account row for a signed-in account (a local session keeps the nav link). */
+function SettingsLink({ active, onNavigate, className }: { active: boolean; onNavigate?: () => void; className: string }) {
+  return (
+    <Link
+      href="/app/settings"
+      onClick={onNavigate}
+      aria-label="Settings"
+      title="Settings"
+      aria-current={active ? "page" : undefined}
+      className={`${className} ${active ? "bg-accent-tint text-accent" : "text-faint hover:bg-surface-2 hover:text-ink"}`}
+    >
+      <Icon name="settings" size={16} />
+    </Link>
+  );
+}
+
+function SignedIn({
+  name: displayName,
+  collapsed,
+  settingsActive,
+  onNavigate,
+}: {
+  name: string | null;
+  collapsed: boolean;
+  settingsActive: boolean;
+  onNavigate?: () => void;
+}) {
   const [open, setOpen] = useState(false);
   const regionId = useId();
   const region = useRef<HTMLDivElement>(null);
@@ -99,6 +127,7 @@ function SignedIn({ name: displayName, collapsed }: { name: string | null; colla
         <button {...disclosure} aria-label={`Account: ${name}`} className={`rounded-full ${out.isError ? "ring-2 ring-rejected" : ""}`}>
           <Avatar name={displayName} />
         </button>
+        <SettingsLink active={settingsActive} onNavigate={onNavigate} className="flex size-8 items-center justify-center rounded-md" />
         <div ref={region} id={regionId} role="group" aria-label="Account" hidden={!open}>
           <button
             type="button"
@@ -117,17 +146,29 @@ function SignedIn({ name: displayName, collapsed }: { name: string | null; colla
   }
   return (
     <div className="flex flex-col">
-      <button
-        {...disclosure}
-        className="flex w-full min-w-0 items-center gap-2.5 rounded-md p-1.5 text-left hover:bg-hover aria-expanded:bg-hover pointer-coarse:py-2"
-      >
-        <Avatar name={displayName} />
-        <span className="flex min-w-0 flex-1 flex-col">
-          <span className="truncate text-[13px] font-medium text-ink">{name}</span>
-          <span className="truncate text-xs text-muted">Signed in</span>
-        </span>
-        <Icon name="chevronDown" size={15} className={`shrink-0 text-faint motion-safe:transition-transform ${open ? "rotate-180" : ""}`} />
-      </button>
+      <div className={`flex items-center gap-0.5 rounded-md pr-0.5 hover:bg-hover ${open ? "bg-hover" : ""}`}>
+        <button
+          {...disclosure}
+          className="flex min-w-0 flex-1 items-center gap-2.5 rounded-md p-1.5 text-left pointer-coarse:py-2"
+        >
+          <Avatar name={displayName} />
+          <span className="flex min-w-0 flex-1 flex-col">
+            <span className="truncate text-[13px] font-medium text-ink">{name}</span>
+            <span className="truncate text-xs text-muted">Signed in</span>
+          </span>
+        </button>
+        <SettingsLink active={settingsActive} onNavigate={onNavigate} className="flex size-7 shrink-0 items-center justify-center rounded-md pointer-coarse:size-11" />
+        <button
+          type="button"
+          onClick={toggle}
+          aria-label="Account actions"
+          aria-expanded={open}
+          aria-controls={regionId}
+          className="flex size-7 shrink-0 items-center justify-center rounded-md text-faint hover:bg-surface-2 hover:text-ink pointer-coarse:size-11"
+        >
+          <Icon name="chevronDown" size={15} className={`motion-safe:transition-transform ${open ? "rotate-180" : ""}`} />
+        </button>
+      </div>
       <div ref={region} id={regionId} role="group" aria-label="Account" hidden={!open} className="pt-1">
         <button
           type="button"

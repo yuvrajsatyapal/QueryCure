@@ -1,13 +1,14 @@
 import { afterEach, expect, test, vi } from "vitest";
-import { cleanup, screen, within } from "@testing-library/react";
+import { cleanup, screen, waitFor, within } from "@testing-library/react";
 import { CommandProvider } from "@/components/command/CommandProvider";
 import { moving } from "@/test/motion";
 import { renderWithQuery } from "@/test/render";
 import { SideNav } from "../SideNav";
 
+vi.mock("@/lib/api/session", () => ({ getMe: vi.fn(async () => me.current) }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }), usePathname: () => "/app" }));
 
-const { items } = vi.hoisted(() => ({ items: [] as unknown[] }));
+const { items, me } = vi.hoisted(() => ({ items: [] as unknown[], me: { current: { user: { id: "u0", kind: "local", displayName: null } } as unknown } }));
 vi.mock("@/lib/api/investigations", async (orig) => ({
   ...(await orig<typeof import("@/lib/api/investigations")>()),
   listInvestigations: vi.fn(async () => ({ items, nextCursor: null })),
@@ -42,6 +43,13 @@ test("every section is a real link (no dead or placeholder entries)", () => {
   expect(screen.getByRole("link", { name: "Settings" }).getAttribute("href")).toBe("/app/settings");
   expect(screen.getByRole("link", { name: "Demo gallery" }).getAttribute("href")).toBe("/demo");
   expect(container.querySelector("[aria-disabled]")).toBeNull();
+});
+
+test("Settings leaves the nav for a signed-in account (it is in the footer row) and stays for a local session", async () => {
+  me.current = { user: { id: "u1", kind: "oauth", displayName: "Ada Lovelace" } };
+  renderNav();
+  await waitFor(() => expect(screen.queryByRole("link", { name: "Settings" })).toBeNull());
+  me.current = { user: { id: "u0", kind: "local", displayName: null } };
 });
 
 test("active runs list only in-flight investigations, approvals first, with the status in words", async () => {

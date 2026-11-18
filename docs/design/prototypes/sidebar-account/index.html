@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="en" class="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sidebar account row — Settings before chevron</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  /* Tokens copied from frontend/src/styles/tokens.css (DESIGN_SYSTEM §2). */
+  :root{--bg:#fbfbfc;--sidebar:#f4f5f6;--surface:#fff;--surface-2:#f2f3f5;--hover:#eceef1;--border:#e1e4e8;--border-strong:#cbcfd6;--ink:#16171a;--muted:#565b68;--faint:#8b909b;--accent:#0a6f6a;--accent-tint:rgba(10,111,106,.08);--rejected:#b3261e}
+  .dark{--bg:#08090a;--sidebar:#0d0e10;--surface:#111214;--surface-2:#17181b;--hover:#1d1f22;--border:#232529;--border-strong:#34373d;--ink:#f2f3f5;--muted:#9aa0ab;--faint:#636873;--accent:#3cc3b4;--accent-tint:rgba(60,195,180,.12)}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.4 Inter,system-ui,sans-serif;padding:32px 24px 64px}
+  h1{font-size:20px;font-weight:600;letter-spacing:-.01em;margin:0 0 4px}
+  .lede{color:var(--muted);margin:0 0 28px;max-width:62ch}
+  .bar{display:flex;gap:8px;margin-bottom:24px}
+  .bar button{font:inherit;font-size:13px;color:var(--muted);background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:6px 10px;cursor:pointer}
+  .bar button:hover{color:var(--ink);border-color:var(--border-strong)}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,max-content));gap:28px 32px;align-items:start}
+  figure{margin:0}
+  figcaption{font-size:12px;color:var(--muted);margin:10px 0 0;max-width:30ch}
+  figcaption b{color:var(--ink);font-weight:500;display:block;margin-bottom:2px}
+  .tag{font:500 11px/1 ui-monospace,monospace;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:0 0 10px}
+
+  /* A slice of the sidebar: 240px wide, 12px padding, footer under a hairline. */
+  .side{width:240px;background:var(--sidebar);border:1px solid var(--border);border-radius:8px;padding:12px}
+  .side.rail{width:56px;padding:12px 8px}
+  .nav-stub{display:flex;flex-direction:column;gap:2px;margin-bottom:14px}
+  .nav-item{display:flex;align-items:center;gap:10px;height:32px;padding:0 8px;border-radius:6px;font-size:14px;font-weight:500;color:var(--muted)}
+  .nav-item.on{background:var(--hover);color:var(--ink)}
+  .ico{width:16px;height:16px;flex:none;fill:none;stroke:currentColor;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round}
+  .foot{border-top:1px solid var(--border);padding-top:12px}
+  .rail .foot{padding-top:12px}
+
+  /* The row. A hover surface sits on the whole row; three siblings inside it. */
+  .acct{display:flex;align-items:center;gap:2px;border-radius:6px;padding:2px 2px 2px 0}
+  .acct:hover,.acct.open{background:var(--hover)}
+  .who{all:unset;box-sizing:border-box;display:flex;flex:1;min-width:0;align-items:center;gap:10px;padding:6px;border-radius:6px;cursor:pointer}
+  .av{width:32px;height:32px;flex:none;border-radius:50%;background:var(--surface-2);box-shadow:0 0 0 1px var(--border);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:var(--muted)}
+  .txt{display:flex;flex-direction:column;min-width:0}
+  .nm{font-size:13px;font-weight:500;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .st{font-size:12px;color:var(--muted)}
+  .ib{all:unset;box-sizing:border-box;width:28px;height:28px;flex:none;display:flex;align-items:center;justify-content:center;border-radius:6px;color:var(--faint);cursor:pointer}
+  .ib:hover{background:var(--surface-2);color:var(--ink)}
+  .acct:hover .ib.gear:not(:hover){color:var(--muted)}
+  .ib:focus-visible,.who:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+  .ib.gear.current{color:var(--accent);background:var(--accent-tint)}
+  .chev{transition:transform .15s ease}
+  .open .chev{transform:rotate(180deg)}
+  .force-hover .gear{background:var(--surface-2);color:var(--ink)}
+  .force-focus .gear{outline:2px solid var(--accent);outline-offset:1px}
+
+  .menu{display:none;padding-top:4px}
+  .open + .menu,.menu.show{display:block}
+  .signout{display:flex;align-items:center;gap:10px;height:32px;width:100%;padding:0 10px;border-radius:6px;color:var(--muted);font:500 13px Inter,sans-serif;background:none;border:0;cursor:pointer;text-align:left}
+  .signout:hover{background:var(--hover);color:var(--ink)}
+  .signout .ico{color:var(--faint)}
+
+  .rail .acct{flex-direction:column;background:none;padding:0;gap:6px}
+  .rail .who{flex:none;padding:0}
+  .rail .ib{width:32px;height:32px}
+  .rail .ib:hover{background:var(--hover)}
+
+  .tip{position:relative}
+  .tip::after{content:attr(data-tip);position:absolute;left:calc(100% + 8px);top:50%;transform:translateY(-50%);background:var(--surface);color:var(--ink);border:1px solid var(--border-strong);border-radius:6px;padding:4px 8px;font-size:12px;white-space:nowrap;opacity:0;pointer-events:none;transition:opacity .12s}
+  .tip:hover::after,.tip:focus-visible::after{opacity:1}
+  .before{opacity:.92}
+  @media (prefers-reduced-motion:reduce){.chev{transition:none}}
+</style>
+</head>
+<body>
+<h1>Sidebar account row</h1>
+<p class="lede">Settings moves into the account row, between the name and the chevron. The gear is its own link to <code>/app/settings</code>; the chevron still expands Sign out. Click the chevron or the name in the live row to try it.</p>
+
+<div class="bar">
+  <button id="theme">Toggle light / dark</button>
+</div>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="gear" viewBox="0 0 24 24"><path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></symbol>
+    <symbol id="down" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></symbol>
+    <symbol id="out" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></symbol>
+    <symbol id="dash" viewBox="0 0 24 24"><path d="M3 3h7v9H3zM14 3h7v5h-7zM14 12h7v9h-7zM3 16h7v5H3z"/></symbol>
+  </defs>
+</svg>
+
+<div class="grid">
+
+  <figure>
+    <p class="tag">Live · try it</p>
+    <div class="side">
+      <div class="nav-stub">
+        <div class="nav-item"><svg class="ico"><use href="#dash"/></svg>Dashboard</div>
+      </div>
+      <div class="foot">
+        <div class="acct" id="live">
+          <button class="who" aria-expanded="false" aria-controls="m1" data-toggle>
+            <span class="av" aria-hidden="true">YS</span>
+            <span class="txt"><span class="nm">Yuvraj Satyapal</span><span class="st">Signed in</span></span>
+          </button>
+          <a class="ib gear" href="#settings" aria-label="Settings" title="Settings" onclick="return false"><svg class="ico"><use href="#gear"/></svg></a>
+          <button class="ib" aria-label="Account actions" aria-expanded="false" aria-controls="m1" data-toggle><svg class="ico chev"><use href="#down"/></svg></button>
+        </div>
+        <div class="menu" id="m1"><button class="signout"><svg class="ico"><use href="#out"/></svg>Sign out</button></div>
+      </div>
+    </div>
+    <figcaption><b>Default → expanded</b>Gear is quiet until the row is hovered. Name and chevron both toggle Sign out.</figcaption>
+  </figure>
+
+  <figure>
+    <p class="tag">Gear hovered</p>
+    <div class="side force-hover">
+      <div class="nav-stub"><div class="nav-item"><svg class="ico"><use href="#dash"/></svg>Dashboard</div></div>
+      <div class="foot">
+        <div class="acct" style="background:var(--hover)">
+          <span class="who"><span class="av">YS</span><span class="txt"><span class="nm">Yuvraj Satyapal</span><span class="st">Signed in</span></span></span>
+          <span class="ib gear"><svg class="ico"><use href="#gear"/></svg></span>
+          <span class="ib"><svg class="ico chev"><use href="#down"/></svg></span>
+        </div>
+      </div>
+    </div>
+    <figcaption><b>Hover</b>Gear gets its own surface so it reads as a separate target from the row.</figcaption>
+  </figure>
+
+  <figure>
+    <p class="tag">On the Settings page</p>
+    <div class="side">
+      <div class="nav-stub"><div class="nav-item"><svg class="ico"><use href="#dash"/></svg>Dashboard</div></div>
+      <div class="foot">
+        <div class="acct">
+          <span class="who"><span class="av">YS</span><span class="txt"><span class="nm">Yuvraj Satyapal</span><span class="st">Signed in</span></span></span>
+          <a class="ib gear current" aria-current="page" aria-label="Settings" href="#" onclick="return false"><svg class="ico"><use href="#gear"/></svg></a>
+          <span class="ib"><svg class="ico chev"><use href="#down"/></svg></span>
+        </div>
+      </div>
+    </div>
+    <figcaption><b>Current page</b>Accent gear plus tint, same as an active nav item. <code>aria-current="page"</code>.</figcaption>
+  </figure>
+
+  <figure>
+    <p class="tag">Keyboard focus</p>
+    <div class="side force-focus">
+      <div class="nav-stub"><div class="nav-item"><svg class="ico"><use href="#dash"/></svg>Dashboard</div></div>
+      <div class="foot">
+        <div class="acct">
+          <span class="who"><span class="av">YS</span><span class="txt"><span class="nm">Yuvraj Satyapal</span><span class="st">Signed in</span></span></span>
+          <span class="ib gear"><svg class="ico"><use href="#gear"/></svg></span>
+          <span class="ib"><svg class="ico chev"><use href="#down"/></svg></span>
+        </div>
+      </div>
+    </div>
+    <figcaption><b>Tab order</b>Name → Settings → chevron. Visible 2px accent ring.</figcaption>
+  </figure>
+
+  <figure>
+    <p class="tag">Long name · 240px</p>
+    <div class="side">
+      <div class="nav-stub"><div class="nav-item"><svg class="ico"><use href="#dash"/></svg>Dashboard</div></div>
+      <div class="foot">
+        <div class="acct">
+          <span class="who"><span class="av">AV</span><span class="txt"><span class="nm">Alexandria Vasquez-Montgomery</span><span class="st">Signed in</span></span></span>
+          <a class="ib gear" href="#" aria-label="Settings" onclick="return false"><svg class="ico"><use href="#gear"/></svg></a>
+          <span class="ib"><svg class="ico chev"><use href="#down"/></svg></span>
+        </div>
+      </div>
+    </div>
+    <figcaption><b>Edge case</b>The name truncates; both icon buttons keep their 28px.</figcaption>
+  </figure>
+
+  <figure>
+    <p class="tag">Collapsed rail</p>
+    <div class="side rail">
+      <div class="nav-stub"><div class="nav-item" style="justify-content:center;padding:0"><svg class="ico"><use href="#dash"/></svg></div></div>
+      <div class="foot">
+        <div class="acct" style="align-items:center">
+          <span class="who"><span class="av">YS</span></span>
+          <a class="ib gear tip" data-tip="Settings" href="#" aria-label="Settings" onclick="return false"><svg class="ico"><use href="#gear"/></svg></a>
+        </div>
+      </div>
+    </div>
+    <figcaption><b>56px rail</b>Avatar (opens Sign out) with the gear stacked under it. No chevron in the rail.</figcaption>
+  </figure>
+
+</div>
+
+<script>
+  const live = document.getElementById('live');
+  const menu = document.getElementById('m1');
+  live.querySelectorAll('[data-toggle]').forEach(b => b.addEventListener('click', () => {
+    const open = !live.classList.contains('open');
+    live.classList.toggle('open', open);
+    menu.classList.toggle('show', open);
+    live.querySelectorAll('[data-toggle]').forEach(x => x.setAttribute('aria-expanded', open));
+  }));
+  document.getElementById('theme').onclick = () => document.documentElement.classList.toggle('dark');
+</script>
+</body>
+</html>

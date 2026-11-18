@@ -110,6 +110,34 @@ test("the profile expands account actions inline, below it, and collapses again"
   expect(screen.queryByRole("button", { name: "Sign out" })).toBeNull();
 });
 
+test("a signed-in row puts Settings between the name and the chevron", async () => {
+  vi.mocked(getMe).mockResolvedValue(oauth("Ada Lovelace") as never);
+  const onNavigate = vi.fn();
+  renderWithQuery(<SidebarAccount onNavigate={onNavigate} />);
+  const profile = await screen.findByRole("button", { name: /Ada Lovelace/ });
+  const settings = screen.getByRole("link", { name: "Settings" });
+  const chevron = screen.getByRole("button", { name: "Account actions" });
+  expect(settings.getAttribute("href")).toBe("/app/settings");
+  expect(settings.hasAttribute("aria-current")).toBe(false);
+  expect(profile.compareDocumentPosition(settings) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(settings.compareDocumentPosition(chevron) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  // The chevron toggles the same region as the name; the link is not inside a button.
+  fireEvent.click(chevron);
+  expect(profile.getAttribute("aria-expanded")).toBe("true");
+  expect(settings.closest("button")).toBeNull();
+  fireEvent.click(settings);
+  expect(onNavigate).toHaveBeenCalledOnce();
+});
+
+test("the collapsed rail keeps a Settings link under the avatar", async () => {
+  vi.mocked(getMe).mockResolvedValue(oauth("Ada Lovelace") as never);
+  renderWithQuery(<SidebarAccount collapsed />);
+  const avatar = await screen.findByRole("button", { name: "Account: Ada Lovelace" });
+  const settings = screen.getByRole("link", { name: "Settings" });
+  expect(settings.getAttribute("href")).toBe("/app/settings");
+  expect(avatar.compareDocumentPosition(settings) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+});
+
 test("the disclosure works from the keyboard", async () => {
   vi.mocked(getMe).mockResolvedValue(oauth("Ada Lovelace") as never);
   const user = userEvent.setup();
@@ -119,6 +147,11 @@ test("the disclosure works from the keyboard", async () => {
   expect(document.activeElement).toBe(profile);
   await user.keyboard("{Enter}");
   expect(profile.getAttribute("aria-expanded")).toBe("true");
+  // Name, then Settings, then the chevron, then the revealed Sign out.
+  await user.tab();
+  expect(document.activeElement).toBe(screen.getByRole("link", { name: "Settings" }));
+  await user.tab();
+  expect(document.activeElement).toBe(screen.getByRole("button", { name: "Account actions" }));
   await user.tab();
   expect(document.activeElement).toBe(screen.getByRole("button", { name: "Sign out" }));
   await user.keyboard("{Shift>}{Tab}{/Shift}");
