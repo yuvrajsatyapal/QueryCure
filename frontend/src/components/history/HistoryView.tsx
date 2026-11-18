@@ -25,6 +25,11 @@ export function HistoryView() {
   const [deleted, setDeleted] = useState<InvestigationSummary | null>(null);
   const params = { q: q.trim() || undefined, status: status || undefined, outcome: outcome || undefined, limit: PAGE };
   const filtered = Boolean(q.trim() || status || outcome);
+  const clearFilters = () => {
+    setQ("");
+    setStatus("");
+    setOutcome("");
+  };
 
   const list = useInfiniteQuery({
     queryKey: ["investigations", "list", params],
@@ -93,11 +98,7 @@ export function HistoryView() {
         {filtered ? (
           <button
             type="button"
-            onClick={() => {
-              setQ("");
-              setStatus("");
-              setOutcome("");
-            }}
+            onClick={clearFilters}
             className="qc-btn-ghost"
           >
             Clear filters
@@ -124,15 +125,23 @@ export function HistoryView() {
       ) : null}
       <ErrorNotice error={list.error ?? remove.error ?? undo.error} />
       {list.isSuccess && items.length === 0 ? (
-        <div className="qc-panel flex flex-col items-start gap-2 p-8">
-          <Icon name="history" size={20} className="text-faint" />
-          <p className="text-sm text-muted">
-            No investigations{filtered ? " match these filters" : " yet"}.{" "}
-            <Link href="/app/investigations/new" className="text-link">
+        <div className="qc-panel flex flex-col items-center gap-3 px-6 py-14 text-center">
+          <span className="flex size-10 items-center justify-center rounded-full border border-border bg-surface-2 text-faint">
+            <Icon name="history" size={18} />
+          </span>
+          <div className="flex flex-col gap-1">
+            <p className="text-sm font-medium">{filtered ? "No investigations match these filters" : "No investigations yet"}</p>
+            <p className="max-w-sm text-sm text-muted">
+              {filtered
+                ? "Try a different search, or clear the filters above."
+                : "Every investigation you run is listed here with its latest run."}
+            </p>
+          </div>
+          {filtered ? null : (
+            <Link href="/app/investigations/new" className="qc-btn-secondary">
               Start one
             </Link>
-            .
-          </p>
+          )}
         </div>
       ) : list.isPending ? (
         <p className="text-sm text-muted">Loading investigations…</p>
