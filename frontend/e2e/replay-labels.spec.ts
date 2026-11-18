@@ -1,5 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
-import { expect, test, type Page, type Response } from "@playwright/test";
+import { expect, test } from "./fixtures";
+import type { Page, Response } from "@playwright/test";
 import { applyTheme } from "./theme";
 
 /** History and Dashboard outcome labels on real local data (REPLAY_OUTCOME_AUDIT §18.1–§18.2): no

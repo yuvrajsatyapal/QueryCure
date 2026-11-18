@@ -1,4 +1,5 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test } from "./fixtures";
+import type { Page } from "@playwright/test";
 import { applyTheme } from "./theme";
 
 /** Layout regression (UI_UX §3.6, 2026-10-31). On short viewports the sidebar's nav shrank below

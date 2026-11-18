@@ -1,5 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test } from "./fixtures";
+import type { Page } from "@playwright/test";
 import fixtures from "../src/test/fixtures/report-v2.json";
 import { applyTheme } from "./theme";
 

@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures";
 
 /** Public demo (T5.5): prerecorded investigations are browsable without a database connection,
  * every page carries the prerecorded label, and the shipped digests check out. */

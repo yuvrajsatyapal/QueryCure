@@ -1,6 +1,5 @@
-import AxeBuilder from "@axe-core/playwright";
-import { expect, test, type Page } from "@playwright/test";
-import { applyTheme } from "./theme";
+import { expect, test } from "./fixtures";
+import type { Page } from "@playwright/test";
 
 /** The landing page reads the existing session (`/me`, `/auth/options`) and adapts its calls to action.
  * Sessions are mocked at our own API so the run is deterministic and needs no provider credentials; a real
@@ -79,82 +78,14 @@ test("landing auth - the sign-in options start the OAuth flow with the dashboard
   expect(new URL(logins[0] ?? "").searchParams.get("return_to")).toBe("/app");
 });
 
-for (const scheme of ["dark", "light"] as const) {
-  test(`landing auth - signed in: dashboard entry points and the account replace Get started (${scheme})`, async ({ page }) => {
-    const started = watchSessionStarts(page);
-    await mockSession(page, { signedIn: true });
-    for (const size of SIZES) {
-      await page.setViewportSize(size);
-      await page.goto("/");
-      await applyTheme(page, scheme);
-      const at = `${size.width}x${size.height} ${scheme}`;
-      await expect(hero(page).getByRole("link", { name: "Open dashboard" }), at).toHaveAttribute("href", "/app");
-      await expect(closing(page).getByRole("link", { name: "Open dashboard" }), at).toHaveAttribute("href", "/app");
-      await expect(page.locator("footer").getByRole("link", { name: "Dashboard" }), at).toHaveAttribute("href", "/app");
-      await expect(header(page).getByRole("img", { name: "Signed in as Ada Lovelace" }), at).toHaveText("AL");
-      await expect(header(page).getByRole("button", { name: "Sign out" }), at).toBeVisible();
-      await expect(page.getByRole("link", { name: /Get started|Sign in|Open QueryCure/ }), at).toHaveCount(0);
-      expect(await noSideways(page), `${at}: sideways overflow`).toBeLessThanOrEqual(0);
-    }
-    await page.setViewportSize({ width: 1440, height: 900 });
-    await page.goto("/");
-    await page.getByRole("heading", { level: 1 }).waitFor();
-    await expect(header(page).getByRole("button", { name: "Sign out" })).toBeVisible();
-    await applyTheme(page, scheme);
-    await page.waitForLoadState("networkidle");
-    // Contrast is only meaningful at rest, as in accessibility.spec.ts: the page keeps starting one-shot entrances
-    // and button colour transitions, so wait (polling) until none is running; looping ones never end, so skip them.
-    await page.waitForFunction(() => document.getAnimations().every((a) => a.playState !== "running" || a.effect?.getComputedTiming().iterations === Infinity), null, { timeout: 15_000 });
-    const result = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]).analyze();
-    expect(result.violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(" ")).join(" | ")}`)).toEqual([]);
-    expect(started).toEqual([]);
-  });
-}
-
-test("landing auth - sign out sends the CSRF token, then the page returns to its signed-out state without starting a session", async ({ page, context }) => {
-  const started = watchSessionStarts(page);
-  const session = { signedIn: true };
-  await mockSession(page, session);
-  await context.addCookies([{ name: "qc_csrf", value: "csrf-token-1", url: "http://localhost:3200" }]);
-  let csrf: string | undefined;
-  await page.route("**/api/v1/auth/logout", (route) => {
-    csrf = route.request().headers()["x-csrf-token"];
-    session.signedIn = false;
-    return route.fulfill({ status: 204 });
-  });
-  await page.setViewportSize({ width: 1440, height: 900 });
-  await page.goto("/");
-  await header(page).getByRole("button", { name: "Sign out" }).click();
-  await expect(hero(page).getByRole("link", { name: "Get started" })).toBeVisible();
-  await expect(header(page).getByRole("link", { name: "Sign in" })).toBeVisible();
-  await expect(page.getByRole("link", { name: /Open dashboard/ })).toHaveCount(0);
-  expect(csrf).toBe("csrf-token-1");
-  // Still on the landing page, with no anonymous session created behind it.
-  await expect(page).toHaveURL(/\/$/);
-  expect(started).toEqual([]);
-});
-
-test("landing auth - a failed sign-out keeps the account and says so", async ({ page }) => {
+// Signed-in visitors never see the marketing page (SignedInRedirect): they are sent to the dashboard.
+// The signed-in sign-out flow is covered on the app's sidebar in sidebar-auth.spec.ts.
+test("landing auth - signed in: the visitor is sent to the dashboard, not shown the landing page", async ({ page }) => {
   await mockSession(page, { signedIn: true });
-  await page.route("**/api/v1/auth/logout", (route) => route.abort("failed"));
-  await page.setViewportSize({ width: 375, height: 812 });
-  await page.goto("/");
-  await header(page).getByRole("button", { name: "Sign out" }).click();
-  await expect(page.getByRole("alert").filter({ hasText: "Sign-out failed" })).toBeVisible();
-  await expect(header(page).getByRole("img", { name: "Signed in as Ada Lovelace" })).toBeVisible();
-  expect(await noSideways(page)).toBeLessThanOrEqual(0);
-});
-
-test("landing auth - window focus picks up a sign-out that happened elsewhere", async ({ page }) => {
-  const session = { signedIn: true };
-  await mockSession(page, session);
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto("/");
-  await expect(hero(page).getByRole("link", { name: "Open dashboard" })).toBeVisible();
-  session.signedIn = false;
-  await page.evaluate(() => window.dispatchEvent(new Event("focus")));
-  await expect(hero(page).getByRole("link", { name: "Get started" })).toBeVisible();
-  await expect(page.getByRole("link", { name: /Open dashboard/ })).toHaveCount(0);
+  await expect(page).toHaveURL(/\/app$/);
+  await expect(page.locator("aside.sticky").getByText("Ada Lovelace")).toBeVisible();
 });
 
 test("landing auth - restricted trial: Sign in is the only way in", async ({ page }) => {

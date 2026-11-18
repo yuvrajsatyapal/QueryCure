@@ -1,5 +1,5 @@
 import AxeBuilder from "@axe-core/playwright";
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures";
 import { waitForShortcuts } from "./shortcuts";
 import { applyTheme } from "./theme";
 

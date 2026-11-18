@@ -1,5 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
-import { expect, test, type Locator, type Page } from "@playwright/test";
+import { expect, test } from "./fixtures";
+import type { Locator, Page } from "@playwright/test";
 import { applyTheme } from "./theme";
 
 /** Authentication UX (UI_UX §3.6, 2026-10-31, revised): a dedicated `/sign-in` page and inline
@@ -240,6 +241,8 @@ for (const scheme of ["dark", "light"] as const) {
       await expect(nav.getByRole("link", { name: "Settings" })).toHaveCount(1);
       await expect(page.getByRole("menu")).toHaveCount(0);
       for (const target of [settings, signOut, nav.getByRole("button", { name: /theme/i })]) {
+        // The sidebar scrolls on short viewports (sidebar-footer.spec.ts): the control must be reachable, not already in view.
+        await target.scrollIntoViewIfNeeded();
         await expect(target, `${at}: control off screen`).toBeInViewport({ ratio: 1 });
         expect(await onTop(target), `${at}: control covered`).toBe(true);
       }
@@ -273,8 +276,12 @@ test("sidebar auth - the collapsed rail shows Settings and an icon Sign out", as
     const aside = page.locator("aside.sticky");
     const signOut = aside.getByRole("button", { name: "Sign out" });
     await expect(signOut).toBeVisible();
+    // At 360px tall the rail scrolls; both controls must be reachable by scrolling it.
+    const settings = aside.getByRole("link", { name: "Settings" });
+    await signOut.scrollIntoViewIfNeeded();
     await expect(signOut).toBeInViewport({ ratio: 1 });
-    await expect(aside.getByRole("link", { name: "Settings" })).toBeInViewport({ ratio: 1 });
+    await settings.scrollIntoViewIfNeeded();
+    await expect(settings).toBeInViewport({ ratio: 1 });
     expect(await onTop(signOut)).toBe(true);
     expect(await noSideways(page)).toBeLessThanOrEqual(0);
   } finally {

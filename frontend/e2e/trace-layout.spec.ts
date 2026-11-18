@@ -1,4 +1,5 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test } from "./fixtures";
+import type { Page } from "@playwright/test";
 import { advanceTo } from "./wizard";
 
 /** Layout regression (UI_UX §3.6, 2026-10-27): a step that is not "done" carries a screen-reader
