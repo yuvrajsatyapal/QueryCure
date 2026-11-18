@@ -125,9 +125,9 @@ test("run outcomes count only concluded runs, in words with an icon", async () =
   ];
   renderWithQuery(<DashboardView />);
   const panel = await screen.findByRole("region", { name: "Run outcomes" });
-  expect(await within(panel).findByText(/^3 concluded · latest run of each of the 25 most recent investigations, not a time window\./)).toBeDefined();
+  expect(await within(panel).findByText(/^3 finished · based on the latest run of each of your last 25 investigations\./)).toBeDefined();
   // A sample of recent investigations, never presented as the 24-hour window the active panel uses.
-  expect(within(panel).getByText("Sample · 25 most recent")).toBeDefined();
+  expect(within(panel).getByText("Last 25 investigations")).toBeDefined();
   expect(within(panel).queryByText(/24 h/)).toBeNull();
   expect(within(panel).getByRole("img", { name: "1 Verified recommendation, 1 Inconclusive, 1 Failed" })).toBeDefined();
 });

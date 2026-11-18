@@ -222,8 +222,8 @@ function OutcomesPanel({ items, failed }: { items: InvestigationSummary[]; faile
         <h2 id="dash-outcomes" className="qc-section-title">
           Run outcomes
         </h2>
-        <span className="ml-auto text-[13px] text-muted" title={`Latest run of each of the ${RECENT_LIMIT} most recent investigations, whenever it finished`}>
-          Sample · {RECENT_LIMIT} most recent
+        <span className="ml-auto text-[13px] text-muted" title={`Latest run of each of your ${RECENT_LIMIT} most recent investigations, whenever it finished`}>
+          Last {RECENT_LIMIT} investigations
         </span>
       </div>
       {failed ? (
@@ -248,15 +248,16 @@ function OutcomesPanel({ items, failed }: { items: InvestigationSummary[]; faile
               </ul>
             </>
           ) : (
-            <p className="text-sm text-muted">No concluded runs yet. Outcomes appear here once a run finishes.</p>
+            <p className="text-sm text-muted">No finished runs yet. Results appear after your first investigation completes.</p>
           )}
           <div className="mt-auto flex items-baseline gap-2 border-t border-border pt-3">
             <span className="qc-label">Median run time</span>
             <span className="ml-auto font-mono text-base font-medium">{median ? formatDuration(median.ms) : "—"}</span>
           </div>
           <p className="-mt-1.5 text-xs text-muted">
-            {b.total ? `${b.total} concluded` : "None concluded"} · latest run of each of the {RECENT_LIMIT} most recent investigations, not a time window.
-            {median ? ` Median of ${median.n} completed run${median.n === 1 ? "" : "s"}.` : " No completed runs with timestamps."}
+            {b.total
+              ? `${b.total} finished · based on the latest run of each of your last ${RECENT_LIMIT} investigations.${median ? ` Median of ${median.n} completed run${median.n === 1 ? "" : "s"}.` : " No completed runs with timestamps."}`
+              : "Needs at least one finished run."}
           </p>
         </div>
       )}
