@@ -1,0 +1,307 @@
+<!doctype html>
+<html lang="en" class="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sign-in page — prototype</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  /* Tokens from frontend/src/styles/tokens.css and DESIGN_SYSTEM §2. No gradients, glow or shadows. */
+  :root{--bg:#fbfbfc;--sidebar:#f4f5f6;--surface:#fff;--surface-2:#f2f3f5;--hover:#eceef1;--border:#e1e4e8;--border-strong:#cbcfd6;--ink:#16171a;--muted:#565b68;--faint:#8b909b;--accent:#0a6f6a;--accent-tint:rgba(10,111,106,.08);--accent-fg:#fff;--verified:#1e7240;--rejected:#b3261e;--inconclusive:#8f5300;--approval:#6a46cc;--running:#1f5fbf}
+  .dark{--bg:#08090a;--sidebar:#0d0e10;--surface:#111214;--surface-2:#17181b;--hover:#1d1f22;--border:#232529;--border-strong:#34373d;--ink:#f2f3f5;--muted:#9aa0ab;--faint:#636873;--accent:#3cc3b4;--accent-tint:rgba(60,195,180,.12);--accent-fg:#06211f;--verified:#5bc584;--rejected:#f2837a;--inconclusive:#e0a84a;--approval:#b39cff;--running:#6ea8fe}
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{background:var(--bg);color:var(--ink);font:14px/22px Inter,system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+  .mono{font-family:"JetBrains Mono",ui-monospace,monospace}
+  button,a{font:inherit}
+  :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+  /* ---- prototype controls (not part of the design) ---- */
+  .proto{position:fixed;z-index:20;left:50%;bottom:14px;transform:translateX(-50%);display:flex;flex-wrap:wrap;gap:6px 14px;justify-content:center;max-width:96vw;padding:8px 10px;background:var(--surface);border:1px solid var(--border-strong);border-radius:10px;font-size:12px}
+  .proto .grp{display:flex;align-items:center;gap:4px}
+  .proto .lbl{color:var(--faint);margin-right:2px}
+  .proto button{color:var(--muted);background:transparent;border:1px solid transparent;border-radius:6px;padding:3px 8px;cursor:pointer}
+  .proto button:hover{color:var(--ink);background:var(--hover)}
+  .proto button[aria-pressed=true]{color:var(--ink);background:var(--surface-2);border-color:var(--border-strong)}
+
+  /* ---- shared pieces ---- */
+  .page{min-height:100dvh;display:flex;flex-direction:column;padding-bottom:64px}
+  .top{height:56px;display:flex;align-items:center;justify-content:space-between;padding:0 20px;flex:none}
+  .ghost{display:inline-flex;align-items:center;gap:8px;height:36px;padding:0 10px;border-radius:6px;color:var(--muted);text-decoration:none;border:0;background:none;cursor:pointer}
+  .ghost:hover{background:var(--hover);color:var(--ink)}
+  .ghost svg,.ico{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:none}
+  .mark{display:block;overflow:visible;color:var(--ink)}
+  .wordmark{display:flex;align-items:center;gap:10px;font-weight:600;letter-spacing:-.01em}
+
+  h1{font-size:24px;line-height:32px;font-weight:600;letter-spacing:-.02em;margin:0}
+  .lede{color:var(--muted);margin:8px 0 0}
+  .tag{display:inline-flex;align-items:center;gap:6px;height:22px;padding:0 8px;border-radius:4px;background:var(--surface-2);border:1px solid var(--border);color:var(--muted);font-size:12px;line-height:1}
+  .tag .ico{width:12px;height:12px;stroke:var(--accent)}
+  .eyebrow{font:500 12px/16px "JetBrains Mono",monospace;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+
+  .prov{display:flex;flex-direction:column;gap:10px}
+  .btn{position:relative;display:flex;align-items:center;justify-content:center;gap:10px;height:44px;width:100%;padding:0 14px;border-radius:6px;border:1px solid var(--border-strong);background:var(--surface-2);color:var(--ink);font-weight:500;text-decoration:none;cursor:pointer;transition:background .12s,border-color .12s}
+  .btn:hover{background:var(--hover);border-color:var(--faint)}
+  .btn .go{position:absolute;right:14px;color:var(--faint);opacity:0;transform:translateX(-3px);transition:opacity .12s,transform .12s}
+  .btn:hover .go{opacity:1;transform:none}
+  .btn[aria-disabled=true]{opacity:.6;cursor:default;pointer-events:none}
+  .btn svg.p{width:17px;height:17px;flex:none}
+  .spin{width:15px;height:15px;border-radius:50%;border:2px solid var(--border-strong);border-top-color:var(--accent);animation:spin .8s linear infinite;flex:none}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .skel{height:44px;border-radius:6px;background:var(--surface-2);animation:pulse 1.4s ease-in-out infinite}
+  @keyframes pulse{50%{opacity:.55}}
+  .alert{display:flex;gap:10px;margin:20px 0 0;padding:12px;border-radius:6px;border:1px solid color-mix(in srgb,var(--rejected) 40%,transparent);background:var(--surface-2);color:var(--rejected);font-size:13px;line-height:20px}
+  .alert .ico{margin-top:2px}
+  .alert b{font-weight:600}
+  .alert span{color:var(--muted)}
+  .alert.info{border-color:var(--border-strong);color:var(--ink)}
+  .alert.info .ico{stroke:var(--inconclusive)}
+  .note{display:flex;gap:10px;color:var(--muted);font-size:12px;line-height:18px}
+  .note .ico{margin-top:2px;color:var(--faint)}
+  .trust{list-style:none;margin:0;padding:0;display:grid;gap:10px}
+  .trust li{display:flex;gap:10px;color:var(--muted);font-size:12px;line-height:18px}
+  .trust .ico{margin-top:2px;stroke:var(--accent)}
+  .trust b{color:var(--ink);font-weight:500}
+  .retry{margin-top:10px;width:100%;height:40px;border-radius:6px;border:1px solid var(--border-strong);background:var(--surface-2);color:var(--ink);font-weight:500;cursor:pointer}
+  .signout{margin-top:10px;width:100%;height:40px;border-radius:6px;border:0;background:none;color:var(--muted);cursor:pointer}
+  .signout:hover{background:var(--hover);color:var(--ink)}
+
+  /* ---- Variant A: refined centred column ---- */
+  .A main{flex:1;display:flex;align-items:center;justify-content:center;padding:24px 16px 6vh}
+  .A .col{width:100%;max-width:380px}
+  .A .col{text-align:center}
+  .A .head{display:flex;justify-content:center;margin-bottom:24px}
+  .A .trust,.A .alert{text-align:left}
+  .A h1{margin-top:0;font-size:28px;line-height:36px;letter-spacing:-.025em;text-wrap:balance}
+  .A .lede{margin:10px auto 0;max-width:320px;font-size:15px;line-height:24px;text-wrap:balance}
+  .A .lede em{font-style:normal;color:var(--ink)}
+  /* Logo: ring and tail draw in as a trace, the accent point lands last, then breathes slowly. */
+  /* Story: the trace is drawn, reaches its end, and the accent point lands = a verified result.
+     It then pings once in a while, like a probe confirming the connection. */
+  .A .anim{animation:rise .6s cubic-bezier(.2,.7,.2,1) both}
+  .A .anim .ring{stroke-dasharray:1;stroke-dashoffset:1;transform-box:view-box;transform-origin:16px 16px;animation:draw 1s cubic-bezier(.65,0,.25,1) .15s forwards,spin 1s cubic-bezier(.65,0,.25,1) .15s both}
+  .A .anim .tail{stroke-dasharray:1;stroke-dashoffset:1;animation:draw .3s cubic-bezier(.4,0,.2,1) 1s forwards}
+  .A .anim .dot{transform-box:fill-box;transform-origin:center;opacity:0;animation:land .5s cubic-bezier(.2,1.8,.4,1) 1.3s forwards}
+  .A .anim .ripple{fill:none;stroke:var(--accent);stroke-width:1.2;transform-box:fill-box;transform-origin:center;opacity:0;animation:ping 1.4s cubic-bezier(.2,.6,.3,1) 1.55s 1 both,ping 1.4s cubic-bezier(.2,.6,.3,1) 5.2s infinite both;animation-delay:1.55s,5.2s}
+  @keyframes rise{from{opacity:0;transform:scale(.92)}to{opacity:1;transform:none}}
+  @keyframes spin{from{transform:rotate(-70deg)}to{transform:rotate(0)}}
+  @keyframes draw{to{stroke-dashoffset:0}}
+  @keyframes land{from{opacity:0;transform:scale(0)}to{opacity:1;transform:scale(1)}}
+  @keyframes ping{0%{opacity:.7;transform:scale(1)}100%{opacity:0;transform:scale(2.2)}}
+  @media (prefers-reduced-motion:reduce){.A .anim,.A .anim .ring,.A .anim .tail{animation:none;stroke-dashoffset:0}.A .anim .dot{animation:none;opacity:1}.A .anim .ripple{animation:none}}
+  .A .prov{margin-top:28px}
+  .A .or{margin:28px 0 0;padding-top:20px;border-top:1px solid var(--border)}
+
+  /* ---- Variant B: split with product panel ---- */
+  .B .split{flex:1;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.1fr)}
+  .B .left{display:flex;flex-direction:column;padding:20px 24px}
+  .B .left .mid{flex:1;display:flex;align-items:center;justify-content:center;padding:24px 0}
+  .B .col{width:100%;max-width:360px}
+  .B .right{background:var(--sidebar);border-left:1px solid var(--border);display:flex;align-items:center;justify-content:center;padding:40px}
+  .B .right .in{width:100%;max-width:480px}
+  .B .right h2{font-size:20px;line-height:28px;font-weight:600;letter-spacing:-.015em;margin:10px 0 6px}
+  .B .right p{margin:0;color:var(--muted)}
+  .trace{margin-top:24px;border:1px solid var(--border);background:var(--surface);border-radius:8px;overflow:hidden}
+  .trace .hd{display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border-bottom:1px solid var(--border);font-size:12px;color:var(--muted)}
+  .trace .row{display:flex;align-items:center;gap:12px;height:44px;padding:0 14px;border-bottom:1px solid var(--border)}
+  .trace .row:last-child{border-bottom:0}
+  .trace .nm{font:500 13px/20px "JetBrains Mono",monospace}
+  .trace .ds{margin-left:auto;color:var(--faint);font-size:12px}
+  .st{width:16px;height:16px;flex:none;display:grid;place-items:center}
+  .st svg{width:16px;height:16px;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+  .st.ok svg{stroke:var(--verified)} .st.ap svg{stroke:var(--approval)} .st.rn svg{stroke:var(--running)} .st.ac svg{stroke:var(--accent)}
+  .trace .row.gate{background:color-mix(in srgb,var(--approval) 7%,transparent)}
+  .trace .foot{padding:10px 14px;border-top:1px solid var(--border);font-size:12px;color:var(--faint);background:var(--surface-2)}
+  .B .right .tag{margin-top:16px}
+
+  /* ---- Variant C: bordered panel ---- */
+  .C main{flex:1;display:flex;align-items:center;justify-content:center;padding:24px 16px 6vh}
+  .C .panel{width:100%;max-width:420px;border:1px solid var(--border);background:var(--surface);border-radius:8px}
+  .C .ph{display:flex;align-items:center;justify-content:space-between;padding:0 20px;min-height:48px;border-bottom:1px solid var(--border)}
+  .C .pb{padding:24px 20px 20px}
+  .C .pf{padding:14px 20px;border-top:1px solid var(--border);background:var(--surface-2);border-radius:0 0 8px 8px}
+  .C h1{font-size:20px;line-height:28px;margin-top:0}
+  .C .prov{margin-top:22px}
+  .C .btn{background:var(--surface)}
+  .C .btn:hover{background:var(--hover)}
+  .C .pb .note{margin-top:20px}
+
+  .V{display:none}
+  body[data-v=A] .A,body[data-v=B] .B,body[data-v=C] .C{display:flex}
+  .hide-trial .trialline{display:none!important}
+
+  @media (max-width:860px){
+    .B .split{grid-template-columns:1fr}
+    .B .right{display:none}
+  }
+  @media (prefers-reduced-motion:reduce){.spin,.skel{animation:none}.btn,.btn .go{transition:none}}
+</style>
+</head>
+<body data-v="A">
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="mark" viewBox="0 0 32 32">
+      <g fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M22.43 12.25A9.5 9.5 0 1 1 17.52 6.89"/><path d="M17.1 19.1L21.4 23.4H23.2"/></g>
+      <circle cx="25.7" cy="23.4" r="2.6" fill="var(--accent)"/>
+    </symbol>
+    <symbol id="google" viewBox="0 0 24 24"><path fill="#4285F4" d="M23.5 12.27c0-.85-.08-1.67-.22-2.45H12v4.64h6.46a5.52 5.52 0 0 1-2.4 3.62v3h3.88c2.27-2.09 3.56-5.17 3.56-8.81z"/><path fill="#34A853" d="M12 24c3.24 0 5.96-1.07 7.94-2.91l-3.88-3a7.2 7.2 0 0 1-10.7-3.78H1.35v3.09A12 12 0 0 0 12 24z"/><path fill="#FBBC05" d="M5.36 14.31a7.2 7.2 0 0 1 0-4.62V6.6H1.35a12 12 0 0 0 0 10.8l4.01-3.09z"/><path fill="#EA4335" d="M12 4.77c1.76 0 3.34.61 4.59 1.8l3.44-3.44A11.5 11.5 0 0 0 12 0 12 12 0 0 0 1.35 6.6l4.01 3.09A7.2 7.2 0 0 1 12 4.77z"/></symbol>
+    <symbol id="github" viewBox="0 0 24 24"><path fill="currentColor" d="M12 .3a12 12 0 0 0-3.8 23.4c.6.1.8-.3.8-.6v-2c-3.3.7-4-1.6-4-1.6-.6-1.4-1.4-1.8-1.4-1.8-1-.7.1-.7.1-.7 1.2.1 1.8 1.2 1.8 1.2 1 1.8 2.8 1.3 3.5 1 .1-.8.4-1.3.7-1.6-2.7-.3-5.5-1.3-5.5-5.9 0-1.3.5-2.4 1.2-3.2-.1-.3-.5-1.5.1-3.2 0 0 1-.3 3.3 1.2a11.5 11.5 0 0 1 6 0c2.3-1.5 3.3-1.2 3.3-1.2.7 1.7.2 2.9.1 3.2.8.8 1.2 1.9 1.2 3.2 0 4.6-2.8 5.6-5.5 5.9.4.4.8 1.1.8 2.2v3.3c0 .3.2.7.8.6A12 12 0 0 0 12 .3z"/></symbol>
+  </defs>
+</svg>
+
+<div class="proto" role="toolbar" aria-label="Prototype controls">
+  <div class="grp"><span class="lbl">Layout</span>
+    <button data-v="A" aria-pressed="true">A · Centred</button>
+    <button data-v="B" aria-pressed="false">B · Split</button>
+    <button data-v="C" aria-pressed="false">C · Panel</button></div>
+  <div class="grp"><span class="lbl">State</span>
+    <button data-s="default" aria-pressed="true">Default</button>
+    <button data-s="loading" aria-pressed="false">Loading</button>
+    <button data-s="redirect" aria-pressed="false">Redirecting</button>
+    <button data-s="denied" aria-pressed="false">Not approved</button>
+    <button data-s="cancel" aria-pressed="false">Cancelled</button>
+    <button data-s="error" aria-pressed="false">API down</button></div>
+  <div class="grp"><span class="lbl">Deploy</span>
+    <button data-t="1" aria-pressed="true">Restricted trial</button>
+    <button data-t="0" aria-pressed="false">Open</button></div>
+  <div class="grp"><button id="theme">Light / dark</button></div>
+</div>
+
+<!-- ======================= A · Centred ======================= -->
+<div class="page V A">
+  <header class="top">
+    <a class="ghost" href="#"><svg class="ico" viewBox="0 0 24 24"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>Back to QueryCure</a>
+  </header>
+  <main>
+    <div class="col">
+      <div class="head">
+        <svg class="mark anim" width="56" height="56" viewBox="0 0 32 32" aria-hidden="true">
+          <g fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+            <path class="ring" pathLength="1" d="M22.43 12.25A9.5 9.5 0 1 1 17.52 6.89"/>
+            <path class="tail" pathLength="1" d="M17.1 19.1L21.4 23.4H23.2"/>
+          </g>
+          <circle class="ripple" cx="25.7" cy="23.4" r="2.6"/>
+          <circle class="dot" cx="25.7" cy="23.4" r="2.6" fill="var(--accent)"/>
+        </svg>
+      </div>
+      <h1>Sign in to QueryCure</h1>
+      <p class="lede">Find out <em>why</em> a query is slow, approve the experiments, and keep the proof.</p>
+      <p class="trialline" style="margin:14px 0 0"><span class="tag"><svg class="ico" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>Private trial · approved accounts only</span></p>
+      <div data-slot="notice"></div>
+      <div class="prov" data-slot="providers"></div>
+      <div class="or">
+        <ul class="trust">
+          <li><svg class="ico" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg><span><b>No password.</b> Google or GitHub confirms who you are.</span></li>
+          <li><svg class="ico" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg><span><b>Right back where you were.</b> You return to the page you came from.</span></li>
+        </ul>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- ======================= B · Split ======================= -->
+<div class="page V B">
+  <div class="split">
+    <section class="left">
+      <header class="top" style="padding:0;height:36px">
+        <a class="ghost" href="#" style="margin-left:-10px"><svg class="ico" viewBox="0 0 24 24"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>Back</a>
+      </header>
+      <div class="mid">
+        <div class="col">
+          <div class="wordmark"><svg class="mark" width="28" height="28"><use href="#mark"/></svg>QueryCure</div>
+          <h1 style="margin-top:36px">Sign in</h1>
+          <p class="lede">Pick up your investigations and database connections.</p>
+          <div data-slot="notice"></div>
+          <div class="prov" data-slot="providers" style="margin-top:28px"></div>
+          <p class="note" style="margin-top:24px"><svg class="ico" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg><span>QueryCure never sees your password. Google or GitHub confirms who you are, and you come back to where you left off.</span></p>
+        </div>
+      </div>
+    </section>
+    <aside class="right" aria-label="What QueryCure does">
+      <div class="in">
+        <span class="eyebrow">How an investigation runs</span>
+        <h2>Evidence first, one human gate.</h2>
+        <p>Every finding cites its evidence. Nothing runs against your data until you approve it.</p>
+        <div class="trace" role="img" aria-label="Investigation stages: inspect, hypothesize, approve, benchmark, verify, report">
+          <div class="hd"><span>Investigation</span><span class="mono">stages</span></div>
+          <div class="row"><span class="st ok"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/></svg></span><span class="nm">inspect</span><span class="ds">plan, schema, statistics</span></div>
+          <div class="row"><span class="st ok"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/></svg></span><span class="nm">hypothesize</span><span class="ds">each cites evidence</span></div>
+          <div class="row gate"><span class="st ap"><svg viewBox="0 0 24 24"><path d="M18 11V6a2 2 0 0 0-4 0v5M14 10V4a2 2 0 0 0-4 0v7M10 10.5V6a2 2 0 0 0-4 0v8l-1.5-1.5a2 2 0 0 0-3 2.6L6 21h9a5 5 0 0 0 5-5v-5a2 2 0 0 0-4 0"/></svg></span><span class="nm">approve</span><span class="ds" style="color:var(--approval)">waits for you</span></div>
+          <div class="row"><span class="st rn"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" stroke-dasharray="2 3"/></svg></span><span class="nm">benchmark</span><span class="ds">disposable sandbox</span></div>
+          <div class="row"><span class="st ac"><svg viewBox="0 0 24 24"><path d="M12 3l2.5 2 3.2-.3.9 3.1 2.7 1.8-1.2 3 1.2 3-2.7 1.8-.9 3.1-3.2-.3L12 21l-2.5-2-3.200.3-.9-3.100L2.700 14.400 3.900 11.400 2.700 8.400l2.700-1.800.9-3.100 3.200.3z" transform="scale(.9) translate(1.3 1.3)"/><path d="M9 12l2 2 4-4"/></svg></span><span class="nm">verify · report</span><span class="ds">deterministic rules</span></div>
+          <div class="foot">Illustrative: shows the stages, not a real run.</div>
+        </div>
+        <p class="tag trialline"><svg class="ico" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>Private trial · approved accounts only</p>
+      </div>
+    </aside>
+  </div>
+</div>
+
+<!-- ======================= C · Panel ======================= -->
+<div class="page V C">
+  <header class="top">
+    <a class="ghost" href="#"><svg class="ico" viewBox="0 0 24 24"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>Back to QueryCure</a>
+  </header>
+  <main>
+    <div class="panel">
+      <div class="ph">
+        <div class="wordmark"><svg class="mark" width="22" height="22"><use href="#mark"/></svg>QueryCure</div>
+        <span class="tag trialline">Private trial</span>
+      </div>
+      <div class="pb">
+        <h1>Welcome back</h1>
+        <p class="lede">Sign in to manage your investigations and database connections.</p>
+        <div data-slot="notice"></div>
+        <div class="prov" data-slot="providers"></div>
+        <p class="trialline note"><svg class="ico" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8v4M12 16h.01"/></svg><span>This trial is limited to approved accounts.</span></p>
+      </div>
+      <div class="pf note"><svg class="ico" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg><span>QueryCure never sees your password. Google or GitHub confirms who you are, and you come back to where you left off.</span></div>
+    </div>
+  </main>
+</div>
+
+<script>
+const arrow='<svg class="ico go" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg>';
+const provider=(id,label,state)=>{
+  const ic=id==='google'?'<svg class="p"><use href="#google"/></svg>':'<svg class="p"><use href="#github"/></svg>';
+  if(state==='redirect'){
+    const me=id==='google';
+    return `<a class="btn" href="#" aria-disabled="true">${me?'<span class="spin"></span>':ic}${me?'Redirecting to Google…':'Continue with GitHub'}</a>`;
+  }
+  return `<a class="btn" href="#">${ic}Continue with ${label}${arrow}</a>`;
+};
+const notices={
+  denied:`<div class="alert" role="alert"><svg class="ico" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8v4M12 16h.01"/></svg><div><b>This account isn't approved for the trial yet.</b><br><span>Sign in with another account, or ask the owner to add yours.</span></div></div>`,
+  cancel:`<div class="alert info" role="alert"><svg class="ico" viewBox="0 0 24 24"><path d="M10.3 3.9L1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0zM12 9v4M12 17h.01"/></svg><div><b>Sign-in was cancelled.</b><br><span>Nothing changed. Try again whenever you're ready.</span></div></div>`
+};
+let st={v:'A',s:'default',t:1};
+function render(){
+  document.body.dataset.v=st.v;
+  document.body.classList.toggle('hide-trial',!st.t);
+  document.querySelectorAll('[data-slot=providers]').forEach(el=>{
+    if(st.s==='loading') el.innerHTML='<div class="skel"></div><div class="skel"></div>';
+    else if(st.s==='error') el.innerHTML='<div class="alert" style="margin:0"><svg class="ico" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8v4M12 16h.01"/></svg><div><b>Cannot reach QueryCure right now.</b><br><span>Check your connection and try again.</span></div></div><button class="retry">Try again</button>';
+    else el.innerHTML=provider('google','Google',st.s)+provider('github','GitHub',st.s)+(st.s==='denied'?'<button class="signout">Sign out</button>':'');
+  });
+  document.querySelectorAll('[data-slot=notice]').forEach(el=>el.innerHTML=notices[st.s]||'');
+  document.querySelectorAll('.proto button[data-v]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.v===st.v));
+  document.querySelectorAll('.proto button[data-s]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.s===st.s));
+  document.querySelectorAll('.proto button[data-t]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.t==String(st.t)));
+}
+document.querySelector('.proto').addEventListener('click',e=>{
+  const b=e.target.closest('button');if(!b)return;
+  if(b.dataset.v)st.v=b.dataset.v;
+  if(b.dataset.s)st.s=b.dataset.s;
+  if(b.dataset.t)st.t=+b.dataset.t;
+  if(b.id==='theme')document.documentElement.classList.toggle('dark');
+  render();
+});
+// Click the logo (or pick layout A again) to replay the intro.
+const replay=()=>{const m=document.querySelector('.A .mark.anim');m.classList.remove('anim');void m.getBoundingClientRect();m.classList.add('anim')};
+document.querySelector('.A .mark.anim').addEventListener('click',replay);
+document.querySelector('.proto [data-v=A]').addEventListener('click',()=>setTimeout(replay));
+render();
+</script>
+</body>
+</html>

@@ -7,7 +7,7 @@ import { useEffect, useState } from "react";
 import { ErrorNotice } from "@/components/common/ErrorNotice";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import { Icon } from "@/components/ui/Icon";
-import { Logo } from "@/components/ui/Logo";
+import { SignInMark } from "@/components/auth/SignInMark";
 import { ProviderIcon, type Provider } from "@/components/ui/ProviderIcon";
 import { API_BASE_URL, ApiError } from "@/lib/api/client";
 import { getAuthOptions, getMe, logout } from "@/lib/api/session";
@@ -121,21 +121,42 @@ export function SignInView({ next, authError }: { next: string | null; authError
       </header>
       {/* Centred, slightly above the middle; on a short screen the content just grows the page. */}
       <main className="flex flex-1 items-center justify-center px-4 pt-6 pb-[12vh] sm:pt-0 sm:pb-[10vh]">
-        <div className="w-full max-w-[380px]">
-          <Logo size={36} />
-          <h1 className="mt-6 text-2xl font-semibold tracking-tight text-ink">Welcome to QueryCure</h1>
-          <p className="mt-2 text-sm leading-relaxed text-muted">Sign in to manage your investigations and database connections.</p>
-          {restricted ? <p className="mt-1 text-sm leading-relaxed text-muted">This trial is limited to approved accounts.</p> : null}
+        <div className="w-full max-w-[380px] text-center">
+          <div className="mb-6 flex justify-center">
+            <SignInMark />
+          </div>
+          <h1 className="text-balance text-[28px] leading-9 font-semibold tracking-tight text-ink">Sign in to QueryCure</h1>
+          <p className="mx-auto mt-2.5 max-w-80 text-balance text-[15px] leading-6 text-muted">
+            Find out <em className="text-ink not-italic">why</em> a query is slow, approve the experiments, and keep the proof.
+          </p>
+          {restricted ? (
+            <p className="mt-3.5">
+              <span className="qc-tag gap-1.5">
+                <Icon name="lock" size={12} className="text-accent" />
+                Private trial · approved accounts only
+              </span>
+            </p>
+          ) : null}
           {notice ? (
-            <p role="alert" className="mt-6 rounded-md border border-rejected/40 bg-surface-2 p-3 text-sm text-rejected">
+            <p role="alert" className="mt-6 rounded-md border border-rejected/40 bg-surface-2 p-3 text-left text-sm text-rejected">
               {notice}
             </p>
           ) : null}
-          <div className="mt-8">{body}</div>
-          <p className="mt-8 flex gap-2.5 border-t border-border pt-5 text-xs leading-relaxed text-muted">
-            <Icon name="lock" size={14} className="mt-px shrink-0 text-faint" />
-            <span>QueryCure never sees your password. Google or GitHub confirms who you are, and you come back to where you left off.</span>
-          </p>
+          <div className="mt-7 text-left">{body}</div>
+          <ul className="mt-7 grid gap-2.5 border-t border-border pt-5 text-left text-xs leading-[18px] text-muted">
+            <li className="flex gap-2.5">
+              <Icon name="check" size={14} className="mt-0.5 shrink-0 text-accent" />
+              <span>
+                <b className="font-medium text-ink">No password.</b> Google or GitHub confirms who you are.
+              </span>
+            </li>
+            <li className="flex gap-2.5">
+              <Icon name="check" size={14} className="mt-0.5 shrink-0 text-accent" />
+              <span>
+                <b className="font-medium text-ink">Right back where you were.</b> You return to the page you came from.
+              </span>
+            </li>
+          </ul>
         </div>
       </main>
     </div>

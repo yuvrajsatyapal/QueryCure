@@ -129,7 +129,7 @@ for (const scheme of ["dark", "light"] as const) {
       await signIn.click();
 
       await expect(page).toHaveURL(/\/sign-in\?next=%2Fapp%2Fhistory$/);
-      await expect(page.getByRole("heading", { level: 1, name: "Welcome to QueryCure" })).toBeVisible();
+      await expect(page.getByRole("heading", { level: 1, name: "Sign in to QueryCure" })).toBeVisible();
       await expect(page.getByRole("dialog")).toHaveCount(0);
       await expect(page.getByRole("menu")).toHaveCount(0);
       for (const name of ["Continue with Google", "Continue with GitHub", "Back to QueryCure"]) {
@@ -196,8 +196,8 @@ test("sign-in page - a restricted trial sends gated pages to the same sign-in pa
   await page.setViewportSize({ width: 375, height: 667 });
   await page.goto("/app/history");
   await expect(page).toHaveURL(/\/sign-in\?next=%2Fapp%2Fhistory$/);
-  await expect(page.getByRole("heading", { level: 1, name: "Welcome to QueryCure" })).toBeVisible();
-  await expect(page.getByText("This trial is limited to approved accounts.")).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Sign in to QueryCure" })).toBeVisible();
+  await expect(page.getByText("Private trial · approved accounts only")).toBeVisible();
   const href = await page.getByRole("link", { name: "Continue with Google" }).getAttribute("href");
   expect(new URL(href ?? "").searchParams.get("return_to")).toBe("/app/history");
   await expect(page.getByRole("link", { name: "Back to QueryCure" })).toHaveAttribute("href", "/");

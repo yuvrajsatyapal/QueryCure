@@ -60,7 +60,7 @@ test("landing auth - signed out: the calls to action lead into the existing sign
   await header(page).getByRole("link", { name: "Sign in" }).click();
   // The bare page: the API's own default destination (the dashboard) applies after sign-in.
   await expect(page).toHaveURL(/\/sign-in$/);
-  await expect(page.getByRole("heading", { level: 1, name: "Welcome to QueryCure" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Sign in to QueryCure" })).toBeVisible();
   expect(started).toEqual([]);
 });
 

@@ -32,13 +32,13 @@ afterEach(() => {
 
 test("the page explains itself and offers each configured provider through the existing login routes", async () => {
   renderWithQuery(<SignInView next="/app/history" authError={null} />);
-  expect(screen.getByRole("heading", { level: 1, name: "Welcome to QueryCure" })).toBeDefined();
-  expect(screen.getByText("Sign in to manage your investigations and database connections.")).toBeDefined();
+  expect(screen.getByRole("heading", { level: 1, name: "Sign in to QueryCure" })).toBeDefined();
+  expect(screen.getByText((_, el) => el?.tagName === "P" && el.textContent === "Find out why a query is slow, approve the experiments, and keep the proof.")).toBeDefined();
   const google = await screen.findByRole("link", { name: "Continue with Google" });
   const github = screen.getByRole("link", { name: "Continue with GitHub" });
   expect(google.getAttribute("href")).toBe(login("google", "/app/history"));
   expect(github.getAttribute("href")).toBe(login("github", "/app/history"));
-  expect(screen.getByText(/never sees your password/)).toBeDefined();
+  expect(screen.getByText(/No password/)).toBeDefined();
   expect(screen.getByRole("link", { name: "Back to QueryCure" }).getAttribute("href")).toBe("/app/history");
   expect(screen.queryByRole("dialog")).toBeNull();
 });
@@ -143,7 +143,7 @@ test("starting a sign-in remembers where to return, for when the provider sends 
 test("a restricted trial says so, and Back leaves for the public page instead of the gated app", async () => {
   vi.mocked(getAuthOptions).mockResolvedValue({ ...both, restrictedAccess: true });
   renderWithQuery(<SignInView next="/app/history" authError={null} />);
-  expect(await screen.findByText("This trial is limited to approved accounts.")).toBeDefined();
+  expect(await screen.findByText("Private trial · approved accounts only")).toBeDefined();
   expect(screen.getByRole("link", { name: "Back to QueryCure" }).getAttribute("href")).toBe("/");
   expect(screen.getByRole("link", { name: "Continue with Google" }).getAttribute("href")).toBe(login("google", "/app/history"));
 });
@@ -180,4 +180,12 @@ test("opening a provider in another tab leaves this page usable", async () => {
   }
   expect(screen.getByRole("link", { name: "Continue with Google" }).getAttribute("aria-disabled")).toBeNull();
   expect(screen.getByRole("link", { name: "Continue with GitHub" }).getAttribute("aria-disabled")).toBeNull();
+});
+
+test("the animated mark is decorative and the page keeps a single h1", async () => {
+  const { container } = renderWithQuery(<SignInView next={null} authError={null} />);
+  await screen.findByRole("link", { name: "Continue with Google" });
+  const mark = container.querySelector("svg.qc-signin-mark");
+  expect(mark?.getAttribute("aria-hidden")).toBe("true");
+  expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
 });
