@@ -10,7 +10,7 @@ export default function DemoLayout({ children }: { children: ReactNode }) {
   return (
     <div className="flex min-h-full flex-1 flex-col">
       <header className="flex h-12 shrink-0 items-center justify-between border-b border-border bg-sidebar px-4">
-        <Link href="/" className="flex items-center gap-2 text-sm font-semibold tracking-tight text-ink">
+        <Link href="/demo" className="flex items-center gap-2 text-sm font-semibold tracking-tight text-ink">
           <Logo />
           QueryCure <span className="font-normal text-muted">· demo</span>
         </Link>
