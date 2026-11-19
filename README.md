@@ -25,7 +25,9 @@ An autonomous, multi-agent investigation tool that explains a slow query with ci
 
 <br/>
 
-<img src="docs/media/querycure-demo.gif" alt="QueryCure demo: paste a slow query, cited findings arrive, approve the exact SQL, the fix is measured in a sandbox, and a sealed report can be replayed" width="860"/>
+<video src="https://github.com/yuvrajsatyapal/QueryCure/raw/main/docs/media/querycure-demo.mp4" poster="https://github.com/yuvrajsatyapal/QueryCure/raw/main/docs/media/05-benchmark.png" controls muted playsinline width="860">
+  <img src="docs/media/querycure-demo.gif" alt="QueryCure demo: paste a slow query, cited findings arrive, approve the exact SQL, the fix is measured in a sandbox, and a sealed report can be replayed" width="860"/>
+</video>
 
 <sub>Plays inline. The numbers are from one recorded PostgreSQL 17.11 run on a synthetic 2,000,000-row table, not a promise for your workload.</sub>
 
@@ -90,7 +92,9 @@ QueryCure behaves like a small team of database performance engineers. It inspec
 A 30-second walkthrough of one recorded investigation: paste a slow query, watch cited findings arrive, approve the exact SQL, see the measured result, then open a sealed report you can replay.
 
 <div align="center">
-<img src="docs/media/querycure-demo.gif" alt="QueryCure demo: paste a slow query, cited findings arrive, approve the exact SQL, the fix is measured in a sandbox, and a sealed report can be replayed" width="860"/>
+<video src="https://github.com/yuvrajsatyapal/QueryCure/raw/main/docs/media/querycure-demo.mp4" poster="https://github.com/yuvrajsatyapal/QueryCure/raw/main/docs/media/05-benchmark.png" controls muted playsinline width="860">
+  <img src="docs/media/querycure-demo.gif" alt="QueryCure demo: paste a slow query, cited findings arrive, approve the exact SQL, the fix is measured in a sandbox, and a sealed report can be replayed" width="860"/>
+</video>
 <br/>
 <sub>Plays inline and loops. <a href="docs/media/querycure-demo.mp4">Open the full 1080p video with sound</a>.</sub>
 </div>
