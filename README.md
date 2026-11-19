@@ -21,15 +21,13 @@ An autonomous, multi-agent investigation tool that explains a slow query with ci
 
 <br/>
 
-[**Watch the 30-second demo**](docs/media/querycure-demo.mp4) · [Architecture](#system-architecture) · [Run locally](#run-locally) · [Docs](#documentation)
+[**Watch the demo with sound**](docs/media/querycure-demo.mp4) · [Architecture](#system-architecture) · [Run locally](#run-locally) · [Docs](#documentation)
 
 <br/>
 
-<a href="docs/media/querycure-demo.mp4">
-  <img src="docs/media/05-benchmark.png" alt="QueryCure demo: a sequential scan of 84.4 ms becomes an index scan of 6 microseconds, measured as the median of 30 runs each" width="860"/>
-</a>
+<img src="docs/media/querycure-demo.gif" alt="QueryCure demo: paste a slow query, cited findings arrive, approve the exact SQL, the fix is measured in a sandbox, and a sealed report can be replayed" width="860"/>
 
-<sub>Click to play the demo. The numbers are from one recorded PostgreSQL 17.11 run on a synthetic 2,000,000-row table, not a promise for your workload.</sub>
+<sub>Plays inline. The numbers are from one recorded PostgreSQL 17.11 run on a synthetic 2,000,000-row table, not a promise for your workload.</sub>
 
 </div>
 
@@ -92,7 +90,9 @@ QueryCure behaves like a small team of database performance engineers. It inspec
 A 30-second walkthrough of one recorded investigation: paste a slow query, watch cited findings arrive, approve the exact SQL, see the measured result, then open a sealed report you can replay.
 
 <div align="center">
-<a href="docs/media/querycure-demo.mp4"><b>Play the full demo video (30 s, 1080p)</b></a>
+<img src="docs/media/querycure-demo.gif" alt="QueryCure demo: paste a slow query, cited findings arrive, approve the exact SQL, the fix is measured in a sandbox, and a sealed report can be replayed" width="860"/>
+<br/>
+<sub>Plays inline and loops. <a href="docs/media/querycure-demo.mp4">Open the full 1080p video with sound</a>.</sub>
 </div>
 
 <br/>
