@@ -1,3 +1,7 @@
+
+
+https://github.com/user-attachments/assets/b2b15c1c-6e23-4552-9743-c7ca9464568e
+
 <div align="center">
 
 # QueryCure
@@ -25,7 +29,11 @@ An autonomous, multi-agent investigation tool that explains a slow query with ci
 
 <br/>
 
-<img src="docs/media/querycure-demo.gif" alt="QueryCure demo: paste a slow query, cited findings arrive, approve the exact SQL, the fix is measured in a sandbox, and a sealed report can be replayed" width="860"/>
+
+
+https://github.com/user-attachments/assets/8c922fb2-9036-4358-9abb-4b55c7fae05e
+
+
 
 <sub>Plays inline. The numbers are from one recorded PostgreSQL 17.11 run on a synthetic 2,000,000-row table, not a promise for your workload.</sub>
 
