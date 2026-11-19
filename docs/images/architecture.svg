@@ -1,0 +1,92 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1180 520" width="1180" height="520" role="img" aria-labelledby="qc-arch-title qc-arch-desc">
+  <title id="qc-arch-title">QueryCure system architecture</title>
+  <desc id="qc-arch-desc">A browser web app talks to a FastAPI API over REST and SSE. The API enqueues jobs in a PostgreSQL metadata database. A worker claims jobs, calls LLM providers with the user's own key, runs plain EXPLAIN against the user's database, and benchmarks candidates in a disposable sandbox Postgres.</desc>
+  <defs>
+    <style>
+      .t { font-family: Inter, -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; }
+      .m { font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+    </style>
+    <marker id="qc-arch-a" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M1,1 L9,5 L1,9" fill="none" stroke="#9AA0AB" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </marker>
+  </defs>
+
+  <rect x="0.5" y="0.5" width="1179" height="519" rx="12" fill="#08090A" stroke="#232529"/>
+
+  <text class="m" x="32" y="38" fill="#9AA0AB" font-size="10" letter-spacing="1.4">SYSTEM ARCHITECTURE</text>
+  <text class="t" x="32" y="64" fill="#F2F3F5" font-size="19" font-weight="600" letter-spacing="-0.3">One modular monolith, two processes</text>
+  <text class="t" x="32" y="86" fill="#9AA0AB" font-size="12">The API serves requests. The worker does the thinking and the measuring. Postgres is the queue.</text>
+
+  <!-- connectors (drawn before nodes) -->
+  <path d="M200,236 H298" fill="none" stroke="#9AA0AB" stroke-width="1.2" marker-end="url(#qc-arch-a)"/>
+  <path d="M470,236 H568" fill="none" stroke="#9AA0AB" stroke-width="1.2" marker-end="url(#qc-arch-a)"/>
+  <path d="M860,236 H762" fill="none" stroke="#9AA0AB" stroke-width="1.2" marker-end="url(#qc-arch-a)"/>
+  <path d="M960,200 V146" fill="none" stroke="#9AA0AB" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#qc-arch-a)"/>
+  <path d="M880,272 V366" fill="none" stroke="#9AA0AB" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#qc-arch-a)"/>
+  <path d="M1010,272 V366" fill="none" stroke="#9AA0AB" stroke-width="1.2" marker-end="url(#qc-arch-a)"/>
+
+  <!-- connector labels -->
+  <rect x="218" y="214" width="64" height="14" fill="#08090A"/>
+  <text class="m" x="250" y="225" text-anchor="middle" fill="#9AA0AB" font-size="8" letter-spacing="0.8">REST + SSE</text>
+  <rect x="491" y="214" width="56" height="14" fill="#08090A"/>
+  <text class="m" x="519" y="225" text-anchor="middle" fill="#9AA0AB" font-size="8" letter-spacing="0.8">ENQUEUE</text>
+  <rect x="770" y="214" width="82" height="14" fill="#08090A"/>
+  <text class="m" x="811" y="225" text-anchor="middle" fill="#9AA0AB" font-size="8" letter-spacing="0.8">CLAIM + WRITE</text>
+  <rect x="966" y="166" width="38" height="14" fill="#08090A"/>
+  <text class="m" x="985" y="177" text-anchor="middle" fill="#9AA0AB" font-size="8" letter-spacing="0.8">BYOK</text>
+  <rect x="796" y="312" width="76" height="14" fill="#08090A"/>
+  <text class="m" x="834" y="323" text-anchor="middle" fill="#9AA0AB" font-size="8" letter-spacing="0.8">EXPLAIN ONLY</text>
+  <rect x="1018" y="312" width="56" height="14" fill="#08090A"/>
+  <text class="m" x="1046" y="323" text-anchor="middle" fill="#9AA0AB" font-size="8" letter-spacing="0.8">BENCHMARK</text>
+
+  <!-- Web -->
+  <rect x="30" y="200" width="170" height="72" rx="6" fill="#111214" stroke="#34373D"/>
+  <text class="m" x="44" y="222" fill="#9AA0AB" font-size="8" letter-spacing="1.2">FRONTEND</text>
+  <text class="t" x="44" y="244" fill="#F2F3F5" font-size="13" font-weight="600">Next.js web app</text>
+  <text class="m" x="44" y="260" fill="#9AA0AB" font-size="9">TypeScript · App Router</text>
+
+  <!-- API -->
+  <rect x="300" y="200" width="170" height="72" rx="6" fill="#111214" stroke="#34373D"/>
+  <text class="m" x="314" y="222" fill="#9AA0AB" font-size="8" letter-spacing="1.2">BACKEND · API</text>
+  <text class="t" x="314" y="244" fill="#F2F3F5" font-size="13" font-weight="600">FastAPI service</text>
+  <text class="m" x="314" y="260" fill="#9AA0AB" font-size="9">auth · REST · SSE</text>
+
+  <!-- Metadata DB -->
+  <rect x="570" y="200" width="190" height="72" rx="6" fill="#111214" stroke="#34373D"/>
+  <text class="m" x="584" y="222" fill="#9AA0AB" font-size="8" letter-spacing="1.2">METADATA DB</text>
+  <text class="t" x="584" y="244" fill="#F2F3F5" font-size="13" font-weight="600">PostgreSQL</text>
+  <text class="m" x="584" y="260" fill="#9AA0AB" font-size="9">queue · events · reports</text>
+
+  <!-- Worker (focal) -->
+  <rect x="860" y="200" width="200" height="72" rx="6" fill="rgba(60,195,180,0.12)" stroke="#3CC3B4" stroke-width="1.4"/>
+  <text class="m" x="874" y="222" fill="#3CC3B4" font-size="8" letter-spacing="1.2">BACKEND · WORKER</text>
+  <text class="t" x="874" y="244" fill="#F2F3F5" font-size="13" font-weight="600">Agent worker</text>
+  <text class="m" x="874" y="260" fill="#9AA0AB" font-size="9">LangGraph · bench engine</text>
+
+  <!-- LLM -->
+  <rect x="860" y="72" width="200" height="72" rx="6" fill="#0D0E10" stroke="#34373D" stroke-dasharray="4,3"/>
+  <text class="m" x="874" y="94" fill="#9AA0AB" font-size="8" letter-spacing="1.2">EXTERNAL</text>
+  <text class="t" x="874" y="116" fill="#F2F3F5" font-size="13" font-weight="600">LLM providers</text>
+  <text class="m" x="874" y="132" fill="#9AA0AB" font-size="9">BYOK · free models only</text>
+
+  <!-- Target DB -->
+  <rect x="700" y="368" width="190" height="72" rx="6" fill="#0D0E10" stroke="#34373D" stroke-dasharray="4,3"/>
+  <text class="m" x="714" y="390" fill="#9AA0AB" font-size="8" letter-spacing="1.2">EXTERNAL · MODE B</text>
+  <text class="t" x="714" y="412" fill="#F2F3F5" font-size="13" font-weight="600">Your database</text>
+  <text class="m" x="714" y="428" fill="#9AA0AB" font-size="9">plain EXPLAIN · read-only</text>
+
+  <!-- Sandbox -->
+  <rect x="940" y="368" width="170" height="72" rx="6" fill="#111214" stroke="#34373D"/>
+  <text class="m" x="954" y="390" fill="#9AA0AB" font-size="8" letter-spacing="1.2">MODE C</text>
+  <text class="t" x="954" y="412" fill="#F2F3F5" font-size="13" font-weight="600">Sandbox Postgres</text>
+  <text class="m" x="954" y="428" fill="#9AA0AB" font-size="9">disposable clone</text>
+
+  <!-- legend -->
+  <line x1="32" y1="462" x2="1148" y2="462" stroke="#232529"/>
+  <rect x="32" y="478" width="16" height="10" rx="2" fill="#111214" stroke="#34373D"/>
+  <text class="m" x="56" y="487" fill="#9AA0AB" font-size="9">Internal component</text>
+  <rect x="204" y="478" width="16" height="10" rx="2" fill="#0D0E10" stroke="#34373D" stroke-dasharray="3,2"/>
+  <text class="m" x="228" y="487" fill="#9AA0AB" font-size="9">External system or optional path</text>
+  <rect x="440" y="478" width="16" height="10" rx="2" fill="rgba(60,195,180,0.12)" stroke="#3CC3B4"/>
+  <text class="m" x="464" y="487" fill="#9AA0AB" font-size="9">Where investigations run</text>
+</svg>

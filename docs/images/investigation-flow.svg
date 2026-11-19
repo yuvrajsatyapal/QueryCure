@@ -1,0 +1,108 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 780 1040" width="780" height="1040" role="img" aria-labelledby="qc-flow-title qc-flow-desc">
+  <title id="qc-flow-title">How a QueryCure investigation flows</title>
+  <desc id="qc-flow-desc">Inputs go to specialist agents, then a deterministic materiality gate. If optimizing is worthwhile the user approves the exact SQL, a sandbox experiment measures baseline against candidate, fixed rules decide the verdict, and a sealed replayable report is written. Declining ends in an unverified recommendation; a failed materiality gate ends in no action needed.</desc>
+  <defs>
+    <style>
+      .t { font-family: Inter, -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; }
+      .m { font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+    </style>
+    <marker id="qc-flow-a" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M1,1 L9,5 L1,9" fill="none" stroke="#9AA0AB" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </marker>
+  </defs>
+
+  <rect x="0.5" y="0.5" width="779" height="1039" rx="12" fill="#08090A" stroke="#232529"/>
+
+  <text class="m" x="32" y="38" fill="#9AA0AB" font-size="10" letter-spacing="1.4">INVESTIGATION FLOW</text>
+  <text class="t" x="32" y="64" fill="#F2F3F5" font-size="19" font-weight="600" letter-spacing="-0.3">From a slow query to a sealed report</text>
+  <text class="t" x="32" y="86" fill="#9AA0AB" font-size="12">Two checkpoints can stop a run early: the materiality gate and your approval.</text>
+
+  <!-- connectors -->
+  <path d="M200,188 V238" fill="none" stroke="#9AA0AB" stroke-width="1.2" marker-end="url(#qc-flow-a)"/>
+  <path d="M200,312 V362" fill="none" stroke="#9AA0AB" stroke-width="1.2" marker-end="url(#qc-flow-a)"/>
+  <path d="M200,456 V506" fill="none" stroke="#9AA0AB" stroke-width="1.2" marker-end="url(#qc-flow-a)"/>
+  <path d="M200,580 V630" fill="none" stroke="#9AA0AB" stroke-width="1.2" marker-end="url(#qc-flow-a)"/>
+  <path d="M200,704 V754" fill="none" stroke="#9AA0AB" stroke-width="1.2" marker-end="url(#qc-flow-a)"/>
+  <path d="M200,828 V878" fill="none" stroke="#9AA0AB" stroke-width="1.2" marker-end="url(#qc-flow-a)"/>
+  <path d="M350,410 H498" fill="none" stroke="#9AA0AB" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#qc-flow-a)"/>
+  <path d="M350,544 H498" fill="none" stroke="#9AA0AB" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#qc-flow-a)"/>
+
+  <!-- connector labels -->
+  <rect x="208" y="330" width="94" height="14" fill="#08090A"/>
+  <text class="m" x="212" y="341" fill="#9AA0AB" font-size="8" letter-spacing="0.8">CITED FINDINGS</text>
+  <rect x="208" y="474" width="28" height="14" fill="#08090A"/>
+  <text class="m" x="212" y="485" fill="#9AA0AB" font-size="8" letter-spacing="0.8">YES</text>
+  <rect x="208" y="598" width="58" height="14" fill="#08090A"/>
+  <text class="m" x="212" y="609" fill="#9AA0AB" font-size="8" letter-spacing="0.8">APPROVED</text>
+  <rect x="208" y="722" width="68" height="14" fill="#08090A"/>
+  <text class="m" x="212" y="733" fill="#9AA0AB" font-size="8" letter-spacing="0.8">INTERLEAVED</text>
+  <rect x="208" y="846" width="74" height="14" fill="#08090A"/>
+  <text class="m" x="212" y="857" fill="#9AA0AB" font-size="8" letter-spacing="0.8">ANY OUTCOME</text>
+  <rect x="412" y="388" width="26" height="14" fill="#08090A"/>
+  <text class="m" x="425" y="399" text-anchor="middle" fill="#9AA0AB" font-size="8" letter-spacing="0.8">NO</text>
+  <rect x="390" y="522" width="70" height="14" fill="#08090A"/>
+  <text class="m" x="425" y="533" text-anchor="middle" fill="#9AA0AB" font-size="8" letter-spacing="0.8">DECLINED</text>
+
+  <!-- 01 Inputs -->
+  <rect x="50" y="116" width="300" height="72" rx="6" fill="#111214" stroke="#34373D"/>
+  <text class="m" x="66" y="138" fill="#9AA0AB" font-size="8" letter-spacing="1.2">01 · INPUTS</text>
+  <text class="t" x="66" y="160" fill="#F2F3F5" font-size="13" font-weight="600">Your SQL, its plan and the schema</text>
+  <text class="m" x="66" y="176" fill="#9AA0AB" font-size="9">EXPLAIN JSON · offline or live</text>
+
+  <!-- 02 Agents -->
+  <rect x="50" y="240" width="300" height="72" rx="6" fill="#111214" stroke="#34373D"/>
+  <text class="m" x="66" y="262" fill="#9AA0AB" font-size="8" letter-spacing="1.2">02 · INVESTIGATE</text>
+  <text class="t" x="66" y="284" fill="#F2F3F5" font-size="13" font-weight="600">Specialist agents</text>
+  <text class="m" x="66" y="300" fill="#9AA0AB" font-size="9">Query Analyzer · Index Strategist · Workload</text>
+
+  <!-- 03 Gate -->
+  <path d="M50,410 L200,364 L350,410 L200,456 Z" fill="#111214" stroke="#34373D"/>
+  <text class="m" x="200" y="394" text-anchor="middle" fill="#9AA0AB" font-size="8" letter-spacing="1.2">03 · MATERIALITY</text>
+  <text class="t" x="200" y="415" text-anchor="middle" fill="#F2F3F5" font-size="13" font-weight="600">Worth optimizing?</text>
+  <text class="m" x="200" y="433" text-anchor="middle" fill="#9AA0AB" font-size="9">deterministic gate</text>
+
+  <!-- outcome: no action -->
+  <rect x="500" y="374" width="240" height="72" rx="6" fill="#0D0E10" stroke="#34373D" stroke-dasharray="4,3"/>
+  <text class="m" x="516" y="396" fill="#9AA0AB" font-size="8" letter-spacing="1.2">OUTCOME</text>
+  <text class="t" x="516" y="418" fill="#F2F3F5" font-size="13" font-weight="600">No action needed</text>
+  <text class="m" x="516" y="434" fill="#9AA0AB" font-size="9">recorded, nothing to build</text>
+
+  <!-- 04 Approve (focal) -->
+  <rect x="50" y="508" width="300" height="72" rx="6" fill="rgba(60,195,180,0.12)" stroke="#3CC3B4" stroke-width="1.4"/>
+  <text class="m" x="66" y="530" fill="#3CC3B4" font-size="8" letter-spacing="1.2">04 · APPROVE</text>
+  <text class="t" x="66" y="552" fill="#F2F3F5" font-size="13" font-weight="600">You review the exact SQL</text>
+  <text class="m" x="66" y="568" fill="#9AA0AB" font-size="9">nothing runs without your OK</text>
+
+  <!-- outcome: unverified -->
+  <rect x="500" y="508" width="240" height="72" rx="6" fill="#0D0E10" stroke="#34373D" stroke-dasharray="4,3"/>
+  <text class="m" x="516" y="530" fill="#9AA0AB" font-size="8" letter-spacing="1.2">OUTCOME</text>
+  <text class="t" x="516" y="552" fill="#F2F3F5" font-size="13" font-weight="600">Unverified recommendation</text>
+  <text class="m" x="516" y="568" fill="#9AA0AB" font-size="9">advice only, nothing measured</text>
+
+  <!-- 05 Experiment -->
+  <rect x="50" y="632" width="300" height="72" rx="6" fill="#111214" stroke="#34373D"/>
+  <text class="m" x="66" y="654" fill="#9AA0AB" font-size="8" letter-spacing="1.2">05 · EXPERIMENT</text>
+  <text class="t" x="66" y="676" fill="#F2F3F5" font-size="13" font-weight="600">Measured in a throwaway sandbox</text>
+  <text class="m" x="66" y="692" fill="#9AA0AB" font-size="9">baseline vs candidate · same params</text>
+
+  <!-- 06 Verify (focal) -->
+  <rect x="50" y="756" width="300" height="72" rx="6" fill="rgba(60,195,180,0.12)" stroke="#3CC3B4" stroke-width="1.4"/>
+  <text class="m" x="66" y="778" fill="#3CC3B4" font-size="8" letter-spacing="1.2">06 · VERIFY</text>
+  <text class="t" x="66" y="800" fill="#F2F3F5" font-size="13" font-weight="600">Fixed rules decide, not the AI</text>
+  <text class="m" x="66" y="816" fill="#9AA0AB" font-size="9">auditor model may only downgrade</text>
+
+  <!-- 07 Report -->
+  <rect x="50" y="880" width="300" height="72" rx="6" fill="#111214" stroke="#34373D"/>
+  <text class="m" x="66" y="902" fill="#9AA0AB" font-size="8" letter-spacing="1.2">07 · REPORT</text>
+  <text class="t" x="66" y="924" fill="#F2F3F5" font-size="13" font-weight="600">Sealed, explained, replayable</text>
+  <text class="m" x="66" y="940" fill="#9AA0AB" font-size="9">digests stored · replay re-checks</text>
+
+  <!-- legend -->
+  <line x1="32" y1="984" x2="748" y2="984" stroke="#232529"/>
+  <rect x="32" y="1002" width="16" height="10" rx="2" fill="#111214" stroke="#34373D"/>
+  <text class="m" x="56" y="1011" fill="#9AA0AB" font-size="9">Step</text>
+  <rect x="116" y="1002" width="16" height="10" rx="2" fill="#0D0E10" stroke="#34373D" stroke-dasharray="3,2"/>
+  <text class="m" x="140" y="1011" fill="#9AA0AB" font-size="9">Early exit</text>
+  <rect x="236" y="1002" width="16" height="10" rx="2" fill="rgba(60,195,180,0.12)" stroke="#3CC3B4"/>
+  <text class="m" x="260" y="1011" fill="#9AA0AB" font-size="9">Control point: human approval, deterministic verdict</text>
+</svg>

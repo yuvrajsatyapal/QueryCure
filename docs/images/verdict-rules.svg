@@ -1,0 +1,92 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 780 900" width="780" height="900" role="img" aria-labelledby="qc-verdict-title qc-verdict-desc">
+  <title id="qc-verdict-title">How QueryCure decides a verdict</title>
+  <desc id="qc-verdict-desc">Seven deterministic gates evaluated in order. The first failing gate sets the verdict as rejected or inconclusive with a reason code. If every gate passes the candidate is verified within the tested scope, and the Benchmark Auditor model may then only downgrade it to inconclusive.</desc>
+  <defs>
+    <style>
+      .t { font-family: Inter, -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; }
+      .m { font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+    </style>
+    <marker id="qc-verdict-a" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M1,1 L9,5 L1,9" fill="none" stroke="#9AA0AB" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </marker>
+  </defs>
+  <rect x="0.5" y="0.5" width="779" height="899" rx="12" fill="#08090A" stroke="#232529"/>
+  <text class="m" x="32" y="38" fill="#9AA0AB" font-size="10" letter-spacing="1.4">VERDICT RULES</text>
+  <text class="t" x="32" y="64" fill="#F2F3F5" font-size="19" font-weight="600" letter-spacing="-0.3">Rules decide. Models advise.</text>
+  <text class="t" x="32" y="86" fill="#9AA0AB" font-size="12">Gates run in order. The first one that fails sets the verdict and a reason code.</text>
+
+  <path d="M270,172 V194" fill="none" stroke="#9AA0AB" stroke-width="1.2" marker-end="url(#qc-verdict-a)"/>
+  <path d="M270,252 V274" fill="none" stroke="#9AA0AB" stroke-width="1.2" marker-end="url(#qc-verdict-a)"/>
+  <path d="M270,332 V354" fill="none" stroke="#9AA0AB" stroke-width="1.2" marker-end="url(#qc-verdict-a)"/>
+  <path d="M270,412 V434" fill="none" stroke="#9AA0AB" stroke-width="1.2" marker-end="url(#qc-verdict-a)"/>
+  <path d="M270,492 V514" fill="none" stroke="#9AA0AB" stroke-width="1.2" marker-end="url(#qc-verdict-a)"/>
+  <path d="M270,572 V594" fill="none" stroke="#9AA0AB" stroke-width="1.2" marker-end="url(#qc-verdict-a)"/>
+  <path d="M270,652 V674" fill="none" stroke="#9AA0AB" stroke-width="1.2" marker-end="url(#qc-verdict-a)"/>
+  <path d="M270,732 V754" fill="none" stroke="#9AA0AB" stroke-width="1.2" marker-end="url(#qc-verdict-a)"/>
+  <path d="M490,144 H568" fill="none" stroke="#9AA0AB" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#qc-verdict-a)"/>
+  <path d="M490,224 H568" fill="none" stroke="#9AA0AB" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#qc-verdict-a)"/>
+  <path d="M490,304 H568" fill="none" stroke="#9AA0AB" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#qc-verdict-a)"/>
+  <path d="M490,384 H568" fill="none" stroke="#9AA0AB" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#qc-verdict-a)"/>
+  <path d="M490,464 H568" fill="none" stroke="#9AA0AB" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#qc-verdict-a)"/>
+  <path d="M490,544 H568" fill="none" stroke="#9AA0AB" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#qc-verdict-a)"/>
+  <path d="M490,624 H568" fill="none" stroke="#9AA0AB" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#qc-verdict-a)"/>
+  <path d="M490,784 H568" fill="none" stroke="#9AA0AB" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#qc-verdict-a)"/>
+  <rect x="50" y="116" width="440" height="56" rx="6" fill="#111214" stroke="#34373D"/>
+  <text class="m" x="66" y="137" fill="#9AA0AB" font-size="8" letter-spacing="1.2">GATE 1 · BUILD</text>
+  <text class="t" x="66" y="157" fill="#F2F3F5" font-size="13" font-weight="600">DDL applies and the size and build-time limits hold</text>
+  <rect x="570" y="122" width="170" height="44" rx="6" fill="rgba(242,131,122,0.08)" stroke="#F2837A" stroke-opacity="0.6"/>
+  <text class="m" x="584" y="141" fill="#F2837A" font-size="9" font-weight="600" letter-spacing="1">REJECTED</text>
+  <text class="m" x="584" y="156" fill="#9AA0AB" font-size="8.5">ddl_failed</text>
+  <rect x="50" y="196" width="440" height="56" rx="6" fill="#111214" stroke="#34373D"/>
+  <text class="m" x="66" y="217" fill="#9AA0AB" font-size="8" letter-spacing="1.2">GATE 2 · STABLE</text>
+  <text class="t" x="66" y="237" fill="#F2F3F5" font-size="13" font-weight="600">Errors and timeouts stay under 10% of samples</text>
+  <rect x="570" y="202" width="170" height="44" rx="6" fill="rgba(224,168,74,0.08)" stroke="#E0A84A" stroke-opacity="0.6"/>
+  <text class="m" x="584" y="221" fill="#E0A84A" font-size="9" font-weight="600" letter-spacing="1">INCONCLUSIVE</text>
+  <text class="m" x="584" y="236" fill="#9AA0AB" font-size="8.5">unstable_execution</text>
+  <rect x="50" y="276" width="440" height="56" rx="6" fill="#111214" stroke="#34373D"/>
+  <text class="m" x="66" y="297" fill="#9AA0AB" font-size="8" letter-spacing="1.2">GATE 3 · CORRECT</text>
+  <text class="t" x="66" y="317" fill="#F2F3F5" font-size="13" font-weight="600">Every parameter set returns the baseline's rows</text>
+  <rect x="570" y="282" width="170" height="44" rx="6" fill="rgba(242,131,122,0.08)" stroke="#F2837A" stroke-opacity="0.6"/>
+  <text class="m" x="584" y="301" fill="#F2837A" font-size="9" font-weight="600" letter-spacing="1">REJECTED</text>
+  <text class="m" x="584" y="316" fill="#9AA0AB" font-size="8.5">result_mismatch</text>
+  <rect x="50" y="356" width="440" height="56" rx="6" fill="#111214" stroke="#34373D"/>
+  <text class="m" x="66" y="377" fill="#9AA0AB" font-size="8" letter-spacing="1.2">GATE 4 · SAMPLES</text>
+  <text class="t" x="66" y="397" fill="#F2F3F5" font-size="13" font-weight="600">At least 10 measured runs on both arms</text>
+  <rect x="570" y="362" width="170" height="44" rx="6" fill="rgba(224,168,74,0.08)" stroke="#E0A84A" stroke-opacity="0.6"/>
+  <text class="m" x="584" y="381" fill="#E0A84A" font-size="9" font-weight="600" letter-spacing="1">INCONCLUSIVE</text>
+  <text class="m" x="584" y="396" fill="#9AA0AB" font-size="8.5">insufficient_evidence</text>
+  <rect x="50" y="436" width="440" height="56" rx="6" fill="#111214" stroke="#34373D"/>
+  <text class="m" x="66" y="457" fill="#9AA0AB" font-size="8" letter-spacing="1.2">GATE 5 · NO REGRESSION</text>
+  <text class="t" x="66" y="477" fill="#F2F3F5" font-size="13" font-weight="600">No parameter set is credibly slower</text>
+  <rect x="570" y="442" width="170" height="44" rx="6" fill="rgba(242,131,122,0.08)" stroke="#F2837A" stroke-opacity="0.6"/>
+  <text class="m" x="584" y="461" fill="#F2837A" font-size="9" font-weight="600" letter-spacing="1">REJECTED</text>
+  <text class="m" x="584" y="476" fill="#9AA0AB" font-size="8.5">regression</text>
+  <rect x="50" y="516" width="440" height="56" rx="6" fill="#111214" stroke="#34373D"/>
+  <text class="m" x="66" y="537" fill="#9AA0AB" font-size="8" letter-spacing="1.2">GATE 6 · QUALITY</text>
+  <text class="t" x="66" y="557" fill="#F2F3F5" font-size="13" font-weight="600">Run-to-run spread stays within the noise limit</text>
+  <rect x="570" y="522" width="170" height="44" rx="6" fill="rgba(224,168,74,0.08)" stroke="#E0A84A" stroke-opacity="0.6"/>
+  <text class="m" x="584" y="541" fill="#E0A84A" font-size="9" font-weight="600" letter-spacing="1">INCONCLUSIVE</text>
+  <text class="m" x="584" y="556" fill="#9AA0AB" font-size="8.5">insufficient_evidence</text>
+  <rect x="50" y="596" width="440" height="56" rx="6" fill="#111214" stroke="#34373D"/>
+  <text class="m" x="66" y="617" fill="#9AA0AB" font-size="8" letter-spacing="1.2">GATE 7 · EFFECT</text>
+  <text class="t" x="66" y="637" fill="#F2F3F5" font-size="13" font-weight="600">Speed-up confidence interval clears 1.10×</text>
+  <rect x="570" y="602" width="170" height="44" rx="6" fill="rgba(224,168,74,0.08)" stroke="#E0A84A" stroke-opacity="0.6"/>
+  <text class="m" x="584" y="621" fill="#E0A84A" font-size="9" font-weight="600" letter-spacing="1">INCONCLUSIVE</text>
+  <text class="m" x="584" y="636" fill="#9AA0AB" font-size="8.5">effect_not_significant</text>
+  <rect x="50" y="676" width="440" height="56" rx="6" fill="rgba(60,195,180,0.12)" stroke="#3CC3B4" stroke-width="1.4"/>
+  <text class="m" x="66" y="697" fill="#3CC3B4" font-size="8" letter-spacing="1.2">ALL GATES PASS</text>
+  <text class="t" x="66" y="717" fill="#F2F3F5" font-size="13" font-weight="600">Verified, within the tested scope</text>
+  <rect x="50" y="756" width="440" height="56" rx="6" fill="#111214" stroke="#34373D" stroke-dasharray="4,3"/>
+  <text class="m" x="66" y="777" fill="#9AA0AB" font-size="8" letter-spacing="1.2">BENCHMARK AUDITOR · MODEL</text>
+  <text class="t" x="66" y="797" fill="#F2F3F5" font-size="13" font-weight="600">Reviews the verdict, can only downgrade it</text>
+  <rect x="570" y="762" width="170" height="44" rx="6" fill="rgba(224,168,74,0.08)" stroke="#E0A84A" stroke-opacity="0.6"/>
+  <text class="m" x="584" y="781" fill="#E0A84A" font-size="9" font-weight="600" letter-spacing="1">INCONCLUSIVE</text>
+  <text class="m" x="584" y="796" fill="#9AA0AB" font-size="8.5">never upgraded to verified</text>
+  <line x1="32" y1="848" x2="748" y2="848" stroke="#232529"/>
+  <rect x="32" y="866" width="16" height="10" rx="2" fill="#111214" stroke="#34373D"/>
+  <text class="m" x="56" y="875" fill="#9AA0AB" font-size="9">Pass continues down</text>
+  <line x1="222" y1="871" x2="246" y2="871" stroke="#9AA0AB" stroke-dasharray="4,3"/>
+  <text class="m" x="254" y="875" fill="#9AA0AB" font-size="9">Fail exits right with a reason code</text>
+  <rect x="520" y="866" width="16" height="10" rx="2" fill="rgba(60,195,180,0.12)" stroke="#3CC3B4"/>
+  <text class="m" x="544" y="875" fill="#9AA0AB" font-size="9">The only way to a verified result</text>
+</svg>
